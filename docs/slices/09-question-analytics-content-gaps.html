@@ -143,21 +143,21 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Capture</div><h2>Log enough to see patterns.</h2>
 <ul>
-<li>Question text or normalized representation.</li>
-<li>Specialist ID, user type, timestamp, timezone, and conversation reference.</li>
-<li>Anonymous identity, account identity, and analytics identity where available.</li>
-<li>Answer outcome: answered, insufficient context, quota denied, or error.</li>
+<li>Raw question text with a defensive length limit.</li>
+<li>Normalized text and fingerprint for deterministic grouping.</li>
+<li>Specialist ID, timestamp, timezone, visitor identity, optional user/conversation reference.</li>
+<li>Only visible outcomes: answered or insufficient context.</li>
 </ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Visitor metric</div><h2>MVP success uses combined distinct-visitor signals.</h2>
-<p class="lead">The target is 50 distinct monthly visitors, measured through a combination of cookies, registered accounts, and analytics signals rather than one brittle identifier.</p>
+<p class="lead">The target is 50 distinct monthly visitors, measured with a first-party visitor cookie and authenticated user IDs. Count user ID first; otherwise count the visitor cookie.</p>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Aggregation</div><h2>Repeated questions become gap candidates.</h2>
 <ul>
 <li>Group by specialist first.</li>
-<li>Use normalized text or similarity fingerprints to cluster repeated questions.</li>
-<li>Thresholds should be configurable rather than hard-coded.</li>
-<li>Admins review candidates before any wiki content is added.</li>
+<li>Group by specialist and normalized question fingerprint.</li>
+<li>MVP threshold: at least 2 occurrences in the last 30 days.</li>
+<li>Highlight insufficient-context repeats as stronger wiki-gap signals.</li>
 </ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Dashboard</div><h2>The admin view should answer editorial questions.</h2>
@@ -168,22 +168,41 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <div class="card"><strong>What should be curated?</strong><span>Candidate topics for new wiki pages or sources.</span></div>
 </div>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Review lifecycle</div><h2>Reviewed does not mean forgotten.</h2>
+<ul>
+<li>Admins can mark a candidate as reviewed.</li>
+<li>Reviewed candidates are hidden from the current list.</li>
+<li>If the same fingerprint crosses the threshold again after review, it resurfaces.</li>
+<li>No comments, assignments, or auto-wiki creation in this slice.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Privacy</div><h2>Conversation deletion removes readable analytics.</h2>
+<ul>
+<li>Deleting a conversation removes or anonymizes linked raw question logs.</li>
+<li>Successful question edits keep the old analytics event.</li>
+<li>Aggregate anonymous counters may remain after deletion.</li>
+<li>Analytics stores no answer text, document contents, OTPs, prompts, or secrets.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Boundary</div><h2>Analytics is not answer grounding.</h2>
 <p class="lead">Question logs can suggest new content work, but user answers still require wiki/source citations.</p>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Event logging plus admin read models.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Endpoint contracts</div><h2>Event logging plus admin read models.</h2>
 <pre>server/utils/analytics/questions.ts
+server/utils/analytics/visitors.ts
+server/api/analytics/visit.post.ts
 server/api/admin/analytics/questions.get.ts
+server/api/admin/analytics/questions/[fingerprint]/review.post.ts
 server/api/admin/analytics/visitors.get.ts
-pages/admin/analytics.vue
-server/database/migrations/*analytics*.sql</pre>
+pages/admin/index.vue
+server/utils/db.ts</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
 <ul>
-<li>Every sent question is recorded under the selected specialist unless blocked before submission.</li>
+<li>Only answered and insufficient-context visible outcomes are recorded.</li>
 <li>Admins can see repeated-question candidates per specialist.</li>
-<li>Insufficient-context questions are separately visible as wiki-gap signals.</li>
-<li>Distinct monthly visitors can be estimated from combined anonymous, account, and analytics signals.</li>
+<li>Reviewed candidates hide until renewed recurrence after review.</li>
+<li>Distinct monthly visitors are counted from first-party visitor/user identities.</li>
 <li>No answer uses analytics data as a citation or factual source.</li>
 </ul>
 </div></section>

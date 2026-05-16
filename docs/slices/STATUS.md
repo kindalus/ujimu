@@ -45,10 +45,58 @@ Known non-blocking warnings:
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
-| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
+| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `grilled` | — | Scope and implementation decisions locked for question analytics, content gaps, review lifecycle, and visitor counts. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Active slice details
+
+### Slice 09 — Question analytics & content gaps
+
+Status: `grilled`
+
+Idea-refined direction:
+
+- Treat user questions as editorial signals per specialist, not as answer-grounding evidence.
+- Record only questions that produced a visible answer outcome: `answered` or `insufficient_context`.
+- Store the raw question text, with a length limit and sensitive-data treatment, so admins can understand real user wording.
+- Also store a normalized question and fingerprint for deterministic grouping.
+- Keep analytics separate from citations and the wiki; analytics must never become a factual source for assistant answers.
+- Surface repeated question candidates in the existing single `/admin` console.
+- Add a minimal distinct monthly visitor metric using Ujimu-owned identifiers instead of external analytics.
+
+Locked grill decisions:
+
+- Do not log quota denials, technical failures, malformed requests, or requests without a valid specialist/question in question analytics.
+- A visible grounded answer is recorded as `answered`; the safe no-evidence fallback is recorded as `insufficient_context`.
+- When a user deletes a conversation, remove or anonymize readable analytics linked to that conversation. Aggregate counters may remain.
+- When a user edits a historical question successfully, keep the old analytics event and record the new edited question if it produces a visible outcome.
+- Define repeated questions by `specialist_id + normalized_question` for the MVP; normalization lowercases, trims, removes simple punctuation, and collapses whitespace.
+- A content-gap candidate appears when the same normalized question appears at least 2 times in the last 30 days.
+- Insufficient-context candidates should be highlighted separately from answered repeats.
+- A reviewed candidate stores `reviewed_at` and is hidden until the same fingerprint crosses the threshold again after review.
+- Distinct monthly visitors use a first-party `ujimu_visitor_id` cookie. Count `user_id` when authenticated; otherwise count visitor cookie identity.
+- Do not integrate Google Analytics or other third-party analytics in this slice.
+- Admin REST contracts are: `POST /api/analytics/visit`, `GET /api/admin/analytics/visitors?month=YYYY-MM`, `GET /api/admin/analytics/questions?specialistId=...`, and `POST /api/admin/analytics/questions/:fingerprint/review`.
+
+Acceptance-test targets:
+
+- Chat analytics logs only `answered` and `insufficient_context` visible outcomes, never quota denials or stream failures.
+- Logged records include specialist, outcome, raw question, normalized question, fingerprint, timestamp, visitor identity, optional user/conversation/message references, and no answer content.
+- Deleting a conversation removes readable question analytics linked to that conversation.
+- Editing a question keeps older analytics and records the edited question only after a visible answer.
+- Admin question analytics lists repeated candidates by specialist, hides reviewed candidates, and resurfaces them after post-review recurrence.
+- Visit analytics creates/reuses a first-party visitor cookie and exposes distinct monthly visitor counts to admins.
+- The `/admin` page contains visitor metric and content-gap sections wired to the admin analytics endpoints.
+
+Out of scope for this slice:
+
+- Semantic/embedding-based question clustering.
+- Automatic wiki page creation or source ingestion from analytics.
+- Third-party analytics integrations.
+- Admin comments, assignments, or editorial workflow beyond reviewed/unreviewed.
+- Using analytics as citations or answer context.
 
 ## Completed slice details
 
