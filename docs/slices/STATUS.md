@@ -165,6 +165,14 @@ Next step:
 
 Status: `verified`
 
+As-built documentation correction, idea-refined direction (2026-05-16):
+
+- Problem: the slice deck still describes parts of the original hardening idea more broadly than the implemented and grilled Slice 11 record, especially around observability sinks and likely implementation files.
+- Recommended direction: correct the deck as an as-built specification note, keeping Slice 11's implemented scope intact while making `STATUS.md`, the deck, and the operations runbook tell the same story.
+- MVP correction scope: update factual contradictions, make daily JSONL operational logs explicit, document safe readiness and CI/runbook boundaries, and list future hardening candidates without promising new behaviour in Slice 11.
+- Key assumptions: `STATUS.md` is the canonical source for Slice 11 as-built decisions; the current implementation remains verified; future hardening belongs in later slices rather than retroactively expanding Slice 11.
+- Not doing: no code changes, no new security controls, no new acceptance tests, and no external observability integrations as part of this correction.
+
 Idea-refined direction:
 
 - Implement a practical hardening MVP rather than integrating external observability vendors in this slice.
