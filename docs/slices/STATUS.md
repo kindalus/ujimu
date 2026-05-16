@@ -42,7 +42,7 @@ Known non-blocking warnings:
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
-| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `idea-refined` | — | Direction refined: OTP by email or mobile phone creates sessions and registered quota subjects; delivery provider stays abstract/fakeable. |
+| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `grilled` | — | OTP implementation decisions locked; context compacted before acceptance tests. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 06 — Authentication with OTP
 
-Status: `idea-refined`
+Status: `grilled`
 
 Idea-refined direction:
 
@@ -64,6 +64,41 @@ Idea-refined direction:
 - Keep notification delivery behind a provider interface; use a fake provider in tests.
 - Add a minimal OTP request/verify/logout UI on the main page.
 - Store normalized email or phone identifiers and hashed OTP secrets; never store OTP codes in clear text.
+
+Locked grill decisions so far:
+
+- Data model uses `users` plus `user_identities` for verified email and phone identities.
+- Linking UI is out of scope, but verifying a new identity while signed in links it to the current account.
+- OTP codes are numeric 6-digit codes.
+- OTP expires after 10 minutes and allows at most 5 verification attempts.
+- Store only `sha256(pepper + code)`; `UJIMU_OTP_PEPPER` is used when available.
+- Notification delivery uses a provider interface; fake delivery is enabled by `UJIMU_AUTH_FAKE_DELIVERY_ENABLED=true` outside production and tests inject providers directly.
+- Session uses a signed JWT in an httpOnly `ujimu_session` cookie.
+- JWT payload includes `sub`, `iat`, `exp`, and `typ: "session"`.
+- JWT session expiry is 90 days.
+- If `UJIMU_SESSION_SECRET` is missing, generate a random singleton process secret; sessions will not survive restart.
+- If `UJIMU_OTP_PEPPER` is missing, generate a random singleton process pepper; pending OTPs will not survive restart.
+- Logout clears the cookie; no server-side JWT revocation in this slice.
+- `resolveQuotaSubject(event)` validates `ujimu_session` first and falls back to anonymous cookie identity.
+- Email normalization: trim + lowercase.
+- Phone normalization: remove spaces and require international E.164 format.
+- Invalid contact input returns HTTP 400 and does not call the provider.
+- Valid OTP request responses are generic to avoid account enumeration.
+- Only one OTP is active per contact; a new request invalidates the previous OTP and creates a new code.
+- Provider delivery failure returns HTTP 503 with a generic message and does not leave an active OTP.
+- Wrong, expired, over-attempted, and reused OTP verification failures use the same generic error message.
+- `GET /api/auth/session` returns only authenticated status, user id, and display contact.
+- Successful verification keeps the OTP record with `used_at` filled for audit and reuse prevention.
+- UI uses a compact main-page auth panel with Entrar, Email/Telemóvel, contact input, code input, signed-in identity, and Sair.
+- Endpoints: `POST /api/auth/otp/request`, `POST /api/auth/otp/verify`, `GET /api/auth/session`, and `POST /api/auth/logout`.
+
+Context compaction before implementation:
+
+- Implement server-side OTP authentication with a minimal main-page UI.
+- Data model: `users`, `user_identities`, `otp_challenges`; no server-side session table because sessions are JWT cookies.
+- Security invariants: no plaintext OTP storage, generic valid-contact request response, generic verification failure response, provider abstraction, no fake delivery in production.
+- Quota integration: update `resolveQuotaSubject(event)` to prefer valid `ujimu_session` and otherwise fall back to anonymous.
+- Acceptance tests should cover email OTP, phone OTP, expired/reused/over-attempted OTP failures, provider abstraction/fake delivery, session endpoint/logout, and registered quota subject resolution.
 
 Out of scope for this slice:
 

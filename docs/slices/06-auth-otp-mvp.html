@@ -166,6 +166,37 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <li>The quota seam from Slice 05 can switch from anonymous to registered without rewriting quota policy.</li>
 </ul>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Account and OTP model.</h2>
+<ul>
+<li>Use a users table plus user_identities table for verified email and phone identities.</li>
+<li>No linking UI now; verifying a new identity while signed in links it to the current account.</li>
+<li>OTP format is a 6-digit numeric code.</li>
+<li>OTP expires after 10 minutes and allows at most 5 verification attempts.</li>
+<li>Store only sha256(pepper + code), using UJIMU_OTP_PEPPER when available.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Delivery, sessions, and quota.</h2>
+<ul>
+<li>Use a notification provider interface; fake delivery is allowed by UJIMU_AUTH_FAKE_DELIVERY_ENABLED outside production.</li>
+<li>Sessions are JWTs in httpOnly ujimu_session cookies, signed with a process session secret.</li>
+<li>If UJIMU_SESSION_SECRET is missing, generate a random singleton secret for the process; existing sessions will not survive restart.</li>
+<li>If UJIMU_OTP_PEPPER is missing, generate a random singleton pepper for the process; pending OTPs will not survive restart.</li>
+<li>JWT session expiry is 90 days; logout clears the cookie and does not add server-side revocation in this slice.</li>
+<li>resolveQuotaSubject validates ujimu_session first and falls back to anonymous quota identity.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Input, endpoints, and UI.</h2>
+<ul>
+<li>Email is normalized with trim and lowercase; phone must be E.164 after removing spaces.</li>
+<li>Invalid contact input returns HTTP 400 and does not call the provider.</li>
+<li>Valid OTP requests always return the same success message to avoid account enumeration.</li>
+<li>Only one OTP is active per contact; requesting a new OTP invalidates the previous one.</li>
+<li>Provider delivery failure returns HTTP 503 and does not leave an active OTP.</li>
+<li>Wrong, expired, over-attempted, or reused codes return the same generic error.</li>
+<li>Successful verification marks the OTP used for audit and reuse prevention.</li>
+<li>Implement request, verify, session, and logout endpoints plus a compact main-page auth panel.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Flows</div><h2>Two login channels, one account model.</h2>
 <div class="grid-3">
 <div class="card"><strong>Email</strong><span>User enters email, receives code, verifies code, session starts.</span></div>
@@ -193,8 +224,9 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Sessions</div><h2>Sessions are server-owned.</h2>
 <ul>
 <li>Use secure, httpOnly cookies for browser sessions.</li>
-<li>Initial default: sessions expire after 30 days of inactivity unless configured otherwise.</li>
-<li>Logout invalidates the active session.</li>
+<li>Initial default: JWT sessions expire after 90 days unless configured otherwise.</li>
+<li>Logout clears the session cookie; server-side revocation is out of scope for this slice.</li>
+<li>The public session endpoint returns only authenticated status, user id, and display contact.</li>
 <li>Session identity becomes the subject for quotas and history.</li>
 </ul>
 </div></section>
