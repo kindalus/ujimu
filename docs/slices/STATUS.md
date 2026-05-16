@@ -42,7 +42,7 @@ Known non-blocking warnings:
 | 02 | [`02-specialist-registry-yaml.html`](./02-specialist-registry-yaml.html) | `verified` | 2026-05-16 | Specialist YAML schema, loader, registry, create/delete services, public listing endpoint. |
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
-| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `planned` | — | Not started. |
+| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `idea-refined` | — | Direction refined: enforce anonymous chat quotas now, keep registered/subscribed policy testable, defer auth/subscription integration. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `planned` | — | Not started. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
@@ -50,6 +50,28 @@ Known non-blocking warnings:
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Active slice details
+
+### Slice 05 — Quotas & request limits
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Protect the anonymous first-time visitor chat path first.
+- Enforce anonymous quotas in `POST /api/chat` before any stream or chat-engine call starts.
+- Use a server-issued httpOnly anonymous identity cookie as an identifier only.
+- Store quota events and decisions server-side in SQLite.
+- Keep the policy engine able to calculate anonymous, registered free, and subscribed quotas, but connect only anonymous chat enforcement in this slice.
+- Return HTTP 429 JSON for quota denials before streaming; do not create a specialist assistant turn for quota denial.
+
+Out of scope for this slice:
+
+- Authentication and real registered-user identity.
+- Subscription activation or payment state.
+- Durable conversation history.
+- Client-authoritative quota state.
 
 ## Completed slice details
 

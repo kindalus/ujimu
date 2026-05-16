@@ -140,6 +140,22 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>Every question has a cost.</h2>
 <p class="lead">A request is each question sent by the user, including a question sent after editing an earlier point in a conversation.</p>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Refined direction</div><h2>Protect anonymous chat first.</h2>
+<ul>
+<li>Integrate quota enforcement into chat for anonymous first-time visitors in this slice.</li>
+<li>Keep policy support for anonymous, registered free, and subscribed subjects testable in server code.</li>
+<li>Do not build authentication, subscription activation, or account UI here.</li>
+<li>Use an httpOnly server-issued anonymous identifier cookie; SQLite remains the authority for quota state.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Minimum success</div><h2>Block before the stream starts.</h2>
+<ul>
+<li>Anonymous users are limited to 5 requests per day or 20 requests per week.</li>
+<li>Quota checks happen before chat creates an AI stream or calls the engine.</li>
+<li>Quota denials return HTTP 429 JSON and do not create assistant turns.</li>
+<li>Registered and subscribed policy logic is covered by tests, but not connected to real auth yet.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Policy table</div><h2>Initial quota policy.</h2>
 <div class="grid-3">
 <div class="card"><strong>Anonymous</strong><span>5 requests per day or 20 requests per week, associated with a browser cookie.</span></div>
@@ -150,6 +166,7 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Authority</div><h2>Cookies identify; the server decides.</h2>
 <ul>
 <li>Client cookies are identifiers, not quota state.</li>
+<li>Anonymous cookies are server-issued, httpOnly, and contain only an opaque identifier.</li>
 <li>All counters and decisions live server-side in SQLite.</li>
 <li>Quota denial happens before Pi is invoked and before streaming starts.</li>
 <li>A failed or denied request should not consume AI resources.</li>
@@ -185,16 +202,19 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>A small policy engine isolates quota rules.</h2>
 <pre>server/utils/quota/policy.ts
 server/utils/quota/usage.ts
+server/utils/quota/identity.ts
+server/utils/quota/db.ts
 server/api/chat.post.ts
-server/middleware/anonymousIdentity.ts
 server/database/migrations/*quota*.sql</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
 <ul>
-<li>Anonymous, registered free, and subscribed users receive the correct effective quota.</li>
+<li>Anonymous chat requests are blocked after 5 per day or 20 per week.</li>
+<li>Anonymous, registered free, and subscribed subjects receive the correct effective quota in policy tests.</li>
 <li>Daily and weekly limits reset according to the user timezone.</li>
 <li>Quota checks run before the AI stream begins.</li>
-<li>Editing an earlier question and sending the replacement counts as a new request.</li>
+<li>Denied requests return HTTP 429 JSON and do not call the chat engine.</li>
+<li>Editing an earlier question and sending the replacement counts as a new request once history editing exists.</li>
 <li>Changing configured subscribed weekly limits takes effect without code changes.</li>
 </ul>
 </div></section>
