@@ -42,6 +42,43 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_request_events_subject_time
         ON request_events (subject_type, subject_id, occurred_at_utc);
     `
+  },
+  {
+    version: '0003_auth_otp',
+    sql: `
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS user_identities (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL CHECK (channel IN ('email', 'phone')),
+        contact TEXT NOT NULL,
+        verified_at TEXT NOT NULL,
+        UNIQUE (channel, contact)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_user_identities_user_id
+        ON user_identities (user_id);
+
+      CREATE TABLE IF NOT EXISTS otp_challenges (
+        id TEXT PRIMARY KEY,
+        channel TEXT NOT NULL CHECK (channel IN ('email', 'phone')),
+        contact TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 5,
+        used_at TEXT,
+        invalidated_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_otp_challenges_contact
+        ON otp_challenges (channel, contact, created_at);
+    `
   }
 ]
 

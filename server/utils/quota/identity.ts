@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { getCookie, setCookie, type H3Event } from 'h3'
+import { SESSION_COOKIE_NAME, verifySessionToken } from '../auth/session'
 import type { QuotaSubject } from './policy'
 
 export const ANONYMOUS_QUOTA_COOKIE_NAME = 'ujimu_anon_id'
@@ -27,17 +28,43 @@ export interface ResolvedAnonymousIdentity {
   cookieToSet?: AnonymousQuotaCookieToSet
 }
 
+export interface ResolveQuotaSubjectFromCookiesInput {
+  sessionCookie?: string
+  anonymousCookie?: string
+  sessionSecret?: string
+}
+
 export function resolveQuotaSubject(
   event: H3Event,
   options: ResolveAnonymousIdentityOptions = {}
 ): QuotaSubject {
-  const identity = resolveAnonymousIdentity(getCookie(event, ANONYMOUS_QUOTA_COOKIE_NAME), options)
+  const subject = resolveQuotaSubjectFromCookies({
+    sessionCookie: getCookie(event, SESSION_COOKIE_NAME),
+    anonymousCookie: getCookie(event, ANONYMOUS_QUOTA_COOKIE_NAME)
+  })
 
+  if (subject.type === 'registered') {
+    return subject
+  }
+
+  const identity = resolveAnonymousIdentity(getCookie(event, ANONYMOUS_QUOTA_COOKIE_NAME), options)
   if (identity.cookieToSet) {
     setCookie(event, identity.cookieToSet.name, identity.cookieToSet.value, identity.cookieToSet.options)
   }
 
   return identity.subject
+}
+
+export function resolveQuotaSubjectFromCookies(
+  input: ResolveQuotaSubjectFromCookiesInput,
+  anonymousOptions: ResolveAnonymousIdentityOptions = {}
+): QuotaSubject {
+  const session = verifySessionToken(input.sessionCookie, { sessionSecret: input.sessionSecret })
+  if (session) {
+    return { type: 'registered', id: session.userId }
+  }
+
+  return resolveAnonymousIdentity(input.anonymousCookie, anonymousOptions).subject
 }
 
 export function resolveAnonymousIdentity(

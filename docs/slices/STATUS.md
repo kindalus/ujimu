@@ -20,12 +20,12 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 05:
+Latest full verification after Slice 06:
 
-- `npm test` — passed, 36 tests
+- `npm test` — passed, 42 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API check — passed for anonymous quota enforcement: first 5 valid chat requests returned `200`, the 6th returned `429` with structured quota JSON.
+- Manual API smoke check — OTP request/session/logout endpoint behaviour checked; OTP verification covered by acceptance tests with an injected fake provider.
 
 Known non-blocking warnings:
 
@@ -42,7 +42,7 @@ Known non-blocking warnings:
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
-| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/auth.acceptance.test.ts`; implementation in progress. |
+| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
@@ -50,11 +50,23 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
-## Active slice details
+## Completed slice details
 
 ### Slice 06 — Authentication with OTP
 
-Status: `acceptance-tested`
+Status: `verified`
+
+Implemented:
+
+- OTP request and verify services for email and E.164 phone contacts.
+- `users`, `user_identities`, and `otp_challenges` SQLite migration.
+- OTP codes stored only as hashes with a pepper.
+- OTP expiry, attempt limit, reuse prevention, and active-code invalidation.
+- Notification provider interface with fake delivery enabled by environment outside production.
+- JWT session creation and verification with httpOnly `ujimu_session` cookie.
+- Session endpoint and logout endpoint.
+- Quota subject resolution now prefers valid registered JWT sessions and falls back to anonymous identity.
+- Compact main-page OTP auth panel with Entrar, Email/Telemóvel, contact input, code input, signed-in identity, and Sair.
 
 Idea-refined direction:
 
@@ -65,7 +77,7 @@ Idea-refined direction:
 - Add a minimal OTP request/verify/logout UI on the main page.
 - Store normalized email or phone identifiers and hashed OTP secrets; never store OTP codes in clear text.
 
-Locked grill decisions so far:
+Key locked decisions:
 
 - Data model uses `users` plus `user_identities` for verified email and phone identities.
 - Linking UI is out of scope, but verifying a new identity while signed in links it to the current account.
@@ -107,7 +119,10 @@ Out of scope for this slice:
 - Durable conversation-history migration from anonymous to account.
 - Full profile-management UI beyond showing the current signed-in identity and logout.
 
-## Completed slice details
+Verification:
+
+- Covered by `tests/auth.acceptance.test.ts` and updated UI acceptance checks.
+- Included in latest full verification snapshot.
 
 ### Slice 05 — Quotas & request limits
 

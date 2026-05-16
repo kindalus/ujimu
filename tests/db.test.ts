@@ -28,7 +28,8 @@ describe('initializeDatabase', () => {
 
     expect(rows).toEqual([
       { version: '0001_initial_schema' },
-      { version: '0002_request_events' }
+      { version: '0002_request_events' },
+      { version: '0003_auth_otp' }
     ])
   })
 
@@ -45,6 +46,6 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(2)
+    expect(count.count).toBe(3)
   })
 })

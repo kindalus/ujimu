@@ -1,0 +1,124 @@
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { getCookie, setCookie, type H3Event } from 'h3'
+
+export const SESSION_COOKIE_NAME = 'ujimu_session'
+export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 90
+
+export interface SessionClaims {
+  userId: string
+  issuedAt: Date
+  expiresAt: Date
+}
+
+export interface SessionOptions {
+  now?: Date
+  sessionSecret?: string
+}
+
+export interface SessionCookieOptions extends SessionOptions {
+  isProduction?: boolean
+}
+
+let generatedSessionSecret: string | undefined
+
+export function createSessionToken(userId: string, options: SessionOptions = {}): string {
+  const now = options.now ?? new Date()
+  const issuedAt = Math.floor(now.getTime() / 1000)
+  const expiresAt = issuedAt + SESSION_DURATION_SECONDS
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const payload = {
+    sub: userId,
+    iat: issuedAt,
+    exp: expiresAt,
+    typ: 'session'
+  }
+  const encodedHeader = base64UrlEncode(JSON.stringify(header))
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload))
+  const signature = sign(`${encodedHeader}.${encodedPayload}`, resolveSessionSecret(options.sessionSecret))
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`
+}
+
+export function verifySessionToken(
+  token: string | undefined,
+  options: SessionOptions = {}
+): SessionClaims | undefined {
+  if (!token) return undefined
+
+  const parts = token.split('.')
+  if (parts.length !== 3) return undefined
+
+  const [encodedHeader, encodedPayload, signature] = parts
+  if (!encodedHeader || !encodedPayload || !signature) return undefined
+
+  const expectedSignature = sign(`${encodedHeader}.${encodedPayload}`, resolveSessionSecret(options.sessionSecret))
+  if (!timingSafeEqualString(signature, expectedSignature)) return undefined
+
+  const payload = parseJson(base64UrlDecode(encodedPayload)) as Partial<{
+    sub: string
+    iat: number
+    exp: number
+    typ: string
+  }> | undefined
+  if (!payload || payload.typ !== 'session' || !payload.sub || !payload.iat || !payload.exp) {
+    return undefined
+  }
+
+  const nowSeconds = Math.floor((options.now ?? new Date()).getTime() / 1000)
+  if (payload.exp <= nowSeconds) {
+    return undefined
+  }
+
+  return {
+    userId: payload.sub,
+    issuedAt: new Date(payload.iat * 1000),
+    expiresAt: new Date(payload.exp * 1000)
+  }
+}
+
+export function readSessionFromEvent(event: H3Event, options: SessionOptions = {}): SessionClaims | undefined {
+  return verifySessionToken(getCookie(event, SESSION_COOKIE_NAME), options)
+}
+
+export function setSessionCookie(event: H3Event, token: string, options: SessionCookieOptions = {}): void {
+  setCookie(event, SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: options.isProduction ?? process.env.NODE_ENV === 'production',
+    maxAge: SESSION_DURATION_SECONDS,
+    path: '/'
+  })
+}
+
+export function resolveSessionSecret(explicitSecret?: string): string {
+  if (explicitSecret) return explicitSecret
+  if (process.env.UJIMU_SESSION_SECRET) return process.env.UJIMU_SESSION_SECRET
+  generatedSessionSecret ??= randomBytes(32).toString('hex')
+  return generatedSessionSecret
+}
+
+function sign(value: string, secret: string): string {
+  return createHmac('sha256', secret).update(value).digest('base64url')
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64url')
+}
+
+function base64UrlDecode(value: string): string {
+  return Buffer.from(value, 'base64url').toString('utf8')
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown
+  } catch {
+    return undefined
+  }
+}
+
+function timingSafeEqualString(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer)
+}

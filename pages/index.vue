@@ -14,6 +14,14 @@ interface SpecialistsResponse {
   specialists: PublicSpecialist[]
 }
 
+interface AuthSessionResponse {
+  authenticated: boolean
+  user?: {
+    id: string
+    displayContact: string
+  }
+}
+
 interface ChatCitation {
   sourceTitle: string
   sourceFile?: string
@@ -48,6 +56,7 @@ interface ApiErrorPayload {
 }
 
 const quotaLimitMessage = 'Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.'
+const otpRequestSuccessMessage = 'Se o contacto estiver correcto, enviaremos um código de acesso.'
 const queueLimit = 3
 let idCounter = 0
 
@@ -60,15 +69,26 @@ const messages = ref<ChatMessage[]>([])
 const queuedQuestions = ref<QueuedQuestion[]>([])
 const isStreaming = ref(false)
 const quotaError = ref('')
+const authSession = ref<AuthSessionResponse>({ authenticated: false })
+const authPanelOpen = ref(false)
+const authChannel = ref<'email' | 'phone'>('email')
+const authContact = ref('')
+const authCode = ref('')
+const authStep = ref<'request' | 'verify'>('request')
+const authMessage = ref('')
+const authError = ref('')
+const authPending = ref(false)
 
 onMounted(() => {
   void loadSpecialists()
+  void loadAuthSession()
 })
 
 const selectedSpecialist = computed(() =>
   specialists.value.find((specialist) => specialist.id === selectedSpecialistId.value)
 )
 const hasSpecialists = computed(() => specialists.value.length > 0)
+const isAuthenticated = computed(() => authSession.value.authenticated)
 const canWriteQuestion = computed(
   () => Boolean(selectedSpecialist.value) && queuedQuestions.value.length < queueLimit
 )
@@ -85,6 +105,88 @@ const composerHelp = computed(() => {
   if (isStreaming.value) return 'A pergunta será adicionada à fila.'
   return 'A resposta será apresentada por partes e com fontes no fim.'
 })
+
+async function loadAuthSession(): Promise<void> {
+  try {
+    const response = await fetch('/api/auth/session')
+    authSession.value = response.ok
+      ? ((await response.json()) as AuthSessionResponse)
+      : { authenticated: false }
+  } catch {
+    authSession.value = { authenticated: false }
+  }
+}
+
+async function requestOtpCode(): Promise<void> {
+  authPending.value = true
+  authError.value = ''
+  authMessage.value = ''
+
+  try {
+    const response = await fetch('/api/auth/otp/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel: authChannel.value, contact: authContact.value })
+    })
+
+    if (!response.ok) {
+      authError.value = response.status === 503
+        ? 'Não foi possível enviar o código neste momento. Tente novamente mais tarde.'
+        : 'Verifique o contacto e tente novamente.'
+      return
+    }
+
+    authStep.value = 'verify'
+    authMessage.value = otpRequestSuccessMessage
+  } catch {
+    authError.value = 'Não foi possível enviar o código neste momento. Tente novamente mais tarde.'
+  } finally {
+    authPending.value = false
+  }
+}
+
+async function verifyOtpCode(): Promise<void> {
+  authPending.value = true
+  authError.value = ''
+
+  try {
+    const response = await fetch('/api/auth/otp/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        channel: authChannel.value,
+        contact: authContact.value,
+        code: authCode.value
+      })
+    })
+
+    if (!response.ok) {
+      authError.value = 'Código inválido ou expirado.'
+      return
+    }
+
+    authSession.value = (await response.json()) as AuthSessionResponse
+    authPanelOpen.value = false
+    authStep.value = 'request'
+    authContact.value = ''
+    authCode.value = ''
+    authMessage.value = ''
+  } catch {
+    authError.value = 'Não foi possível verificar o código. Tente novamente.'
+  } finally {
+    authPending.value = false
+  }
+}
+
+async function logout(): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
+  authSession.value = { authenticated: false }
+  authPanelOpen.value = false
+  authStep.value = 'request'
+  authCode.value = ''
+  authMessage.value = ''
+  authError.value = ''
+}
 
 async function loadSpecialists(): Promise<void> {
   specialistsPending.value = true
@@ -315,6 +417,66 @@ function createId(prefix: string): string {
         Escolha uma especialidade, faça a sua pergunta e confirme a resposta nas
         fontes apresentadas no fim.
       </p>
+
+      <section class="auth-panel" aria-label="Autenticação">
+        <div v-if="isAuthenticated" class="auth-session">
+          <span>Ligado como {{ authSession.user?.displayContact }}</span>
+          <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
+            Sair
+          </UButton>
+        </div>
+
+        <div v-else class="auth-entry">
+          <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
+            Entrar
+          </UButton>
+
+          <form v-if="authPanelOpen" class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
+            <div class="auth-channel" role="group" aria-label="Canal de autenticação">
+              <UButton
+                type="button"
+                size="xs"
+                :color="authChannel === 'email' ? 'primary' : 'neutral'"
+                :variant="authChannel === 'email' ? 'soft' : 'ghost'"
+                @click="authChannel = 'email'"
+              >
+                Email
+              </UButton>
+              <UButton
+                type="button"
+                size="xs"
+                :color="authChannel === 'phone' ? 'primary' : 'neutral'"
+                :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
+                @click="authChannel = 'phone'"
+              >
+                Telemóvel
+              </UButton>
+            </div>
+
+            <label class="auth-field" for="auth-contact">
+              <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
+              <UInput
+                id="auth-contact"
+                v-model="authContact"
+                :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
+                :disabled="authPending || authStep === 'verify'"
+              />
+            </label>
+
+            <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
+              <span>Código</span>
+              <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
+            </label>
+
+            <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
+            <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+
+            <UButton type="submit" color="primary" size="sm" :loading="authPending">
+              {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
+            </UButton>
+          </form>
+        </div>
+      </section>
     </section>
 
     <section class="workspace" aria-label="Área de consulta">
@@ -555,6 +717,58 @@ h3 {
   color: var(--ujimu-muted);
   font-size: clamp(1.1rem, 2vw, 1.45rem);
   line-height: 1.5;
+}
+
+.auth-panel {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  margin-top: 24px;
+  border: 1px solid rgba(249, 214, 22, 0.24);
+  border-radius: 22px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.auth-session,
+.auth-entry,
+.auth-channel,
+.auth-form,
+.auth-field {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-session {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  color: #fff8cc;
+  font-weight: 800;
+}
+
+.auth-channel {
+  grid-template-columns: repeat(2, max-content);
+}
+
+.auth-field {
+  color: var(--ujimu-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.auth-message,
+.auth-error {
+  margin: 0;
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+
+.auth-message {
+  color: #fff8cc;
+}
+
+.auth-error {
+  color: #ffd3d3;
 }
 
 .workspace {
