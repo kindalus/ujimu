@@ -50,7 +50,43 @@ Known non-blocking warnings:
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
-| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `idea-refined` | — | All registered users can use passkeys; management belongs in `/account/security`; OTP remains fallback/recovery; WebAuthn library must sit behind a swappable contract. |
+
+## Slice 12 — Passkeys post-MVP
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Passkeys are available to all registered users, not limited to subscribers or administrators.
+- OTP remains the account bootstrap, fallback, and recovery path; this slice does not create passkey-only accounts.
+- Passkey management lives in a dedicated `/account/security` page rather than inside the main chat workspace.
+- The core user success path is: a user with an OTP account can add a passkey, sign out, sign back in with the passkey, remove the passkey, and still use OTP.
+- Use a mature WebAuthn/passkey library rather than hand-rolling cryptographic verification.
+- Keep library-specific implementation behind internal contracts/adapters so Ujimu can change WebAuthn libraries later without rewriting route, session, or account-management code.
+- Reuse the existing `users`, `user_identities`, quota subject, and JWT session model after successful passkey authentication.
+- Preserve strict WebAuthn security expectations: configured origin/RP ID validation, short-lived one-time challenges, replay rejection, malformed assertion rejection, and credential binding to the authenticated user during registration.
+
+Acceptance-test direction:
+
+- Authenticated registered users can register a passkey for their current account.
+- Users with a registered passkey can sign in without requesting OTP.
+- Removing a passkey prevents future sign-in with that credential.
+- OTP request and verification continue to work after passkey registration and removal.
+- Invalid origin, expired challenge, replayed challenge/assertion, or malformed payload does not create a session.
+- The passkey service is exercised through internal contracts so the concrete WebAuthn library can be replaced.
+
+Out of scope for this slice:
+
+- Password authentication.
+- Mandatory passkey enrolment.
+- Passkey-only accounts or passkey-only recovery.
+- Subscriber-only or admin-only rollout.
+- Enterprise SSO, identity-provider federation, or passkey sync/account recovery beyond platform authenticator behaviour.
+
+Next step:
+
+- Run `grill-me` to lock implementation decisions one question at a time before writing acceptance tests.
 
 ## Slice 11 — Security, operations & observability
 

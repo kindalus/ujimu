@@ -149,10 +149,18 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <li>Keep OTP as fallback for account recovery and unsupported devices.</li>
 </ul>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Refined direction</div><h2>Passkeys are for every registered user.</h2>
+<ul>
+<li>Do not limit passkeys to subscribers or administrators.</li>
+<li>OTP remains the account bootstrap, fallback, and recovery path.</li>
+<li>Passkey management lives in a dedicated account-security page, not inside the chat workspace.</li>
+<li>The target experience is: add passkey after OTP sign-in, sign out, sign back in with passkey, remove passkey, and still use OTP.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">User flows</div><h2>Registration and sign-in are separate flows.</h2>
 <div class="grid-3">
-<div class="card"><strong>Register passkey</strong><span>Authenticated user adds a passkey from account settings.</span></div>
-<div class="card"><strong>Sign in</strong><span>User chooses passkey sign-in and completes browser authenticator flow.</span></div>
+<div class="card"><strong>Register passkey</strong><span>Authenticated registered user adds a passkey from /account/security.</span></div>
+<div class="card"><strong>Sign in</strong><span>User chooses passkey sign-in and completes the browser authenticator flow.</span></div>
 <div class="card"><strong>Remove passkey</strong><span>User removes a registered credential while retaining OTP access.</span></div>
 </div>
 </div></section>
@@ -176,21 +184,38 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <li>Never expose private keys because the app never receives them.</li>
 </ul>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Implementation boundary</div><h2>Use a WebAuthn library behind a swappable contract.</h2>
+<ul>
+<li>Use a mature WebAuthn/passkey library rather than hand-rolling cryptographic verification.</li>
+<li>Keep library-specific calls behind an internal passkey service/adapter so the implementation can be replaced later.</li>
+<li>Verify official library documentation before implementation and keep origin/RP configuration explicit.</li>
+<li>Reuse the existing user and JWT session model after successful passkey login.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Add without rewriting OTP auth.</h2>
 <pre>server/utils/auth/passkeys.ts
+server/utils/auth/passkey-adapter.ts
 server/api/auth/passkeys/register-options.get.ts
 server/api/auth/passkeys/register.post.ts
 server/api/auth/passkeys/login-options.post.ts
 server/api/auth/passkeys/login.post.ts
+server/api/auth/passkeys/index.get.ts
+server/api/auth/passkeys/[credentialId].delete.ts
 pages/account/security.vue
 server/database/migrations/*passkeys*.sql</pre>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">MVP scope</div><h2>Small enough to verify, useful enough to keep.</h2>
+<div class="grid-2">
+<div class="card"><strong>In scope</strong><span>Passkey registration for authenticated users, passkey login, credential listing/removal, OTP fallback, strict challenge/origin checks, and tests around replay/expiry failures.</span></div>
+<div class="card"><strong>Not doing</strong><span>No passwords, no mandatory passkeys, no passkey-only accounts, no admin-only rollout, no enterprise SSO, and no recovery path that removes OTP.</span></div>
+</div>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
 <ul>
-<li>An authenticated user can register a passkey for the current account.</li>
-<li>A user with a registered passkey can sign in without OTP.</li>
-<li>OTP remains available as fallback and recovery path.</li>
-<li>Removing a passkey prevents future sign-in with that credential.</li>
+<li>A registered OTP user can add a passkey from /account/security.</li>
+<li>The user can sign out and sign back in with the registered passkey, without requesting a new OTP.</li>
+<li>The user can remove the passkey and that credential can no longer sign in.</li>
+<li>OTP continues to work after adding or removing passkeys.</li>
 <li>Invalid origin, expired challenge, or replayed assertion does not create a session.</li>
 </ul>
 </div></section>
