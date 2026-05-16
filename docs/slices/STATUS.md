@@ -181,6 +181,13 @@ As-built documentation correction, locked grill decisions (2026-05-16):
 - Treat `STATUS.md` as the canonical Slice 11 source of truth and align the deck to its already-locked decisions.
 - Verify by documentation review and diff only, because no runtime code, tests, or package files are changed.
 
+Future hardening candidates preserved by this correction:
+
+- Log retention, archival, deletion, and explicit file-permission policy.
+- Stricter CSP policy and environment-specific security-header tuning.
+- Readiness degraded-state semantics and operational dashboards.
+- Backup restore drills, incident-response workflow, alerting, APM, metrics, and external log aggregation.
+
 Idea-refined direction:
 
 - Implement a practical hardening MVP rather than integrating external observability vendors in this slice.

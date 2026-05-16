@@ -130,85 +130,107 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
     <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 11 · hardening</div></div>
     <main class="deck">
 <section class="slide"><div class="frame content"><div class="kicker">Slice 11</div><h1>Security, operations &amp; observability</h1>
-<p class="lead">Harden the product around uploads, auth, specialist isolation, quotas, billing callbacks, deletion, and operational visibility.</p>
+<p class="lead">As-built hardening MVP: security headers, safe health/readiness, sanitized daily JSONL logs, CI, and an operations runbook.</p>
 <div class="pills">
-<span class="pill">privacy</span>
-<span class="pill">uploads</span>
-<span class="pill">logs</span>
-<span class="pill">SQLite</span>
-<span class="pill">isolation</span>
+<span class="pill">verified</span>
+<span class="pill">JSONL logs</span>
+<span class="pill">health/readiness</span>
+<span class="pill">CI gate</span>
+<span class="pill">runbook</span>
 </div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Correction</div><h2>This deck is the as-built correction.</h2>
+<ul>
+<li>It aligns the original Slice 11 deck to the canonical `STATUS.md` record.</li>
+<li>It does not expand Slice 11 or change verified behaviour.</li>
+<li>It replaces broad or contradictory implementation hints with the implemented decisions.</li>
+<li>Future hardening ideas are labelled as future candidates, not current scope.</li>
+</ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>Trust is a feature.</h2>
-<p class="lead">Because Ujimu answers legal/regulatory questions, the system must be explicit, traceable, conservative, and observable.</p>
+<p class="lead">Because Ujimu answers legal and regulatory questions, the system must be conservative, traceable, privacy-aware, and operable before production use.</p>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Upload safety</div><h2>Files are data, never executable instructions.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Scope boundary</div><h2>Practical hardening, not an observability platform.</h2>
 <ul>
-<li>Prevent path traversal and unsafe filenames.</li>
-<li>Store raw files inside the specialist raw/ directory only.</li>
-<li>Validate file type and readability where possible.</li>
-<li>Do not run OCR or executable document macros in the MVP.</li>
+<li>Use first-party app controls and local operational signals.</li>
+<li>Do not add external APM, log aggregation, metrics, SIEM, or alerting vendors in this slice.</li>
+<li>Keep readiness safe: booleans and counts, never secret values or paths.</li>
+<li>Keep implementation small enough to verify with acceptance tests.</li>
 </ul>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Specialist isolation</div><h2>A chat cannot leak across domains.</h2>
-<ul>
-<li>Chat context is limited to the selected specialist.</li>
-<li>Admin actions must target a single specialist by validated ID.</li>
-<li>Source metadata and histories are partitioned by specialist ID.</li>
-<li>Deleting a specialist removes associated customer histories.</li>
-</ul>
-</div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Secrets</div><h2>Providers require secret hygiene.</h2>
-<ul>
-<li>Keep Appy Pay, Stripe, SendGrid, and session secrets in environment variables or a secret manager.</li>
-<li>Never commit .env files.</li>
-<li>Do not expose server-only config to Nuxt public runtime config.</li>
-<li>Webhook signing secrets must be verified server-side.</li>
-</ul>
-</div></section>
-<section class="slide"><div class="frame content"><div class="kicker">SQLite operations</div><h2>Small database does not mean casual database.</h2>
-<ul>
-<li>Use migrations and a schema_migrations table.</li>
-<li>Apply safe transaction boundaries for destructive operations.</li>
-<li>Plan backup and restore procedures before production use.</li>
-<li>Avoid long-running write locks during ingestion or analytics jobs.</li>
-</ul>
-</div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Observability</div><h2>Log decisions, not secrets.</h2>
-<div class="grid-2">
-<div class="card"><strong>Chat</strong><span>Specialist, outcome, timings, citation presence, insufficient-context results — never raw questions or answers.</span></div>
-<div class="card"><strong>Quota</strong><span>Allow/deny decisions and effective policy without client-authoritative state.</span></div>
-<div class="card"><strong>Ingestion</strong><span>Pending, processing, ingested, failed with safe errors, no document contents.</span></div>
-<div class="card"><strong>Billing</strong><span>Provider events, confirmation, activation, expiry, no webhook secrets.</span></div>
+<section class="slide"><div class="frame content"><div class="kicker">HTTP surfaces</div><h2>Expose liveness and readiness without leaking internals.</h2>
+<div class="grid-3">
+<div class="card"><strong>Security headers</strong><span>Baseline headers apply to app and API responses through server middleware.</span></div>
+<div class="card"><strong>/healthz</strong><span>Public liveness endpoint returns only a minimal OK payload.</span></div>
+<div class="card"><strong>/api/admin/ops/readyz</strong><span>Admin-only readiness returns safe booleans and numeric migration count.</span></div>
 </div>
-<div class="callout">MVP observability is first-party and local: structured SQLite/console signals, health/readiness endpoints, and a runbook. External APM/logging is later.</div>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Deletion and privacy</div><h2>Permanent deletion must be complete.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Operational logs</div><h2>Use daily JSONL files as the MVP sink.</h2>
 <ul>
-<li>Conversation deletion removes messages and citations.</li>
-<li>Specialist deletion removes associated customer histories.</li>
-<li>Deleted content should not remain visible in history, admin lists, or chat context.</li>
-<li>Operational logs should avoid retaining sensitive message content unnecessarily.</li>
+<li>Write to `&lt;UJIMU_DATA_DIR&gt;/logs/operational/operational-YYYY-MM-DD.jsonl`.</li>
+<li>Each line is one event with timestamp, category, event name, severity, optional specialist ID, and sanitized metadata.</li>
+<li>Console output stays minimal and derives from the same sanitized event payload.</li>
+<li>No SQLite operational-events table was added in this slice.</li>
 </ul>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Cross-cutting utilities and policies.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Privacy rule</div><h2>Log decisions, not secrets or contents.</h2>
+<ul>
+<li>Never persist raw questions, answers, OTP codes, cookies, JWTs, webhook secrets, or document contents.</li>
+<li>Do not store full email or phone contact values in operational logs.</li>
+<li>Safe metadata includes outcomes, counts, provider names, booleans, and error codes.</li>
+<li>Billing webhook rejection and processing outcomes are logged with sanitized fields only.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Hardening targets</div><h2>Protect the boundaries users can cross.</h2>
+<ul>
+<li>Uploads must stay inside the selected specialist `raw/` directory.</li>
+<li>Chat, history, ingestion, and admin operations stay scoped by validated specialist ID.</li>
+<li>Permanent deletion removes user-visible dependent data.</li>
+<li>Billing webhooks activate subscriptions only after verified secret-protected confirmation.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">SQLite and delivery</div><h2>Small operations still need discipline.</h2>
+<div class="grid-2">
+<div class="card"><strong>Migrations</strong><span>Schema changes are tracked with `schema_migrations`; readiness reports migration count only.</span></div>
+<div class="card"><strong>Backups</strong><span>The runbook documents SQLite backup and restore commands plus integrity checks.</span></div>
+<div class="card"><strong>CI</strong><span>GitHub Actions runs install, tests, typecheck, build, and high-severity audit.</span></div>
+<div class="card"><strong>Secrets</strong><span>Session, OTP, admin, billing, provider, and passkey settings stay server-side.</span></div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Implemented files</div><h2>The as-built implementation areas.</h2>
 <pre>server/middleware/security-headers.ts
 server/utils/security/headers.ts
-server/utils/security/paths.ts
 server/utils/ops/logger.ts
 server/routes/healthz.get.ts
 server/api/admin/ops/readyz.get.ts
 .github/workflows/ci.yml
-docs/operations.md</pre>
+docs/operations.md
+tests/security-ops.acceptance.test.ts
+tests/ops-ci-docs.acceptance.test.ts</pre>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Verification</div><h2>Acceptance checks define the slice.</h2>
 <ul>
-<li>Uploads cannot escape the intended specialist raw/ directory.</li>
-<li>Chat, history, ingestion, and admin operations are scoped by validated specialist ID.</li>
-<li>Secrets are not exposed to client bundles or committed files.</li>
-<li>Billing webhooks only activate subscriptions when verified.</li>
-<li>Permanent deletion paths remove user-visible data and dependent records.</li>
-<li>Operational logs rotate daily as JSONL files without storing unnecessary sensitive content.</li>
+<li>Security headers apply to app responses.</li>
+<li>Operational events are daily JSONL and sanitized.</li>
+<li>`/healthz` is minimal; readiness is admin-only and safe.</li>
+<li>Uploads reject traversal and remain inside `raw/`.</li>
+<li>CI and the operations runbook cover the deployment quality gate.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Future candidates</div><h2>Known hardening gaps belong in later slices.</h2>
+<ul>
+<li>Log retention, archival, deletion, and explicit file-permission policy.</li>
+<li>Stricter CSP policy and environment-specific security-header tuning.</li>
+<li>Readiness degraded-state semantics and operational dashboards.</li>
+<li>Backup restore drills, incident-response workflow, alerting, APM, metrics, and external log aggregation.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What Slice 11 means after correction.</h2>
+<ul>
+<li>Verified behaviour remains unchanged.</li>
+<li>The deck no longer contradicts `STATUS.md` on JSONL logs or implementation areas.</li>
+<li>Operations documentation remains the runbook for health, readiness, logs, secrets, and SQLite backup/restore.</li>
+<li>Future ideas are visible without being retroactively added to the slice.</li>
 </ul>
 </div></section>
     </main>
