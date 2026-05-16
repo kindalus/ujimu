@@ -46,13 +46,13 @@ Known non-blocking warnings:
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
-| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `grilled` | — | Mockable provider MVP decisions locked; ready for acceptance tests. |
+| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `acceptance-tested` | — | Acceptance tests written and failing for missing billing behaviour. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 10 — Subscriptions, payments & advertising
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -79,6 +79,22 @@ Locked grill decisions:
 - Appy Pay methods in the MVP contract are Multicaixa Express, Multicaixa Reference, and QR Code; Stripe is the VISA provider boundary.
 - Billing state drives quota subject resolution: active subscribed users use the subscribed weekly quota policy; expired users fall back to registered limits.
 - The user-facing billing UI lives on the main page for the MVP and hides advertising for subscribed users.
+
+Acceptance tests written first in:
+
+- `tests/billing.acceptance.test.ts`
+- `tests/billing-ui.acceptance.test.ts`
+- `tests/db.test.ts`
+
+Acceptance-test targets:
+
+- Registered users can create pending quarterly checkouts for 50,000.00 AOA using valid Appy Pay and Stripe method mappings.
+- Anonymous checkout attempts return `401`; invalid provider/method combinations return `400`.
+- Secret-protected webhook confirmation activates subscriptions, hides ads, and stays idempotent for repeated events or already confirmed payments.
+- Missing webhook secret returns `503`; invalid webhook secret returns `401` and records no trusted provider event.
+- Renewals stack from the current active expiry, expired subscriptions lose access immediately, and near-expiry warnings appear under seven days.
+- Active subscriptions resolve to the subscribed quota subject while expired subscriptions fall back to registered limits.
+- The main page exposes billing status, checkout actions, expiry warnings, and ad visibility rules.
 
 Out of scope for this slice:
 
