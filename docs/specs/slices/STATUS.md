@@ -51,6 +51,159 @@ Known non-blocking warnings:
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
+| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `grilled` | — | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
+
+## Slice 13 — Three Pi agent pipeline
+
+Status: `grilled`
+
+Idea-refined direction:
+
+- Split the Pi-backed source and answer flow into three distinct Pi SDK sessions: conversion, ingestion, and consultation.
+- Treat the feature as not governed by legislation for the purposes of the Zafir law-material workflow.
+- Defer a broad architecture/design revisit; keep the existing Nuxt, SQLite, specialist directory, and Pi SDK architecture as the base for this slice.
+- Store original uploads under the specialist `raw/` directory, but ensure ingestion operates only on Markdown sources.
+- Convert original PDF, TXT, DOCX, HTML/HTM, CSV, and XLSX uploads into generated Markdown files before ingestion.
+- Preserve the original file extension in generated Markdown names by appending `.md` to the raw relative path: `lei.pdf` becomes `lei.pdf.md`, `lei.docx` becomes `lei.docx.md`, `lei.csv` becomes `lei.csv.md`, and so on.
+- Treat generated Markdown as a derived artefact that may be overwritten whenever the original file changes.
+- Skip conversion when the original checksum has not changed and the generated Markdown file already exists.
+- Store direct admin Markdown uploads as already-normalized originals by renaming `lei.md` to `lei.original.md` on upload.
+- Reject a direct Markdown upload when the target `raw/<name>.original.md` already exists.
+- Keep traceability from original raw upload to generated/normalized Markdown source, then to wiki pages and user-facing citations.
+- Add project-local Pi configuration under `.pi/` so Ujimu does not depend on a developer's global Pi setup.
+- Version `.pi/settings.json`, `.pi/models.json`, `.pi/auth.json.sample`, and agent skills/prompts, but never commit `.pi/auth.json`.
+- Use the project-local `.pi` default model for consultation.
+- Allow conversion and ingestion to override provider/model/thinking level through environment variables; when absent, they fall back to the project-local default.
+- Do not add new Pi tools in this slice. Agent skills are instructions, not capabilities.
+- Keep `bash` disabled by default. Conversion and ingestion may use only the already-approved file tools: `read`, `write`, `edit`, `grep`, `find`, and `ls`. Consultation should use read/search tools only.
+- If PDF, DOCX, or HTML content cannot be extracted safely with the existing tools, conversion fails safely and ingestion does not advance for that source.
+
+Locked grill decisions:
+
+- Conversion state lives inside the existing per-specialist `ingest/state.json`, not in a separate `conversion/state.json` file.
+- The state schema should distinguish conversion status from ingestion status while keeping one canonical source-pipeline state file for admin display, startup detection, reload, and manual pipeline actions.
+- `ingest/state.json` uses one source record per original uploaded file, not one record per generated Markdown artefact.
+- For converted sources, the record key and primary `raw_path` remain the original upload path, while conversion metadata stores the generated Markdown path and ingestion metadata stores the Markdown path used by the ingestion agent.
+- Direct Markdown uploads are stored and tracked as `*.original.md` source records with conversion marked as not required and ingestion using the same Markdown path.
+- Source records use nested `conversion` and `ingestion` objects rather than one shared top-level status for the whole pipeline.
+- Conversion statuses are `not_required`, `pending`, `processing`, `converted`, and `failed`.
+- Ingestion statuses are `blocked`, `pending`, `processing`, `ingested`, and `failed`.
+- A conversion failure blocks ingestion for that source until conversion is retried successfully or the source is replaced.
+- Conversion is a manual admin action, not an automatic side effect of upload or reload.
+- Upload stores the original source, reload/detect updates pending pipeline state, conversion is triggered explicitly, and ingestion is triggered explicitly after conversion succeeds.
+- When ingestion is triggered, it processes only Markdown sources that are ready for ingestion and skips sources whose conversion is pending or failed.
+- Ingestion must not auto-run conversion. The ingestion result should report ingested/skipped counts and safe skipped reasons such as `conversion_pending` and `conversion_failed`.
+- Ujimu ingestion uses the `llm-wiki` skill through a project-local copy under `.pi/skills/llm-wiki`.
+- The project-local `llm-wiki` copy adds a minimal Ujimu override: only Markdown files under `raw/` may be ingested; non-Markdown raw files are original uploads for the conversion pipeline and must not be ingested directly.
+- If a global `llm-wiki` skill is also available, the project-local `.pi/skills/llm-wiki` copy must prevail. This was verified through Pi resource loading: the project copy wins the `llm-wiki` collision and the global copy is the loser.
+- Pi SDK sessions resolve their agent directory from `UJIMU_PI_AGENT_DIR` when set, otherwise they fall back to the project-root `.pi` directory.
+- Conversion, ingestion, and consultation sessions must pass this resolved `agentDir` explicitly to Pi SDK session/resource-loader/model-registry setup so they use the project-local settings, models, auth sample convention, and skills.
+- Conversion and ingestion model overrides are valid only when both provider and model environment variables are set for that role.
+- If neither provider nor model override is set for a role, that role uses the project-local default model from `.pi/settings.json`.
+- If only one of provider/model is set, or if the configured model does not exist or lacks configured authentication, fail with a clear configuration error before starting the Pi session.
+- Do not infer providers from model IDs and do not silently fall back from a malformed override to the default model.
+- Pi-backed agent execution is enabled per role with `UJIMU_PI_CONVERSION_ENABLED=true`, `UJIMU_PI_INGESTION_ENABLED=true`, and `UJIMU_PI_CHAT_ENABLED=true`.
+- A disabled role must fail safely without starting a Pi session: conversion remains pending, ingestion skips or reports disabled according to existing admin semantics, and chat returns the safe service-unavailable fallback.
+- Per-role flags allow admin conversion/ingestion to be enabled without exposing real Pi chat to users.
+- Raw scanning must not create independent source records for generated Markdown artefacts named `*.pdf.md`, `*.docx.md`, `*.html.md`, or `*.txt.md`.
+- Generated Markdown artefacts are discovered through their original source record's conversion metadata.
+- Direct Markdown uploads renamed to `*.original.md` do create source records because they represent already-normalized original sources.
+- Admin uploads accepted in this slice are `.pdf`, `.txt`, `.docx`, `.html`, `.htm`, `.csv`, `.xlsx`, `.md`, and `.markdown`.
+- CSV and XLSX conversion should preserve tabular content faithfully in Markdown when viable; XLSX sheet names should be represented as headings.
+- The conversion agent must not silently summarize tabular sources. If faithful extraction/conversion is not viable or would produce unusably large/illegible Markdown, mark conversion failed and require manual source preparation.
+- This slice does not add a raw upload size limit, but conversion output is capped by `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES`, defaulting to 1 MiB (`1048576`).
+- If generated Markdown exceeds the configured output byte limit, mark conversion failed and do not advance ingestion.
+- Add a manual admin conversion endpoint `POST /api/admin/specialists/:id/conversion/run`.
+- The conversion endpoint processes all sources with `conversion.status = pending` or `failed`, skips sources with `converted` or `not_required`, and returns safe converted/failed/skipped counts.
+- Pipeline stages stuck in `processing` become eligible for retry when their `updated_at` is older than `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES`, defaulting to 30 minutes.
+- The stale-processing retry rule applies to both `conversion.processing` and `ingestion.processing`.
+- Reingestion after an original source changes should ask the `llm-wiki` ingestion agent to update and reconcile existing wiki pages rather than deleting pages or creating duplicate versioned pages by default.
+- Reingestion context passed to the agent should include original path, Markdown path, previous/current checksums when available, and whether the source had previously been ingested.
+- Automatic destructive cleanup of existing wiki pages is out of scope for this slice.
+- User-facing citation `sourceFile` values point to the original uploaded source path, not the generated Markdown artefact path.
+- Internal ingestion metadata keeps the Markdown `source_path` used by the ingestion agent.
+- For direct Markdown uploads stored as `*.original.md`, user-facing citations point to `raw/<name>.original.md` because that stored Markdown is the normalized original.
+- Before invoking the consultation Pi runner, the backend computes the allowed citation evidence list from usable ingested sources and includes that list in the consultation prompt.
+- The consultation agent may cite only the provided `sourceFile` values, and the backend still validates returned citations against the same allowed list.
+- The consultation agent must answer from the specialist wiki, not from `raw/` at answer time. It should not read raw uploaded or generated files during user consultation.
+- If possible, enforce the consultation read/search path policy to `wiki/` plus safe state/citation context; at minimum the prompt must forbid using `raw/` for answers.
+- Scanned PDFs that require OCR fail conversion with `OCR_REQUIRED` when detectable; otherwise use a generic safe `CONVERSION_FAILED` error code.
+- OCR remains out of scope, and failed OCR-required sources keep ingestion blocked.
+- Version `.pi/settings.json` with the project-local default provider/model `openrouter` / `moonshotai/kimi-k2.6`, `defaultThinkingLevel = medium`, and `hideThinkingBlock = true`.
+- Version `.pi/models.json` as a minimal custom-provider placeholder with an empty `providers` object; real credentials belong in `.pi/auth.json` or environment variables, with examples in `.pi/auth.json.sample`.
+- If the project-local default model lacks configured authentication, Pi-backed sessions must fail with a clear configuration error rather than silently selecting another available model.
+- Admin-triggered conversion runs create admin audit events with safe counts and error-code summaries.
+- Ingestion continues using/expanding existing admin audit behaviour.
+- Pi consultation does not create new per-question operational/audit logs containing prompts or answers; it relies on existing quota, history, and analytics mechanisms, while operational logs may record sanitized technical outcomes only.
+- Automated acceptance tests for the slice use fake Pi adapters/runners and must not require real model credentials or network access.
+- Real Pi conversion, ingestion, and consultation are verified through a documented manual smoke path, not mandatory CI tests.
+- When an original source checksum changes after conversion or ingestion, detection resets that source to `conversion.status = pending` and `ingestion.status = blocked` until conversion and ingestion are run again.
+- Changed originals must not remain usable as citation evidence from stale ingestion state; chat should ignore them until the refreshed Markdown has been ingested.
+- If conversion fails while an older generated Markdown file still exists, keep the old Markdown file in place for diagnosis but keep the source state failed/blocked.
+- Ingestion must trust `ingest/state.json`, not raw file existence alone, so stale generated Markdown cannot be ingested while conversion is failed or pending.
+- Real Pi-backed consultation/chat is in scope for this slice, not merely a placeholder or future preparation step.
+- The slice must implement the user consultation agent as a real Pi SDK runner behind `UJIMU_PI_CHAT_ENABLED=true`, while preserving safe fallbacks when disabled, misconfigured, ungrounded, or missing valid citations.
+- The consultation agent must return a structured machine-readable stream rather than relying on free-form source text.
+- The consultation protocol is NDJSON-style structured events produced by the Pi-backed agent and parsed by the backend, not a single buffered final JSON object.
+- The backend displays Pi consultation output only from validated structured events: non-empty answer deltas, non-empty citations, citation source files belonging to the specialist's usable ingested evidence, and at least one article reference per citation.
+- If structured event parsing or validation fails, the backend must use the existing insufficient-evidence fallback instead of showing unvalidated Pi output.
+- The first forwarded user-visible consultation output must follow a valid `citations` event. The backend validates citations against usable specialist evidence before forwarding answer text to the UI.
+- If the Pi agent emits free text before the first valid `citations` event, the backend buffers that text instead of forwarding it immediately. If valid citations arrive later, the buffered text may be released as initial answer text; if valid citations never arrive, the buffered text is discarded and the fallback is used.
+- Pre-citation buffered output is capped at 16 KB. If the agent exceeds that limit before valid citations arrive, the consultation result is invalidated and the fallback is used.
+- The consultation NDJSON event contract accepts only `citations`, `delta`, `done`, and `error` event types.
+- `citations` must contain a non-empty citations array with known usable `sourceFile` values and non-empty `articleRefs` arrays.
+- `delta` must contain non-empty string `text` and may only be forwarded after citations are valid.
+- `done` terminates the response. `error` causes the backend to use a safe fallback. Unknown event types invalidate the response.
+- The consultation agent is read-only. It may use only `read`, `grep`, `find`, and `ls` and must not write derived wiki pages during user conversations.
+- The `llm-wiki` skill's generic "queries compound too" behaviour is overridden for Ujimu consultation: repeated or unsupported user questions remain analytics/content-gap signals for admin review, not automatic wiki content.
+- The conversion agent has a strict exception to raw immutability: for a given original source it may write or edit only that source's deterministic generated Markdown target, and must not modify the original or any other raw file.
+- Conversion code should validate the expected target after the run and treat unexpected missing/invalid output as conversion failure.
+- Conversion succeeds only when the expected Markdown target exists, contains at least 20 non-whitespace characters of legible Markdown/text content, and can be checksummed.
+- On successful conversion, store `markdown_checksum` and `converted_at`, then set ingestion to `pending`.
+- Direct Markdown uploads renamed to `*.original.md` do not run through the conversion agent. They are marked with `conversion.status = not_required`, `conversion.markdown_path` equal to the stored Markdown path, `conversion.markdown_checksum` from the uploaded file, and `ingestion.status = pending`.
+- User-facing citations are still emitted at the end of the response stream after answer deltas, preserving the existing UI citation placement.
+
+Potential implementation zones:
+
+- `server/utils/ingestion/detect.ts`
+- `server/utils/ingestion/run.ts`
+- `server/utils/ingestion/pi-runner.ts`
+- `server/utils/ingestion/state.ts`
+- `server/utils/ingestion/storage.ts`
+- `server/utils/chat/pi-runner.ts`
+- `server/utils/chat/engine.ts`
+- `server/api/admin/specialists/[id]/raw.post.ts`
+- `server/api/admin/specialists/[id]/conversion/run.post.ts`
+- `.gitignore`
+- `.pi/settings.json`
+- `.pi/models.json`
+- `.pi/auth.json.sample`
+- `.pi/skills/**`
+
+Success conditions to convert into acceptance tests:
+
+- An admin can upload PDF, TXT, DOCX, or HTML and the system records a deterministic generated Markdown target ending in `.md`.
+- TXT and any source extractable with the approved Pi file tools are converted to Markdown before ingestion.
+- Direct Markdown upload `lei.md` is stored as `lei.original.md`; duplicate `lei.original.md` targets are rejected.
+- When an original file changes, the generated Markdown artefact is overwritten; when the original has not changed, conversion is skipped.
+- Ingestion reads only Markdown sources and preserves original-source traceability in citation metadata.
+- Consultation uses a real Pi SDK runner with the project-local default Pi model, returns a validated structured NDJSON answer/citation event stream, and produces answers grounded in the selected specialist wiki with user-facing citations.
+- `.pi/auth.json` is ignored/untracked, while `.pi/auth.json.sample` documents safe configuration examples.
+- Conversion and ingestion model overrides are read from environment variables and fall back to the project-local default when absent.
+- The project-local `llm-wiki` skill prevails over any global skill with the same name and instructs ingestion to use only Markdown files under `raw/`.
+- No new Pi tools are introduced; tests prove the expected tool allowlists for each agent role.
+
+Out of scope for this slice:
+
+- OCR for scanned PDFs.
+- New custom Pi tools or extraction tools.
+- Broad architecture redesign.
+- Real payment, OTP, deployment, or observability provider changes.
+- Using analytics as a grounding source.
+
+Next step:
+
+- Write acceptance tests first from the locked success conditions, then implement incrementally.
 
 ## Slice 12 — Passkeys post-MVP
 

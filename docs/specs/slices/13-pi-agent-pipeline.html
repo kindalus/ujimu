@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 13 — Three Pi agent pipeline</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+:root {
+  --bg: #070707;
+  --text: #f5f5f0;
+  --muted: #b9b7ad;
+  --faint: #77746b;
+  --line: rgba(255,255,255,.14);
+  --yellow: #f9d616;
+  --yellow-soft: rgba(249,214,22,.16);
+  --red: #d21034;
+  --panel: rgba(12,12,12,.62);
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(249,214,22,.14), transparent 28%),
+    radial-gradient(circle at 88% 78%, rgba(210,16,52,.10), transparent 30%),
+    linear-gradient(135deg, #030303 0%, #111 50%, #050505 100%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .24;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+.deck { width: 100vw; height: 100vh; position: relative; }
+.slide {
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 7vh 10vw 8vh;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(12px) scale(.99);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.slide.active { display: flex; opacity: 1; transform: translateY(0) scale(1); }
+.frame {
+  width: min(1180px, 100%);
+  min-height: min(690px, 76vh);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  box-shadow: 0 28px 90px rgba(0,0,0,.42);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  position: relative;
+  overflow: hidden;
+}
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(249,214,22,.08) 48%, transparent 100%);
+  opacity: .55;
+}
+.content { position: relative; z-index: 1; }
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin-bottom: 1.2rem;
+  color: var(--yellow);
+  font-size: .82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+}
+.kicker::before {
+  content: "";
+  width: 2.2rem;
+  height: .18rem;
+  border-radius: 99px;
+  background: var(--yellow);
+  box-shadow: 0 0 22px rgba(249,214,22,.45);
+}
+h1,h2 { font-family: var(--font-display); letter-spacing: -.045em; line-height: .96; margin: 0; }
+h1 { font-size: clamp(3.2rem, 7vw, 7rem); }
+h2 { max-width: 980px; font-size: clamp(2.25rem, 5vw, 5rem); }
+p.lead { max-width: 880px; margin: 1.35rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.55rem); line-height: 1.45; }
+ul { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; gap: .85rem; }
+li { display: flex; gap: .8rem; align-items: flex-start; color: #e8e7df; font-size: clamp(1rem, 1.55vw, 1.26rem); line-height: 1.38; }
+li::before { content: ""; flex: 0 0 .58rem; width: .58rem; height: .58rem; margin-top: .5rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 18px rgba(249,214,22,.38); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.card { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 1.05rem; min-height: 118px; }
+.card strong { display: block; color: var(--yellow); font-family: var(--font-display); font-size: 1.1rem; margin-bottom: .38rem; }
+.card span { color: var(--muted); line-height: 1.4; }
+.flow { display: flex; align-items: stretch; gap: .7rem; margin-top: 2rem; }
+.node { flex: 1; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.055); padding: 1rem; text-align: center; font-weight: 800; }
+.arrow { align-self: center; color: var(--yellow); font-size: 1.5rem; }
+pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px solid var(--line); background: rgba(0,0,0,.54); color: #fff8c8; font-size: clamp(.76rem, 1.1vw, .96rem); line-height: 1.45; overflow: auto; }
+.callout { margin-top: 1.7rem; padding: 1rem 1.2rem; border-radius: 18px; border: 1px solid rgba(249,214,22,.30); background: var(--yellow-soft); color: #fff9d1; max-width: 900px; line-height: 1.45; font-weight: 650; }
+.pills { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 2rem; }
+.pill { border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.06); padding: .62rem .85rem; font-weight: 800; color: #f8f6e8; }
+.topbar { position: fixed; top: 1.2rem; left: 50%; z-index: 10; transform: translateX(-50%); width: min(1180px,80vw); display: flex; justify-content: space-between; color: rgba(245,245,240,.68); font-size: .84rem; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 900; color: #fffef6; }
+.brand-dot { width: .75rem; height: .75rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 20px rgba(249,214,22,.7); }
+.slide-counter { position: fixed; right: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.72); font-weight: 800; }
+.navhint { position: fixed; left: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.45); font-size: .85rem; }
+.progress { position: fixed; left: 0; bottom: 0; z-index: 12; height: 4px; width: 100vw; background: rgba(255,255,255,.08); }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #fff2a0); box-shadow: 0 0 22px rgba(249,214,22,.55); transition: width 180ms ease; }
+@media (max-width: 1024px) { .slide { padding: 6vh 6vw 8vh; } .frame { min-height: 74vh; padding: 2rem; } .grid-3 { grid-template-columns: 1fr; } .grid-2 { grid-template-columns: 1fr; } .flow { flex-direction: column; } .arrow { transform: rotate(90deg); } }
+@media print { body { overflow: visible; background: #080808; } body::before, .topbar, .slide-counter, .progress, .navhint { display: none; } .deck { height: auto; } .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; } }
+</style>
+  </head>
+  <body>
+    <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 13 · Pi agent pipeline</div></div>
+    <main class="deck">
+<section class="slide"><div class="frame content"><div class="kicker">Slice 13</div><h1>Three Pi agent pipeline</h1>
+<p class="lead">Separate source conversion, wiki ingestion, and user consultation into distinct Pi-backed sessions with isolated prompts, model selection, and tool policy.</p>
+<div class="pills">
+<span class="pill">conversion</span>
+<span class="pill">ingestion</span>
+<span class="pill">consultation</span>
+<span class="pill">project-local .pi</span>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Brainstorm outcome</div><h2>The pipeline becomes explicit.</h2>
+<p class="lead">Raw files no longer flow directly into wiki ingestion. Every source that reaches ingestion is Markdown, and the conversion step is owned by a dedicated Pi agent.</p>
+<div class="flow">
+<div class="node">admin upload</div><div class="arrow">→</div><div class="node">conversion agent</div><div class="arrow">→</div><div class="node">Markdown source</div><div class="arrow">→</div><div class="node">ingestion agent</div><div class="arrow">→</div><div class="node">consultation agent</div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Architecture revisit</div><h2>General architecture review is deferred.</h2>
+<ul>
+<li>This slice is not considered affected by legislation or regulatory material.</li>
+<li>The current Nuxt, SQLite, specialist directory, and Pi SDK architecture remains the base.</li>
+<li>The change is scoped to the Pi source pipeline and project-local Pi configuration.</li>
+<li>A broader architecture deck can be revisited later if the agent pipeline expands beyond this scope.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Agent roles</div><h2>Three sessions, three responsibilities.</h2>
+<div class="grid-3">
+<div class="card"><strong>Conversion</strong><span>Turns uploaded original files into generated Markdown sources under raw/.</span></div>
+<div class="card"><strong>Ingestion</strong><span>Reads Markdown sources only and maintains the specialist wiki with traceability.</span></div>
+<div class="card"><strong>Consultation</strong><span>Answers user questions from the selected specialist wiki with citations.</span></div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Source naming</div><h2>Conversion output keeps the original extension.</h2>
+<pre>raw/lei.pdf   → raw/lei.pdf.md
+raw/lei.docx  → raw/lei.docx.md
+raw/lei.html  → raw/lei.html.md
+raw/lei.htm   → raw/lei.htm.md
+raw/lei.txt   → raw/lei.txt.md
+raw/lei.csv   → raw/lei.csv.md
+raw/lei.xlsx  → raw/lei.xlsx.md</pre>
+<div class="callout">The output path is deterministic: append <code>.md</code> to the original raw relative path. This avoids collisions between files with the same base name but different original formats.</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Direct Markdown upload</div><h2>Admin-provided Markdown is renamed as original.</h2>
+<pre>upload: lei.md
+stored: raw/lei.original.md</pre>
+<ul>
+<li>Direct Markdown uploads are treated as already-normalized source originals.</li>
+<li>The system must not create <code>lei.md.md</code>.</li>
+<li>If <code>raw/lei.original.md</code> already exists, the upload is rejected as a duplicate.</li>
+<li>Ingestion uses <code>lei.original.md</code> like any other Markdown ingestion source.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Generated artefacts</div><h2>Converted Markdown is not admin-owned prose.</h2>
+<ul>
+<li>Converted <code>.md</code> files are generated artefacts.</li>
+<li>If the original file changes, its generated Markdown is overwritten.</li>
+<li>If the original has not changed and Markdown exists, conversion is skipped.</li>
+<li>Manual edits to generated Markdown are not protected from overwrite after an original change.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Formats</div><h2>The MVP accepts common source formats.</h2>
+<ul>
+<li>Conversion candidates: PDF, TXT, DOCX, HTML/HTM, CSV, and XLSX.</li>
+<li>Scanned PDFs and OCR remain out of scope.</li>
+<li>CSV/XLSX conversion should preserve tabular content faithfully; XLSX sheet names become headings.</li>
+<li>The conversion agent must not silently summarize tabular sources.</li>
+<li>Generated Markdown is capped by <code>UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES</code>, default 1 MiB.</li>
+<li>Scanned PDFs fail with <code>OCR_REQUIRED</code> when detectable; OCR is out of scope.</li>
+<li>If content cannot be extracted safely or output is too large, conversion fails and ingestion does not run.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Tools boundary</div><h2>No new Pi tools are introduced in this slice.</h2>
+<ul>
+<li>The slice does not add custom extractors or new tool capabilities.</li>
+<li>Agent skills are instructions, not capabilities.</li>
+<li>Allowed tools are enforced in code when creating each Pi SDK session.</li>
+<li><code>bash</code> remains disabled by default.</li>
+</ul>
+<div class="callout">The existing file tools remain the boundary: <code>read</code>, <code>write</code>, <code>edit</code>, <code>grep</code>, <code>find</code>, and <code>ls</code>. Consultation should use read/search only.</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Project-local Pi config</div><h2>Ujimu should not depend on a developer's global Pi setup.</h2>
+<pre>.pi/
+  settings.json
+  models.json
+  auth.json.sample
+  skills/
+    llm-wiki/SKILL.md
+    llm-wiki/references/**
+  ujimu/
+    agents/
+      conversion-system.md
+      ingestion-system.md
+      consultation-system.md</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Secrets</div><h2>Auth is local or secret-managed.</h2>
+<ul>
+<li><code>.pi/auth.json</code> must not be committed.</li>
+<li><code>.pi/auth.json.sample</code> documents safe example credentials and provider shapes.</li>
+<li><code>.pi/settings.json</code> defaults to <code>openrouter/moonshotai/kimi-k2.6</code> with medium thinking.</li>
+<li><code>.pi/models.json</code> is a minimal custom-provider placeholder.</li>
+<li>If the default lacks auth, fail clearly instead of silently selecting another model.</li>
+<li>Conversion runs create safe admin audit events; consultation avoids new prompt/answer operational logs.</li>
+<li>Automated tests use fake Pi adapters; real Pi is covered by a documented manual smoke path.</li>
+<li>Production should mount credentials as secrets or use environment variables where possible.</li>
+<li>The implementation should update ignore rules so the real auth file stays out of Git.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Model selection</div><h2>Conversion and ingestion can override the default model.</h2>
+<ul>
+<li>Consultation uses the default model specified by the project-local <code>.pi</code> configuration.</li>
+<li>Conversion can use a provider/model/thinking override from environment variables.</li>
+<li>Ingestion can use a separate provider/model/thinking override from environment variables.</li>
+<li>If an override is absent, the agent falls back to the project-local default.</li>
+</ul>
+<pre>UJIMU_PI_CONVERSION_PROVIDER
+UJIMU_PI_CONVERSION_MODEL
+UJIMU_PI_CONVERSION_THINKING_LEVEL
+
+UJIMU_PI_INGESTION_PROVIDER
+UJIMU_PI_INGESTION_MODEL
+UJIMU_PI_INGESTION_THINKING_LEVEL</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Traceability</div><h2>Every answer must trace back through the pipeline.</h2>
+<ul>
+<li>Conversion state links original raw path to generated Markdown path and checksums.</li>
+<li>Ingestion state records the Markdown source used by the ingestion agent.</li>
+<li>Citation metadata preserves the original source identity shown to users.</li>
+<li>Analytics and chat history must not become grounding sources.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Conversion state stays with ingestion state.</h2>
+<ul>
+<li>Use the existing per-specialist <code>ingest/state.json</code> as the canonical source-pipeline state file.</li>
+<li>Do not create a separate <code>conversion/state.json</code> in this slice.</li>
+<li>The schema should distinguish conversion status from ingestion status.</li>
+<li>Admin display, startup detection, reload, and manual actions read one state file.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>State records are keyed by the original upload.</h2>
+<ul>
+<li>Use one source record per original uploaded file, not per generated Markdown artefact.</li>
+<li>Converted records keep <code>raw_path</code> as the original path and store <code>markdown_path</code> in conversion metadata.</li>
+<li>Ingestion metadata stores the Markdown path actually used by the ingestion agent.</li>
+<li>Direct Markdown uploads are tracked as <code>*.original.md</code> with conversion marked not required.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>State separates conversion from ingestion.</h2>
+<pre>conversion.status:
+  not_required | pending | processing | converted | failed
+
+ingestion.status:
+  blocked | pending | processing | ingested | failed</pre>
+<ul>
+<li>Use nested <code>conversion</code> and <code>ingestion</code> objects.</li>
+<li>A conversion failure blocks ingestion for that source.</li>
+<li>Admin UI can render two explicit pipeline stages.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Conversion is manual, not upload-time work.</h2>
+<div class="flow">
+<div class="node">Upload</div><div class="arrow">→</div><div class="node">Reload / detect</div><div class="arrow">→</div><div class="node">Run conversion</div><div class="arrow">→</div><div class="node">Run ingestion</div>
+</div>
+<ul>
+<li>Upload should not silently invoke Pi.</li>
+<li>Reload detects pending state but does not run heavy agent work.</li>
+<li>Admins explicitly trigger conversion and ingestion.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Ingestion skips sources that are not ready.</h2>
+<ul>
+<li>Ingestion processes only Markdown sources whose conversion stage is ready.</li>
+<li>Sources with pending or failed conversion are skipped, not converted implicitly.</li>
+<li>The API should return ingested and skipped counts with safe skipped reasons.</li>
+<li>Example reasons: <code>conversion_pending</code> and <code>conversion_failed</code>.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Project-local llm-wiki controls ingestion.</h2>
+<ul>
+<li>Copy the current <code>llm-wiki</code> skill into <code>.pi/skills/llm-wiki</code>.</li>
+<li>Add a minimal Ujimu override: ingest only Markdown files under <code>raw/</code>.</li>
+<li>Non-Markdown raw files are conversion inputs and must not be ingested directly.</li>
+<li>The project-local copy must win any skill-name collision with global <code>llm-wiki</code>.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Pi sessions use the Ujimu agent directory.</h2>
+<ul>
+<li>Resolve <code>agentDir</code> from <code>UJIMU_PI_AGENT_DIR</code> when set.</li>
+<li>Fallback to the project-root <code>.pi</code> directory.</li>
+<li>Pass the resolved <code>agentDir</code> explicitly to Pi SDK setup.</li>
+<li>All three agents use project-local settings, models, auth convention, and skills.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Model overrides are all-or-default.</h2>
+<ul>
+<li>Use an override only when both provider and model are set for that role.</li>
+<li>If neither is set, use the default from <code>.pi/settings.json</code>.</li>
+<li>If only one is set, fail with a configuration error.</li>
+<li>If the model is missing or unauthenticated, fail before starting the Pi session.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Each Pi role is enabled independently.</h2>
+<pre>UJIMU_PI_CONVERSION_ENABLED=true
+UJIMU_PI_INGESTION_ENABLED=true
+UJIMU_PI_CHAT_ENABLED=true</pre>
+<ul>
+<li>Disabled roles fail safely without starting Pi sessions.</li>
+<li>Admin conversion and ingestion can be enabled before user-facing chat.</li>
+<li>Existing ingestion and chat flags remain compatible.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Generated Markdown is not scanned as a source.</h2>
+<ul>
+<li><code>*.pdf.md</code>, <code>*.docx.md</code>, <code>*.html.md</code>, <code>*.htm.md</code>, <code>*.txt.md</code>, <code>*.csv.md</code>, and <code>*.xlsx.md</code> never create independent source records.</li>
+<li>They are discovered through the original source record's conversion metadata.</li>
+<li><code>*.original.md</code> does create a source record because it is an uploaded normalized original.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Changed originals invalidate downstream state.</h2>
+<ul>
+<li>If an original checksum changes, mark conversion as <code>pending</code>.</li>
+<li>Mark ingestion as <code>blocked</code> until the new Markdown is converted.</li>
+<li>Do not expose stale ingested evidence for changed originals.</li>
+<li>Chat ignores the source until refreshed conversion and ingestion complete.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Failed conversion keeps old Markdown but blocks ingestion.</h2>
+<ul>
+<li>Do not delete an existing generated Markdown file when a later conversion fails.</li>
+<li>Keep the file for diagnosis and Git diffability.</li>
+<li>The state remains failed/blocked, so ingestion cannot use the stale artefact.</li>
+<li>Ingestion trusts state, not file existence alone.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Real Pi consultation ships in this slice.</h2>
+<ul>
+<li>The consultation agent is not just scaffolding or a placeholder.</li>
+<li>Implement a real Pi SDK chat runner behind <code>UJIMU_PI_CHAT_ENABLED=true</code>.</li>
+<li>When disabled, misconfigured, ungrounded, or missing valid citations, fail safely.</li>
+<li>The runner uses the project-local default Pi model and read/search-only access.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Consultation streams structured NDJSON.</h2>
+<pre>{"type":"citations","citations":[{"sourceFile":"raw/lei.pdf","articleRefs":["Artigo 1.º"]}]}
+{"type":"delta","text":"..."}
+{"type":"done"}</pre>
+<ul>
+<li>The Pi-backed agent emits machine-readable events, not free-form source text.</li>
+<li>The first forwarded answer text must come after a valid <code>citations</code> event.</li>
+<li>Free text before citations is buffered, never shown immediately.</li>
+<li>The pre-citation buffer is capped at 16 KB.</li>
+<li>Accepted event types: <code>citations</code>, <code>delta</code>, <code>done</code>, and <code>error</code>.</li>
+<li>If valid citations arrive, buffered text may be released as initial answer text.</li>
+<li>If citations never validate, an unknown event appears, or the buffer limit is exceeded, discard the buffer and trigger fallback.</li>
+<li>Consultation is read-only: no derived pages are written during user chat.</li>
+<li>Conversion may write only its deterministic Markdown target under <code>raw/</code>.</li>
+<li>Conversion output must exist, have ≥20 non-whitespace characters, and be checksummed.</li>
+<li>Direct Markdown uploads become <code>*.original.md</code>, skip conversion, and go straight to pending ingestion.</li>
+<li>Manual conversion endpoint: <code>POST /api/admin/specialists/:id/conversion/run</code>.</li>
+<li>Conversion run retries <code>pending</code> and <code>failed</code> sources, skipping converted/not-required sources.</li>
+<li>Stale conversion or ingestion <code>processing</code> work older than <code>UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES</code> is retryable; default 30 minutes.</li>
+<li>Reingestion reconciles existing wiki pages; it does not delete or duplicate pages by default.</li>
+<li>User-facing citations point to the original upload path, not generated Markdown artefacts.</li>
+<li>The consultation prompt includes the backend-computed allowlist of usable citation evidence.</li>
+<li>The backend validates returned citations against the same allowlist.</li>
+<li>Consultation answers from <code>wiki/</code>, not by reading <code>raw/</code> at answer time.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Likely implementation zones</div><h2>The change extends existing ingestion and chat boundaries.</h2>
+<pre>server/utils/ingestion/detect.ts
+server/utils/ingestion/run.ts
+server/utils/ingestion/pi-runner.ts
+server/utils/ingestion/state.ts
+server/utils/ingestion/storage.ts
+server/utils/chat/pi-runner.ts
+server/utils/chat/engine.ts
+server/utils/pi/config.ts
+server/api/admin/specialists/[id]/raw.post.ts
+server/api/admin/specialists/[id]/conversion/run.post.ts
+.pi/settings.json
+.pi/models.json
+.pi/auth.json.sample
+.pi/skills/llm-wiki/**</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>The slice is done when the pipeline is observable and safe.</h2>
+<ul>
+<li>An admin can upload PDF/TXT/DOCX/HTML/HTM/CSV/XLSX and the system records a conversion target ending in <code>.md</code>.</li>
+<li>TXT and any extractable source are converted to Markdown before ingestion.</li>
+<li>Direct Markdown upload is stored as <code>.original.md</code> and duplicate originals are rejected.</li>
+<li>Ingestion reads only Markdown sources and preserves original-source traceability.</li>
+<li>The project-local <code>llm-wiki</code> skill wins collisions and enforces Markdown-only raw ingestion.</li>
+<li>Real Pi-backed consultation answers from the wiki through validated structured NDJSON events with citations produced from the converted pipeline.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Explicit exclusions</div><h2>Keep this slice focused.</h2>
+<ul>
+<li>No OCR for scanned PDFs.</li>
+<li>No new Pi tools or custom extraction tools.</li>
+<li>No broad architecture redesign.</li>
+<li>No real payment, OTP, or deployment changes.</li>
+<li>No automatic wiki content creation from analytics signals.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Next step</div><h2>Write acceptance tests first.</h2>
+<p class="lead">The grill decisions are locked. The next Zafir phase is acceptance-test creation from these success conditions, followed by incremental implementation.</p>
+<div class="callout">Keep automated tests fake-runner based; real Pi conversion, ingestion, and consultation are covered by a documented smoke path.</div>
+</div></section>
+    </main>
+    <div class="navhint">← → / space to navigate</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      const progressBar = document.getElementById("progressBar");
+      let idx = 0;
+      total.textContent = slides.length;
+      function update() {
+        slides.forEach((slide, i) => slide.classList.toggle("active", i === idx));
+        current.textContent = idx + 1;
+        progressBar.style.width = `${((idx + 1) / slides.length) * 100}%`;
+      }
+      function go(next) {
+        idx = Math.max(0, Math.min(slides.length - 1, next));
+        update();
+      }
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === " ") { event.preventDefault(); go(idx + 1); }
+        if (event.key === "ArrowLeft") { event.preventDefault(); go(idx - 1); }
+        if (event.key === "Home") { event.preventDefault(); go(0); }
+        if (event.key === "End") { event.preventDefault(); go(slides.length - 1); }
+      });
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("a, button, code")) return;
+        event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1);
+      });
+      update();
+    </script>
+  </body>
+</html>

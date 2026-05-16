@@ -1,0 +1,6 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "moonshotai/kimi-k2.6",
+  "defaultThinkingLevel": "medium",
+  "hideThinkingBlock": true
+}
