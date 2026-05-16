@@ -173,6 +173,14 @@ As-built documentation correction, idea-refined direction (2026-05-16):
 - Key assumptions: `STATUS.md` is the canonical source for Slice 11 as-built decisions; the current implementation remains verified; future hardening belongs in later slices rather than retroactively expanding Slice 11.
 - Not doing: no code changes, no new security controls, no new acceptance tests, and no external observability integrations as part of this correction.
 
+As-built documentation correction, locked grill decisions (2026-05-16):
+
+- Edit the existing Slice 11 deck content so it matches the as-built decisions, and add an explicit correction note rather than leaving contradictory original slides in place.
+- Keep Slice 11 status as `verified`; this is a documentation fidelity correction, not a new implementation phase or behavioural change.
+- Record unresolved hardening topics only as future candidates in this correction; do not create or scope a new slice as part of this work.
+- Treat `STATUS.md` as the canonical Slice 11 source of truth and align the deck to its already-locked decisions.
+- Verify by documentation review and diff only, because no runtime code, tests, or package files are changed.
+
 Idea-refined direction:
 
 - Implement a practical hardening MVP rather than integrating external observability vendors in this slice.
