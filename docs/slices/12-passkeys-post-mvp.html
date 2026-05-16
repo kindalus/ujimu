@@ -164,49 +164,69 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <div class="card"><strong>Remove passkey</strong><span>User removes a registered credential while retaining OTP access.</span></div>
 </div>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Data model</div><h2>Store credentials without storing secrets.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Locked data model</div><h2>Store credentials without storing secrets.</h2>
 <pre>passkey_credentials
-  id
-  user_id
-  credential_id
-  public_key
-  counter
-  transports
-  created_at
-  last_used_at</pre>
+  id, user_id, credential_id UNIQUE, public_key
+  counter, transports_json, created_at, last_used_at
+  deleted_at, deleted_by_user_id
+
+passkey_challenges
+  id, challenge UNIQUE, purpose, user_id
+  created_at, expires_at, consumed_at, metadata_json
+
+passkey_auth_attempts
+  id, subject_type, subject_id, purpose
+  success, failure_code, occurred_at</pre>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Security conditions</div><h2>WebAuthn checks must be strict.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Locked security</div><h2>WebAuthn checks must be strict.</h2>
 <ul>
-<li>Validate origin and relying-party ID against configured production values.</li>
-<li>Use one-time challenges with short expiry.</li>
-<li>Bind credentials to the authenticated user during registration.</li>
-<li>Reject replayed or malformed assertions.</li>
-<li>Never expose private keys because the app never receives them.</li>
+<li>Passkeys are enabled explicitly and require configured origin/RP values in production.</li>
+<li>Registration requires a session created by OTP within the last 15 minutes.</li>
+<li>Use one-time five-minute challenges consumed on any verification attempt.</li>
+<li>Validate origin/RP ID, bind credentials to the current user, and reject replayed or malformed assertions.</li>
+<li>Rate-limit public login endpoints and validate same-origin on authenticated passkey mutations.</li>
 </ul>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Implementation boundary</div><h2>Use a WebAuthn library behind a swappable contract.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Implementation boundary</div><h2>Use SimpleWebAuthn behind a swappable contract.</h2>
 <ul>
-<li>Use a mature WebAuthn/passkey library rather than hand-rolling cryptographic verification.</li>
-<li>Keep library-specific calls behind an internal passkey service/adapter so the implementation can be replaced later.</li>
-<li>Verify official library documentation before implementation and keep origin/RP configuration explicit.</li>
-<li>Reuse the existing user and JWT session model after successful passkey login.</li>
+<li>Use @simplewebauthn/server and @simplewebauthn/browser initially.</li>
+<li>Keep library-specific calls behind an internal PasskeyWebAuthnAdapter.</li>
+<li>Tests inject a deterministic fake adapter instead of real browser/OS authenticators.</li>
+<li>Reuse the existing user and JWT session model, extended with authMethod.</li>
 </ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked endpoint contract</div><h2>Challenge creation is always POST.</h2>
+<pre>POST /api/auth/passkeys/registration/options
+POST /api/auth/passkeys/registration/verify
+POST /api/auth/passkeys/authentication/options
+POST /api/auth/passkeys/authentication/verify
+GET    /api/auth/passkeys
+DELETE /api/auth/passkeys/:credentialId</pre>
+<div class="callout">Options responses expose WebAuthn options only. The server stores and looks up challenges by challenge value and purpose.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Add without rewriting OTP auth.</h2>
 <pre>server/utils/auth/passkeys.ts
 server/utils/auth/passkey-adapter.ts
-server/api/auth/passkeys/register-options.get.ts
-server/api/auth/passkeys/register.post.ts
-server/api/auth/passkeys/login-options.post.ts
-server/api/auth/passkeys/login.post.ts
-server/api/auth/passkeys/index.get.ts
-server/api/auth/passkeys/[credentialId].delete.ts
+server/api/auth/passkeys/**
 pages/account/security.vue
-server/database/migrations/*passkeys*.sql</pre>
+pages/index.vue
+server/utils/db.ts
+server/api/auth/session.get.ts
+server/api/admin/ops/readyz.get.ts
+docs/operations.md</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked WebAuthn policy</div><h2>Modern passkeys, conservative trust.</h2>
+<ul>
+<li>Registration uses attestation none, residentKey preferred, userVerification preferred.</li>
+<li>Login uses discoverable credentials: do not send allowCredentials.</li>
+<li>Registration sends active credentials in excludeCredentials.</li>
+<li>Credentials are soft-deleted and may be reactivated only for the same user.</li>
+<li>Counter checks reject non-increasing positive counters but accept always-zero authenticators.</li>
+</ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">MVP scope</div><h2>Small enough to verify, useful enough to keep.</h2>
 <div class="grid-2">
-<div class="card"><strong>In scope</strong><span>Passkey registration for authenticated users, passkey login, credential listing/removal, OTP fallback, strict challenge/origin checks, and tests around replay/expiry failures.</span></div>
+<div class="card"><strong>In scope</strong><span>Passkey registration for authenticated users after recent OTP, passkey login, credential listing/removal, OTP fallback, strict challenge/origin checks, rate limiting, and fake-adapter tests.</span></div>
 <div class="card"><strong>Not doing</strong><span>No passwords, no mandatory passkeys, no passkey-only accounts, no admin-only rollout, no enterprise SSO, and no recovery path that removes OTP.</span></div>
 </div>
 </div></section>

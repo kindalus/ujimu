@@ -50,11 +50,11 @@ Known non-blocking warnings:
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
-| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `idea-refined` | — | All registered users can use passkeys; management belongs in `/account/security`; OTP remains fallback/recovery; WebAuthn library must sit behind a swappable contract. |
+| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `grilled` | — | Passkey implementation decisions locked; next step is acceptance tests before implementation. |
 
 ## Slice 12 — Passkeys post-MVP
 
-Status: `idea-refined`
+Status: `grilled`
 
 Idea-refined direction:
 
@@ -67,14 +67,58 @@ Idea-refined direction:
 - Reuse the existing `users`, `user_identities`, quota subject, and JWT session model after successful passkey authentication.
 - Preserve strict WebAuthn security expectations: configured origin/RP ID validation, short-lived one-time challenges, replay rejection, malformed assertion rejection, and credential binding to the authenticated user during registration.
 
+Locked grill decisions:
+
+- Passkeys are enabled explicitly with `UJIMU_PASSKEYS_ENABLED=true`; when disabled, public passkey login endpoints are hidden and UI passkey actions are not shown.
+- Configure WebAuthn through `UJIMU_PASSKEY_RP_ID`, `UJIMU_PASSKEY_RP_NAME`, and `UJIMU_PASSKEY_ORIGIN`; development may default to `localhost`, `Ujimu`, and `http://localhost:3000`, but production requires explicit values when passkeys are enabled.
+- Admin readiness should report passkey enabled/configured booleans without exposing RP ID, origin, or other configuration values.
+- Use `@simplewebauthn/server` and `@simplewebauthn/browser` initially, behind an internal `PasskeyWebAuthnAdapter` so tests and future library swaps do not change route/session/account code.
+- Read current official SimpleWebAuthn documentation before implementation.
+- Generate WebAuthn options through mutating `POST` endpoints because challenge creation writes server-side state.
+- Public/auth contracts are `POST /api/auth/passkeys/registration/options`, `POST /api/auth/passkeys/registration/verify`, `POST /api/auth/passkeys/authentication/options`, `POST /api/auth/passkeys/authentication/verify`, `GET /api/auth/passkeys`, and `DELETE /api/auth/passkeys/:credentialId`.
+- Registration endpoints require an authenticated session created by OTP within the last 15 minutes; passkey-created sessions cannot add new passkeys until the user re-enters by OTP.
+- Extend session JWT payloads with `authMethod: 'otp' | 'passkey'`; existing tokens without the field remain valid as `unknown` for general app use.
+- `GET /api/auth/session` may expose safe `authMethod` and `recentOtpAuthenticated` fields for UI convenience, but server-side checks remain authoritative.
+- Passkey login only authenticates existing accounts; account creation/bootstrap remains OTP-only.
+- Admin access remains based on verified identities and `UJIMU_ADMIN_CONTACTS`; admins may enter `/admin` with passkey sessions, but adding passkeys still requires recent OTP.
+- Store passkey data in inline SQLite migrations in `server/utils/db.ts`, not a separate migrations directory.
+- Add `passkey_credentials`, `passkey_challenges`, and `passkey_auth_attempts` tables.
+- Store binary WebAuthn values as base64url strings; UI and delete operations use the internal `passkey_credentials.id`, not the raw WebAuthn credential ID.
+- `credential_id` is globally unique. Duplicate active credentials return `409 PASSKEY_ALREADY_REGISTERED` without revealing account ownership.
+- Passkey removal is soft-delete with `deleted_at`; active login/listing ignores soft-deleted credentials.
+- Re-registration may reactivate a soft-deleted credential only for the same `user_id`; never reassign a credential from another user.
+- Users may register multiple passkeys, with an initial defensive cap of 20 active credentials per user.
+- Users may remove their last passkey because OTP remains the official fallback/recovery path.
+- Passkey registration uses `attestationType: 'none'`, `residentKey: 'preferred'`, and `userVerification: 'preferred'`.
+- Passkey authentication uses discoverable credentials: do not send `allowCredentials`; map returned `credential_id` to `user_id` server-side.
+- Registration options include active credentials in `excludeCredentials`; soft-deleted credentials are excluded from that list.
+- Challenges are stored server-side, expire after 5 minutes, are one-shot, and are consumed on any verification attempt whether verification succeeds or fails.
+- Verification looks up challenges by challenge value and purpose; do not expose a separate `challengeId` to the browser.
+- Clean old passkey challenges and auth-attempt rows opportunistically in passkey endpoints after 24 hours; do not add a background worker in this slice.
+- Store and update WebAuthn counters, rejecting non-increasing positive counters while accepting authenticators that consistently return zero.
+- Public passkey login endpoints are rate-limited server-side: roughly 20 option challenges per 10 minutes and 10 failed verifications per 10 minutes.
+- Rate-limit identity prefers `ujimu_visitor_id`; fallback to direct event IP; only trust proxy headers when `UJIMU_TRUST_PROXY_HEADERS=true`; store hashed IP identifiers, not raw IP addresses.
+- Authenticated sensitive passkey operations validate same-origin using `Origin` or `Referer`; production rejects missing origin evidence for those operations.
+- Client UI detects unsupported WebAuthn/insecure contexts only for UX; OTP remains available and the server still validates everything.
+- `/account/security` is the management UI; the main page adds a discreet `Segurança da conta` link for authenticated users and `Entrar com passkey` for unauthenticated users when available.
+- `/account/security` shows session state, add passkey, active passkey list, remove buttons, and a short note that OTP remains available.
+- Passkey list responses expose only internal credential ID, creation time, last-used time, and transports; never expose public keys, challenges, signatures, raw authenticator data, or full WebAuthn payloads.
+- Passkey removal uses a client-side confirmation prompt; the backend returns `404` for missing, cross-user, or already removed credentials.
+- Operational logs should record sanitized passkey registration/login/removal/configuration outcomes without credential IDs, public keys, challenges, signatures, contacts, or full WebAuthn payloads.
+- Public error codes should be safe and generic: `INVALID_PASSKEY_REQUEST`, `PASSKEY_AUTHENTICATION_FAILED`, `RECENT_AUTH_REQUIRED`, `PASSKEY_ALREADY_REGISTERED`, `PASSKEY_RATE_LIMITED`, and `PASSKEYS_NOT_CONFIGURED`.
+- Tests should use a deterministic fake adapter for WebAuthn behavior and avoid real browser/OS authenticator prompts.
+
 Acceptance-test direction:
 
-- Authenticated registered users can register a passkey for their current account.
-- Users with a registered passkey can sign in without requesting OTP.
-- Removing a passkey prevents future sign-in with that credential.
-- OTP request and verification continue to work after passkey registration and removal.
-- Invalid origin, expired challenge, replayed challenge/assertion, or malformed payload does not create a session.
-- The passkey service is exercised through internal contracts so the concrete WebAuthn library can be replaced.
+- Authenticated registered users can register a passkey for their current account only after recent OTP authentication.
+- Users with a registered passkey can sign out and sign in without requesting OTP.
+- Removing a passkey prevents future sign-in with that credential, while OTP request and verification continue to work.
+- Disabled or misconfigured passkeys hide/fail safely without leaking configuration values.
+- Invalid origin, expired challenge, reused challenge, malformed payload, unknown credential, removed credential, duplicate credential, and invalid assertion do not create a session.
+- Public passkey login endpoints enforce rate limits.
+- The passkey service is exercised through internal adapter contracts with fake adapter tests so the concrete WebAuthn library can be replaced.
+- `/account/security` exposes the agreed management UI and the main chat page links to it when appropriate.
+- Operations documentation and readiness include passkey enablement/configuration expectations without exposing secrets or RP/origin values.
 
 Out of scope for this slice:
 
@@ -86,7 +130,7 @@ Out of scope for this slice:
 
 Next step:
 
-- Run `grill-me` to lock implementation decisions one question at a time before writing acceptance tests.
+- Write acceptance tests first, then implement incrementally.
 
 ## Slice 11 — Security, operations & observability
 
