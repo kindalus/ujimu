@@ -129,6 +129,7 @@ const authError = ref('')
 const authPending = ref(false)
 
 onMounted(() => {
+  void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
 })
@@ -155,6 +156,10 @@ const composerHelp = computed(() => {
   if (isStreaming.value) return 'A pergunta será adicionada à fila.'
   return 'A resposta será apresentada por partes e com fontes no fim.'
 })
+
+async function recordVisit(): Promise<void> {
+  await fetch('/api/analytics/visit', { method: 'POST' }).catch(() => undefined)
+}
 
 async function loadAuthSession(): Promise<void> {
   try {

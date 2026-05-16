@@ -20,12 +20,12 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 08:
+Latest full verification after Slice 09:
 
-- `npm test` — passed, 53 tests
+- `npm test` — passed, 57 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API smoke check — not separately run for admin; route, audit, upload, trash-delete, and UI contracts are covered by acceptance tests.
+- Manual API smoke check — not separately run for analytics; route, stream logging, privacy deletion, review lifecycle, visitor count, and UI contracts are covered by acceptance tests.
 
 Known non-blocking warnings:
 
@@ -45,16 +45,30 @@ Known non-blocking warnings:
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
-| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `acceptance-tested` | — | Acceptance tests written for question logging, content-gap review, visitor counts, deletion privacy, and admin UI. |
+| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
-## Active slice details
+## Completed slice details
 
 ### Slice 09 — Question analytics & content gaps
 
-Status: `acceptance-tested`
+Status: `verified`
+
+Implemented:
+
+- `question_analytics_events`, `question_analytics_reviews`, and `visitor_events` SQLite migration.
+- Deterministic question normalization and SHA-256 fingerprints for repeated-question grouping.
+- Chat stream analytics logging after complete visible `answered` or `insufficient_context` outcomes only.
+- Analytics rows linked to conversation/user message IDs when authenticated history is saved, while keeping old analytics after successful edits.
+- Conversation deletion privacy via cascading removal of linked readable analytics rows.
+- First-party `ujimu_visitor_id` cookie and public visit recording endpoint.
+- Admin visitor-count endpoint for distinct monthly visitors, using `user_id` before visitor cookie identity.
+- Admin question analytics endpoint for candidates and recent questions per specialist.
+- Candidate review endpoint that hides reviewed fingerprints until renewed recurrence after review.
+- `/admin` dashboard sections for monthly visitors, content-gap candidates, recent questions, and review actions.
+- Main page visit ping on load.
 
 Idea-refined direction:
 
@@ -103,8 +117,6 @@ Out of scope for this slice:
 - Third-party analytics integrations.
 - Admin comments, assignments, or editorial workflow beyond reviewed/unreviewed.
 - Using analytics as citations or answer context.
-
-## Completed slice details
 
 ### Slice 08 — Admin specialist management
 

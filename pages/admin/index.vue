@@ -34,6 +34,41 @@ interface AdminSpecialistsResponse {
   specialists: AdminSpecialist[]
 }
 
+interface MonthlyVisitorsResponse {
+  month: string
+  distinctVisitors: number
+}
+
+interface ContentGapCandidate {
+  specialistId: string
+  fingerprint: string
+  normalizedQuestion: string
+  latestQuestion: string
+  countLast30Days: number
+  countSinceReview: number
+  totalCount: number
+  insufficientContextCount: number
+  firstOccurredAt: string
+  lastOccurredAt: string
+  reviewedAt: string | null
+}
+
+interface RecentQuestionAnalytics {
+  id: string
+  specialistId: string
+  outcome: 'answered' | 'insufficient_context'
+  questionText: string
+  normalizedQuestion: string
+  fingerprint: string
+  occurredAt: string
+  userTimezone: string
+}
+
+interface QuestionAnalyticsResponse {
+  candidates: ContentGapCandidate[]
+  recentQuestions: RecentQuestionAnalytics[]
+}
+
 interface ApiErrorPayload {
   error?: {
     code?: string
@@ -52,6 +87,12 @@ const errorMessage = ref('')
 const pending = ref(false)
 const uploadFile = ref<File | undefined>()
 const confirmationId = ref('')
+const monthlyVisitors = ref<MonthlyVisitorsResponse | undefined>()
+const analyticsCandidates = ref<ContentGapCandidate[]>([])
+const recentQuestions = ref<RecentQuestionAnalytics[]>([])
+const analyticsPending = ref(false)
+const analyticsError = ref('')
+const currentMonth = new Date().toISOString().slice(0, 7)
 
 const createForm = ref({
   id: '',
@@ -88,6 +129,7 @@ async function loadAdminSession(): Promise<void> {
       : { authenticated: false, admin: false }
     if (session.value.admin) {
       await loadSpecialists()
+      await loadMonthlyVisitors()
     }
   } catch {
     session.value = { authenticated: false, admin: false }
@@ -124,6 +166,39 @@ function selectSpecialist(specialistId: string): void {
     streaming_enabled: specialist.streaming_enabled
   }
   confirmationId.value = ''
+  void loadQuestionAnalytics()
+}
+
+async function loadMonthlyVisitors(): Promise<void> {
+  try {
+    const response = await fetch(`/api/admin/analytics/visitors?month=${encodeURIComponent(currentMonth)}`)
+    if (!response.ok) throw new Error('Failed to load visitors.')
+    monthlyVisitors.value = (await response.json()) as MonthlyVisitorsResponse
+  } catch {
+    monthlyVisitors.value = undefined
+  }
+}
+
+async function loadQuestionAnalytics(): Promise<void> {
+  if (!selectedSpecialistId.value) {
+    analyticsCandidates.value = []
+    recentQuestions.value = []
+    return
+  }
+
+  analyticsPending.value = true
+  analyticsError.value = ''
+  try {
+    const response = await fetch(`/api/admin/analytics/questions?specialistId=${encodeURIComponent(selectedSpecialistId.value)}`)
+    if (!response.ok) throw new Error('Failed to load analytics.')
+    const payload = (await response.json()) as QuestionAnalyticsResponse
+    analyticsCandidates.value = payload.candidates
+    recentQuestions.value = payload.recentQuestions
+  } catch {
+    analyticsError.value = 'Não foi possível carregar as lacunas de conteúdo.'
+  } finally {
+    analyticsPending.value = false
+  }
 }
 
 async function createSpecialist(): Promise<void> {
@@ -218,6 +293,19 @@ async function runIngestion(): Promise<void> {
     const payload = (await response.json()) as { sources: IngestionSource[] }
     replaceSelectedSources(payload.sources)
     feedback.value = 'Ingestão concluída.'
+  })
+}
+
+async function reviewCandidate(candidate: ContentGapCandidate): Promise<void> {
+  await runAdminAction(async () => {
+    const response = await fetch(`/api/admin/analytics/questions/${encodeURIComponent(candidate.fingerprint)}/review`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ specialistId: candidate.specialistId })
+    })
+    if (!response.ok) throw new Error(await readApiError(response))
+    feedback.value = 'Lacuna marcada como revista.'
+    await loadQuestionAnalytics()
   })
 }
 
@@ -399,6 +487,59 @@ async function readApiError(response: Response): Promise<string> {
           </section>
         </div>
       </section>
+
+      <section class="admin-card analytics-card" aria-labelledby="analytics-title">
+        <div class="card-heading">
+          <div>
+            <p class="section-label">Analytics</p>
+            <h2 id="analytics-title">Visitantes este mês</h2>
+          </div>
+          <UBadge color="primary" variant="soft">
+            {{ monthlyVisitors?.distinctVisitors ?? '—' }}
+          </UBadge>
+        </div>
+        <p class="muted">Visitantes distintos em {{ monthlyVisitors?.month ?? currentMonth }}.</p>
+
+        <div class="card-heading analytics-heading">
+          <div>
+            <p class="section-label">Editorial</p>
+            <h2>Lacunas de conteúdo</h2>
+          </div>
+          <UButton type="button" color="neutral" variant="soft" size="sm" :loading="analyticsPending" @click="loadQuestionAnalytics">
+            Actualizar
+          </UButton>
+        </div>
+
+        <p v-if="!selectedSpecialist" class="muted">Seleccione uma especialidade para ver lacunas.</p>
+        <p v-else-if="analyticsPending" class="muted">A carregar lacunas de conteúdo...</p>
+        <p v-else-if="analyticsError" class="admin-error" role="alert">{{ analyticsError }}</p>
+        <p v-else-if="analyticsCandidates.length === 0" class="muted">Sem lacunas repetidas por rever.</p>
+        <ol v-else class="analytics-list">
+          <li v-for="candidate in analyticsCandidates" :key="candidate.fingerprint">
+            <div>
+              <strong>{{ candidate.latestQuestion }}</strong>
+              <small>
+                {{ candidate.countLast30Days }} ocorrências em 30 dias ·
+                {{ candidate.insufficientContextCount }} sem contexto suficiente
+              </small>
+            </div>
+            <UButton type="button" color="primary" variant="soft" size="sm" :loading="pending" @click="reviewCandidate(candidate)">
+              Marcar como revista
+            </UButton>
+          </li>
+        </ol>
+
+        <section class="recent-questions" aria-labelledby="recent-questions-title">
+          <h3 id="recent-questions-title">Perguntas recentes</h3>
+          <p v-if="recentQuestions.length === 0" class="muted">Sem perguntas registadas.</p>
+          <ol v-else>
+            <li v-for="item in recentQuestions" :key="item.id">
+              <span>{{ item.questionText }}</span>
+              <small>{{ item.outcome === 'insufficient_context' ? 'Sem contexto suficiente' : 'Respondida' }}</small>
+            </li>
+          </ol>
+        </section>
+      </section>
     </section>
 
     <p v-if="feedback" class="feedback">{{ feedback }}</p>
@@ -440,6 +581,8 @@ async function readApiError(response: Response): Promise<string> {
 .admin-hero p:not(.section-label),
 .muted,
 .sources small,
+.analytics-list small,
+.recent-questions small,
 .danger-zone p {
   color: var(--ujimu-muted);
 }
@@ -511,7 +654,9 @@ async function readApiError(response: Response): Promise<string> {
   flex-wrap: wrap;
 }
 
-.sources ol {
+.sources ol,
+.analytics-list,
+.recent-questions ol {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -519,7 +664,17 @@ async function readApiError(response: Response): Promise<string> {
   list-style: none;
 }
 
+.analytics-card {
+  grid-column: 1 / -1;
+}
+
+.analytics-heading {
+  margin-top: 10px;
+}
+
 .sources li,
+.analytics-list li,
+.recent-questions li,
 .danger-zone {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
@@ -527,9 +682,22 @@ async function readApiError(response: Response): Promise<string> {
   background: rgba(0, 0, 0, 0.18);
 }
 
-.sources li {
+.sources li,
+.recent-questions li {
   display: grid;
   gap: 4px;
+}
+
+.analytics-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent-questions {
+  display: grid;
+  gap: 10px;
 }
 
 .sources span,

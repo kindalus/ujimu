@@ -389,13 +389,15 @@ function failingStreamRunner(): ChatEngineRunner {
       return {
         grounded: true,
         citations: [input.citationEvidence[0]],
-        async *deltas() {
-          yield 'Resposta parcial.'
-          throw new Error('stream failed')
-        }
+        deltas: failingDeltas()
       }
     }
   }
+}
+
+async function* failingDeltas(): AsyncIterable<string> {
+  yield 'Resposta parcial.'
+  throw new Error('stream failed')
 }
 
 async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {

@@ -8,6 +8,7 @@ import {
   setResponseHeaders,
   setResponseStatus
 } from 'h3'
+import { resolveVisitorIdentity } from '../utils/analytics/visitors'
 import { createChatEventStream } from '../utils/chat/engine'
 import { serializeChatEvent } from '../utils/chat/ndjson'
 import type { ChatStreamEvent } from '../utils/chat/types'
@@ -39,6 +40,7 @@ export default defineEventHandler(async (event) => {
   try {
     const input = validateChatRequestBody(body)
     const subject = resolveQuotaSubject(event)
+    const visitor = resolveVisitorIdentity(event)
 
     const stream = await createChatEventStream(input, {
       quota: {
@@ -48,6 +50,11 @@ export default defineEventHandler(async (event) => {
       history: {
         database,
         subject
+      },
+      analytics: {
+        database,
+        visitorId: visitor.visitorId,
+        ...(subject.type === 'anonymous' ? {} : { userId: subject.id })
       }
     })
 

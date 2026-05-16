@@ -142,6 +142,51 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_admin_audit_events_specialist
         ON admin_audit_events (specialist_id, occurred_at);
     `
+  },
+  {
+    version: '0006_question_analytics',
+    sql: `
+      CREATE TABLE IF NOT EXISTS question_analytics_events (
+        id TEXT PRIMARY KEY,
+        specialist_id TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('answered', 'insufficient_context')),
+        question_text TEXT NOT NULL,
+        normalized_question TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        user_timezone TEXT NOT NULL,
+        visitor_id TEXT,
+        user_id TEXT,
+        conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+        user_message_id TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_question_analytics_specialist_fingerprint_time
+        ON question_analytics_events (specialist_id, fingerprint, occurred_at);
+
+      CREATE INDEX IF NOT EXISTS idx_question_analytics_conversation
+        ON question_analytics_events (conversation_id);
+
+      CREATE TABLE IF NOT EXISTS question_analytics_reviews (
+        specialist_id TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        reviewed_at TEXT NOT NULL,
+        reviewed_by_user_id TEXT NOT NULL,
+        reviewed_by_contact TEXT NOT NULL,
+        PRIMARY KEY (specialist_id, fingerprint)
+      );
+
+      CREATE TABLE IF NOT EXISTS visitor_events (
+        id TEXT PRIMARY KEY,
+        visitor_id TEXT NOT NULL,
+        user_id TEXT,
+        occurred_at TEXT NOT NULL,
+        month TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_visitor_events_month_identity
+        ON visitor_events (month, user_id, visitor_id);
+    `
   }
 ]
 

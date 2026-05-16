@@ -4,6 +4,7 @@ import type { SpecialistRuntime } from '../specialists/schema'
 import { getSpecialistById } from '../specialists/registry'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowed } from '../quota/usage'
+import { recordQuestionAnalyticsEvent, type QuestionAnalyticsOutcome } from '../analytics/questions'
 import {
   buildConversationContext,
   getConversationSummary,
@@ -44,11 +45,19 @@ export interface ChatHistoryOptions {
   titleTimeoutMs?: number
 }
 
+export interface ChatAnalyticsOptions {
+  database: DatabaseSync
+  visitorId?: string
+  userId?: string
+  now?: Date
+}
+
 export interface CreateChatEventStreamOptions extends SpecialistPathOptions {
   runner?: ChatEngineRunner
   piChatEnabled?: boolean
   quota?: ChatQuotaOptions
   history?: ChatHistoryOptions
+  analytics?: ChatAnalyticsOptions
 }
 
 export async function createChatEventStreamFromBody(
@@ -113,7 +122,11 @@ export async function createChatEventStreamForSpecialist(
   const citationEvidence = await getCitationEvidence(specialist)
 
   if (citationEvidence.length === 0) {
-    return fallbackStream(INSUFFICIENT_EVIDENCE_MESSAGE, historyPersistence)
+    return fallbackStream(
+      INSUFFICIENT_EVIDENCE_MESSAGE,
+      historyPersistence,
+      buildAnalyticsPersistence('insufficient_context')
+    )
   }
 
   const runner = options.runner ?? createDefaultChatRunner(isPiChatEnabled(options.piChatEnabled))
@@ -127,15 +140,35 @@ export async function createChatEventStreamForSpecialist(
   const citations = normalizeCitations(result.citations)
 
   if (result.grounded && citations.length === 0) {
-    return fallbackStream(MISSING_CITATIONS_MESSAGE, historyPersistence)
+    return fallbackStream(
+      MISSING_CITATIONS_MESSAGE,
+      historyPersistence,
+      buildAnalyticsPersistence('insufficient_context')
+    )
   }
 
   return streamRunnerResult({
     grounded: result.grounded,
     citations: result.grounded ? citations : [],
     deltas: result.deltas,
-    history: historyPersistence
+    history: historyPersistence,
+    analytics: result.grounded ? buildAnalyticsPersistence('answered') : undefined
   })
+
+  function buildAnalyticsPersistence(outcome: QuestionAnalyticsOutcome): StreamAnalyticsPersistence | undefined {
+    if (!options.analytics) return undefined
+
+    return {
+      database: options.analytics.database,
+      specialistId: specialist.id,
+      outcome,
+      question: input.question,
+      userTimezone: input.clientTimezone,
+      visitorId: options.analytics.visitorId,
+      userId: options.analytics.userId,
+      now: options.analytics.now
+    }
+  }
 }
 
 function resolveSpecialistIdForRequest(
@@ -185,13 +218,15 @@ function normalizeCitations(citations: ChatCitation[]): ChatCitation[] {
 
 function fallbackStream(
   message: string,
-  history?: StreamHistoryPersistence
+  history?: StreamHistoryPersistence,
+  analytics?: StreamAnalyticsPersistence
 ): AsyncIterable<ChatStreamEvent> {
   return streamRunnerResult({
     grounded: false,
     citations: [],
     deltas: toAsyncDeltas([message]),
-    history
+    history,
+    analytics
   })
 }
 
@@ -208,11 +243,23 @@ interface StreamHistoryPersistence {
   now?: Date
 }
 
+interface StreamAnalyticsPersistence {
+  database: DatabaseSync
+  specialistId: string
+  outcome: QuestionAnalyticsOutcome
+  question: string
+  userTimezone?: string
+  visitorId?: string
+  userId?: string
+  now?: Date
+}
+
 async function* streamRunnerResult(input: {
   grounded: boolean
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
   history?: StreamHistoryPersistence
+  analytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
 
@@ -228,8 +275,10 @@ async function* streamRunnerResult(input: {
       yield { type: 'citation', citation }
     }
 
+    let persisted: Awaited<ReturnType<typeof persistCompletedHistoryTurn>> | undefined
+
     if (input.history) {
-      const persisted = await persistCompletedHistoryTurn(input.history.database, {
+      persisted = await persistCompletedHistoryTurn(input.history.database, {
         userId: input.history.userId,
         specialistId: input.history.specialistId,
         specialistName: input.history.specialistName,
@@ -252,6 +301,20 @@ async function* streamRunnerResult(input: {
         title: persisted.title,
         titleStatus: persisted.titleStatus
       }
+    }
+
+    if (input.analytics) {
+      recordQuestionAnalyticsEvent(input.analytics.database, {
+        specialistId: input.analytics.specialistId,
+        outcome: input.analytics.outcome,
+        question: input.analytics.question,
+        userTimezone: input.analytics.userTimezone,
+        visitorId: input.analytics.visitorId,
+        userId: input.analytics.userId,
+        conversationId: persisted?.conversationId,
+        userMessageId: persisted?.userMessageId,
+        occurredAt: input.analytics.now
+      })
     }
 
     yield { type: 'done', grounded: input.grounded }
