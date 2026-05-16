@@ -44,7 +44,7 @@ Known non-blocking warnings:
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
-| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `idea-refined` | — | Admin allowlist, single-page console, specialist CRUD, upload/detect/manual ingestion, minimal audit events. |
+| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `grilled` | — | Decisions locked: admin allowlist, upload conflicts, immutable id/wiki type, manual ingestion, trash delete, REST contracts. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 08 — Admin specialist management
 
-Status: `idea-refined`
+Status: `grilled`
 
 Idea-refined direction:
 
@@ -71,12 +71,34 @@ Idea-refined direction:
 - Deleting a specialist requires explicit confirmation, removes its directory, reloads the registry, and deletes customer conversation history for that specialist.
 - Record minimal SQLite audit events for admin create, edit, upload, reload/detect, ingestion trigger, and delete actions.
 
-Assumptions to validate during grilling:
+Locked grill decisions:
 
-- `UJIMU_ADMIN_CONTACTS` should accept comma-separated normalized OTP contacts and should be safe to leave empty in development.
-- Upload filename sanitization from the ingestion storage layer is enough for MVP source uploads if paired with size/type validation at the API boundary.
-- Audit events can store action metadata as JSON text without becoming a full compliance audit log.
-- Manual ingestion can reuse the existing disabled-by-default Pi ingestion behaviour and surface disabled/failure states to admins.
+- `UJIMU_ADMIN_CONTACTS` accepts comma-separated verified OTP contacts. Email contacts compare lowercased; phone contacts compare without spaces. If unset or empty, nobody is admin.
+- Admin authorization checks all verified identities for the authenticated user, not only the session display contact.
+- Admin endpoints return `401` for unauthenticated requests, `403` for authenticated non-admin users, `400` for invalid input, `404` for missing specialists, and `409` for duplicates, disabled ingestion, or operational conflicts.
+- Source uploads accept only `.txt`, `.md`, `.markdown`, and `.pdf`; Ujimu adds no MVP-specific file size cap beyond platform limits.
+- Upload filenames must be plain basenames with no absolute paths, slashes, `.` or `..` path tricks. Duplicate filenames are rejected by default instead of overwritten.
+- Specialist edits may change `name`, `description`, `system_prompt`, `citations_required`, and `streaming_enabled` only. `id` and `wiki_type` are immutable after creation.
+- Manual ingestion returns `409 Conflict` with the user-facing message `A ingestão automática não está activa neste ambiente.` when Pi ingestion is disabled; pending sources remain pending and the skipped action is audited.
+- `admin_audit_events` stores `id`, `admin_user_id`, `admin_contact`, `action`, `specialist_id`, `occurred_at`, and `metadata_json`.
+- Audit metadata may include safe operational details such as filename, status counts, changed fields, and error code. It must not store document contents, OTPs, old prompts, or secrets.
+- Deleting a specialist behaves as product deletion but moves the specialist directory to `<UJIMU_DATA_DIR>/trash/specialties/<timestamp>_<specialistId>/` instead of erasing it immediately.
+- Delete requires exact `confirmationId`, deletes customer conversation history, removes the specialist from public selection, reloads the registry, and does not implement restore in this slice.
+- The admin UI is a single `/admin` page with authentication/authorization messaging, specialist list, create form, edit panel, source upload, source status list, reload, ingestion, and delete controls.
+- The main chat page shows a discreet `Administração` link only when `/api/admin/session` reports that the signed-in user is an admin.
+- Admin REST contracts are: `GET /api/admin/session`, `GET/POST /api/admin/specialists`, `PATCH/DELETE /api/admin/specialists/:id`, `POST /api/admin/specialists/:id/raw`, `POST /api/admin/specialists/:id/sources/reload`, and `POST /api/admin/specialists/:id/ingestion/run`.
+
+Acceptance-test targets:
+
+- Unauthenticated admin operations return `401`; authenticated non-admin operations return `403`.
+- `GET /api/admin/session` reflects `authenticated` and `admin` using all verified identities and an empty allowlist grants no admin access.
+- An admin can create a valid legislation/regulatory specialist and duplicate/invalid creates fail with appropriate errors.
+- An admin can edit mutable specialist fields, while attempts to change `id` or `wiki_type` are rejected or ignored safely.
+- Upload accepts supported raw source types, rejects duplicate filenames and unsafe filenames, and marks sources pending after reload/detection.
+- Manual ingestion returns `409` and leaves sources pending when Pi ingestion is disabled; enabled ingestion can reuse the existing runner contract.
+- Deleting a specialist with the exact confirmation moves its directory to trash, removes it from public specialists, deletes conversation history, and records audit.
+- Admin create/update/upload/reload/ingestion/delete actions create safe audit events.
+- The `/admin` page contains the agreed management UI copy and the main page contains the conditional `Administração` link/API hook.
 
 Out of scope for this slice:
 

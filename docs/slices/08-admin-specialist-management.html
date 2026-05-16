@@ -177,13 +177,41 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </div>
 <div class="callout">Upload should not silently run Pi ingestion. A separate reload/detect action refreshes state, and a separate ingestion action may run only when ingestion is enabled.</div>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Delete specialist</div><h2>Deletion has product-wide consequences.</h2>
+<section class="slide"><div class="frame content"><div class="kicker">Delete specialist</div><h2>Product delete, disk trash.</h2>
 <ul>
-<li>Remove the specialist from the selectable list.</li>
+<li>Require exact ID confirmation before deletion.</li>
+<li>Move the specialist directory to <code>&lt;UJIMU_DATA_DIR&gt;/trash/specialties/&lt;timestamp&gt;_&lt;id&gt;/</code>.</li>
+<li>Remove the specialist from the selectable list and reload the registry.</li>
 <li>Delete customer histories for that specialist.</li>
-<li>Remove or quarantine the specialist directory according to the destructive-delete implementation.</li>
-<li>Require explicit admin confirmation before deletion.</li>
+<li>Do not implement restore in this slice.</li>
 </ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Keep the admin surface narrow and explicit.</h2>
+<ul>
+<li><code>UJIMU_ADMIN_CONTACTS</code> is a comma-separated allowlist of verified OTP contacts; empty means nobody is admin.</li>
+<li>Admin checks all verified identities for the user; unauthenticated gets <code>401</code>, non-admin gets <code>403</code>.</li>
+<li>Only <code>.txt</code>, <code>.md</code>, <code>.markdown</code>, and <code>.pdf</code> uploads are accepted; duplicate filenames are rejected.</li>
+<li>After creation, <code>id</code> and <code>wiki_type</code> are immutable.</li>
+<li>Manual ingestion returns <code>409</code> with a clear message when Pi ingestion is disabled.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Audit</div><h2>Record operations, not secrets.</h2>
+<ul>
+<li>Store minimal events with admin user, admin contact, action, specialist, timestamp, and safe metadata JSON.</li>
+<li>Actions cover create, update, upload, source reload, ingestion start/completion/skipped, and delete.</li>
+<li>Metadata may include filenames, status counts, changed fields, and error codes.</li>
+<li>Never store document contents, OTPs, old prompts, or secrets in audit metadata.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">API contract</div><h2>REST endpoints stay predictable.</h2>
+<pre>GET    /api/admin/session
+GET    /api/admin/specialists
+POST   /api/admin/specialists
+PATCH  /api/admin/specialists/:id
+DELETE /api/admin/specialists/:id
+POST   /api/admin/specialists/:id/raw
+POST   /api/admin/specialists/:id/sources/reload
+POST   /api/admin/specialists/:id/ingestion/run</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Admin routes compose earlier services.</h2>
 <pre>pages/admin/index.vue
@@ -205,8 +233,8 @@ server/utils/ingestion/*.ts</pre>
 <li>An admin can upload a source file, refresh detection, and see it marked pending for ingestion.</li>
 <li>An admin can manually run ingestion when enabled and inspect source statuses.</li>
 <li>An admin can edit specialist metadata and prompt without prompt-version audit history.</li>
-<li>Deleting a specialist requires explicit confirmation, removes it from chat selection, and deletes associated customer histories.</li>
-<li>Admin create/edit/upload/reload/delete actions create minimal audit events in SQLite.</li>
+<li>Deleting a specialist requires exact ID confirmation, moves its directory to trash, removes it from chat selection, and deletes associated customer histories.</li>
+<li>Admin create/edit/upload/reload/ingestion/delete actions create minimal audit events in SQLite.</li>
 </ul>
 </div></section>
     </main>
