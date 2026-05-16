@@ -381,14 +381,28 @@ function createAdminFetch(dataDir: string, conversionHandler: unknown): (request
   const fetch = toWebHandler(app)
 
   return async (request: Request) => {
+    const piAgentDir = join(dataDir, 'pi-agent')
+    await mkdir(piAgentDir, { recursive: true })
+    await writeFile(
+      join(piAgentDir, 'settings.json'),
+      JSON.stringify({ defaultProvider: 'openrouter', defaultModel: 'moonshotai/kimi-k2.6' })
+    )
+    await writeFile(join(piAgentDir, 'models.json'), JSON.stringify({ providers: {} }))
+
     const previousDataDir = process.env.UJIMU_DATA_DIR
     const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
     const previousAdminContacts = process.env.UJIMU_ADMIN_CONTACTS
     const previousConversionEnabled = process.env.UJIMU_PI_CONVERSION_ENABLED
+    const previousAgentDir = process.env.UJIMU_PI_AGENT_DIR
+    const previousConversionProvider = process.env.UJIMU_PI_CONVERSION_PROVIDER
+    const previousConversionModel = process.env.UJIMU_PI_CONVERSION_MODEL
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'admin-test-secret'
     process.env.UJIMU_ADMIN_CONTACTS = 'admin@example.com'
     process.env.UJIMU_PI_CONVERSION_ENABLED = 'true'
+    process.env.UJIMU_PI_AGENT_DIR = piAgentDir
+    delete process.env.UJIMU_PI_CONVERSION_PROVIDER
+    delete process.env.UJIMU_PI_CONVERSION_MODEL
 
     try {
       return await fetch(request)
@@ -397,6 +411,9 @@ function createAdminFetch(dataDir: string, conversionHandler: unknown): (request
       restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
       restoreEnv('UJIMU_ADMIN_CONTACTS', previousAdminContacts)
       restoreEnv('UJIMU_PI_CONVERSION_ENABLED', previousConversionEnabled)
+      restoreEnv('UJIMU_PI_AGENT_DIR', previousAgentDir)
+      restoreEnv('UJIMU_PI_CONVERSION_PROVIDER', previousConversionProvider)
+      restoreEnv('UJIMU_PI_CONVERSION_MODEL', previousConversionModel)
     }
   }
 }
