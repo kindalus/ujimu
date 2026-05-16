@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { defineEventHandler } from 'h3'
 import { requireAdmin } from '../../../utils/admin/guards'
 import { resolveAppConfig } from '../../../utils/config'
+import { getPasskeyReadiness } from '../../../utils/auth/passkeys'
 import { initializeDatabase } from '../../../utils/db'
 import { getOperationalLogDirectory } from '../../../utils/ops/logger'
 
@@ -14,6 +15,8 @@ interface ReadinessChecks {
   billingWebhookSecretConfigured: boolean
   sessionSecretConfigured: boolean
   otpPepperConfigured: boolean
+  passkeysEnabled: boolean
+  passkeysConfigured: boolean
 }
 
 export default defineEventHandler(async (event) => {
@@ -22,6 +25,7 @@ export default defineEventHandler(async (event) => {
   try {
     requireAdmin(database, event)
     const config = resolveAppConfig({ env: process.env })
+    const passkeyReadiness = getPasskeyReadiness(process.env)
     const checks: ReadinessChecks = {
       database: canQueryDatabase(database),
       dataDirectoryWritable: await canWriteToDirectory(config.dataDir),
@@ -29,7 +33,9 @@ export default defineEventHandler(async (event) => {
       migrationsApplied: getAppliedMigrationCount(database),
       billingWebhookSecretConfigured: Boolean(process.env.UJIMU_BILLING_WEBHOOK_SECRET),
       sessionSecretConfigured: Boolean(process.env.UJIMU_SESSION_SECRET),
-      otpPepperConfigured: Boolean(process.env.UJIMU_OTP_PEPPER)
+      otpPepperConfigured: Boolean(process.env.UJIMU_OTP_PEPPER),
+      passkeysEnabled: passkeyReadiness.passkeysEnabled,
+      passkeysConfigured: passkeyReadiness.passkeysConfigured
     }
 
     return {

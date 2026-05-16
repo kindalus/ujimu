@@ -240,6 +240,53 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_user_end
         ON billing_subscriptions (user_id, current_period_end);
     `
+  },
+  {
+    version: '0008_passkeys',
+    sql: `
+      CREATE TABLE IF NOT EXISTS passkey_credentials (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        credential_id TEXT NOT NULL UNIQUE,
+        public_key TEXT NOT NULL,
+        counter INTEGER NOT NULL DEFAULT 0,
+        transports_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        last_used_at TEXT,
+        deleted_at TEXT,
+        deleted_by_user_id TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_passkey_credentials_user_active
+        ON passkey_credentials (user_id, deleted_at, created_at);
+
+      CREATE TABLE IF NOT EXISTS passkey_challenges (
+        id TEXT PRIMARY KEY,
+        challenge TEXT NOT NULL UNIQUE,
+        purpose TEXT NOT NULL CHECK (purpose IN ('registration', 'authentication')),
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        metadata_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_passkey_challenges_purpose_user
+        ON passkey_challenges (purpose, user_id, expires_at, consumed_at);
+
+      CREATE TABLE IF NOT EXISTS passkey_auth_attempts (
+        id TEXT PRIMARY KEY,
+        subject_type TEXT NOT NULL CHECK (subject_type IN ('visitor', 'ip', 'unknown')),
+        subject_id TEXT NOT NULL,
+        purpose TEXT NOT NULL CHECK (purpose IN ('options', 'verify')),
+        success INTEGER NOT NULL CHECK (success IN (0, 1)),
+        failure_code TEXT,
+        occurred_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_passkey_auth_attempts_subject_time
+        ON passkey_auth_attempts (subject_type, subject_id, purpose, occurred_at);
+    `
   }
 ]
 

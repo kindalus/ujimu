@@ -189,7 +189,7 @@ export async function verifyOtp(
 
   return {
     user,
-    sessionToken: createSessionToken(user.id, { now, sessionSecret: options.sessionSecret })
+    sessionToken: createSessionToken(user.id, { now, sessionSecret: options.sessionSecret, authMethod: 'otp' })
   }
 }
 

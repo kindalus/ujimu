@@ -20,6 +20,12 @@ interface AuthSessionResponse {
     id: string
     displayContact: string
   }
+  authMethod?: 'otp' | 'passkey' | 'unknown'
+  recentOtpAuthenticated?: boolean
+  passkeys?: {
+    passkeysEnabled: boolean
+    passkeysConfigured: boolean
+  }
 }
 
 interface AdminSessionResponse extends AuthSessionResponse {
@@ -57,6 +63,10 @@ interface BillingCheckoutResponse {
     status: 'pending'
     instructions: string
   }
+}
+
+interface PasskeyAuthenticationOptionsResponse {
+  options: Record<string, unknown>
 }
 
 type BillingProvider = 'appy_pay' | 'stripe'
@@ -189,11 +199,15 @@ const billingPending = ref(false)
 const billingError = ref('')
 const billingMessage = ref('')
 const billingCheckoutPendingMethod = ref<BillingPaymentMethod | ''>('')
+const passkeysSupported = ref(false)
+const passkeyPending = ref(false)
+const passkeyError = ref('')
 
 onMounted(() => {
   void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
+  void detectPasskeySupport()
 })
 
 const selectedSpecialist = computed(() =>
@@ -201,6 +215,9 @@ const selectedSpecialist = computed(() =>
 )
 const hasSpecialists = computed(() => specialists.value.length > 0)
 const isAuthenticated = computed(() => authSession.value.authenticated)
+const passkeySignInAvailable = computed(
+  () => passkeysSupported.value && Boolean(authSession.value.passkeys?.passkeysEnabled && authSession.value.passkeys.passkeysConfigured)
+)
 const billingPriceLabel = computed(() => `${formatBillingAmount(billingStatus.value.plan.amount.value)} AOA`)
 const billingExpiryLabel = computed(() => formatDisplayDate(billingStatus.value.subscription?.expiresAt))
 const canWriteQuestion = computed(
@@ -364,6 +381,63 @@ async function verifyOtpCode(): Promise<void> {
     authError.value = 'Não foi possível verificar o código. Tente novamente.'
   } finally {
     authPending.value = false
+  }
+}
+
+async function detectPasskeySupport(): Promise<void> {
+  try {
+    const { browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
+    passkeysSupported.value = browserSupportsWebAuthn()
+  } catch {
+    passkeysSupported.value = false
+  }
+}
+
+async function signInWithPasskey(): Promise<void> {
+  if (!passkeysSupported.value) {
+    passkeyError.value = 'Este dispositivo ou navegador não suporta passkeys. Use o código por email ou telemóvel.'
+    return
+  }
+
+  passkeyPending.value = true
+  passkeyError.value = ''
+
+  try {
+    const optionsResponse = await fetch('/api/auth/passkeys/authentication/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    })
+    if (!optionsResponse.ok) {
+      passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
+      return
+    }
+
+    const { startAuthentication } = await import('@simplewebauthn/browser')
+    const payload = (await optionsResponse.json()) as PasskeyAuthenticationOptionsResponse
+    const credential = await startAuthentication({
+      optionsJSON: payload.options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON']
+    })
+    const verifyResponse = await fetch('/api/auth/passkeys/authentication/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(credential)
+    })
+
+    if (!verifyResponse.ok) {
+      passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
+      return
+    }
+
+    authSession.value = (await verifyResponse.json()) as AuthSessionResponse
+    authPanelOpen.value = false
+    void loadHistory()
+    void loadAdminSession()
+    void loadBillingStatus()
+  } catch {
+    passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
+  } finally {
+    passkeyPending.value = false
   }
 }
 
@@ -783,6 +857,9 @@ function formatDisplayDate(value: string | undefined): string {
             <UButton v-if="adminAvailable" to="/admin" color="primary" variant="soft" size="sm">
               Administração
             </UButton>
+            <UButton to="/account/security" color="primary" variant="soft" size="sm">
+              Segurança da conta
+            </UButton>
             <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
               Sair
             </UButton>
@@ -790,9 +867,24 @@ function formatDisplayDate(value: string | undefined): string {
         </div>
 
         <div v-else class="auth-entry">
-          <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
-            Entrar
-          </UButton>
+          <div class="auth-actions">
+            <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
+              Entrar
+            </UButton>
+            <UButton
+              type="button"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              v-if="passkeySignInAvailable"
+              :disabled="!passkeysSupported"
+              :loading="passkeyPending"
+              @click="signInWithPasskey"
+            >
+              Entrar com passkey
+            </UButton>
+          </div>
+          <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
 
           <form v-if="authPanelOpen" class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
             <div class="auth-channel" role="group" aria-label="Canal de autenticação">

@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 11:
+Latest full verification after Slice 12:
 
-- `npm test` — passed, 67 tests
+- `npm test` — passed, 73 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Manual API smoke check — not separately run for hardening; security headers, health/readiness, operational logging, upload path safety, CI, and runbook contracts are covered by acceptance tests.
+- Manual browser/WebAuthn prompt check — not run; passkey domain behaviour is covered by fake-adapter acceptance tests and UI file-contract tests.
 
 Known non-blocking warnings:
 
@@ -50,11 +50,11 @@ Known non-blocking warnings:
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
-| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `acceptance-tested` | — | Acceptance tests written first and currently fail for missing passkey implementation. |
+| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 
 ## Slice 12 — Passkeys post-MVP
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Idea-refined direction:
 
@@ -129,9 +129,25 @@ Acceptance-test targets:
 - `/account/security` exposes the agreed management UI and the main chat page links to it when appropriate.
 - Operations documentation and readiness include passkey enablement/configuration expectations without exposing secrets or RP/origin values.
 
-RED verification:
+Implemented:
 
-- `npm test -- tests/passkeys.acceptance.test.ts tests/passkeys-ui.acceptance.test.ts tests/auth.acceptance.test.ts tests/db.test.ts tests/ops-ci-docs.acceptance.test.ts` is expected to fail until passkey code, migration, UI, and docs are implemented.
+- `@simplewebauthn/server` and `@simplewebauthn/browser` dependencies behind a swappable `PasskeyWebAuthnAdapter`.
+- Session JWT `authMethod` support with backwards compatibility for older `unknown` sessions.
+- SQLite migration `0008_passkeys` for credentials, challenges, and passkey auth-attempt rate limiting.
+- Passkey service for registration options, registration verification, authentication options, authentication verification, credential listing, credential soft-delete, one-shot challenges, duplicate handling, reactivation, counter updates, and rate limits.
+- Passkey API endpoints for registration, authentication, listing, and deletion.
+- Main chat page passkey sign-in action and authenticated `Segurança da conta` link.
+- `/account/security` page for passkey add/list/remove flows and unsupported-browser messaging.
+- Admin readiness passkey enabled/configured booleans without exposing RP/origin values.
+- Operations runbook passkey configuration notes.
+
+Verification:
+
+- `npm test` — passed, 73 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
+- Manual browser/WebAuthn prompt check was not run in this environment; fake-adapter acceptance tests cover the domain contract.
 
 Out of scope for this slice:
 
@@ -143,7 +159,7 @@ Out of scope for this slice:
 
 Next step:
 
-- Implement incrementally until the acceptance tests and full verification suite pass.
+- If desired, run a real-browser WebAuthn smoke test against a configured HTTPS/dev origin before production launch.
 
 ## Slice 11 — Security, operations & observability
 

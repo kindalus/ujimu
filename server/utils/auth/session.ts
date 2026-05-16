@@ -4,15 +4,19 @@ import { getCookie, setCookie, type H3Event } from 'h3'
 export const SESSION_COOKIE_NAME = 'ujimu_session'
 export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 90
 
+export type SessionAuthMethod = 'otp' | 'passkey' | 'unknown'
+
 export interface SessionClaims {
   userId: string
   issuedAt: Date
   expiresAt: Date
+  authMethod: SessionAuthMethod
 }
 
 export interface SessionOptions {
   now?: Date
   sessionSecret?: string
+  authMethod?: Exclude<SessionAuthMethod, 'unknown'>
 }
 
 export interface SessionCookieOptions extends SessionOptions {
@@ -30,7 +34,8 @@ export function createSessionToken(userId: string, options: SessionOptions = {})
     sub: userId,
     iat: issuedAt,
     exp: expiresAt,
-    typ: 'session'
+    typ: 'session',
+    ...(options.authMethod ? { authMethod: options.authMethod } : {})
   }
   const encodedHeader = base64UrlEncode(JSON.stringify(header))
   const encodedPayload = base64UrlEncode(JSON.stringify(payload))
@@ -59,6 +64,7 @@ export function verifySessionToken(
     iat: number
     exp: number
     typ: string
+    authMethod: SessionAuthMethod
   }> | undefined
   if (!payload || payload.typ !== 'session' || !payload.sub || !payload.iat || !payload.exp) {
     return undefined
@@ -72,7 +78,10 @@ export function verifySessionToken(
   return {
     userId: payload.sub,
     issuedAt: new Date(payload.iat * 1000),
-    expiresAt: new Date(payload.exp * 1000)
+    expiresAt: new Date(payload.exp * 1000),
+    authMethod: payload.authMethod === 'otp' || payload.authMethod === 'passkey'
+      ? payload.authMethod
+      : 'unknown'
   }
 }
 
