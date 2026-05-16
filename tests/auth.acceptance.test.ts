@@ -51,7 +51,7 @@ describe('OTP authentication acceptance', () => {
       now: new Date('2026-05-16T12:03:00.000Z'),
       sessionSecret: 'session-secret'
     })
-    expect(session).toMatchObject({ userId: verified.user.id })
+    expect(session).toMatchObject({ userId: verified.user.id, authMethod: 'otp' })
     expect(
       resolveQuotaSubjectFromCookies({ sessionCookie: verified.sessionToken, sessionSecret: 'session-secret' })
     ).toEqual({ type: 'registered', id: verified.user.id })

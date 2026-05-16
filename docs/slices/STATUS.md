@@ -50,11 +50,11 @@ Known non-blocking warnings:
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
-| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `grilled` | — | Passkey implementation decisions locked; next step is acceptance tests before implementation. |
+| 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `acceptance-tested` | — | Acceptance tests written first and currently fail for missing passkey implementation. |
 
 ## Slice 12 — Passkeys post-MVP
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -108,7 +108,15 @@ Locked grill decisions:
 - Public error codes should be safe and generic: `INVALID_PASSKEY_REQUEST`, `PASSKEY_AUTHENTICATION_FAILED`, `RECENT_AUTH_REQUIRED`, `PASSKEY_ALREADY_REGISTERED`, `PASSKEY_RATE_LIMITED`, and `PASSKEYS_NOT_CONFIGURED`.
 - Tests should use a deterministic fake adapter for WebAuthn behavior and avoid real browser/OS authenticator prompts.
 
-Acceptance-test direction:
+Acceptance tests written first in:
+
+- `tests/passkeys.acceptance.test.ts`
+- `tests/passkeys-ui.acceptance.test.ts`
+- `tests/auth.acceptance.test.ts`
+- `tests/db.test.ts`
+- `tests/ops-ci-docs.acceptance.test.ts`
+
+Acceptance-test targets:
 
 - Authenticated registered users can register a passkey for their current account only after recent OTP authentication.
 - Users with a registered passkey can sign out and sign in without requesting OTP.
@@ -116,9 +124,14 @@ Acceptance-test direction:
 - Disabled or misconfigured passkeys hide/fail safely without leaking configuration values.
 - Invalid origin, expired challenge, reused challenge, malformed payload, unknown credential, removed credential, duplicate credential, and invalid assertion do not create a session.
 - Public passkey login endpoints enforce rate limits.
+- OTP-created sessions expose `authMethod: 'otp'`; future passkey sessions expose `authMethod: 'passkey'`.
 - The passkey service is exercised through internal adapter contracts with fake adapter tests so the concrete WebAuthn library can be replaced.
 - `/account/security` exposes the agreed management UI and the main chat page links to it when appropriate.
 - Operations documentation and readiness include passkey enablement/configuration expectations without exposing secrets or RP/origin values.
+
+RED verification:
+
+- `npm test -- tests/passkeys.acceptance.test.ts tests/passkeys-ui.acceptance.test.ts tests/auth.acceptance.test.ts tests/db.test.ts tests/ops-ci-docs.acceptance.test.ts` is expected to fail until passkey code, migration, UI, and docs are implemented.
 
 Out of scope for this slice:
 
@@ -130,7 +143,7 @@ Out of scope for this slice:
 
 Next step:
 
-- Write acceptance tests first, then implement incrementally.
+- Implement incrementally until the acceptance tests and full verification suite pass.
 
 ## Slice 11 — Security, operations & observability
 

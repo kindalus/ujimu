@@ -33,7 +33,8 @@ describe('initializeDatabase', () => {
       { version: '0004_conversation_history' },
       { version: '0005_admin_audit_events' },
       { version: '0006_question_analytics' },
-      { version: '0007_billing_subscriptions' }
+      { version: '0007_billing_subscriptions' },
+      { version: '0008_passkeys' }
     ])
   })
 
@@ -50,6 +51,6 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(7)
+    expect(count.count).toBe(8)
   })
 })
