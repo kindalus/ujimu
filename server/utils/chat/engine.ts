@@ -4,15 +4,22 @@ import type { SpecialistRuntime } from '../specialists/schema'
 import { getSpecialistById } from '../specialists/registry'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowed } from '../quota/usage'
+import {
+  buildConversationContext,
+  getConversationSummary,
+  persistCompletedHistoryTurn,
+  type ConversationTitleRunner
+} from '../history/repository'
 import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
 import {
+  ChatRequestError,
   specialistNotFound,
   validateChatRequestBody,
   type ValidatedChatRequest
 } from './request'
-import type { ChatCitation, ChatEngineRunner, ChatStreamEvent } from './types'
+import type { ChatCitation, ChatConversationContextMessage, ChatEngineRunner, ChatStreamEvent } from './types'
 
 const INSUFFICIENT_EVIDENCE_MESSAGE =
   'Ainda não tenho fontes oficiais suficientes nesta especialidade para responder com segurança. Para poder responder, será necessário acrescentar uma fonte oficial relevante, por exemplo o diploma, regulamento, instrução administrativa ou artigo aplicável à pergunta.'
@@ -29,10 +36,19 @@ export interface ChatQuotaOptions {
   occurredAt?: Date
 }
 
+export interface ChatHistoryOptions {
+  database: DatabaseSync
+  subject: QuotaSubject
+  now?: Date
+  titleRunner?: ConversationTitleRunner
+  titleTimeoutMs?: number
+}
+
 export interface CreateChatEventStreamOptions extends SpecialistPathOptions {
   runner?: ChatEngineRunner
   piChatEnabled?: boolean
   quota?: ChatQuotaOptions
+  history?: ChatHistoryOptions
 }
 
 export async function createChatEventStreamFromBody(
@@ -47,10 +63,11 @@ export async function createChatEventStream(
   input: ValidatedChatRequest,
   options: CreateChatEventStreamOptions = {}
 ): Promise<AsyncIterable<ChatStreamEvent>> {
-  const specialist = await getSpecialistById(input.specialistId, options)
+  const specialistId = resolveSpecialistIdForRequest(input, options)
+  const specialist = await getSpecialistById(specialistId, options)
 
   if (!specialist) {
-    throw specialistNotFound(input.specialistId)
+    throw specialistNotFound(specialistId)
   }
 
   return createChatEventStreamForSpecialist(specialist, input, options)
@@ -70,10 +87,33 @@ export async function createChatEventStreamForSpecialist(
     })
   }
 
+  const historyUserId = resolveHistoryUserId(options.history)
+  const conversationContext = historyUserId
+    ? buildRunnerConversationContext(options.history?.database, {
+        userId: historyUserId,
+        conversationId: input.conversationId,
+        beforeMessageId: input.replaceFromMessageId
+      })
+    : undefined
+  const historyPersistence = historyUserId
+    ? {
+        database: options.history!.database,
+        userId: historyUserId,
+        specialistId: specialist.id,
+        specialistName: specialist.name,
+        conversationId: input.conversationId,
+        replaceFromMessageId: input.replaceFromMessageId,
+        question: input.question,
+        titleRunner: options.history!.titleRunner,
+        titleTimeoutMs: options.history!.titleTimeoutMs,
+        now: options.history!.now
+      }
+    : undefined
+
   const citationEvidence = await getCitationEvidence(specialist)
 
   if (citationEvidence.length === 0) {
-    return fallbackStream(INSUFFICIENT_EVIDENCE_MESSAGE)
+    return fallbackStream(INSUFFICIENT_EVIDENCE_MESSAGE, historyPersistence)
   }
 
   const runner = options.runner ?? createDefaultChatRunner(isPiChatEnabled(options.piChatEnabled))
@@ -81,19 +121,60 @@ export async function createChatEventStreamForSpecialist(
     specialist,
     question: input.question,
     ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
-    citationEvidence
+    citationEvidence,
+    ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {})
   })
   const citations = normalizeCitations(result.citations)
 
   if (result.grounded && citations.length === 0) {
-    return fallbackStream(MISSING_CITATIONS_MESSAGE)
+    return fallbackStream(MISSING_CITATIONS_MESSAGE, historyPersistence)
   }
 
   return streamRunnerResult({
     grounded: result.grounded,
     citations: result.grounded ? citations : [],
-    deltas: result.deltas
+    deltas: result.deltas,
+    history: historyPersistence
   })
+}
+
+function resolveSpecialistIdForRequest(
+  input: ValidatedChatRequest,
+  options: CreateChatEventStreamOptions
+): string {
+  const userId = resolveHistoryUserId(options.history)
+  if (!userId || !input.conversationId || !options.history) {
+    return input.specialistId
+  }
+
+  const conversation = getConversationSummary(options.history.database, {
+    userId,
+    conversationId: input.conversationId
+  })
+
+  if (!conversation) {
+    throw new ChatRequestError(404, 'HISTORY_NOT_FOUND', 'Conversation was not found.')
+  }
+
+  return conversation.specialistId
+}
+
+function resolveHistoryUserId(history: ChatHistoryOptions | undefined): string | undefined {
+  if (!history || history.subject.type === 'anonymous') return undefined
+  return history.subject.id
+}
+
+function buildRunnerConversationContext(
+  database: DatabaseSync | undefined,
+  input: { userId: string; conversationId?: string; beforeMessageId?: string }
+): ChatConversationContextMessage[] | undefined {
+  if (!database || !input.conversationId) return undefined
+
+  return buildConversationContext(database, {
+    userId: input.userId,
+    conversationId: input.conversationId,
+    beforeMessageId: input.beforeMessageId
+  }).map((message) => ({ role: message.role, content: message.content }))
 }
 
 function normalizeCitations(citations: ChatCitation[]): ChatCitation[] {
@@ -102,28 +183,75 @@ function normalizeCitations(citations: ChatCitation[]): ChatCitation[] {
     .filter((citation): citation is ChatCitation => Boolean(citation))
 }
 
-function fallbackStream(message: string): AsyncIterable<ChatStreamEvent> {
+function fallbackStream(
+  message: string,
+  history?: StreamHistoryPersistence
+): AsyncIterable<ChatStreamEvent> {
   return streamRunnerResult({
     grounded: false,
     citations: [],
-    deltas: toAsyncDeltas([message])
+    deltas: toAsyncDeltas([message]),
+    history
   })
+}
+
+interface StreamHistoryPersistence {
+  database: DatabaseSync
+  userId: string
+  specialistId: string
+  specialistName: string
+  conversationId?: string
+  replaceFromMessageId?: string
+  question: string
+  titleRunner?: ConversationTitleRunner
+  titleTimeoutMs?: number
+  now?: Date
 }
 
 async function* streamRunnerResult(input: {
   grounded: boolean
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
+  history?: StreamHistoryPersistence
 }): AsyncIterable<ChatStreamEvent> {
+  let answer = ''
+
   try {
     for await (const text of input.deltas) {
       if (text.length > 0) {
+        answer += text
         yield { type: 'delta', text }
       }
     }
 
     for (const citation of input.citations) {
       yield { type: 'citation', citation }
+    }
+
+    if (input.history) {
+      const persisted = await persistCompletedHistoryTurn(input.history.database, {
+        userId: input.history.userId,
+        specialistId: input.history.specialistId,
+        specialistName: input.history.specialistName,
+        ...(input.history.conversationId ? { conversationId: input.history.conversationId } : {}),
+        ...(input.history.replaceFromMessageId ? { replaceFromMessageId: input.history.replaceFromMessageId } : {}),
+        question: input.history.question,
+        answer,
+        grounded: input.grounded,
+        citations: input.citations,
+        ...(input.history.now ? { now: input.history.now } : {}),
+        ...(input.history.titleRunner ? { titleRunner: input.history.titleRunner } : {}),
+        ...(input.history.titleTimeoutMs !== undefined ? { titleTimeoutMs: input.history.titleTimeoutMs } : {})
+      })
+
+      yield {
+        type: 'history',
+        conversationId: persisted.conversationId,
+        userMessageId: persisted.userMessageId,
+        assistantMessageId: persisted.assistantMessageId,
+        title: persisted.title,
+        titleStatus: persisted.titleStatus
+      }
     }
 
     yield { type: 'done', grounded: input.grounded }

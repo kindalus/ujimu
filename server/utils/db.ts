@@ -79,6 +79,49 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_otp_challenges_contact
         ON otp_challenges (channel, contact, created_at);
     `
+  },
+  {
+    version: '0004_conversation_history',
+    sql: `
+      CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        specialist_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        title_status TEXT NOT NULL CHECK (title_status IN ('generated', 'pending')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_specialist_updated
+        ON conversations (user_id, specialist_id, updated_at);
+
+      CREATE TABLE IF NOT EXISTS conversation_messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        content TEXT NOT NULL,
+        message_order INTEGER NOT NULL,
+        grounded INTEGER CHECK (grounded IN (0, 1)),
+        created_at TEXT NOT NULL,
+        UNIQUE (conversation_id, message_order)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation_order
+        ON conversation_messages (conversation_id, message_order);
+
+      CREATE TABLE IF NOT EXISTS message_citations (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL REFERENCES conversation_messages(id) ON DELETE CASCADE,
+        source_file TEXT,
+        source_title TEXT NOT NULL,
+        article_refs_json TEXT NOT NULL,
+        shown_order INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_message_citations_message_order
+        ON message_citations (message_id, shown_order);
+    `
   }
 ]
 

@@ -1,5 +1,11 @@
-export async function deleteConversationHistoryForSpecialist(_specialistId: string): Promise<void> {
-  // Conversation history tables are introduced in the history slice.
-  // This contract is intentionally present now so destructive specialist deletion
-  // already calls the future history cleanup boundary.
+import { initializeDatabase } from '../db'
+import { deleteConversationsForSpecialist } from './repository'
+
+export async function deleteConversationHistoryForSpecialist(specialistId: string): Promise<void> {
+  const database = await initializeDatabase()
+  try {
+    deleteConversationsForSpecialist(database, specialistId)
+  } finally {
+    database.close()
+  }
 }

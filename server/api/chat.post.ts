@@ -1,3 +1,4 @@
+import type { DatabaseSync } from 'node:sqlite'
 import {
   createError,
   defineEventHandler,
@@ -7,13 +8,13 @@ import {
   setResponseHeaders,
   setResponseStatus
 } from 'h3'
-import { createChatEventStreamForSpecialist } from '../utils/chat/engine'
+import { createChatEventStream } from '../utils/chat/engine'
 import { serializeChatEvent } from '../utils/chat/ndjson'
-import { ChatRequestError, specialistNotFound, validateChatRequestBody } from '../utils/chat/request'
+import type { ChatStreamEvent } from '../utils/chat/types'
+import { ChatRequestError, validateChatRequestBody } from '../utils/chat/request'
 import { initializeDatabase } from '../utils/db'
 import { QuotaExceededError } from '../utils/quota/errors'
 import { resolveQuotaSubject } from '../utils/quota/identity'
-import { getSpecialistById } from '../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
   const contentType = getRequestHeader(event, 'content-type') ?? ''
@@ -37,22 +38,18 @@ export default defineEventHandler(async (event) => {
 
   try {
     const input = validateChatRequestBody(body)
-    const specialist = await getSpecialistById(input.specialistId)
-
-    if (!specialist) {
-      throw specialistNotFound(input.specialistId)
-    }
-
     const subject = resolveQuotaSubject(event)
 
-    const stream = await createChatEventStreamForSpecialist(specialist, input, {
+    const stream = await createChatEventStream(input, {
       quota: {
+        database,
+        subject
+      },
+      history: {
         database,
         subject
       }
     })
-
-    database.close()
 
     setResponseHeaders(event, {
       'content-type': 'application/x-ndjson; charset=utf-8',
@@ -60,7 +57,7 @@ export default defineEventHandler(async (event) => {
       'x-accel-buffering': 'no'
     })
 
-    return sendIterable(event, stream, { serializer: serializeChatEvent })
+    return sendIterable(event, closeDatabaseAfterStream(stream, database), { serializer: serializeChatEvent })
   } catch (error) {
     database.close()
 
@@ -80,3 +77,14 @@ export default defineEventHandler(async (event) => {
     throw error
   }
 })
+
+async function* closeDatabaseAfterStream(
+  stream: AsyncIterable<ChatStreamEvent>,
+  database: DatabaseSync
+): AsyncIterable<ChatStreamEvent> {
+  try {
+    yield* stream
+  } finally {
+    database.close()
+  }
+}

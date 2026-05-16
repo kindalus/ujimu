@@ -2,9 +2,11 @@ export interface ValidatedChatRequest {
   specialistId: string
   question: string
   clientTimezone?: string
+  conversationId?: string
+  replaceFromMessageId?: string
 }
 
-export type ChatRequestErrorCode = 'INVALID_CHAT_REQUEST' | 'SPECIALIST_NOT_FOUND'
+export type ChatRequestErrorCode = 'INVALID_CHAT_REQUEST' | 'SPECIALIST_NOT_FOUND' | 'HISTORY_NOT_FOUND'
 
 export class ChatRequestError extends Error {
   constructor(
@@ -30,11 +32,19 @@ export function validateChatRequestBody(body: unknown): ValidatedChatRequest {
   }
 
   const clientTimezone = readOptionalString(body.clientTimezone, 'clientTimezone')
+  const conversationId = readOptionalString(body.conversationId, 'conversationId', 200)
+  const replaceFromMessageId = readOptionalString(body.replaceFromMessageId, 'replaceFromMessageId', 200)
+
+  if (replaceFromMessageId && !conversationId) {
+    throw invalidRequest('replaceFromMessageId requires conversationId.')
+  }
 
   return {
     specialistId,
     question,
-    ...(clientTimezone ? { clientTimezone } : {})
+    ...(clientTimezone ? { clientTimezone } : {}),
+    ...(conversationId ? { conversationId } : {}),
+    ...(replaceFromMessageId ? { replaceFromMessageId } : {})
   }
 }
 
@@ -55,7 +65,7 @@ function readRequiredString(value: unknown, fieldName: string): string {
   return trimmed
 }
 
-function readOptionalString(value: unknown, fieldName: string): string | undefined {
+function readOptionalString(value: unknown, fieldName: string, maxLength = 100): string | undefined {
   if (value === undefined || value === null) {
     return undefined
   }
@@ -65,8 +75,8 @@ function readOptionalString(value: unknown, fieldName: string): string | undefin
   }
 
   const trimmed = value.trim()
-  if (trimmed.length > 100) {
-    throw invalidRequest(`${fieldName} must be at most 100 characters long.`)
+  if (trimmed.length > maxLength) {
+    throw invalidRequest(`${fieldName} must be at most ${maxLength} characters long.`)
   }
 
   return trimmed || undefined

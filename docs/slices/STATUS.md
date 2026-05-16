@@ -20,12 +20,12 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 06:
+Latest full verification after Slice 07:
 
-- `npm test` — passed, 42 tests
+- `npm test` — passed, 48 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API smoke check — OTP request/session/logout endpoint behaviour checked; OTP verification covered by acceptance tests with an injected fake provider.
+- Manual API smoke check — not separately run for history; route, repository, stream, and UI contracts are covered by acceptance tests.
 
 Known non-blocking warnings:
 
@@ -43,18 +43,31 @@ Known non-blocking warnings:
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
-| 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/history.acceptance.test.ts`; implementation pending. |
+| 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
-## Active slice details
+## Completed slice details
 
 ### Slice 07 — Conversation history & editing
 
-Status: `acceptance-tested`
+Status: `verified`
+
+Implemented:
+
+- `conversations`, `conversation_messages`, and `message_citations` SQLite migration.
+- History repository for list, load, delete, persistence, specialist cleanup, and continuation context windows.
+- Authenticated REST history endpoints for list, load, and permanent delete.
+- `POST /api/chat` history metadata support with `conversationId` and `replaceFromMessageId`.
+- Authenticated stream persistence after complete responses/fallbacks only.
+- NDJSON `history` event emitted before `done` with persisted conversation and message IDs.
+- Destructive edit replacement that keeps old history intact when replacement generation fails.
+- Citation snapshots restored from SQLite rather than recalculated.
+- Hybrid AI title generation contract with generated or pending title status.
+- Compact main-page history panel with Retomar, Apagar, and Editar flows for authenticated users.
 
 Idea-refined direction:
 
@@ -109,8 +122,6 @@ Out of scope for this slice:
 - Conversation sharing/export.
 - Multi-branch conversation trees; editing rewrites the linear future.
 - Using history summaries as grounding evidence for specialist answers.
-
-## Completed slice details
 
 ### Slice 06 — Authentication with OTP
 

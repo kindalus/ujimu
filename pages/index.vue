@@ -22,6 +22,35 @@ interface AuthSessionResponse {
   }
 }
 
+interface HistoryConversationSummary {
+  id: string
+  specialistId: string
+  title: string
+  titleStatus: 'generated' | 'pending'
+  createdAt: string
+  updatedAt: string
+}
+
+interface HistoryMessagePayload {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  citations: ChatCitation[]
+  grounded?: boolean
+}
+
+interface HistoryConversationPayload extends HistoryConversationSummary {
+  messages: HistoryMessagePayload[]
+}
+
+interface HistoryListResponse {
+  conversations: HistoryConversationSummary[]
+}
+
+interface HistoryConversationResponse {
+  conversation: HistoryConversationPayload
+}
+
 interface ChatCitation {
   sourceTitle: string
   sourceFile?: string
@@ -31,6 +60,14 @@ interface ChatCitation {
 type ChatStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
+  | {
+      type: 'history'
+      conversationId: string
+      userMessageId: string
+      assistantMessageId: string
+      title: string
+      titleStatus: 'generated' | 'pending'
+    }
   | { type: 'done'; grounded: boolean }
   | { type: 'error'; code: string; message: string }
 
@@ -40,6 +77,7 @@ interface ChatMessage {
   text: string
   citations: ChatCitation[]
   grounded?: boolean
+  historyMessageId?: string
   status: 'streaming' | 'done' | 'error'
 }
 
@@ -67,6 +105,12 @@ const selectedSpecialistId = ref('')
 const question = ref('')
 const messages = ref<ChatMessage[]>([])
 const queuedQuestions = ref<QueuedQuestion[]>([])
+const activeConversationId = ref('')
+const activeConversationTitle = ref('')
+const historyConversations = ref<HistoryConversationSummary[]>([])
+const historyPending = ref(false)
+const historyError = ref('')
+const editingMessageId = ref('')
 const isStreaming = ref(false)
 const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
@@ -93,6 +137,7 @@ const canWriteQuestion = computed(
   () => Boolean(selectedSpecialist.value) && queuedQuestions.value.length < queueLimit
 )
 const canSubmitQuestion = computed(() => canWriteQuestion.value && question.value.trim().length > 0)
+const canUseHistory = computed(() => isAuthenticated.value && Boolean(selectedSpecialistId.value))
 const statusLabel = computed(() => {
   if (isStreaming.value) return 'A responder'
   if (selectedSpecialist.value) return 'Preparado'
@@ -112,6 +157,9 @@ async function loadAuthSession(): Promise<void> {
     authSession.value = response.ok
       ? ((await response.json()) as AuthSessionResponse)
       : { authenticated: false }
+    if (authSession.value.authenticated) {
+      void loadHistory()
+    }
   } catch {
     authSession.value = { authenticated: false }
   }
@@ -166,6 +214,7 @@ async function verifyOtpCode(): Promise<void> {
     }
 
     authSession.value = (await response.json()) as AuthSessionResponse
+    void loadHistory()
     authPanelOpen.value = false
     authStep.value = 'request'
     authContact.value = ''
@@ -181,11 +230,103 @@ async function verifyOtpCode(): Promise<void> {
 async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
   authSession.value = { authenticated: false }
+  historyConversations.value = []
+  activeConversationId.value = ''
+  activeConversationTitle.value = ''
   authPanelOpen.value = false
   authStep.value = 'request'
   authCode.value = ''
   authMessage.value = ''
   authError.value = ''
+}
+
+async function loadHistory(): Promise<void> {
+  if (!canUseHistory.value) {
+    historyConversations.value = []
+    return
+  }
+
+  historyPending.value = true
+  historyError.value = ''
+
+  try {
+    const response = await fetch(`/api/history?specialistId=${encodeURIComponent(selectedSpecialistId.value)}`)
+    if (!response.ok) {
+      throw new Error('Failed to load history.')
+    }
+    const payload = (await response.json()) as HistoryListResponse
+    historyConversations.value = payload.conversations
+  } catch {
+    historyError.value = 'Não foi possível carregar o histórico.'
+  } finally {
+    historyPending.value = false
+  }
+}
+
+async function openConversation(conversationId: string): Promise<void> {
+  if (isStreaming.value) return
+
+  try {
+    const response = await fetch(`/api/history/${encodeURIComponent(conversationId)}`)
+    if (!response.ok) {
+      throw new Error('Failed to open conversation.')
+    }
+    const payload = (await response.json()) as HistoryConversationResponse
+    const conversation = payload.conversation
+
+    selectedSpecialistId.value = conversation.specialistId
+    activeConversationId.value = conversation.id
+    activeConversationTitle.value = conversation.title
+    messages.value = conversation.messages.map((message) => ({
+      id: message.id,
+      historyMessageId: message.id,
+      role: message.role,
+      text: message.content,
+      citations: message.citations,
+      grounded: message.grounded,
+      status: 'done'
+    }))
+    queuedQuestions.value = []
+    question.value = ''
+    editingMessageId.value = ''
+    quotaError.value = ''
+    void loadHistory()
+  } catch {
+    historyError.value = 'Não foi possível retomar a conversa.'
+  }
+}
+
+async function deleteHistoryConversation(conversationId: string): Promise<void> {
+  if (isStreaming.value) return
+  const confirmed = window.confirm('Apagar esta conversa de forma permanente?')
+  if (!confirmed) return
+
+  try {
+    const response = await fetch(`/api/history/${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error('Failed to delete conversation.')
+    }
+    if (activeConversationId.value === conversationId) {
+      activeConversationId.value = ''
+      activeConversationTitle.value = ''
+      messages.value = []
+      editingMessageId.value = ''
+    }
+    void loadHistory()
+  } catch {
+    historyError.value = 'Não foi possível apagar a conversa.'
+  }
+}
+
+function startEditingQuestion(message: ChatMessage): void {
+  if (isStreaming.value || message.role !== 'user' || !message.historyMessageId) return
+  editingMessageId.value = message.historyMessageId
+  question.value = message.text
+}
+
+function cancelEditing(): void {
+  editingMessageId.value = ''
+  question.value = ''
 }
 
 async function loadSpecialists(): Promise<void> {
@@ -214,22 +355,29 @@ function selectSpecialist(specialistId: string): void {
   question.value = ''
   messages.value = []
   queuedQuestions.value = []
+  activeConversationId.value = ''
+  activeConversationTitle.value = ''
+  editingMessageId.value = ''
   quotaError.value = ''
+  void loadHistory()
 }
 
 function submitQuestion(): void {
   const text = question.value.trim()
   if (!canSubmitQuestion.value || !text) return
 
+  const replaceFromMessageId = editingMessageId.value || undefined
   question.value = ''
   quotaError.value = ''
 
   if (isStreaming.value) {
-    queuedQuestions.value.push({ id: createId('queued'), text })
+    if (!replaceFromMessageId) {
+      queuedQuestions.value.push({ id: createId('queued'), text })
+    }
     return
   }
 
-  void startQuestion(text)
+  void startQuestion(text, { replaceFromMessageId })
 }
 
 function cancelQueuedQuestion(id: string): void {
@@ -247,7 +395,10 @@ function moveQueuedQuestion(index: number, direction: -1 | 1): void {
   queuedQuestions.value = reordered
 }
 
-async function startQuestion(text: string): Promise<void> {
+async function startQuestion(
+  text: string,
+  options: { replaceFromMessageId?: string } = {}
+): Promise<void> {
   const specialistId = selectedSpecialistId.value
   if (!specialistId) return
 
@@ -259,6 +410,16 @@ async function startQuestion(text: string): Promise<void> {
     status: 'done'
   }
   let continueQueue = true
+  const previousMessages = options.replaceFromMessageId ? [...messages.value] : undefined
+
+  if (options.replaceFromMessageId) {
+    const editIndex = messages.value.findIndex(
+      (message) => message.historyMessageId === options.replaceFromMessageId
+    )
+    if (editIndex >= 0) {
+      messages.value = messages.value.slice(0, editIndex)
+    }
+  }
 
   messages.value.push(userMessage)
   isStreaming.value = true
@@ -270,25 +431,34 @@ async function startQuestion(text: string): Promise<void> {
       body: JSON.stringify({
         specialistId,
         question: text,
-        clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ...(activeConversationId.value ? { conversationId: activeConversationId.value } : {}),
+        ...(options.replaceFromMessageId ? { replaceFromMessageId: options.replaceFromMessageId } : {})
       })
     })
 
     if (!response.ok) {
       if (response.status === 429) {
         quotaError.value = await readQuotaErrorMessage(response)
+        if (previousMessages) {
+          messages.value = previousMessages
+        }
         continueQueue = false
         return
       }
 
-      messages.value.push({
-        id: createId('assistant'),
-        role: 'assistant',
-        text: 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.',
-        citations: [],
-        status: 'error',
-        grounded: false
-      })
+      if (previousMessages) {
+        messages.value = previousMessages
+      } else {
+        messages.value.push({
+          id: createId('assistant'),
+          role: 'assistant',
+          text: 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.',
+          citations: [],
+          status: 'error',
+          grounded: false
+        })
+      }
       return
     }
 
@@ -301,20 +471,29 @@ async function startQuestion(text: string): Promise<void> {
     }
     messages.value.push(assistantMessage)
 
-    await readChatStream(response, assistantMessage)
+    await readChatStream(response, assistantMessage, userMessage)
+
+    if (previousMessages && assistantMessage.status === 'error') {
+      messages.value = previousMessages
+      return
+    }
 
     if (assistantMessage.status === 'streaming') {
       assistantMessage.status = 'done'
     }
   } catch {
-    messages.value.push({
-      id: createId('assistant'),
-      role: 'assistant',
-      text: 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.',
-      citations: [],
-      status: 'error',
-      grounded: false
-    })
+    if (previousMessages) {
+      messages.value = previousMessages
+    } else {
+      messages.value.push({
+        id: createId('assistant'),
+        role: 'assistant',
+        text: 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.',
+        citations: [],
+        status: 'error',
+        grounded: false
+      })
+    }
   } finally {
     isStreaming.value = false
     const nextQuestion = continueQueue ? queuedQuestions.value.shift() : undefined
@@ -333,7 +512,11 @@ async function readQuotaErrorMessage(response: Response): Promise<string> {
   }
 }
 
-async function readChatStream(response: Response, assistantMessage: ChatMessage): Promise<void> {
+async function readChatStream(
+  response: Response,
+  assistantMessage: ChatMessage,
+  userMessage: ChatMessage
+): Promise<void> {
   const reader = response.body?.getReader()
   if (!reader) {
     throw new Error('Response body is not readable.')
@@ -350,18 +533,22 @@ async function readChatStream(response: Response, assistantMessage: ChatMessage)
     buffer = lines.pop() ?? ''
 
     for (const line of lines) {
-      handleChatEventLine(line, assistantMessage)
+      handleChatEventLine(line, assistantMessage, userMessage)
     }
 
     if (done) break
   }
 
   if (buffer.trim()) {
-    handleChatEventLine(buffer, assistantMessage)
+    handleChatEventLine(buffer, assistantMessage, userMessage)
   }
 }
 
-function handleChatEventLine(line: string, assistantMessage: ChatMessage): void {
+function handleChatEventLine(
+  line: string,
+  assistantMessage: ChatMessage,
+  userMessage: ChatMessage
+): void {
   const event = parseChatEvent(line)
   if (!event) return
 
@@ -375,9 +562,21 @@ function handleChatEventLine(line: string, assistantMessage: ChatMessage): void 
     return
   }
 
+  if (event.type === 'history') {
+    activeConversationId.value = event.conversationId
+    activeConversationTitle.value = event.title
+    userMessage.historyMessageId = event.userMessageId
+    assistantMessage.historyMessageId = event.assistantMessageId
+    editingMessageId.value = ''
+    void loadHistory()
+    return
+  }
+
   if (event.type === 'done') {
     assistantMessage.grounded = event.grounded
-    assistantMessage.status = 'done'
+    if (assistantMessage.status !== 'error') {
+      assistantMessage.status = 'done'
+    }
     return
   }
 
@@ -391,7 +590,7 @@ function parseChatEvent(line: string): ChatStreamEvent | undefined {
 
   try {
     const parsed = JSON.parse(line) as ChatStreamEvent
-    if (['delta', 'citation', 'done', 'error'].includes(parsed.type)) {
+    if (['delta', 'citation', 'history', 'done', 'error'].includes(parsed.type)) {
       return parsed
     }
   } catch {
@@ -509,6 +708,49 @@ function createId(prefix: string): string {
             <small>{{ specialist.description }}</small>
           </UButton>
         </div>
+
+        <section v-if="isAuthenticated" class="history-panel" aria-labelledby="history-title">
+          <div class="history-heading">
+            <h3 id="history-title">Histórico</h3>
+            <small v-if="selectedSpecialistId">20 últimas</small>
+          </div>
+          <p v-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
+          <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
+          <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
+          <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
+          <ol v-else class="history-list">
+            <li
+              v-for="conversation in historyConversations"
+              :key="conversation.id"
+              :class="{ active: conversation.id === activeConversationId }"
+            >
+              <strong>{{ conversation.title }}</strong>
+              <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
+              <div class="history-actions">
+                <UButton
+                  type="button"
+                  size="xs"
+                  color="primary"
+                  variant="ghost"
+                  :disabled="isStreaming"
+                  @click="openConversation(conversation.id)"
+                >
+                  Retomar
+                </UButton>
+                <UButton
+                  type="button"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="isStreaming"
+                  @click="deleteHistoryConversation(conversation.id)"
+                >
+                  Apagar
+                </UButton>
+              </div>
+            </li>
+          </ol>
+        </section>
       </aside>
 
       <section class="chat-panel" aria-labelledby="chat-title">
@@ -516,7 +758,7 @@ function createId(prefix: string): string {
           <div>
             <p class="section-label">Consulta</p>
             <h2 id="chat-title">
-              {{ selectedSpecialist?.name ?? 'Faça uma pergunta' }}
+              {{ activeConversationTitle || selectedSpecialist?.name || 'Faça uma pergunta' }}
             </h2>
           </div>
           <UBadge color="primary" variant="soft" size="lg">{{ statusLabel }}</UBadge>
@@ -543,6 +785,19 @@ function createId(prefix: string): string {
             <p class="message-text">
               {{ message.text || (message.status === 'streaming' ? 'A preparar resposta...' : '') }}
             </p>
+
+            <div v-if="message.role === 'user' && message.historyMessageId" class="message-actions">
+              <UButton
+                type="button"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                :disabled="isStreaming"
+                @click="startEditingQuestion(message)"
+              >
+                Editar
+              </UButton>
+            </div>
 
             <section
               v-if="message.role === 'assistant' && message.citations.length > 0"
@@ -609,6 +864,12 @@ function createId(prefix: string): string {
         </section>
 
         <form class="composer" @submit.prevent="submitQuestion">
+          <div v-if="editingMessageId" class="editing-banner">
+            <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
+            <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
+              Cancelar edição
+            </UButton>
+          </div>
           <label for="question">Pergunta</label>
           <UTextarea
             id="question"
@@ -620,7 +881,7 @@ function createId(prefix: string): string {
           <div class="composer-actions">
             <small>{{ composerHelp }}</small>
             <UButton type="submit" color="primary" :disabled="!canSubmitQuestion">
-              {{ isStreaming ? 'Adicionar à fila' : 'Enviar' }}
+              {{ editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar' }}
             </UButton>
           </div>
         </form>
@@ -818,6 +1079,56 @@ h3 {
   color: #ffd3d3;
 }
 
+.history-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 18px;
+}
+
+.history-heading,
+.history-actions,
+.message-actions,
+.editing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-heading small,
+.history-list small {
+  color: var(--ujimu-muted);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-list li {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.history-list li.active {
+  border-color: rgba(249, 214, 22, 0.4);
+  background: rgba(249, 214, 22, 0.1);
+}
+
+.history-list strong {
+  color: #f7f4e8;
+  line-height: 1.25;
+}
+
 .chat-panel {
   display: grid;
   min-height: 640px;
@@ -905,6 +1216,10 @@ h3 {
   white-space: pre-wrap;
 }
 
+.message-actions {
+  justify-content: flex-end;
+}
+
 .citations {
   margin-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -973,6 +1288,15 @@ h3 {
   gap: 10px;
   color: var(--ujimu-muted);
   font-weight: 700;
+}
+
+.editing-banner {
+  border: 1px solid rgba(249, 214, 22, 0.24);
+  border-radius: 16px;
+  padding: 10px;
+  color: #fff8cc;
+  background: rgba(249, 214, 22, 0.1);
+  line-height: 1.35;
 }
 
 .composer :deep(textarea) {
