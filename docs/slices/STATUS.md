@@ -20,12 +20,12 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 07:
+Latest full verification after Slice 08:
 
-- `npm test` — passed, 48 tests
+- `npm test` — passed, 53 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API smoke check — not separately run for history; route, repository, stream, and UI contracts are covered by acceptance tests.
+- Manual API smoke check — not separately run for admin; route, audit, upload, trash-delete, and UI contracts are covered by acceptance tests.
 
 Known non-blocking warnings:
 
@@ -44,17 +44,31 @@ Known non-blocking warnings:
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
-| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `acceptance-tested` | — | Acceptance tests written for admin allowlist, CRUD, uploads, ingestion, trash delete, audit, and UI contracts. |
+| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
-## Active slice details
+## Completed slice details
 
 ### Slice 08 — Admin specialist management
 
-Status: `acceptance-tested`
+Status: `verified`
+
+Implemented:
+
+- `admin_audit_events` SQLite migration for minimal admin operation auditing.
+- Admin guard based on existing OTP sessions and `UJIMU_ADMIN_CONTACTS`, checking every verified identity for the user.
+- Admin session endpoint returning authenticated/admin status without exposing allowlist internals.
+- Admin specialist list/create/edit/delete endpoints with 401/403/400/404/409 semantics.
+- Specialist edit support for mutable metadata and prompts while keeping `id` and `wiki_type` immutable.
+- Specialist deletion that moves the directory to `<UJIMU_DATA_DIR>/trash/specialties/<timestamp>_<id>/`, removes it from public selection, and deletes conversation history.
+- Raw source upload endpoint with supported extension checks, filename sanitization, and duplicate rejection.
+- Source reload endpoint that refreshes `ingest/state.json` and returns source statuses.
+- Manual ingestion endpoint that surfaces disabled Pi ingestion as `409` with safe user-facing copy and audited skipped state.
+- Single-page `/admin` console for specialist creation, editing, source upload, source reload, ingestion trigger, and delete confirmation.
+- Conditional `Administração` link on the main page for allowlisted admins.
 
 Idea-refined direction:
 
@@ -116,8 +130,6 @@ Out of scope for this slice:
 - Background ingestion workers or queues.
 - OCR for scanned PDFs.
 - Payment/subscription admin functions.
-
-## Completed slice details
 
 ### Slice 07 — Conversation history & editing
 

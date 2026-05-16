@@ -122,6 +122,26 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_message_citations_message_order
         ON message_citations (message_id, shown_order);
     `
+  },
+  {
+    version: '0005_admin_audit_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_audit_events (
+        id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        admin_contact TEXT NOT NULL,
+        action TEXT NOT NULL,
+        specialist_id TEXT,
+        occurred_at TEXT NOT NULL,
+        metadata_json TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_time
+        ON admin_audit_events (occurred_at);
+
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_specialist
+        ON admin_audit_events (specialist_id, occurred_at);
+    `
   }
 ]
 

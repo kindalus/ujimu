@@ -22,6 +22,10 @@ interface AuthSessionResponse {
   }
 }
 
+interface AdminSessionResponse extends AuthSessionResponse {
+  admin: boolean
+}
+
 interface HistoryConversationSummary {
   id: string
   specialistId: string
@@ -114,6 +118,7 @@ const editingMessageId = ref('')
 const isStreaming = ref(false)
 const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
+const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const authChannel = ref<'email' | 'phone'>('email')
 const authContact = ref('')
@@ -162,6 +167,19 @@ async function loadAuthSession(): Promise<void> {
     }
   } catch {
     authSession.value = { authenticated: false }
+  }
+  void loadAdminSession()
+}
+
+async function loadAdminSession(): Promise<void> {
+  try {
+    const response = await fetch('/api/admin/session')
+    const session = response.ok
+      ? ((await response.json()) as AdminSessionResponse)
+      : { authenticated: false, admin: false }
+    adminAvailable.value = Boolean(session.authenticated && session.admin)
+  } catch {
+    adminAvailable.value = false
   }
 }
 
@@ -215,6 +233,7 @@ async function verifyOtpCode(): Promise<void> {
 
     authSession.value = (await response.json()) as AuthSessionResponse
     void loadHistory()
+    void loadAdminSession()
     authPanelOpen.value = false
     authStep.value = 'request'
     authContact.value = ''
@@ -230,6 +249,7 @@ async function verifyOtpCode(): Promise<void> {
 async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
   authSession.value = { authenticated: false }
+  adminAvailable.value = false
   historyConversations.value = []
   activeConversationId.value = ''
   activeConversationTitle.value = ''
@@ -620,9 +640,14 @@ function createId(prefix: string): string {
       <section class="auth-panel" aria-label="Autenticação">
         <div v-if="isAuthenticated" class="auth-session">
           <span>Ligado como {{ authSession.user?.displayContact }}</span>
-          <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
-            Sair
-          </UButton>
+          <div class="auth-actions">
+            <UButton v-if="adminAvailable" to="/admin" color="primary" variant="soft" size="sm">
+              Administração
+            </UButton>
+            <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
+              Sair
+            </UButton>
+          </div>
         </div>
 
         <div v-else class="auth-entry">
@@ -1005,6 +1030,13 @@ h3 {
   align-items: center;
   color: #fff8cc;
   font-weight: 800;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .auth-channel {

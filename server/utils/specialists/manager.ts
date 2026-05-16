@@ -1,5 +1,6 @@
-import { access, mkdir, rm, writeFile } from 'node:fs/promises'
-import { stringify } from 'yaml'
+import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { parse, stringify } from 'yaml'
 import { deleteConversationHistoryForSpecialist } from '../history/delete'
 import { resolveSpecialistPaths, resolveSpecialtiesRoot, type SpecialistPathOptions } from './paths'
 import {
@@ -12,6 +13,15 @@ import { reloadSpecialistRegistry } from './registry'
 
 export interface SpecialistManagerOptions extends SpecialistPathOptions {
   deleteHistoryForSpecialist?: (specialistId: string) => Promise<void>
+}
+
+export type EditSpecialistInput = Partial<Pick<
+  SpecialistConfig,
+  'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled'
+>>
+
+export interface DeleteSpecialistResult {
+  trashPath: string
 }
 
 export class SpecialistOperationError extends Error {
@@ -49,10 +59,11 @@ export async function createSpecialist(
   return { ...config, paths }
 }
 
-export async function deleteSpecialist(
+export async function editSpecialist(
   specialistId: string,
+  input: EditSpecialistInput,
   options: SpecialistManagerOptions = {}
-): Promise<void> {
+): Promise<SpecialistRuntime> {
   assertValidSpecialistId(specialistId)
   const specialtiesRoot = resolveSpecialtiesRoot(options)
   const paths = resolveSpecialistPaths(specialtiesRoot, specialistId)
@@ -64,9 +75,36 @@ export async function deleteSpecialist(
     )
   }
 
-  await (options.deleteHistoryForSpecialist ?? deleteConversationHistoryForSpecialist)(specialistId)
-  await rm(paths.root, { recursive: true, force: false })
+  const existing = validateSpecialistConfig(parse(await readFile(paths.config, 'utf8')), specialistId)
+  const updated = validateSpecialistConfig({ ...existing, ...input }, specialistId)
+  const tempPath = `${paths.config}.tmp`
+  await writeFile(tempPath, stringifySpecialistConfig(updated))
+  await rename(tempPath, paths.config)
   await reloadSpecialistRegistry({ specialtiesRoot })
+
+  return { ...updated, paths }
+}
+
+export async function deleteSpecialist(
+  specialistId: string,
+  options: SpecialistManagerOptions = {}
+): Promise<DeleteSpecialistResult> {
+  assertValidSpecialistId(specialistId)
+  const specialtiesRoot = resolveSpecialtiesRoot(options)
+  const paths = resolveSpecialistPaths(specialtiesRoot, specialistId)
+
+  if (!(await pathExists(paths.root))) {
+    throw new SpecialistOperationError(
+      'SPECIALIST_NOT_FOUND',
+      `Specialist "${specialistId}" does not exist.`
+    )
+  }
+
+  const trashPath = await moveSpecialistToTrash(paths.root, specialistId, specialtiesRoot, options)
+  await (options.deleteHistoryForSpecialist ?? deleteConversationHistoryForSpecialist)(specialistId)
+  await reloadSpecialistRegistry({ specialtiesRoot })
+
+  return { trashPath }
 }
 
 function stringifySpecialistConfig(config: SpecialistConfig): string {
@@ -82,6 +120,20 @@ function stringifySpecialistConfig(config: SpecialistConfig): string {
     },
     { lineWidth: 0 }
   )
+}
+
+async function moveSpecialistToTrash(
+  specialistRoot: string,
+  specialistId: string,
+  specialtiesRoot: string,
+  options: SpecialistPathOptions
+): Promise<string> {
+  const trashRoot = join(options.dataDir ?? dirname(specialtiesRoot), 'trash', 'specialties')
+  await mkdir(trashRoot, { recursive: true })
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const trashPath = join(trashRoot, `${timestamp}_${specialistId}`)
+  await rename(specialistRoot, trashPath)
+  return trashPath
 }
 
 async function pathExists(path: string): Promise<boolean> {
