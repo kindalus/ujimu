@@ -150,6 +150,7 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <li>History is grouped by specialist and shown as a compact panel on the main chat page.</li>
 <li>The list shows the latest 20 conversations/sessions per specialist.</li>
 <li>Conversation deletion is permanent.</li>
+<li>History endpoints require authentication: anonymous users receive 401; missing or cross-user conversations return 404.</li>
 </ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Data model</div><h2>Keep conversations linear.</h2>
@@ -158,19 +159,23 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 messages
   id, conversation_id, role, content, parent_order, created_at
 message_citations
-  message_id, source_file, title, article_refs
+  message_id, source_file, source_title, article_refs_json, shown_order
 conversation_title_jobs
   id, conversation_id, status, created_at, completed_at</pre>
+<div class="callout">Locked decision: assistant citations are stored as exact snapshots of what was shown to the user, and restored conversations render those snapshots instead of recalculating citations from the wiki.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Conversation title</div><h2>Let AI name the session after it has context.</h2>
 <p class="lead">When the first assistant response completes, generate an indicative title from the first question, the first answer, and the selected specialist. The title is for navigation only and is not used as answer-grounding evidence.</p>
-<div class="callout">Open implementation question for grilling: whether title generation blocks the first response, runs in the background, or uses a temporary placeholder until the AI title is ready.</div>
+<div class="callout">Locked decision: use a hybrid path. Try to generate the AI title quickly after the first answer with a 5 second timeout; if generation fails, times out, or no title provider is configured, keep a temporary title with pending status. This slice stores pending state but does not implement a background regeneration worker.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Resume</div><h2>Continuing a session appends to the current timeline.</h2>
+<p class="lead">A limited slice of prior messages may be sent as conversational context for disambiguation, but never as grounding evidence or a replacement for wiki citations. The initial window is the first 5 messages plus the last 10 messages, de-duplicated for short conversations.</p>
 <div class="flow">
 <div class="node">open history</div>
 <div class="arrow">→</div>
-<div class="node">choose specialist session</div>
+<div class="node">choose session</div>
+<div class="arrow">→</div>
+<div class="node">switch to original specialist</div>
 <div class="arrow">→</div>
 <div class="node">load messages</div>
 <div class="arrow">→</div>
@@ -180,7 +185,7 @@ conversation_title_jobs
 </div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Edit behaviour</div><h2>Going back rewrites the future.</h2>
-<p class="lead">When the user edits a prior question and submits it, every later message in that conversation is permanently removed and replaced by the new continuation.</p>
+<p class="lead">Only authenticated user-authored question messages can be edited. When an edit succeeds, the original question and every later message are permanently removed, then the edited question and new assistant response are appended after the remaining prefix with new message IDs. If replacement generation fails or the stream is incomplete, the old conversation remains intact.</p>
 <div class="flow">
 <div class="node">old question</div>
 <div class="arrow">→</div>
@@ -203,7 +208,10 @@ conversation_title_jobs
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>History touches UI and server state.</h2>
 <pre>components/history/ConversationList.vue
 components/chat/EditQuestion.vue
-server/api/history/*.ts
+server/api/history/index.get.ts
+server/api/history/[conversationId].get.ts
+server/api/history/[conversationId].delete.ts
+server/api/chat.post.ts // optional conversationId + replaceFromMessageId
 server/utils/history/repository.ts
 server/database/migrations/*conversations*.sql</pre>
 </div></section>
@@ -214,7 +222,8 @@ server/database/migrations/*conversations*.sql</pre>
 <li>Deleting a conversation permanently removes it from the user history.</li>
 <li>Editing an earlier question permanently removes all later messages before saving the replacement path.</li>
 <li>After the first assistant response, an AI-generated title is stored using the question, answer, and selected specialist as input.</li>
-<li>Fallback answers shown to the user are saved; technical failures and quota denials are not saved as conversation messages.</li>
+<li>The chat stream emits a history event with persisted conversation/message IDs after authenticated history is saved and before the final done event.</li>
+<li>Fallback answers shown to the user are saved after completion; technical failures, partial streams, and quota denials are not saved as conversation messages.</li>
 <li>History for one specialist never appears under another specialist.</li>
 </ul>
 </div></section>
