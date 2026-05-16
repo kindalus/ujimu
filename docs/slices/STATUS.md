@@ -42,7 +42,7 @@ Known non-blocking warnings:
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
-| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `grilled` | — | OTP implementation decisions locked; context compacted before acceptance tests. |
+| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/auth.acceptance.test.ts`; implementation in progress. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 06 — Authentication with OTP
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
