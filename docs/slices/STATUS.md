@@ -46,9 +46,30 @@ Known non-blocking warnings:
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
-| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
+| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `idea-refined` | — | Direction refined for a mockable provider MVP before real Appy Pay/Stripe integrations. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Slice 10 — Subscriptions, payments & advertising
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Implement a mockable billing MVP rather than direct Appy Pay or Stripe API calls in this slice.
+- Keep payment providers behind an internal interface so real Appy Pay and Stripe adapters can be added later without changing subscription, quota, or UI logic.
+- Authenticated users can create a quarterly subscription checkout for the public 50,000.00 AOA plan.
+- Checkout creates a pending payment; subscription activation happens only after a provider-style confirmation event.
+- Subscription status drives quota subject resolution, expiry warnings, and advertising visibility.
+- Advertising zones remain visible for anonymous and registered free users and hidden for subscribed users.
+- Treat provider event payloads as untrusted input and keep confirmation idempotent.
+
+Out of scope for this slice:
+
+- Real Appy Pay API calls.
+- Real Stripe Checkout, Payment Intents, or card processing.
+- Subscription cancellation, refunds, invoices, or receipts.
+- Admin billing dashboards.
 
 ## Completed slice details
 

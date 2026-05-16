@@ -151,9 +151,9 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Payment providers</div><h2>Use provider boundaries from the start.</h2>
 <div class="grid-3">
-<div class="card"><strong>Appy Pay</strong><span>Multicaixa Express, Multicaixa Reference, and QR Code.</span></div>
-<div class="card"><strong>Stripe</strong><span>Preferred path to attempt VISA integration.</span></div>
-<div class="card"><strong>Abstraction</strong><span>Payment logic should not be hard-wired to one provider API shape.</span></div>
+<div class="card"><strong>Mockable first</strong><span>This slice creates provider abstractions and mock confirmations, not real provider API calls.</span></div>
+<div class="card"><strong>Appy Pay</strong><span>Boundary prepared for Multicaixa Express, Multicaixa Reference, and QR Code.</span></div>
+<div class="card"><strong>Stripe</strong><span>Boundary prepared for the preferred VISA path when available.</span></div>
 </div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Payment states</div><h2>The app needs clear state transitions.</h2>
@@ -186,13 +186,12 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Billing crosses server, UI, and quota.</h2>
-<pre>server/utils/billing/providers/appyPay.ts
-server/utils/billing/providers/stripe.ts
+<pre>server/utils/billing/providers/mock.ts
 server/utils/billing/subscriptions.ts
+server/api/billing/status.get.ts
 server/api/billing/checkout.post.ts
-server/api/billing/webhooks/*.post.ts
-components/billing/ExpiryWarning.vue
-components/ads/AdSlot.vue</pre>
+server/api/billing/webhooks/[provider].post.ts
+pages/index.vue billing/ads panels</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
 <ul>
