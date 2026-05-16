@@ -49,12 +49,12 @@ Known non-blocking warnings:
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
-| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `grilled` | — | Hardening MVP decisions locked; ready for acceptance tests. |
+| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `acceptance-tested` | — | Acceptance tests written and failing for missing hardening behaviour. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 11 — Security, operations & observability
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -79,6 +79,22 @@ Locked grill decisions:
 - Add baseline HTTP security headers through server middleware for all app/API responses.
 - Add CI automation with `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, and `npm audit --audit-level=high`.
 - Document SQLite backup/restore, log location, health/readiness endpoints, and secret expectations in an operations runbook.
+
+Acceptance tests written first in:
+
+- `tests/security-ops.acceptance.test.ts`
+- `tests/ops-ci-docs.acceptance.test.ts`
+
+Acceptance-test targets:
+
+- Baseline security headers are applied to application responses.
+- Operational events are written as daily JSONL files under the configured data directory.
+- Operational-event metadata is sanitized so sensitive question, answer, OTP, session, webhook, document, and contact values are not persisted.
+- Public `/healthz` exposes only a minimal liveness payload.
+- Admin-only `/api/admin/ops/readyz` exposes safe readiness booleans/numeric migration count without paths or secret values.
+- Raw source storage keeps uploads inside the specialist raw directory and rejects traversal filenames.
+- CI runs install, tests, typecheck, build, and high-severity audit.
+- The operations runbook documents health/readiness, logs, secrets, and SQLite backup/restore.
 
 Out of scope for this slice:
 
