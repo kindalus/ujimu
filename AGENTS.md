@@ -160,21 +160,39 @@ Specialist prompt changes do not require audit history in the MVP.
 - Add tests for quota enforcement, specialist loading, ingestion detection, and answer-grounding failure paths.
 - Implementation planning decks should describe success conditions that can be converted into tests; they should not contain concrete test code.
 
-## Project specifications and slice workflow
+## Project specifications and Zafir slice workflow
 
-- Treat `docs/brainstorming-inicial.html` and the slice decks in `docs/slices/` as project specification artefacts, not presentation-only files.
-- For slices that have not yet been implemented, update the relevant brainstorming or slice deck whenever a new product idea, technical idea, scope clarification, or implementation decision emerges.
-- During `idea-refine` and `grill-me` for an unimplemented slice, update that slice deck so the refined scope and locked decisions are captured before acceptance tests are written.
-- Do not retroactively change the intended scope of an already implemented slice deck. If the implemented slice needs factual corrections or as-built notes, keep them clearly documented as corrections/notes; new behaviour belongs in a future slice.
-- Keep `docs/slices/STATUS.md` as the canonical slice progress tracker and update it whenever a slice changes status or verification state.
-- Use Git as the project change log. After this repository has been initialized, keep commits small and phase-based during each slice.
-- For every new slice, make separate commits for at least: `idea-refine`/spec updates, `grill-me` locked decisions, acceptance-test creation, and implementation after the full verification suite passes.
-- Do not collapse those slice-phase commits into one large commit unless the user explicitly asks for a squash.
+Ujimu adopts the Zafir development process, adapted to this repository by migrating specification artefacts to `docs/specs/`.
+
+- Treat `docs/specs/brainstorming-inicial.html` and the slice decks in `docs/specs/slices/` as project specification artefacts, not presentation-only files.
+- Specs, brainstorms, design decisions, architecture decisions, and slice plans should be captured as HTML slide decks under `docs/specs/` unless a more specific user instruction says otherwise.
+- Keep `docs/specs/slices/STATUS.md` as the canonical slice progress tracker and update it whenever a slice changes status or verification state.
+- At the start of every new brainstorm, ask whether the software or feature is governed by legislation. If yes, ask the user to place all relevant legislative material in `docs/specs/laws/`; then consult that folder with the `llm-wiki` skill for brainstorm, design, architecture, slice, implementation, and bug-fix decisions that could be affected by law.
+- Brainstorm first: elicit the objective, technological constraints, design and architecture principles, non-goals, and known boundaries; update the relevant HTML deck after each iteration; use `idea-refine` to sharpen the idea; stop only when the user approves the deck as the spec of record.
+- For existing projects, ask whether the user wants to revisit the current design and architecture before new slicing. If yes, capture the outcome in a design/architecture HTML deck such as `docs/specs/architecture.html`; if no or deferred, record that explicitly in the relevant deck.
+- Cut approved work into sequential slices under `docs/specs/slices/`. Each slice deck must include the idea, scope, locked decisions, likely implementation zones, success conditions, explicit exclusions, and links back to the originating brainstorm and architecture decks. When legislation applies, include the relevant law references.
+- Work on one slice at a time. A slice must be fully verified and green before the next one starts.
+- For slices that have not yet been implemented, update the relevant brainstorm or slice deck whenever a new product idea, technical idea, scope clarification, or implementation decision emerges.
 - Before moving into a new implementation slice, first refine the slice direction with the `idea-refine` skill, then stress-test and lock implementation decisions with the `grill-me` skill.
 - During the `grill-me` step, ask one decision-sharpening question at a time, provide a recommended answer for each question, and resolve dependencies before implementation starts.
+- During `idea-refine` and `grill-me` for an unimplemented slice, update that slice deck so the refined scope and locked decisions are captured before acceptance tests are written.
+- Do not retroactively change the intended scope of an already implemented slice deck. If the implemented slice needs factual corrections or as-built notes, keep them clearly documented as corrections/notes; new behaviour belongs in a future slice.
 - When implementation of a slice starts, write acceptance tests first from the slice success conditions.
 - After acceptance tests exist, implement the remaining code incrementally and use test-driven development where practical: write a failing test, make it pass with the smallest correct change, then refactor while keeping tests green.
 - Keep acceptance tests focused on externally visible slice behaviour rather than implementation details.
+- Use Git as the project change log. Keep commits small and phase-based during each slice.
+- For every new slice, make separate commits for at least: `idea-refine`/spec updates, `grill-me` locked decisions, acceptance-test creation, and implementation after the full verification suite passes.
+- Do not collapse those slice-phase commits into one large commit unless the user explicitly asks for a squash.
+
+## Zafir bug-fix workflow
+
+Bug fixes do not require the full slice workflow, but they must still be disciplined:
+
+- Reproduce and diagnose the issue before touching code.
+- If no existing test covers the behaviour, write a failing test for the bug first.
+- Patch narrowly; avoid drive-by refactors.
+- Run the relevant tests and the full verification suite before considering the fix done.
+- If legislation applies, verify the fix against the relevant material in `docs/specs/laws/` using the `llm-wiki` skill.
 
 ## Suggested specialty directory shape
 
