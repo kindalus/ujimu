@@ -156,6 +156,33 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <li>Registered and subscribed policy logic is covered by tests, but not connected to real auth yet.</li>
 </ul>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Windows and consumption.</h2>
+<ul>
+<li>Daily windows use the user's validated timezone.</li>
+<li>Weekly windows are local ISO weeks: Monday 00:00 to the following Monday 00:00.</li>
+<li>Quota is consumed after request validation and specialist lookup, immediately before stream creation.</li>
+<li>Invalid requests and missing specialists do not consume quota.</li>
+<li>If chat fails after quota is allowed, the request still counts in this slice.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Anonymous identity and limits.</h2>
+<ul>
+<li>Create the anonymous cookie only on the first valid chat request.</li>
+<li>Cookie name: ujimu_anon_id; value: server-generated UUID.</li>
+<li>Cookie options: httpOnly, sameSite=lax, secure in production, maxAge 180 days.</li>
+<li>Invalid or missing timezone falls back to Africa/Luanda.</li>
+<li>Subscribed weekly limit comes from UJIMU_SUBSCRIBED_WEEKLY_LIMIT, default 5000.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Denials and queue behaviour.</h2>
+<ul>
+<li>Quota denials return HTTP 429 JSON before streaming.</li>
+<li>The 429 body includes only exceeded limits with limit, used, and resetAt.</li>
+<li>If daily and weekly are both exceeded, include both limit objects.</li>
+<li>The frontend shows quota errors above the composer, not as assistant messages.</li>
+<li>If a queued question hits 429, stop processing the queue and keep pending questions visible.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Policy table</div><h2>Initial quota policy.</h2>
 <div class="grid-3">
 <div class="card"><strong>Anonymous</strong><span>5 requests per day or 20 requests per week, associated with a browser cookie.</span></div>
@@ -189,7 +216,10 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
   conversation_id
   occurred_at_utc
   user_timezone
-  counted: boolean</pre>
+  counted: boolean
+  decision: allowed | denied
+  denial_reason</pre>
+<div class="callout">The table is append-only for this slice. Allowed and denied attempts are recorded; denied events are not counted against quota.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">User feedback</div><h2>Quota messages should guide the next action.</h2>
 <ul>
