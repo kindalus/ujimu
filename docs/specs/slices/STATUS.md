@@ -51,11 +51,11 @@ Known non-blocking warnings:
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
-| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `grilled` | — | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
+| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `acceptance-tested` | — | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
 
 ## Slice 13 — Three Pi agent pipeline
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -178,11 +178,21 @@ Potential implementation zones:
 - `.pi/settings.json`
 - `.pi/models.json`
 - `.pi/auth.json.sample`
-- `.pi/skills/**`
+- `.pi/skills/llm-wiki/**`
 
-Success conditions to convert into acceptance tests:
+Acceptance tests written first in:
 
-- An admin can upload PDF, TXT, DOCX, or HTML and the system records a deterministic generated Markdown target ending in `.md`.
+- `tests/pi-agent-pipeline.acceptance.test.ts`
+- `tests/admin-ui.acceptance.test.ts`
+- `tests/ops-ci-docs.acceptance.test.ts`
+
+Acceptance tests currently fail for missing Slice 13 behaviour, as expected:
+
+- `npm test -- tests/pi-agent-pipeline.acceptance.test.ts tests/admin-ui.acceptance.test.ts tests/ops-ci-docs.acceptance.test.ts` — failed with missing conversion pipeline, admin UI conversion action, operations runbook updates, conversion route, and citation allowlist validation.
+
+Success conditions covered by acceptance tests:
+
+- An admin can upload PDF, TXT, DOCX, HTML/HTM, CSV, or XLSX and the system records a deterministic generated Markdown target ending in `.md`.
 - TXT and any source extractable with the approved Pi file tools are converted to Markdown before ingestion.
 - Direct Markdown upload `lei.md` is stored as `lei.original.md`; duplicate `lei.original.md` targets are rejected.
 - When an original file changes, the generated Markdown artefact is overwritten; when the original has not changed, conversion is skipped.
@@ -203,7 +213,7 @@ Out of scope for this slice:
 
 Next step:
 
-- Write acceptance tests first from the locked success conditions, then implement incrementally.
+- Implement the Slice 13 pipeline incrementally until the acceptance tests pass, then run the full verification suite.
 
 ## Slice 12 — Passkeys post-MVP
 
