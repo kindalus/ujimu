@@ -130,12 +130,13 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
     <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 7 · history</div></div>
     <main class="deck">
 <section class="slide"><div class="frame content"><div class="kicker">Slice 7</div><h1>Conversation history &amp; editing</h1>
-<p class="lead">Give registered users the latest 20 sessions per specialist, with resume, hard delete, and destructive edit behaviour.</p>
+<p class="lead">Give registered users the latest 20 sessions per specialist, with resume, hard delete, destructive edit behaviour, and an AI-generated title after the first answer.</p>
 <div class="pills">
 <span class="pill">20 sessions</span>
 <span class="pill">resume</span>
 <span class="pill">hard delete</span>
 <span class="pill">truncate after edit</span>
+<span class="pill">AI title</span>
 </div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>History is useful, but bounded.</h2>
@@ -144,7 +145,9 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Scope</div><h2>Only registered users get history.</h2>
 <ul>
 <li>Anonymous users do not get cross-session history in the MVP.</li>
-<li>History is grouped by specialist.</li>
+<li>Messages sent before login are not retroactively migrated into a registered history.</li>
+<li>The first authenticated question for a selected specialist automatically creates a conversation.</li>
+<li>History is grouped by specialist and shown as a compact panel on the main chat page.</li>
 <li>The list shows the latest 20 conversations/sessions per specialist.</li>
 <li>Conversation deletion is permanent.</li>
 </ul>
@@ -155,7 +158,13 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 messages
   id, conversation_id, role, content, parent_order, created_at
 message_citations
-  message_id, source_file, title, article_refs</pre>
+  message_id, source_file, title, article_refs
+conversation_title_jobs
+  id, conversation_id, status, created_at, completed_at</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Conversation title</div><h2>Let AI name the session after it has context.</h2>
+<p class="lead">When the first assistant response completes, generate an indicative title from the first question, the first answer, and the selected specialist. The title is for navigation only and is not used as answer-grounding evidence.</p>
+<div class="callout">Open implementation question for grilling: whether title generation blocks the first response, runs in the background, or uses a temporary placeholder until the AI title is ready.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Resume</div><h2>Continuing a session appends to the current timeline.</h2>
 <div class="flow">
@@ -204,6 +213,8 @@ server/database/migrations/*conversations*.sql</pre>
 <li>Opening a session restores its messages and allows continuation.</li>
 <li>Deleting a conversation permanently removes it from the user history.</li>
 <li>Editing an earlier question permanently removes all later messages before saving the replacement path.</li>
+<li>After the first assistant response, an AI-generated title is stored using the question, answer, and selected specialist as input.</li>
+<li>Fallback answers shown to the user are saved; technical failures and quota denials are not saved as conversation messages.</li>
 <li>History for one specialist never appears under another specialist.</li>
 </ul>
 </div></section>
