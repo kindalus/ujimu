@@ -167,6 +167,9 @@ Specialist prompt changes do not require audit history in the MVP.
 - During `idea-refine` and `grill-me` for an unimplemented slice, update that slice deck so the refined scope and locked decisions are captured before acceptance tests are written.
 - Do not retroactively change the intended scope of an already implemented slice deck. If the implemented slice needs factual corrections or as-built notes, keep them clearly documented as corrections/notes; new behaviour belongs in a future slice.
 - Keep `docs/slices/STATUS.md` as the canonical slice progress tracker and update it whenever a slice changes status or verification state.
+- Use Git as the project change log. After this repository has been initialized, keep commits small and phase-based during each slice.
+- For every new slice, make separate commits for at least: `idea-refine`/spec updates, `grill-me` locked decisions, acceptance-test creation, and implementation after the full verification suite passes.
+- Do not collapse those slice-phase commits into one large commit unless the user explicitly asks for a squash.
 - Before moving into a new implementation slice, first refine the slice direction with the `idea-refine` skill, then stress-test and lock implementation decisions with the `grill-me` skill.
 - During the `grill-me` step, ask one decision-sharpening question at a time, provide a recommended answer for each question, and resolve dependencies before implementation starts.
 - When implementation of a slice starts, write acceptance tests first from the slice success conditions.
