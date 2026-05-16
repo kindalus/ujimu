@@ -42,7 +42,7 @@ Known non-blocking warnings:
 | 02 | [`02-specialist-registry-yaml.html`](./02-specialist-registry-yaml.html) | `verified` | 2026-05-16 | Specialist YAML schema, loader, registry, create/delete services, public listing endpoint. |
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
-| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `grilled` | — | Direction and implementation decisions locked; next step is acceptance tests first. |
+| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/quotas.acceptance.test.ts`; implementation in progress. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `planned` | — | Not started. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
@@ -55,7 +55,7 @@ Known non-blocking warnings:
 
 ### Slice 05 — Quotas & request limits
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 

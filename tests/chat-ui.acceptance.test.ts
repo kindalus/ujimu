@@ -15,6 +15,8 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('Descer')
     expect(page).toContain('Remover')
     expect(page).toContain('Fontes')
+    expect(page).toContain('quotaError')
+    expect(page).toContain('Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.')
     expect(page).toContain(':disabled="!canSubmitQuestion"')
   })
 })
