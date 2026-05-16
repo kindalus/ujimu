@@ -7,11 +7,12 @@ import {
   type BillingPaymentStatus
 } from '../../../utils/billing/subscriptions'
 import { initializeDatabase } from '../../../utils/db'
+import { writeOperationalEventSafely } from '../../../utils/ops/logger'
 
 const BILLING_WEBHOOK_SECRET_HEADER = 'x-ujimu-billing-secret'
 
 export default defineEventHandler(async (event) => {
-  assertWebhookSecret(event)
+  await assertWebhookSecret(event)
 
   const provider = parseBillingProvider(getRouterParam(event, 'provider'))
   if (!provider) {
@@ -23,12 +24,27 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
   try {
-    return processBillingWebhookEvent(database, {
+    const result = processBillingWebhookEvent(database, {
       provider,
       eventId: input.eventId,
       paymentId: input.paymentId,
       status: input.status
     })
+
+    await writeOperationalEventSafely({
+      category: 'billing',
+      event: 'webhook_processed',
+      severity: result.result === 'ignored' ? 'warn' : 'info',
+      metadata: {
+        provider,
+        result: result.result,
+        paymentId: result.paymentId,
+        status: input.status,
+        subscriptionActive: result.subscription?.active ?? false
+      }
+    })
+
+    return result
   } catch (error) {
     if (error instanceof BillingValidationError) {
       throw createError({ statusCode: 400, statusMessage: error.message, data: { code: error.code } })
@@ -40,9 +56,15 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-function assertWebhookSecret(event: Parameters<typeof getRequestHeader>[0]): void {
+async function assertWebhookSecret(event: Parameters<typeof getRequestHeader>[0]): Promise<void> {
   const expectedSecret = process.env.UJIMU_BILLING_WEBHOOK_SECRET
   if (!expectedSecret) {
+    await writeOperationalEventSafely({
+      category: 'billing',
+      event: 'webhook_rejected',
+      severity: 'error',
+      metadata: { reason: 'missing_secret' }
+    })
     throw createError({
       statusCode: 503,
       statusMessage: 'Billing webhook secret is not configured',
@@ -52,6 +74,12 @@ function assertWebhookSecret(event: Parameters<typeof getRequestHeader>[0]): voi
 
   const providedSecret = getRequestHeader(event, BILLING_WEBHOOK_SECRET_HEADER)
   if (!providedSecret || !safeEqual(providedSecret, expectedSecret)) {
+    await writeOperationalEventSafely({
+      category: 'billing',
+      event: 'webhook_rejected',
+      severity: 'warn',
+      metadata: { reason: 'invalid_secret' }
+    })
     throw createError({
       statusCode: 401,
       statusMessage: 'Invalid billing webhook secret',

@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 10:
+Latest full verification after Slice 11:
 
-- `npm test` — passed, 61 tests
+- `npm test` — passed, 67 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Manual API smoke check — not separately run for billing; checkout, webhook confirmation, subscription status, quota subject resolution, expiry warning, and UI contracts are covered by acceptance tests.
+- Manual API smoke check — not separately run for hardening; security headers, health/readiness, operational logging, upload path safety, CI, and runbook contracts are covered by acceptance tests.
 
 Known non-blocking warnings:
 
@@ -49,12 +49,12 @@ Known non-blocking warnings:
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
-| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `acceptance-tested` | — | Acceptance tests written and failing for missing hardening behaviour. |
+| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 11 — Security, operations & observability
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Idea-refined direction:
 
@@ -80,6 +80,16 @@ Locked grill decisions:
 - Add CI automation with `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, and `npm audit --audit-level=high`.
 - Document SQLite backup/restore, log location, health/readiness endpoints, and secret expectations in an operations runbook.
 
+Implemented:
+
+- Server middleware that applies baseline security headers to all application/API responses.
+- Public `GET /healthz` liveness endpoint outside `/api` with a minimal non-sensitive payload.
+- Admin-only `GET /api/admin/ops/readyz` readiness endpoint with database, writeability, migration-count, and secret-presence checks that do not expose paths or secret values.
+- Daily JSONL operational logger under `<UJIMU_DATA_DIR>/logs/operational/operational-YYYY-MM-DD.jsonl` with metadata sanitization and test-suppressed console emission.
+- Safe operational logging around billing webhook rejection and processing outcomes.
+- CI workflow for install, tests, typecheck, build, and high-severity audit.
+- `docs/operations.md` runbook covering health/readiness, logs, secrets, and SQLite backup/restore.
+
 Acceptance tests written first in:
 
 - `tests/security-ops.acceptance.test.ts`
@@ -95,6 +105,11 @@ Acceptance-test targets:
 - Raw source storage keeps uploads inside the specialist raw directory and rejects traversal filenames.
 - CI runs install, tests, typecheck, build, and high-severity audit.
 - The operations runbook documents health/readiness, logs, secrets, and SQLite backup/restore.
+
+Verification:
+
+- Covered by `tests/security-ops.acceptance.test.ts` and `tests/ops-ci-docs.acceptance.test.ts`.
+- Included in latest full verification snapshot.
 
 Out of scope for this slice:
 
