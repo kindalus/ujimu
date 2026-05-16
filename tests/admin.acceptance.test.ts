@@ -165,7 +165,7 @@ describe('admin specialist management acceptance', () => {
     )
     expect(upload.status).toBe(201)
     await expect(upload.json()).resolves.toMatchObject({
-      stored: { relativePath: 'codigo-iva.md' }
+      stored: { relativePath: 'codigo-iva.original.md' }
     })
 
     const duplicate = await fetchAdmin(
@@ -191,7 +191,7 @@ describe('admin specialist management acceptance', () => {
     )
     expect(reloaded.status).toBe(200)
     await expect(reloaded.json()).resolves.toMatchObject({
-      sources: [expect.objectContaining({ raw_path: 'codigo-iva.md', status: 'pending' })]
+      sources: [expect.objectContaining({ raw_path: 'codigo-iva.original.md', status: 'pending' })]
     })
 
     const disabledIngestion = await fetchAdmin(
@@ -214,7 +214,7 @@ describe('admin specialist management acceptance', () => {
       'sources_reloaded',
       'ingestion_skipped_disabled'
     ])
-    expect(audit[0].metadata_json).toContain('codigo-iva.md')
+    expect(audit[0].metadata_json).toContain('codigo-iva.original.md')
     expect(audit[0].metadata_json).not.toContain('Artigo 1.º')
   })
 

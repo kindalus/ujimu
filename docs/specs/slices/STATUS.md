@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 12:
+Latest full verification after Slice 13:
 
-- `npm test` — passed, 73 tests
+- `npm test` — passed, 80 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Manual browser/WebAuthn prompt check — not run; passkey domain behaviour is covered by fake-adapter acceptance tests and UI file-contract tests.
+- Manual real-Pi conversion/ingestion/consultation smoke test — not run; documented in `docs/operations.md` and intentionally excluded from CI because it requires model credentials.
 
 Known non-blocking warnings:
 
@@ -51,11 +51,11 @@ Known non-blocking warnings:
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
-| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `acceptance-tested` | — | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
+| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-16 | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
 
 ## Slice 13 — Three Pi agent pipeline
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Idea-refined direction:
 
@@ -186,9 +186,9 @@ Acceptance tests written first in:
 - `tests/admin-ui.acceptance.test.ts`
 - `tests/ops-ci-docs.acceptance.test.ts`
 
-Acceptance tests currently fail for missing Slice 13 behaviour, as expected:
+Acceptance tests were written first and now pass with the implementation:
 
-- `npm test -- tests/pi-agent-pipeline.acceptance.test.ts tests/admin-ui.acceptance.test.ts tests/ops-ci-docs.acceptance.test.ts` — failed with missing conversion pipeline, admin UI conversion action, operations runbook updates, conversion route, and citation allowlist validation.
+- `npm test -- tests/pi-agent-pipeline.acceptance.test.ts tests/admin-ui.acceptance.test.ts tests/ops-ci-docs.acceptance.test.ts` — passed.
 
 Success conditions covered by acceptance tests:
 
@@ -211,9 +211,12 @@ Out of scope for this slice:
 - Real payment, OTP, deployment, or observability provider changes.
 - Using analytics as a grounding source.
 
-Next step:
+Verification completed:
 
-- Implement the Slice 13 pipeline incrementally until the acceptance tests pass, then run the full verification suite.
+- `npm test` — passed, 80 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 12 — Passkeys post-MVP
 

@@ -366,8 +366,9 @@ async function createIngestedSource(specialtiesRoot: string, specialistId: strin
     content: '# Código do IVA\n\nArtigo 1.º\nTexto legal.'
   })
   const state = await scanSpecialistRawSources(specialist)
-  state.sources[`${specialistId}-fonte.md`].status = 'ingested'
-  state.sources[`${specialistId}-fonte.md`].ingested_at = '2026-05-16T00:00:00.000Z'
+  state.sources[`${specialistId}-fonte.original.md`].status = 'ingested'
+  state.sources[`${specialistId}-fonte.original.md`].ingestion!.status = 'ingested'
+  state.sources[`${specialistId}-fonte.original.md`].ingested_at = '2026-05-16T00:00:00.000Z'
   await writeIngestionState(specialist.paths.ingestState, state)
 }
 

@@ -12,9 +12,20 @@ interface AdminSessionResponse {
 
 interface IngestionSource {
   raw_path: string
-  status: 'pending' | 'processing' | 'ingested' | 'failed'
+  status: 'pending' | 'processing' | 'ingested' | 'failed' | 'blocked'
   title: string
   article_refs: string[]
+  conversion?: {
+    status: 'not_required' | 'pending' | 'processing' | 'converted' | 'failed'
+    markdown_path: string
+    error_message?: string
+  }
+  ingestion?: {
+    status: 'blocked' | 'pending' | 'processing' | 'ingested' | 'failed'
+    source_path: string
+    skipped_reason?: string
+    error_message?: string
+  }
   error_code?: string
   error_message?: string
 }
@@ -281,6 +292,21 @@ async function reloadSources(): Promise<void> {
   })
 }
 
+async function runConversion(): Promise<void> {
+  if (!selectedSpecialist.value) return
+
+  await runAdminAction(async () => {
+    const response = await fetch(`/api/admin/specialists/${encodeURIComponent(selectedSpecialist.value!.id)}/conversion/run`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error(await readApiError(response))
+
+    const payload = (await response.json()) as { sources: IngestionSource[]; converted?: number; failed?: number }
+    replaceSelectedSources(payload.sources)
+    feedback.value = `Conversão concluída: ${payload.converted ?? 0} fonte(s) convertida(s), ${payload.failed ?? 0} com erro.`
+  })
+}
+
 async function runIngestion(): Promise<void> {
   if (!selectedSpecialist.value) return
 
@@ -451,13 +477,16 @@ async function readApiError(response: Response): Promise<string> {
 
           <section class="source-tools" aria-labelledby="upload-title">
             <h3 id="upload-title">Carregar fonte</h3>
-            <input type="file" accept=".txt,.md,.markdown,.pdf" :disabled="pending" @change="rememberUploadFile" />
+            <input type="file" accept=".pdf,.txt,.docx,.html,.htm,.csv,.xlsx,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
             <div class="tool-actions">
               <UButton type="button" color="primary" variant="soft" :loading="pending" @click="uploadRawSource">
                 Carregar fonte
               </UButton>
               <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="reloadSources">
                 Recarregar fontes
+              </UButton>
+              <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="runConversion">
+                Executar conversão
               </UButton>
               <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="runIngestion">
                 Executar ingestão
@@ -472,6 +501,8 @@ async function readApiError(response: Response): Promise<string> {
               <li v-for="source in selectedSpecialist.sources" :key="source.raw_path">
                 <strong>{{ source.raw_path }}</strong>
                 <span>{{ source.status }}</span>
+                <small v-if="source.conversion">Conversão: {{ source.conversion.status }} → {{ source.conversion.markdown_path }}</small>
+                <small v-if="source.ingestion">Ingestão: {{ source.ingestion.status }} → {{ source.ingestion.source_path }}</small>
                 <small v-if="source.error_message">{{ source.error_message }}</small>
               </li>
             </ol>

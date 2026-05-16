@@ -21,8 +21,8 @@ describe('legislation wiki raw ingestion acceptance', () => {
       content: '# Código do IVA\n\nArtigo 1.º\nTexto legal.'
     })
 
-    expect(stored.relativePath).toBe('codigo-iva.md')
-    expect(stored.absolutePath).toBe(join(specialist.paths.raw, 'codigo-iva.md'))
+    expect(stored.relativePath).toBe('codigo-iva.original.md')
+    expect(stored.absolutePath).toBe(join(specialist.paths.raw, 'codigo-iva.original.md'))
     expect((await stat(stored.absolutePath)).isFile()).toBe(true)
     await expect(readFile(stored.absolutePath, 'utf8')).resolves.toContain('Artigo 1.º')
   })
@@ -35,11 +35,11 @@ describe('legislation wiki raw ingestion acceptance', () => {
     })
 
     const state = await scanSpecialistRawSources(specialist)
-    const source = state.sources['codigo-iva.md']
+    const source = state.sources['codigo-iva.original.md']
 
     expect(source).toMatchObject({
       specialist_id: 'iva',
-      raw_path: 'codigo-iva.md',
+      raw_path: 'codigo-iva.original.md',
       status: 'pending',
       title: 'Código do IVA',
       article_refs: ['Artigo 1.º', 'Art. 12']
@@ -56,17 +56,18 @@ describe('legislation wiki raw ingestion acceptance', () => {
     })
 
     const firstScan = await scanSpecialistRawSources(specialist)
-    firstScan.sources['codigo-iva.md'].status = 'ingested'
-    firstScan.sources['codigo-iva.md'].ingested_at = '2026-05-16T00:00:00.000Z'
+    firstScan.sources['codigo-iva.original.md'].status = 'ingested'
+    firstScan.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
+    firstScan.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
     await import('../server/utils/ingestion/state').then(({ writeIngestionState }) =>
       writeIngestionState(specialist.paths.ingestState, firstScan)
     )
 
     const secondScan = await scanSpecialistRawSources(specialist)
 
-    expect(Object.keys(secondScan.sources)).toEqual(['codigo-iva.md'])
-    expect(secondScan.sources['codigo-iva.md'].status).toBe('ingested')
-    expect(secondScan.sources['codigo-iva.md'].ingested_at).toBe('2026-05-16T00:00:00.000Z')
+    expect(Object.keys(secondScan.sources)).toEqual(['codigo-iva.original.md'])
+    expect(secondScan.sources['codigo-iva.original.md'].status).toBe('ingested')
+    expect(secondScan.sources['codigo-iva.original.md'].ingested_at).toBe('2026-05-16T00:00:00.000Z')
   })
 
   it('keeps pending sources pending when Pi ingestion is disabled', async () => {
@@ -85,7 +86,7 @@ describe('legislation wiki raw ingestion acceptance', () => {
     ).rejects.toMatchObject({ code: 'PI_INGESTION_DISABLED' })
 
     const state = await readIngestionState(specialist.paths.ingestState)
-    expect(state.sources['codigo-iva.md'].status).toBe('pending')
+    expect(state.sources['codigo-iva.original.md'].status).toBe('pending')
   })
 
   it('runs Pi ingestion one textual source at a time and records ingested citation metadata', async () => {
@@ -103,18 +104,18 @@ describe('legislation wiki raw ingestion acceptance', () => {
     })
 
     const state = await readIngestionState(specialist.paths.ingestState)
-    expect(ingested).toEqual(['codigo-iva.md'])
-    expect(state.sources['codigo-iva.md']).toMatchObject({
+    expect(ingested).toEqual(['codigo-iva.original.md'])
+    expect(state.sources['codigo-iva.original.md']).toMatchObject({
       status: 'ingested',
       title: 'Código do IVA',
       article_refs: ['Artigo 1.º']
     })
-    expect(state.sources['codigo-iva.md']).not.toHaveProperty('error_code')
-    expect(state.sources['codigo-iva.md']).not.toHaveProperty('error_message')
-    expect(state.sources['codigo-iva.md'].ingested_at).toBeTruthy()
+    expect(state.sources['codigo-iva.original.md']).not.toHaveProperty('error_code')
+    expect(state.sources['codigo-iva.original.md']).not.toHaveProperty('error_message')
+    expect(state.sources['codigo-iva.original.md'].ingested_at).toBeTruthy()
   })
 
-  it('reports PDF sources as unsupported without corrupting ingestion state', async () => {
+  it('keeps PDF sources blocked until manual conversion succeeds', async () => {
     const specialist = await createTempSpecialist('iva')
     await storeRawSource(specialist, {
       fileName: 'scan.pdf',
@@ -131,9 +132,9 @@ describe('legislation wiki raw ingestion acceptance', () => {
 
     const state = await readIngestionState(specialist.paths.ingestState)
     expect(state.sources['scan.pdf']).toMatchObject({
-      status: 'failed',
-      error_code: 'UNSUPPORTED_SOURCE_TYPE',
-      error_message: 'PDF text extraction is not available in this slice.'
+      status: 'blocked',
+      conversion: { status: 'pending', markdown_path: 'scan.pdf.md' },
+      ingestion: { status: 'blocked', source_path: 'scan.pdf.md' }
     })
     expect(state.sources['scan.pdf'].checksum).toMatch(/^sha256:/)
   })

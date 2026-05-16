@@ -3,7 +3,17 @@ import type { SpecialistRuntime } from '../specialists/schema'
 import { readIngestionState } from '../ingestion/state'
 import type { IngestionSourceRecord } from '../ingestion/types'
 
-const ALLOWED_RAW_SOURCE_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.pdf'])
+const ALLOWED_RAW_SOURCE_EXTENSIONS = new Set([
+  '.pdf',
+  '.txt',
+  '.docx',
+  '.html',
+  '.htm',
+  '.csv',
+  '.xlsx',
+  '.md',
+  '.markdown'
+])
 
 export interface AdminSpecialistPayload {
   id: string
@@ -21,6 +31,7 @@ export interface SourceStatusCounts {
   processing: number
   ingested: number
   failed: number
+  blocked: number
 }
 
 export async function toAdminSpecialistPayload(
@@ -51,7 +62,7 @@ export function countSources(sources: IngestionSourceRecord[]): SourceStatusCoun
       counts[source.status] += 1
       return counts
     },
-    { pending: 0, processing: 0, ingested: 0, failed: 0 }
+    { pending: 0, processing: 0, ingested: 0, failed: 0, blocked: 0 }
   )
 }
 

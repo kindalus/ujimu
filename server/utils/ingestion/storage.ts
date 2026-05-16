@@ -1,5 +1,5 @@
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { basename, isAbsolute, join } from 'node:path'
+import { basename, extname, isAbsolute, join } from 'node:path'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { StoredRawSource } from './types'
 
@@ -52,7 +52,16 @@ function sanitizeRawFileName(fileName: string): string {
     throw new RawSourceStorageError('INVALID_RAW_FILENAME', `Invalid raw source filename "${fileName}".`)
   }
 
-  return trimmed
+  return normalizeMarkdownUploadName(trimmed)
+}
+
+function normalizeMarkdownUploadName(fileName: string): string {
+  const extension = extname(fileName).toLowerCase()
+  if (extension !== '.md' && extension !== '.markdown') {
+    return fileName
+  }
+
+  return `${fileName.slice(0, -extension.length)}.original.md`
 }
 
 async function pathExists(path: string): Promise<boolean> {

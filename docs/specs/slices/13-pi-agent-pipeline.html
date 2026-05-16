@@ -403,7 +403,7 @@ server/utils/ingestion/state.ts
 server/utils/ingestion/storage.ts
 server/utils/chat/pi-runner.ts
 server/utils/chat/engine.ts
-server/utils/pi/config.ts
+server/utils/pi/session.ts
 server/api/admin/specialists/[id]/raw.post.ts
 server/api/admin/specialists/[id]/conversion/run.post.ts
 .pi/settings.json
@@ -430,9 +430,9 @@ server/api/admin/specialists/[id]/conversion/run.post.ts
 <li>No automatic wiki content creation from analytics signals.</li>
 </ul>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Next step</div><h2>Write acceptance tests first.</h2>
-<p class="lead">The grill decisions are locked. The next Zafir phase is acceptance-test creation from these success conditions, followed by incremental implementation.</p>
-<div class="callout">Keep automated tests fake-runner based; real Pi conversion, ingestion, and consultation are covered by a documented smoke path.</div>
+<section class="slide"><div class="frame content"><div class="kicker">Verification</div><h2>Slice 13 is verified.</h2>
+<p class="lead">Acceptance tests, implementation, typecheck, build, and high-severity audit have passed for the Markdown-first three-agent Pi pipeline.</p>
+<div class="callout">Automated tests remain fake-runner based; real Pi conversion, ingestion, and consultation are covered by the documented smoke path in <code>docs/operations.md</code>.</div>
 </div></section>
     </main>
     <div class="navhint">← → / space to navigate</div>

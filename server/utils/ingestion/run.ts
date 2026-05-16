@@ -1,13 +1,15 @@
 import type { SpecialistRuntime } from '../specialists/schema'
-import { isPdfSource, isTextSource, scanSpecialistRawSources } from './detect'
+import { scanSpecialistRawSources } from './detect'
 import { createPiSdkIngestionRunner, PiIngestionError, type PiIngestionRunner } from './pi-runner'
 import { writeIngestionState } from './state'
 import type { IngestionSourceRecord, IngestionState } from './types'
+import { resolveStaleProcessingMinutes } from './conversion'
 
 export interface RunPendingIngestionOptions {
   piIngestionEnabled?: boolean
   runner?: PiIngestionRunner
   timeoutMs?: number
+  staleProcessingMinutes?: number
 }
 
 export class PiIngestionDisabledError extends Error {
@@ -24,11 +26,14 @@ export async function runPendingIngestion(
   options: RunPendingIngestionOptions = {}
 ): Promise<IngestionState> {
   const state = await scanSpecialistRawSources(specialist)
+  const staleCutoffMs = resolveStaleProcessingMinutes(options.staleProcessingMinutes) * 60 * 1000
+  const now = new Date()
   const pendingSources = Object.values(state.sources)
-    .filter((source) => source.status === 'pending')
+    .filter((source) => shouldRunIngestion(source, now, staleCutoffMs))
     .sort((left, right) => left.raw_path.localeCompare(right.raw_path))
 
   if (pendingSources.length === 0) {
+    await writeIngestionState(specialist.paths.ingestState, state)
     return state
   }
 
@@ -50,6 +55,28 @@ function isPiIngestionEnabled(option: boolean | undefined): boolean {
   return option ?? process.env.UJIMU_PI_INGESTION_ENABLED === 'true'
 }
 
+function shouldRunIngestion(source: IngestionSourceRecord, now: Date, staleCutoffMs: number): boolean {
+  const ingestion = source.ingestion
+  if (!ingestion) {
+    return source.status === 'pending' || source.status === 'failed'
+  }
+
+  if (ingestion.status === 'pending' || ingestion.status === 'failed') {
+    return isMarkdownReady(source)
+  }
+
+  if (ingestion.status === 'processing') {
+    const updatedAt = ingestion.updated_at ?? source.updated_at
+    return isMarkdownReady(source) && Number.isFinite(Date.parse(updatedAt)) && now.getTime() - Date.parse(updatedAt) > staleCutoffMs
+  }
+
+  return false
+}
+
+function isMarkdownReady(source: IngestionSourceRecord): boolean {
+  return source.conversion?.status === 'converted' || source.conversion?.status === 'not_required' || !source.conversion
+}
+
 async function processSource(input: {
   specialist: SpecialistRuntime
   state: IngestionState
@@ -58,18 +85,6 @@ async function processSource(input: {
   timeoutMs?: number
 }): Promise<void> {
   const { specialist, state, source, runner, timeoutMs } = input
-
-  if (isPdfSource(source.raw_path)) {
-    markFailed(source, 'UNSUPPORTED_SOURCE_TYPE', 'PDF text extraction is not available in this slice.')
-    await writeIngestionState(specialist.paths.ingestState, state)
-    return
-  }
-
-  if (!isTextSource(source.raw_path)) {
-    markFailed(source, 'UNSUPPORTED_SOURCE_TYPE', 'Source type is not supported for ingestion.')
-    await writeIngestionState(specialist.paths.ingestState, state)
-    return
-  }
 
   markProcessing(source)
   await writeIngestionState(specialist.paths.ingestState, state)
@@ -89,10 +104,16 @@ async function processSource(input: {
 }
 
 function markProcessing(source: IngestionSourceRecord): void {
+  const now = new Date().toISOString()
   source.status = 'processing'
   source.error_code = undefined
   source.error_message = undefined
-  source.updated_at = new Date().toISOString()
+  source.updated_at = now
+  source.ingestion = {
+    status: 'processing',
+    source_path: source.ingestion?.source_path ?? source.raw_path,
+    updated_at: now
+  }
 }
 
 function markIngested(source: IngestionSourceRecord): void {
@@ -102,11 +123,28 @@ function markIngested(source: IngestionSourceRecord): void {
   source.error_message = undefined
   source.ingested_at = now
   source.updated_at = now
+  source.ingestion = {
+    ...source.ingestion!,
+    status: 'ingested',
+    ingested_at: now,
+    updated_at: now,
+    error_code: undefined,
+    error_message: undefined,
+    skipped_reason: undefined
+  }
 }
 
 function markFailed(source: IngestionSourceRecord, errorCode: string, errorMessage: string): void {
+  const now = new Date().toISOString()
   source.status = 'failed'
   source.error_code = errorCode
   source.error_message = errorMessage
-  source.updated_at = new Date().toISOString()
+  source.updated_at = now
+  source.ingestion = {
+    ...source.ingestion!,
+    status: 'failed',
+    updated_at: now,
+    error_code: errorCode,
+    error_message: errorMessage
+  }
 }

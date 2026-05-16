@@ -38,6 +38,12 @@ Configure these outside source control:
 - `UJIMU_PASSKEY_ORIGIN` — exact origin used for WebAuthn verification; required in production when passkeys are enabled.
 - `UJIMU_DATA_DIR` — storage root for SQLite, specialties, trash, and logs.
 - `UJIMU_DB_PATH` — optional SQLite override; defaults under `UJIMU_DATA_DIR`.
+- `UJIMU_PI_AGENT_DIR` — optional Pi agent directory override; defaults to the project-local `.pi` directory.
+- `UJIMU_PI_CONVERSION_ENABLED` — set to `true` only where admins may run raw-to-Markdown conversion.
+- `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may ingest converted Markdown into specialist wikis.
+- `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
+- `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — maximum validated converted Markdown size; defaults to `1048576`.
+- `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
 
 ## Passkey configuration
 
@@ -46,6 +52,16 @@ Passkeys are disabled unless `UJIMU_PASSKEYS_ENABLED=true`. In development, pass
 Passkeys require the correct browser origin and HTTPS in production. OTP continues to be the fallback and recovery path after passkeys are added or removed.
 
 The admin readiness endpoint reports only passkey booleans such as enabled/configured status. It must not expose RP IDs, origins, challenges, public keys, credential IDs, or WebAuthn payloads.
+
+## Pi conversion, ingestion, and consultation smoke test
+
+Run this smoke path only in a configured non-production environment with `.pi/auth.json` present outside source control and the Pi enable flags set deliberately:
+
+1. Upload a small official source through the admin console.
+2. Click `Executar conversão` and confirm that `raw/<original filename>.md` is created and the source state becomes conversion `converted` / ingestion `pending`.
+3. Click `Executar ingestão` and confirm that the wiki is updated while citations still reference the original uploaded file.
+4. Ask a scoped chat question and confirm that the response streams only after validated citations are available.
+5. Review admin audit events for safe conversion counts; do not log source contents, prompts, answers, or secrets.
 
 ## SQLite backup
 

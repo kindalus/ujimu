@@ -1,3 +1,4 @@
+import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { IngestionSourceRecord } from './types'
 
@@ -40,36 +41,18 @@ async function runPiSdkIngestion(
   source: IngestionSourceRecord,
   options: PiSdkIngestionOptions
 ): Promise<PiIngestionResult> {
-  const {
-    createAgentSession,
-    DefaultResourceLoader,
-    getAgentDir,
-    SessionManager,
-    SettingsManager
-  } = await import('@earendil-works/pi-coding-agent')
-
   const cwd = specialist.paths.root
-  const loader = new DefaultResourceLoader({
+  const { session } = await createUjimuPiSession({
     cwd,
-    agentDir: getAgentDir(),
+    task: 'ingestion',
+    modelEnvPrefix: 'UJIMU_PI_INGESTION',
+    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
     appendSystemPromptOverride: () => [
       'You are maintaining a Ujimu specialist LLM Wiki.',
       'Operate only inside the current specialist directory.',
       'Never modify files under raw/.',
       'Use the legislation/regulatory LLM Wiki conventions for laws, articles, definitions, topics, amendments, derived pages, index, and log.'
     ]
-  })
-  await loader.reload()
-
-  const { session } = await createAgentSession({
-    cwd,
-    resourceLoader: loader,
-    tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
-    sessionManager: SessionManager.inMemory(cwd),
-    settingsManager: SettingsManager.inMemory({
-      compaction: { enabled: false },
-      retry: { enabled: true, maxRetries: 1 }
-    })
   })
 
   const prompt = buildIngestionPrompt(specialist, source)
@@ -80,7 +63,7 @@ async function runPiSdkIngestion(
       options.timeoutMs ?? 5 * 60 * 1000,
       async () => session.abort()
     )
-    return { summary: `Pi ingested ${source.raw_path}` }
+    return { summary: `Pi ingested ${source.ingestion?.source_path ?? source.raw_path}` }
   } catch (error) {
     if (error instanceof PiIngestionError) {
       throw error
@@ -96,7 +79,9 @@ async function runPiSdkIngestion(
 }
 
 function buildIngestionPrompt(specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
-  return `Ingest exactly one source into this specialist wiki.
+  const markdownPath = source.ingestion?.source_path ?? source.raw_path
+
+  return `Ingest exactly one Markdown source into this specialist wiki.
 
 Specialist:
 - id: ${specialist.id}
@@ -104,18 +89,22 @@ Specialist:
 - wiki type: ${specialist.wiki_type}
 
 Source:
-- raw path: raw/${source.raw_path}
+- original raw path for citations: raw/${source.raw_path}
+- Markdown ingestion path: raw/${markdownPath}
 - title: ${source.title}
-- checksum: ${source.checksum}
+- original checksum: ${source.checksum}
+- Markdown checksum: ${source.conversion?.markdown_checksum ?? '(unknown)'}
 - article references detected by the app: ${source.article_refs.join(', ') || '(none)'}
 
 Instructions:
-1. Read only the source at raw/${source.raw_path} as the ingestion source.
-2. Do not modify, rename, or delete anything under raw/.
-3. Maintain the wiki/ directory using the legislation/regulatory LLM Wiki structure.
-4. Preserve traceability from wiki pages to the original source file raw/${source.raw_path}.
-5. Update wiki/index.md and wiki/log.md if present, or create them if missing.
-6. If you cannot ingest the source from the available context, explain the failure clearly.
+1. Use the llm-wiki skill to ingest only the Markdown file at raw/${markdownPath}.
+2. Do not ingest raw/${source.raw_path} directly when it differs from the Markdown ingestion path.
+3. Do not modify, rename, or delete anything under raw/.
+4. Maintain the wiki/ directory using the legislation/regulatory LLM Wiki structure.
+5. Preserve traceability from wiki pages to the original source file raw/${source.raw_path}.
+6. Update wiki/index.md and wiki/log.md if present, or create them if missing.
+7. If this is a reingestion, reconcile existing wiki pages instead of creating duplicate source pages.
+8. If you cannot ingest the source from the available context, explain the failure clearly.
 `
 }
 

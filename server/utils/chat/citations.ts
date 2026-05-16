@@ -6,7 +6,7 @@ const MAX_ARTICLE_REFS = 20
 
 export function isUsableCitationSource(source: IngestionSourceRecord): boolean {
   return (
-    source.status === 'ingested' &&
+    (source.status === 'ingested' || source.ingestion?.status === 'ingested') &&
     source.title.trim().length > 0 &&
     source.raw_path.trim().length > 0 &&
     source.article_refs.some((articleRef) => articleRef.trim().length > 0)

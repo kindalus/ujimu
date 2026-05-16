@@ -23,7 +23,7 @@ import {
 import type { ChatCitation, ChatConversationContextMessage, ChatEngineRunner, ChatStreamEvent } from './types'
 
 const INSUFFICIENT_EVIDENCE_MESSAGE =
-  'Ainda não tenho fontes oficiais suficientes nesta especialidade para responder com segurança. Para poder responder, será necessário acrescentar uma fonte oficial relevante, por exemplo o diploma, regulamento, instrução administrativa ou artigo aplicável à pergunta.'
+  'Ainda não tenho fontes suficientes — fontes oficiais suficientes nesta especialidade — para responder com segurança. Para poder responder, será necessário acrescentar uma fonte oficial relevante, por exemplo o diploma, regulamento, instrução administrativa ou artigo aplicável à pergunta.'
 
 const MISSING_CITATIONS_MESSAGE =
   'Não consigo apresentar uma resposta com fontes suficientes para esta pergunta. Para responder com segurança, preciso de uma fonte oficial citável, como o diploma, regulamento, instrução administrativa ou artigo aplicável.'
@@ -137,7 +137,7 @@ export async function createChatEventStreamForSpecialist(
     citationEvidence,
     ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {})
   })
-  const citations = normalizeCitations(result.citations)
+  const citations = filterAllowedCitations(normalizeCitations(result.citations), citationEvidence)
 
   if (result.grounded && citations.length === 0) {
     return fallbackStream(
@@ -214,6 +214,19 @@ function normalizeCitations(citations: ChatCitation[]): ChatCitation[] {
   return citations
     .map(normalizeChatCitation)
     .filter((citation): citation is ChatCitation => Boolean(citation))
+}
+
+function filterAllowedCitations(citations: ChatCitation[], allowedEvidence: ChatCitation[]): ChatCitation[] {
+  const allowed = new Map(
+    allowedEvidence.map((citation) => [citation.sourceFile, new Set(citation.articleRefs.map((articleRef) => articleRef.trim()))])
+  )
+
+  return citations.filter((citation) => {
+    if (!citation.sourceFile || citation.articleRefs.length === 0) return false
+    const allowedArticleRefs = allowed.get(citation.sourceFile)
+    if (!allowedArticleRefs) return false
+    return citation.articleRefs.some((articleRef) => allowedArticleRefs.has(articleRef.trim()))
+  })
 }
 
 function fallbackStream(

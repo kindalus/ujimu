@@ -155,7 +155,7 @@ describe('security, operations, and observability acceptance', () => {
     )
 
     const stored = await storeRawSource(specialist, { fileName: 'codigo-iva.md', content: '# Código do IVA' })
-    expect(stored.absolutePath).toBe(join(specialist.paths.raw, 'codigo-iva.md'))
+    expect(stored.absolutePath).toBe(join(specialist.paths.raw, 'codigo-iva.original.md'))
 
     for (const fileName of ['/tmp/escape.md', '../escape.md', 'subdir/file.md', '..\\escape.md', '.', '..']) {
       await expect(storeRawSource(specialist, { fileName, content: 'bad' })).rejects.toBeInstanceOf(
