@@ -45,7 +45,7 @@ Known non-blocking warnings:
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
-| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `grilled` | — | Scope and implementation decisions locked for question analytics, content gaps, review lifecycle, and visitor counts. |
+| 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `acceptance-tested` | — | Acceptance tests written for question logging, content-gap review, visitor counts, deletion privacy, and admin UI. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 09 — Question analytics & content gaps
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -79,6 +79,12 @@ Locked grill decisions:
 - Distinct monthly visitors use a first-party `ujimu_visitor_id` cookie. Count `user_id` when authenticated; otherwise count visitor cookie identity.
 - Do not integrate Google Analytics or other third-party analytics in this slice.
 - Admin REST contracts are: `POST /api/analytics/visit`, `GET /api/admin/analytics/visitors?month=YYYY-MM`, `GET /api/admin/analytics/questions?specialistId=...`, and `POST /api/admin/analytics/questions/:fingerprint/review`.
+
+Acceptance tests written first in:
+
+- `tests/analytics.acceptance.test.ts`
+- `tests/admin-ui.acceptance.test.ts`
+- `tests/db.test.ts`
 
 Acceptance-test targets:
 
