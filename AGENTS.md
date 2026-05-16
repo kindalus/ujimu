@@ -172,6 +172,7 @@ Specialist prompt changes do not require audit history in the MVP.
 - Do not collapse those slice-phase commits into one large commit unless the user explicitly asks for a squash.
 - Before moving into a new implementation slice, first refine the slice direction with the `idea-refine` skill, then stress-test and lock implementation decisions with the `grill-me` skill.
 - During the `grill-me` step, ask one decision-sharpening question at a time, provide a recommended answer for each question, and resolve dependencies before implementation starts.
+- After `grill-me` is complete and before acceptance tests or implementation begin, compact/summarize the active context so the next phase starts with the refined decisions, current status, and open questions clearly captured.
 - When implementation of a slice starts, write acceptance tests first from the slice success conditions.
 - After acceptance tests exist, implement the remaining code incrementally and use test-driven development where practical: write a failing test, make it pass with the smallest correct change, then refactor while keeping tests green.
 - Keep acceptance tests focused on externally visible slice behaviour rather than implementation details.
