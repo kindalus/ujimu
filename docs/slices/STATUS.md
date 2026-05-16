@@ -44,7 +44,7 @@ Known non-blocking warnings:
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
-| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `grilled` | — | Decisions locked: admin allowlist, upload conflicts, immutable id/wiki type, manual ingestion, trash delete, REST contracts. |
+| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `acceptance-tested` | — | Acceptance tests written for admin allowlist, CRUD, uploads, ingestion, trash delete, audit, and UI contracts. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 08 — Admin specialist management
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
@@ -87,6 +87,13 @@ Locked grill decisions:
 - The admin UI is a single `/admin` page with authentication/authorization messaging, specialist list, create form, edit panel, source upload, source status list, reload, ingestion, and delete controls.
 - The main chat page shows a discreet `Administração` link only when `/api/admin/session` reports that the signed-in user is an admin.
 - Admin REST contracts are: `GET /api/admin/session`, `GET/POST /api/admin/specialists`, `PATCH/DELETE /api/admin/specialists/:id`, `POST /api/admin/specialists/:id/raw`, `POST /api/admin/specialists/:id/sources/reload`, and `POST /api/admin/specialists/:id/ingestion/run`.
+
+Acceptance tests written first in:
+
+- `tests/admin.acceptance.test.ts`
+- `tests/admin-ui.acceptance.test.ts`
+- `tests/db.test.ts`
+- `tests/chat-ui.acceptance.test.ts`
 
 Acceptance-test targets:
 
