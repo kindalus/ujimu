@@ -42,13 +42,35 @@ Known non-blocking warnings:
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
-| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `planned` | — | Not started. |
+| 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `idea-refined` | — | Direction refined: OTP by email or mobile phone creates sessions and registered quota subjects; delivery provider stays abstract/fakeable. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Active slice details
+
+### Slice 06 — Authentication with OTP
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Let anonymous visitors request an OTP by email or mobile phone.
+- Verify the OTP to create a server-owned session.
+- After verification, quota evaluation should see the user as a registered subject rather than anonymous.
+- Keep notification delivery behind a provider interface; use a fake provider in tests.
+- Add a minimal OTP request/verify/logout UI on the main page.
+- Store normalized email or phone identifiers and hashed OTP secrets; never store OTP codes in clear text.
+
+Out of scope for this slice:
+
+- Passkeys, passwords, and social login.
+- Subscription activation or payment state.
+- Durable conversation-history migration from anonymous to account.
+- Full profile-management UI beyond showing the current signed-in identity and logout.
 
 ## Completed slice details
 

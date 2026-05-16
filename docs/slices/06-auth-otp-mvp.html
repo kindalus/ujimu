@@ -142,6 +142,30 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>Account creation should feel lightweight.</h2>
 <p class="lead">The MVP avoids passwords. Users identify by email or phone, receive a temporary code, and get a secure session after verification.</p>
 </div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Refined direction</div><h2>Turn anonymous visitors into registered users.</h2>
+<ul>
+<li>Minimum success: request OTP by email or mobile phone, verify the code, create a session.</li>
+<li>After verification, quotas use the registered subject instead of the anonymous cookie subject.</li>
+<li>Keep notification delivery behind an interface; tests use a fake provider.</li>
+<li>Add a minimal user-facing OTP entry flow on the main page.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Not doing</div><h2>Authentication, not account management.</h2>
+<ul>
+<li>No passkeys, passwords, or social login.</li>
+<li>No subscription activation or payment state.</li>
+<li>No durable conversation history migration from anonymous to account.</li>
+<li>No full profile-management UI beyond showing the current signed-in identity and logout.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Assumptions to validate</div><h2>Trust depends on invisible details.</h2>
+<ul>
+<li>Users will accept OTP as the first registration and sign-in path.</li>
+<li>Email and mobile-phone channels can share one OTP business workflow.</li>
+<li>Hashed OTP storage plus attempt limits is sufficient for the MVP threat model.</li>
+<li>The quota seam from Slice 05 can switch from anonymous to registered without rewriting quota policy.</li>
+</ul>
+</div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Flows</div><h2>Two login channels, one account model.</h2>
 <div class="grid-3">
 <div class="card"><strong>Email</strong><span>User enters email, receives code, verifies code, session starts.</span></div>
@@ -160,6 +184,7 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <section class="slide"><div class="frame content"><div class="kicker">OTP lifecycle</div><h2>Codes are short-lived and limited.</h2>
 <ul>
 <li>Store OTP secrets hashed, never plaintext.</li>
+<li>Store normalized email or phone identifiers; do not store OTP codes in clear text.</li>
 <li>Use a configurable expiry window; initial default is 10 minutes.</li>
 <li>Limit verification attempts per code.</li>
 <li>Allow controlled resend without creating unlimited codes.</li>
@@ -190,8 +215,9 @@ server/database/migrations/*auth*.sql</pre>
 <li>A new user can sign in with a verified email OTP.</li>
 <li>A new user can sign in with a verified mobile-phone OTP.</li>
 <li>Expired, reused, or over-attempted codes do not create sessions.</li>
-<li>Provider-specific delivery code is isolated behind an interface.</li>
-<li>Authenticated users are recognised by quota and history slices.</li>
+<li>Provider-specific delivery code is isolated behind an interface and fakeable in tests.</li>
+<li>Authenticated users are recognised as registered subjects by the quota layer.</li>
+<li>The UI exposes a minimal OTP request/verify/logout flow.</li>
 </ul>
 </div></section>
     </main>
