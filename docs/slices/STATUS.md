@@ -44,11 +44,49 @@ Known non-blocking warnings:
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
-| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
+| 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `idea-refined` | — | Admin allowlist, single-page console, specialist CRUD, upload/detect/manual ingestion, minimal audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Active slice details
+
+### Slice 08 — Admin specialist management
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Provide a single-page admin console at `/admin` for the MVP rather than a multi-route admin area.
+- Use the existing OTP identity system for authentication.
+- Authorize admins through an environment allowlist such as `UJIMU_ADMIN_CONTACTS`, matching verified email or E.164 phone identities.
+- Keep one role only: `admin`. Do not add editor, reviewer, owner, or per-specialist permissions in this slice.
+- Keep `visibility` out of the YAML model in this slice; created specialists are public once valid and loaded.
+- Admins can create specialists by supplying ID, display name, description, LLM Wiki preset, system prompt, citation-required, and streaming-enabled settings.
+- Admins can edit specialist metadata and system prompt; prompt-version audit history remains out of scope.
+- Admins can upload official source files into the specialist `raw/` directory.
+- Upload does not silently run Pi ingestion. Admins can refresh source detection/status separately, then manually trigger ingestion when enabled.
+- Admins can inspect ingestion/source statuses after upload, detection, and ingestion attempts.
+- Deleting a specialist requires explicit confirmation, removes its directory, reloads the registry, and deletes customer conversation history for that specialist.
+- Record minimal SQLite audit events for admin create, edit, upload, reload/detect, ingestion trigger, and delete actions.
+
+Assumptions to validate during grilling:
+
+- `UJIMU_ADMIN_CONTACTS` should accept comma-separated normalized OTP contacts and should be safe to leave empty in development.
+- Upload filename sanitization from the ingestion storage layer is enough for MVP source uploads if paired with size/type validation at the API boundary.
+- Audit events can store action metadata as JSON text without becoming a full compliance audit log.
+- Manual ingestion can reuse the existing disabled-by-default Pi ingestion behaviour and surface disabled/failure states to admins.
+
+Out of scope for this slice:
+
+- Public/private/draft specialist visibility.
+- Admin management UI or invitation flows.
+- Multi-role permissions.
+- Prompt version history.
+- Background ingestion workers or queues.
+- OCR for scanned PDFs.
+- Payment/subscription admin functions.
 
 ## Completed slice details
 
