@@ -162,18 +162,21 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <div class="arrow">→</div>
 <div class="node">pending payment</div>
 <div class="arrow">→</div>
-<div class="node">confirmed</div>
+<div class="node">confirmed webhook</div>
 <div class="arrow">→</div>
 <div class="node">subscription active</div>
 <div class="arrow">→</div>
 <div class="node">expired</div>
 </div>
+<div class="callout">Renewal extends from max(now, current expiry) + 3 months, so early renewal never loses remaining time.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Webhook discipline</div><h2>Payment confirmation should be idempotent.</h2>
 <ul>
+<li>Checkout requires an authenticated OTP session and creates only a pending payment.</li>
+<li>Webhook confirmation requires <code>UJIMU_BILLING_WEBHOOK_SECRET</code>; missing secret returns 503.</li>
 <li>Repeated provider callbacks do not create duplicate subscriptions.</li>
 <li>Unknown or unverifiable callbacks do not activate access.</li>
-<li>Payment provider events are recorded for troubleshooting.</li>
+<li>Trusted provider events are recorded for troubleshooting.</li>
 <li>Subscription status derives from confirmed payment and expiry time.</li>
 </ul>
 </div></section>

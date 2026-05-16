@@ -46,13 +46,13 @@ Known non-blocking warnings:
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
-| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `idea-refined` | — | Direction refined for a mockable provider MVP before real Appy Pay/Stripe integrations. |
+| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `grilled` | — | Mockable provider MVP decisions locked; ready for acceptance tests. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 10 — Subscriptions, payments & advertising
 
-Status: `idea-refined`
+Status: `grilled`
 
 Idea-refined direction:
 
@@ -63,6 +63,22 @@ Idea-refined direction:
 - Subscription status drives quota subject resolution, expiry warnings, and advertising visibility.
 - Advertising zones remain visible for anonymous and registered free users and hidden for subscribed users.
 - Treat provider event payloads as untrusted input and keep confirmation idempotent.
+
+Locked grill decisions:
+
+- Use a mockable provider MVP now: checkout creates a pending payment and provider abstractions prepare for real Appy Pay and Stripe adapters later.
+- Subscription checkout requires an authenticated OTP session; anonymous users see advertising and can sign in before subscribing.
+- Payment confirmation only happens through provider-style webhook endpoints protected by `UJIMU_BILLING_WEBHOOK_SECRET`.
+- If `UJIMU_BILLING_WEBHOOK_SECRET` is missing, webhook endpoints return `503` and do not activate access.
+- Invalid webhook secrets return `401` and do not record a trusted provider event.
+- Confirmations are idempotent: duplicate provider events or repeated confirmation for an already confirmed payment do not create duplicate subscription time.
+- Unknown payment IDs in otherwise authenticated webhook events are recorded as ignored and never activate access.
+- Renewals stack from `max(now, current_period_end) + 3 months`, so users do not lose remaining subscription time when renewing early.
+- Expired subscriptions immediately lose subscribed status; there is no grace period.
+- The expiry warning appears when an active subscription has less than seven days remaining.
+- Appy Pay methods in the MVP contract are Multicaixa Express, Multicaixa Reference, and QR Code; Stripe is the VISA provider boundary.
+- Billing state drives quota subject resolution: active subscribed users use the subscribed weekly quota policy; expired users fall back to registered limits.
+- The user-facing billing UI lives on the main page for the MVP and hides advertising for subscribed users.
 
 Out of scope for this slice:
 
