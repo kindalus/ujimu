@@ -176,11 +176,12 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Observability</div><h2>Log decisions, not secrets.</h2>
 <div class="grid-2">
-<div class="card"><strong>Chat</strong><span>Specialist, outcome, timings, citation presence, insufficient-context results.</span></div>
-<div class="card"><strong>Quota</strong><span>Allow/deny decisions and effective policy.</span></div>
-<div class="card"><strong>Ingestion</strong><span>Pending, processing, ingested, failed with safe errors.</span></div>
-<div class="card"><strong>Billing</strong><span>Provider events, confirmation, activation, expiry.</span></div>
+<div class="card"><strong>Chat</strong><span>Specialist, outcome, timings, citation presence, insufficient-context results — never raw questions or answers.</span></div>
+<div class="card"><strong>Quota</strong><span>Allow/deny decisions and effective policy without client-authoritative state.</span></div>
+<div class="card"><strong>Ingestion</strong><span>Pending, processing, ingested, failed with safe errors, no document contents.</span></div>
+<div class="card"><strong>Billing</strong><span>Provider events, confirmation, activation, expiry, no webhook secrets.</span></div>
 </div>
+<div class="callout">MVP observability is first-party and local: structured SQLite/console signals, health/readiness endpoints, and a runbook. External APM/logging is later.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Deletion and privacy</div><h2>Permanent deletion must be complete.</h2>
 <ul>
@@ -191,12 +192,14 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 </ul>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Cross-cutting utilities and policies.</h2>
-<pre>server/utils/security/paths.ts
-server/utils/security/uploads.ts
-server/utils/logging/logger.ts
-server/utils/db/transactions.ts
-server/middleware/securityHeaders.ts
-server/database/migrations/*hardening*.sql</pre>
+<pre>server/middleware/security-headers.ts
+server/utils/security/headers.ts
+server/utils/security/paths.ts
+server/utils/ops/logger.ts
+server/api/health.get.ts
+server/api/admin/ops/readiness.get.ts
+.github/workflows/ci.yml
+docs/operations.md</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
 <ul>

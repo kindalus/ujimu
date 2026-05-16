@@ -49,8 +49,29 @@ Known non-blocking warnings:
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
-| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
+| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `idea-refined` | — | Direction refined for a hardening MVP without external observability services. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
+
+## Slice 11 — Security, operations & observability
+
+Status: `idea-refined`
+
+Idea-refined direction:
+
+- Implement a practical hardening MVP rather than integrating external observability vendors in this slice.
+- Add baseline HTTP security headers for all app/API responses.
+- Add safe structured operational logging that records decisions and outcomes without raw questions, answers, OTPs, secrets, document contents, or provider secrets.
+- Add minimal health/readiness surfaces that expose operational state without leaking sensitive configuration values.
+- Strengthen tests around upload path safety, specialist isolation, deletion, verified billing webhooks, and sensitive-data avoidance.
+- Add CI automation for install, tests, typecheck, build, and high-severity dependency audit.
+- Document SQLite backup/restore and operational runbook basics before production use.
+
+Out of scope for this slice:
+
+- External log aggregation, APM, metrics, or alerting services.
+- Real Appy Pay, Stripe, or SendGrid operational dashboards.
+- Full incident-response process automation.
+- Enterprise SIEM integration.
 
 ## Slice 10 — Subscriptions, payments & advertising
 
