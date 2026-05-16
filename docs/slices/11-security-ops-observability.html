@@ -196,8 +196,8 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 server/utils/security/headers.ts
 server/utils/security/paths.ts
 server/utils/ops/logger.ts
-server/api/health.get.ts
-server/api/admin/ops/readiness.get.ts
+server/routes/healthz.get.ts
+server/api/admin/ops/readyz.get.ts
 .github/workflows/ci.yml
 docs/operations.md</pre>
 </div></section>
@@ -208,7 +208,7 @@ docs/operations.md</pre>
 <li>Secrets are not exposed to client bundles or committed files.</li>
 <li>Billing webhooks only activate subscriptions when verified.</li>
 <li>Permanent deletion paths remove user-visible data and dependent records.</li>
-<li>Operational logs provide enough context to diagnose failures without storing unnecessary sensitive content.</li>
+<li>Operational logs rotate daily as JSONL files without storing unnecessary sensitive content.</li>
 </ul>
 </div></section>
     </main>

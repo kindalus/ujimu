@@ -49,12 +49,12 @@ Known non-blocking warnings:
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
-| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `idea-refined` | — | Direction refined for a hardening MVP without external observability services. |
+| 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `grilled` | — | Hardening MVP decisions locked; ready for acceptance tests. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 11 — Security, operations & observability
 
-Status: `idea-refined`
+Status: `grilled`
 
 Idea-refined direction:
 
@@ -65,6 +65,20 @@ Idea-refined direction:
 - Strengthen tests around upload path safety, specialist isolation, deletion, verified billing webhooks, and sensitive-data avoidance.
 - Add CI automation for install, tests, typecheck, build, and high-severity dependency audit.
 - Document SQLite backup/restore and operational runbook basics before production use.
+
+Locked grill decisions:
+
+- Use daily JSON Lines operational log files as the primary MVP observability sink instead of a new SQLite operational-events table.
+- Operational logs are written under `<UJIMU_DATA_DIR>/logs/operational/operational-YYYY-MM-DD.jsonl`.
+- Each JSONL line is one complete event with timestamp, category, event name, severity, optional specialist ID, and sanitized metadata.
+- Operational logs must not include raw questions, answers, OTP codes, session cookies/JWTs, webhook secrets, document contents, or full contact values.
+- Keep console logging minimal and derived from the same sanitized event payload.
+- Use `GET /healthz` as the public liveness endpoint, outside `/api`, returning only a minimal non-sensitive OK payload.
+- Use `GET /api/admin/ops/readyz` as the authenticated admin readiness endpoint with safe boolean checks only.
+- Readiness checks include database access, data-directory write access, operational-log write access, migration count, and secret/config presence as booleans rather than values.
+- Add baseline HTTP security headers through server middleware for all app/API responses.
+- Add CI automation with `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, and `npm audit --audit-level=high`.
+- Document SQLite backup/restore, log location, health/readiness endpoints, and secret expectations in an operations runbook.
 
 Out of scope for this slice:
 
