@@ -26,6 +26,48 @@ interface AdminSessionResponse extends AuthSessionResponse {
   admin: boolean
 }
 
+interface BillingStatusResponse {
+  authenticated: boolean
+  subscribed: boolean
+  plan: {
+    amount: {
+      value: string
+      currency: 'AOA'
+    }
+  }
+  subscription: {
+    active: boolean
+    expiresAt: string
+  } | null
+  expiryWarning: {
+    message: string
+    expiresAt: string
+    daysRemaining: number
+  } | null
+  ads: {
+    visible: boolean
+  }
+}
+
+interface BillingCheckoutResponse {
+  checkout: {
+    id: string
+    provider: BillingProvider
+    method: BillingPaymentMethod
+    status: 'pending'
+    instructions: string
+  }
+}
+
+type BillingProvider = 'appy_pay' | 'stripe'
+type BillingPaymentMethod = 'multicaixa_express' | 'multicaixa_reference' | 'qr_code' | 'visa'
+
+interface BillingMethodOption {
+  label: string
+  provider: BillingProvider
+  method: BillingPaymentMethod
+}
+
 interface HistoryConversationSummary {
   id: string
   specialistId: string
@@ -99,6 +141,21 @@ interface ApiErrorPayload {
 
 const quotaLimitMessage = 'Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.'
 const otpRequestSuccessMessage = 'Se o contacto estiver correcto, enviaremos um código de acesso.'
+const billingCheckoutSuccessMessage = 'Pagamento criado. A subscrição será activada depois da confirmação do pagamento.'
+const defaultBillingStatus: BillingStatusResponse = {
+  authenticated: false,
+  subscribed: false,
+  plan: { amount: { value: '50000.00', currency: 'AOA' } },
+  subscription: null,
+  expiryWarning: null,
+  ads: { visible: true }
+}
+const billingMethodOptions: BillingMethodOption[] = [
+  { label: 'Multicaixa Express', provider: 'appy_pay', method: 'multicaixa_express' },
+  { label: 'Referência Multicaixa', provider: 'appy_pay', method: 'multicaixa_reference' },
+  { label: 'QR Code', provider: 'appy_pay', method: 'qr_code' },
+  { label: 'VISA', provider: 'stripe', method: 'visa' }
+]
 const queueLimit = 3
 let idCounter = 0
 
@@ -127,6 +184,11 @@ const authStep = ref<'request' | 'verify'>('request')
 const authMessage = ref('')
 const authError = ref('')
 const authPending = ref(false)
+const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
+const billingPending = ref(false)
+const billingError = ref('')
+const billingMessage = ref('')
+const billingCheckoutPendingMethod = ref<BillingPaymentMethod | ''>('')
 
 onMounted(() => {
   void recordVisit()
@@ -139,6 +201,8 @@ const selectedSpecialist = computed(() =>
 )
 const hasSpecialists = computed(() => specialists.value.length > 0)
 const isAuthenticated = computed(() => authSession.value.authenticated)
+const billingPriceLabel = computed(() => `${formatBillingAmount(billingStatus.value.plan.amount.value)} AOA`)
+const billingExpiryLabel = computed(() => formatDisplayDate(billingStatus.value.subscription?.expiresAt))
 const canWriteQuestion = computed(
   () => Boolean(selectedSpecialist.value) && queuedQuestions.value.length < queueLimit
 )
@@ -174,6 +238,57 @@ async function loadAuthSession(): Promise<void> {
     authSession.value = { authenticated: false }
   }
   void loadAdminSession()
+  void loadBillingStatus()
+}
+
+async function loadBillingStatus(): Promise<void> {
+  billingPending.value = true
+  billingError.value = ''
+
+  try {
+    const response = await fetch('/api/billing/status')
+    billingStatus.value = response.ok
+      ? ((await response.json()) as BillingStatusResponse)
+      : { ...defaultBillingStatus }
+  } catch {
+    billingStatus.value = { ...defaultBillingStatus }
+    billingError.value = 'Não foi possível carregar o estado da subscrição.'
+  } finally {
+    billingPending.value = false
+  }
+}
+
+async function startBillingCheckout(provider: BillingProvider, method: BillingPaymentMethod): Promise<void> {
+  if (!isAuthenticated.value) {
+    authPanelOpen.value = true
+    billingError.value = 'Entre para subscrever.'
+    return
+  }
+
+  billingCheckoutPendingMethod.value = method
+  billingError.value = ''
+  billingMessage.value = ''
+
+  try {
+    const response = await fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider, method })
+    })
+
+    if (!response.ok) {
+      billingError.value = 'Não foi possível iniciar o pagamento.'
+      return
+    }
+
+    const payload = (await response.json()) as BillingCheckoutResponse
+    billingMessage.value = payload.checkout.instructions || billingCheckoutSuccessMessage
+    void loadBillingStatus()
+  } catch {
+    billingError.value = 'Não foi possível iniciar o pagamento.'
+  } finally {
+    billingCheckoutPendingMethod.value = ''
+  }
 }
 
 async function loadAdminSession(): Promise<void> {
@@ -239,6 +354,7 @@ async function verifyOtpCode(): Promise<void> {
     authSession.value = (await response.json()) as AuthSessionResponse
     void loadHistory()
     void loadAdminSession()
+    void loadBillingStatus()
     authPanelOpen.value = false
     authStep.value = 'request'
     authContact.value = ''
@@ -263,6 +379,10 @@ async function logout(): Promise<void> {
   authCode.value = ''
   authMessage.value = ''
   authError.value = ''
+  billingStatus.value = { ...defaultBillingStatus }
+  billingMessage.value = ''
+  billingError.value = ''
+  void loadBillingStatus()
 }
 
 async function loadHistory(): Promise<void> {
@@ -629,6 +749,20 @@ function createId(prefix: string): string {
   idCounter += 1
   return `${prefix}-${Date.now()}-${idCounter}`
 }
+
+function formatBillingAmount(value: string): string {
+  const parsed = Number.parseFloat(value)
+  if (!Number.isFinite(parsed)) return '50 000,00'
+  return new Intl.NumberFormat('pt-PT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(parsed)
+}
+
+function formatDisplayDate(value: string | undefined): string {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium' }).format(new Date(value))
+}
 </script>
 
 <template>
@@ -917,10 +1051,48 @@ function createId(prefix: string): string {
         </form>
       </section>
 
-      <aside class="ad-panel" aria-label="Publicidade">
-        <p class="section-label">Publicidade</p>
-        <div class="ad-slot">300 × 250</div>
-        <div class="ad-slot wide">728 × 90</div>
+      <aside class="ad-panel" aria-label="Subscrição e publicidade">
+        <section class="billing-panel" aria-labelledby="billing-title">
+          <p class="section-label">Subscrição</p>
+          <h2 id="billing-title">Plano trimestral — 50 000,00 AOA</h2>
+          <p class="billing-price">{{ billingPriceLabel }} <span>por trimestre</span></p>
+          <p v-if="billingPending" class="panel-note">A carregar subscrição...</p>
+          <template v-else>
+            <p v-if="billingStatus.subscribed" class="billing-status">
+              Subscrição activa até {{ billingExpiryLabel }}. Não verá publicidade enquanto a subscrição estiver activa.
+            </p>
+            <p v-else class="billing-status">
+              Entre para subscrever, remover publicidade e usar os limites de subscritor.
+            </p>
+            <p v-if="billingStatus.expiryWarning" class="billing-warning" role="alert">
+              A sua subscrição termina em menos de uma semana.
+            </p>
+          </template>
+
+          <p v-if="billingMessage" class="billing-message">{{ billingMessage }}</p>
+          <p v-if="billingError" class="billing-error" role="alert">{{ billingError }}</p>
+
+          <div class="billing-actions" aria-label="Métodos de pagamento">
+            <UButton
+              v-for="option in billingMethodOptions"
+              :key="option.method"
+              type="button"
+              color="primary"
+              variant="soft"
+              size="xs"
+              :loading="billingCheckoutPendingMethod === option.method"
+              @click="startBillingCheckout(option.provider, option.method)"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+        </section>
+
+        <section v-if="billingStatus.ads.visible" aria-label="Publicidade" class="ads-section">
+          <p class="section-label">Publicidade</p>
+          <div class="ad-slot">300 × 250</div>
+          <div class="ad-slot wide">728 × 90</div>
+        </section>
       </aside>
     </section>
   </main>
@@ -1341,10 +1513,63 @@ h3 {
   border-radius: 22px;
 }
 
-.ad-panel {
+.ad-panel,
+.billing-panel,
+.ads-section,
+.billing-actions {
   display: grid;
   align-content: start;
   gap: 14px;
+}
+
+.billing-panel,
+.ads-section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.billing-price {
+  margin: 0;
+  color: #fff8cc;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.billing-price span,
+.billing-status {
+  color: var(--ujimu-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.billing-status,
+.billing-warning,
+.billing-message,
+.billing-error {
+  margin: 0;
+}
+
+.billing-warning,
+.billing-message,
+.billing-error {
+  border-radius: 16px;
+  padding: 10px;
+  line-height: 1.35;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.billing-warning,
+.billing-message {
+  color: #fff8cc;
+  background: rgba(249, 214, 22, 0.11);
+}
+
+.billing-error {
+  color: #ffd3d3;
+  background: rgba(210, 16, 52, 0.16);
 }
 
 .ad-slot {

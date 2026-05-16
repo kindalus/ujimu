@@ -20,16 +20,18 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 09:
+Latest full verification after Slice 10:
 
-- `npm test` — passed, 57 tests
+- `npm test` — passed, 61 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API smoke check — not separately run for analytics; route, stream logging, privacy deletion, review lifecycle, visitor count, and UI contracts are covered by acceptance tests.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities
+- Manual API smoke check — not separately run for billing; checkout, webhook confirmation, subscription status, quota subject resolution, expiry warning, and UI contracts are covered by acceptance tests.
 
 Known non-blocking warnings:
 
 - Nuxt/Tailwind sourcemap warnings during build.
+- VueUse Rollup pure-comment warnings during build.
 - `node:sqlite` is external during Nitro build and experimental at runtime under Node.
 
 ## Slice table
@@ -46,13 +48,13 @@ Known non-blocking warnings:
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `verified` | 2026-05-16 | Registered conversation history, restore/delete/edit, citation snapshots, history stream event, compact history UI. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `verified` | 2026-05-16 | Admin allowlist, single-page console, specialist CRUD, uploads, source reload, disabled ingestion handling, trash delete, audit events. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `verified` | 2026-05-16 | Question analytics, content-gap candidates, review lifecycle, first-party visitor counts, admin dashboard. |
-| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `acceptance-tested` | — | Acceptance tests written and failing for missing billing behaviour. |
+| 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
 ## Slice 10 — Subscriptions, payments & advertising
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Idea-refined direction:
 
@@ -80,6 +82,20 @@ Locked grill decisions:
 - Billing state drives quota subject resolution: active subscribed users use the subscribed weekly quota policy; expired users fall back to registered limits.
 - The user-facing billing UI lives on the main page for the MVP and hides advertising for subscribed users.
 
+Implemented:
+
+- `billing_payments`, `billing_provider_events`, and `billing_subscriptions` SQLite migration.
+- Quarterly public plan model for 50,000.00 AOA with three-month subscription periods.
+- Mock provider checkout boundary with Appy Pay method mapping and Stripe VISA method mapping.
+- Authenticated `POST /api/billing/checkout` endpoint that creates pending payments only.
+- Public `GET /api/billing/status` endpoint for authenticated and anonymous billing/ad state.
+- Secret-protected `POST /api/billing/webhooks/:provider` endpoint using `UJIMU_BILLING_WEBHOOK_SECRET`.
+- Idempotent webhook processing for duplicate events and already confirmed payments.
+- Subscription renewal stacking from `max(now, current_period_end) + 3 months`.
+- No-grace active subscription resolution and under-seven-day expiry warnings.
+- Chat quota subject upgrade from registered to subscribed while a subscription is active.
+- Main-page subscription panel with checkout actions, expiry warning, and subscribed ad hiding.
+
 Acceptance tests written first in:
 
 - `tests/billing.acceptance.test.ts`
@@ -95,6 +111,11 @@ Acceptance-test targets:
 - Renewals stack from the current active expiry, expired subscriptions lose access immediately, and near-expiry warnings appear under seven days.
 - Active subscriptions resolve to the subscribed quota subject while expired subscriptions fall back to registered limits.
 - The main page exposes billing status, checkout actions, expiry warnings, and ad visibility rules.
+
+Verification:
+
+- Covered by `tests/billing.acceptance.test.ts`, `tests/billing-ui.acceptance.test.ts`, and updated database migration checks.
+- Included in latest full verification snapshot.
 
 Out of scope for this slice:
 

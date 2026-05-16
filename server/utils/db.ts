@@ -187,6 +187,59 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_visitor_events_month_identity
         ON visitor_events (month, user_id, visitor_id);
     `
+  },
+  {
+    version: '0007_billing_subscriptions',
+    sql: `
+      CREATE TABLE IF NOT EXISTS billing_payments (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK (provider IN ('appy_pay', 'stripe')),
+        method TEXT NOT NULL CHECK (method IN ('multicaixa_express', 'multicaixa_reference', 'qr_code', 'visa')),
+        plan_id TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'failed')),
+        provider_reference TEXT NOT NULL,
+        checkout_url TEXT,
+        created_at TEXT NOT NULL,
+        confirmed_at TEXT,
+        UNIQUE (provider, provider_reference)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_billing_payments_user_time
+        ON billing_payments (user_id, created_at);
+
+      CREATE TABLE IF NOT EXISTS billing_provider_events (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL CHECK (provider IN ('appy_pay', 'stripe')),
+        event_id TEXT NOT NULL,
+        payment_id TEXT,
+        event_type TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        result TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        UNIQUE (provider, event_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_billing_provider_events_payment
+        ON billing_provider_events (payment_id, received_at);
+
+      CREATE TABLE IF NOT EXISTS billing_subscriptions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        plan_id TEXT NOT NULL,
+        current_period_start TEXT NOT NULL,
+        current_period_end TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_payment_id TEXT NOT NULL REFERENCES billing_payments(id),
+        UNIQUE (user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_user_end
+        ON billing_subscriptions (user_id, current_period_end);
+    `
   }
 ]
 

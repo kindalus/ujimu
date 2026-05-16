@@ -13,6 +13,7 @@ import { createChatEventStream } from '../utils/chat/engine'
 import { serializeChatEvent } from '../utils/chat/ndjson'
 import type { ChatStreamEvent } from '../utils/chat/types'
 import { ChatRequestError, validateChatRequestBody } from '../utils/chat/request'
+import { resolveQuotaSubjectWithSubscription } from '../utils/billing/subscriptions'
 import { initializeDatabase } from '../utils/db'
 import { QuotaExceededError } from '../utils/quota/errors'
 import { resolveQuotaSubject } from '../utils/quota/identity'
@@ -39,7 +40,8 @@ export default defineEventHandler(async (event) => {
 
   try {
     const input = validateChatRequestBody(body)
-    const subject = resolveQuotaSubject(event)
+    const baseSubject = resolveQuotaSubject(event)
+    const subject = resolveQuotaSubjectWithSubscription(database, baseSubject)
     const visitor = resolveVisitorIdentity(event)
 
     const stream = await createChatEventStream(input, {
