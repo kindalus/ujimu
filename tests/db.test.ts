@@ -26,7 +26,10 @@ describe('initializeDatabase', () => {
       .all() as Array<{ version: string }>
     database.close()
 
-    expect(rows).toEqual([{ version: '0001_initial_schema' }])
+    expect(rows).toEqual([
+      { version: '0001_initial_schema' },
+      { version: '0002_request_events' }
+    ])
   })
 
   it('can be initialised repeatedly without duplicating migrations', async () => {
@@ -42,6 +45,6 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(1)
+    expect(count.count).toBe(2)
   })
 })

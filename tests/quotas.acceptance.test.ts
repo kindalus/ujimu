@@ -96,16 +96,17 @@ describe('quota and request limit acceptance', () => {
       occurredAt: now
     })
 
-    expect(denied).toMatchObject({
-      allowed: false,
-      error: {
-        code: 'QUOTA_EXCEEDED',
-        limits: {
-          daily: { limit: 5, used: 5, resetAt: '2026-05-16T23:00:00.000Z' }
-        }
+    expect(denied.allowed).toBe(false)
+    if (denied.allowed) {
+      throw new Error('Expected daily quota to be denied')
+    }
+    expect(denied.error).toMatchObject({
+      code: 'QUOTA_EXCEEDED',
+      limits: {
+        daily: { limit: 5, used: 5, resetAt: '2026-05-16T23:00:00.000Z' }
       }
     })
-    expect(denied.error?.limits).not.toHaveProperty('weekly')
+    expect(denied.error.limits).not.toHaveProperty('weekly')
     expect(getRequestEventCount(database)).toBe(6)
     expect(getDeniedEventCount(database)).toBe(1)
     database.close()
@@ -135,7 +136,10 @@ describe('quota and request limit acceptance', () => {
     })
 
     expect(denied.allowed).toBe(false)
-    expect(denied.error?.limits).toEqual({
+    if (denied.allowed) {
+      throw new Error('Expected daily and weekly quotas to be denied')
+    }
+    expect(denied.error.limits).toEqual({
       daily: { limit: 5, used: 5, resetAt: '2026-05-14T23:00:00.000Z' },
       weekly: { limit: 20, used: 20, resetAt: '2026-05-17T23:00:00.000Z' }
     })

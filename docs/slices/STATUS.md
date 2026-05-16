@@ -20,13 +20,12 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 04:
+Latest full verification after Slice 05:
 
-- `npm test` — passed, 30 tests
+- `npm test` — passed, 36 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
-- Manual API check — passed for `GET /api/specialists` and NDJSON `POST /api/chat`
-- Browser smoke test — passed for specialist selection, disabled composer before selection, chat submission, and streamed fallback rendering
+- Manual API check — passed for anonymous quota enforcement: first 5 valid chat requests returned `200`, the 6th returned `429` with structured quota JSON.
 
 Known non-blocking warnings:
 
@@ -42,7 +41,7 @@ Known non-blocking warnings:
 | 02 | [`02-specialist-registry-yaml.html`](./02-specialist-registry-yaml.html) | `verified` | 2026-05-16 | Specialist YAML schema, loader, registry, create/delete services, public listing endpoint. |
 | 03 | [`03-legislation-wiki-raw-ingestion.html`](./03-legislation-wiki-raw-ingestion.html) | `verified` | 2026-05-16 | Raw source storage, checksum-based detection, `ingest/state.json`, Pi SDK ingestion runner, disabled-by-default real ingestion, PDF unsupported handling. |
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
-| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/quotas.acceptance.test.ts`; implementation in progress. |
+| 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `planned` | — | Not started. |
 | 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `planned` | — | Not started. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
@@ -51,11 +50,24 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `planned` | — | Not started. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `deferred` | — | Post-MVP passkeys slice; OTP is the MVP authentication path. |
 
-## Active slice details
+## Completed slice details
 
 ### Slice 05 — Quotas & request limits
 
-Status: `acceptance-tested`
+Status: `verified`
+
+Implemented:
+
+- Quota policy engine for anonymous, registered free, and subscribed subjects.
+- Configurable subscribed weekly limit via `UJIMU_SUBSCRIBED_WEEKLY_LIMIT`, default `5000`.
+- IANA timezone validation with fallback to `Africa/Luanda`.
+- Daily and local ISO weekly quota windows.
+- `request_events` SQLite migration and append-only event recording.
+- Anonymous identity helper for the `ujimu_anon_id` httpOnly cookie.
+- `POST /api/chat` anonymous quota enforcement before stream creation.
+- HTTP 429 structured JSON for quota denials.
+- Frontend quota error display above the composer, without creating assistant messages.
+- Queue processing stops when a queued request receives 429, keeping pending questions visible.
 
 Idea-refined direction:
 
@@ -91,7 +103,10 @@ Out of scope for this slice:
 - Durable conversation history.
 - Client-authoritative quota state.
 
-## Completed slice details
+Verification:
+
+- Covered by `tests/quotas.acceptance.test.ts` and updated UI acceptance checks.
+- Included in latest full verification snapshot.
 
 ### Slice 04 — Specialist chat, streaming & citations
 

@@ -40,6 +40,14 @@ interface QueuedQuestion {
   text: string
 }
 
+interface ApiErrorPayload {
+  error?: {
+    code?: string
+    message?: string
+  }
+}
+
+const quotaLimitMessage = 'Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.'
 const queueLimit = 3
 let idCounter = 0
 
@@ -51,6 +59,7 @@ const question = ref('')
 const messages = ref<ChatMessage[]>([])
 const queuedQuestions = ref<QueuedQuestion[]>([])
 const isStreaming = ref(false)
+const quotaError = ref('')
 
 onMounted(() => {
   void loadSpecialists()
@@ -103,6 +112,7 @@ function selectSpecialist(specialistId: string): void {
   question.value = ''
   messages.value = []
   queuedQuestions.value = []
+  quotaError.value = ''
 }
 
 function submitQuestion(): void {
@@ -110,6 +120,7 @@ function submitQuestion(): void {
   if (!canSubmitQuestion.value || !text) return
 
   question.value = ''
+  quotaError.value = ''
 
   if (isStreaming.value) {
     queuedQuestions.value.push({ id: createId('queued'), text })
@@ -145,15 +156,9 @@ async function startQuestion(text: string): Promise<void> {
     citations: [],
     status: 'done'
   }
-  const assistantMessage: ChatMessage = {
-    id: createId('assistant'),
-    role: 'assistant',
-    text: '',
-    citations: [],
-    status: 'streaming'
-  }
+  let continueQueue = true
 
-  messages.value.push(userMessage, assistantMessage)
+  messages.value.push(userMessage)
   isStreaming.value = true
 
   try {
@@ -168,27 +173,61 @@ async function startQuestion(text: string): Promise<void> {
     })
 
     if (!response.ok) {
-      assistantMessage.text = 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.'
-      assistantMessage.status = 'error'
-      assistantMessage.grounded = false
+      if (response.status === 429) {
+        quotaError.value = await readQuotaErrorMessage(response)
+        continueQueue = false
+        return
+      }
+
+      messages.value.push({
+        id: createId('assistant'),
+        role: 'assistant',
+        text: 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.',
+        citations: [],
+        status: 'error',
+        grounded: false
+      })
       return
     }
 
+    const assistantMessage: ChatMessage = {
+      id: createId('assistant'),
+      role: 'assistant',
+      text: '',
+      citations: [],
+      status: 'streaming'
+    }
+    messages.value.push(assistantMessage)
+
     await readChatStream(response, assistantMessage)
-  } catch {
-    assistantMessage.text ||= 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.'
-    assistantMessage.status = 'error'
-    assistantMessage.grounded = false
-  } finally {
+
     if (assistantMessage.status === 'streaming') {
       assistantMessage.status = 'done'
     }
-
+  } catch {
+    messages.value.push({
+      id: createId('assistant'),
+      role: 'assistant',
+      text: 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.',
+      citations: [],
+      status: 'error',
+      grounded: false
+    })
+  } finally {
     isStreaming.value = false
-    const nextQuestion = queuedQuestions.value.shift()
+    const nextQuestion = continueQueue ? queuedQuestions.value.shift() : undefined
     if (nextQuestion) {
       void startQuestion(nextQuestion.text)
     }
+  }
+}
+
+async function readQuotaErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = (await response.json()) as ApiErrorPayload
+    return payload.error?.message || quotaLimitMessage
+  } catch {
+    return quotaLimitMessage
   }
 }
 
@@ -359,6 +398,10 @@ function createId(prefix: string): string {
             </section>
           </article>
         </div>
+
+        <p v-if="quotaError" class="quota-error" role="alert">
+          {{ quotaError }}
+        </p>
 
         <section v-if="queuedQuestions.length > 0" class="queue-panel" aria-labelledby="queue-title">
           <div>
@@ -681,6 +724,17 @@ h3 {
 .queue-panel p,
 .composer small {
   color: var(--ujimu-muted);
+}
+
+.quota-error {
+  margin: 0;
+  border: 1px solid rgba(249, 214, 22, 0.32);
+  border-radius: 18px;
+  padding: 12px 14px;
+  color: #fff8cc;
+  background: rgba(249, 214, 22, 0.12);
+  line-height: 1.45;
+  font-weight: 700;
 }
 
 .queue-panel {

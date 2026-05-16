@@ -23,6 +23,25 @@ const MIGRATIONS: Migration[] = [
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `
+  },
+  {
+    version: '0002_request_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS request_events (
+        id TEXT PRIMARY KEY,
+        subject_type TEXT NOT NULL CHECK (subject_type IN ('anonymous', 'registered', 'subscribed')),
+        subject_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL,
+        occurred_at_utc TEXT NOT NULL,
+        user_timezone TEXT NOT NULL,
+        counted INTEGER NOT NULL CHECK (counted IN (0, 1)),
+        decision TEXT NOT NULL CHECK (decision IN ('allowed', 'denied')),
+        denial_reason TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_request_events_subject_time
+        ON request_events (subject_type, subject_id, occurred_at_utc);
+    `
   }
 ]
 

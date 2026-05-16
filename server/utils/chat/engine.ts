@@ -1,6 +1,9 @@
+import type { DatabaseSync } from 'node:sqlite'
 import type { SpecialistPathOptions } from '../specialists/paths'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { getSpecialistById } from '../specialists/registry'
+import type { QuotaSubject } from '../quota/policy'
+import { assertQuotaAllowed } from '../quota/usage'
 import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
@@ -20,9 +23,16 @@ const MISSING_CITATIONS_MESSAGE =
 const STREAM_ERROR_MESSAGE =
   'Ocorreu um erro ao preparar a resposta. Tente novamente dentro de alguns minutos.'
 
+export interface ChatQuotaOptions {
+  database: DatabaseSync
+  subject: QuotaSubject
+  occurredAt?: Date
+}
+
 export interface CreateChatEventStreamOptions extends SpecialistPathOptions {
   runner?: ChatEngineRunner
   piChatEnabled?: boolean
+  quota?: ChatQuotaOptions
 }
 
 export async function createChatEventStreamFromBody(
@@ -51,6 +61,15 @@ export async function createChatEventStreamForSpecialist(
   input: ValidatedChatRequest,
   options: CreateChatEventStreamOptions = {}
 ): Promise<AsyncIterable<ChatStreamEvent>> {
+  if (options.quota) {
+    assertQuotaAllowed(options.quota.database, {
+      subject: options.quota.subject,
+      specialistId: specialist.id,
+      userTimezone: input.clientTimezone,
+      occurredAt: options.quota.occurredAt
+    })
+  }
+
   const citationEvidence = await getCitationEvidence(specialist)
 
   if (citationEvidence.length === 0) {
