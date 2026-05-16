@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 3 — Legislation wiki &amp; raw ingestion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+:root {
+  --bg: #070707;
+  --text: #f5f5f0;
+  --muted: #b9b7ad;
+  --faint: #77746b;
+  --line: rgba(255,255,255,.14);
+  --yellow: #f9d616;
+  --yellow-soft: rgba(249,214,22,.16);
+  --panel: rgba(12,12,12,.62);
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(249,214,22,.14), transparent 28%),
+    radial-gradient(circle at 88% 78%, rgba(210,16,52,.10), transparent 30%),
+    linear-gradient(135deg, #030303 0%, #111 50%, #050505 100%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .24;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+.deck { width: 100vw; height: 100vh; position: relative; }
+.slide {
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 7vh 10vw 8vh;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(12px) scale(.99);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.slide.active { display: flex; opacity: 1; transform: translateY(0) scale(1); }
+.frame {
+  width: min(1180px, 100%);
+  min-height: min(690px, 76vh);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  box-shadow: 0 28px 90px rgba(0,0,0,.42);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  position: relative;
+  overflow: hidden;
+}
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(249,214,22,.08) 48%, transparent 100%);
+  opacity: .55;
+}
+.content { position: relative; z-index: 1; }
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin-bottom: 1.2rem;
+  color: var(--yellow);
+  font-size: .82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+}
+.kicker::before {
+  content: "";
+  width: 2.2rem;
+  height: .18rem;
+  border-radius: 99px;
+  background: var(--yellow);
+  box-shadow: 0 0 22px rgba(249,214,22,.45);
+}
+h1,h2 { font-family: var(--font-display); letter-spacing: -.045em; line-height: .96; margin: 0; }
+h1 { font-size: clamp(3.2rem, 7vw, 7rem); }
+h2 { max-width: 980px; font-size: clamp(2.25rem, 5vw, 5rem); }
+p.lead { max-width: 850px; margin: 1.35rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.55rem); line-height: 1.45; }
+ul { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; gap: .85rem; }
+li { display: flex; gap: .8rem; align-items: flex-start; color: #e8e7df; font-size: clamp(1rem, 1.55vw, 1.26rem); line-height: 1.38; }
+li::before { content: ""; flex: 0 0 .58rem; width: .58rem; height: .58rem; margin-top: .5rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 18px rgba(249,214,22,.38); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.card { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 1.05rem; min-height: 118px; }
+.card strong { display: block; color: var(--yellow); font-family: var(--font-display); font-size: 1.1rem; margin-bottom: .38rem; }
+.card span { color: var(--muted); line-height: 1.4; }
+.flow { display: flex; align-items: stretch; gap: .7rem; margin-top: 2rem; }
+.node { flex: 1; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.055); padding: 1rem; text-align: center; font-weight: 800; }
+.arrow { align-self: center; color: var(--yellow); font-size: 1.5rem; }
+pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px solid var(--line); background: rgba(0,0,0,.54); color: #fff8c8; font-size: clamp(.76rem, 1.1vw, .96rem); line-height: 1.45; overflow: auto; }
+.callout { margin-top: 1.7rem; padding: 1rem 1.2rem; border-radius: 18px; border: 1px solid rgba(249,214,22,.30); background: var(--yellow-soft); color: #fff9d1; max-width: 850px; line-height: 1.45; font-weight: 650; }
+.pills { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 2rem; }
+.pill { border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.06); padding: .62rem .85rem; font-weight: 800; color: #f8f6e8; }
+.topbar { position: fixed; top: 1.2rem; left: 50%; z-index: 10; transform: translateX(-50%); width: min(1180px,80vw); display: flex; justify-content: space-between; color: rgba(245,245,240,.68); font-size: .84rem; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 900; color: #fffef6; }
+.brand-dot { width: .75rem; height: .75rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 20px rgba(249,214,22,.7); }
+.slide-counter { position: fixed; right: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.72); font-weight: 800; }
+.navhint { position: fixed; left: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.45); font-size: .85rem; }
+.progress { position: fixed; left: 0; bottom: 0; z-index: 12; height: 4px; width: 100vw; background: rgba(255,255,255,.08); }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #fff2a0); box-shadow: 0 0 22px rgba(249,214,22,.55); transition: width 180ms ease; }
+@media (max-width: 1024px) { .slide { padding: 6vh 6vw 8vh; } .frame { min-height: 74vh; padding: 2rem; } .grid-3 { grid-template-columns: 1fr; } .grid-2 { grid-template-columns: 1fr; } }
+@media print { body { overflow: visible; background: #080808; } body::before, .topbar, .slide-counter, .progress, .navhint { display: none; } .deck { height: auto; } .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; } }
+</style>
+  </head>
+  <body>
+    <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 3 · ingestion</div></div>
+    <main class="deck">
+<section class="slide"><div class="frame content"><div class="kicker">Slice 3</div><h1>Legislation wiki &amp; raw ingestion</h1>
+<p class="lead">Accept official source files, detect pending ingestion, and maintain ingestion state for public legislation/regulatory wikis.</p>
+<div class="pills">
+<span class="pill">raw/</span>
+<span class="pill">PDF/TXT/MD</span>
+<span class="pill">legislation-regulatory</span>
+<span class="pill">no OCR</span>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>Official files enter raw/ before becoming knowledge.</h2>
+<p class="lead">The app should never treat uploads as answered knowledge until they are ingested into the specialist wiki with traceable metadata.</p>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Source rules</div><h2>The MVP keeps source handling simple.</h2>
+<ul>
+<li>Accepted sources are files such as PDF, TXT, Markdown, and similar text-bearing formats.</li>
+<li>Files are stored under the specialist raw/ directory.</li>
+<li>There is no raw file size restriction in the MVP.</li>
+<li>In this slice, textual sources are ingested; PDFs are accepted and detected but marked unsupported when ingestion runs.</li>
+<li>OCR is out of scope; scanned PDFs that cannot be read are reported as unsupported for now.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Legislation preset</div><h2>Use the LLM Wiki legislation/regulatory shape.</h2>
+<div class="grid-3">
+<div class="card"><strong>laws</strong><span>One page per law, code, decree, or statute.</span></div>
+<div class="card"><strong>articles</strong><span>One page per operative provision or article.</span></div>
+<div class="card"><strong>definitions</strong><span>Defined terms scoped to a law.</span></div>
+<div class="card"><strong>topics</strong><span>Synthesis hubs for common regulatory questions.</span></div>
+<div class="card"><strong>amendments</strong><span>Amending instruments and effective dates.</span></div>
+<div class="card"><strong>derived</strong><span>Analyses created from substantive queries.</span></div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Detection</div><h2>Startup and reload both look for pending work.</h2>
+<div class="flow">
+<div class="node">raw file added</div>
+<div class="arrow">→</div>
+<div class="node">checksum calculated</div>
+<div class="arrow">→</div>
+<div class="node">state compared</div>
+<div class="arrow">→</div>
+<div class="node">pending job created</div>
+<div class="arrow">→</div>
+<div class="node">ingestion status visible</div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Ingestion state</div><h2>Every source needs a clear state.</h2>
+<pre>source_id
+specialist_id
+raw_path
+checksum
+status: pending | processing | ingested | failed
+title
+article_refs
+error_code
+error_message
+ingested_at</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Citation metadata</div><h2>Prepare citations before chat needs them.</h2>
+<ul>
+<li>Store the original file title or inferred legal instrument title.</li>
+<li>For legislation, record titles, chapters, articles, and effective dates when available.</li>
+<li>Do not expose internal wiki page names as user-facing citations.</li>
+<li>Keep traceability from citation to raw file and wiki synthesis.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Pi role</div><h2>Pi maintains the wiki; the app orchestrates.</h2>
+<ul>
+<li>The app detects source files and starts ingestion work.</li>
+<li>Pi SDK runs in-process, scoped to the specialist directory.</li>
+<li>Pi uses file tools only: read, write, edit, grep, find, and ls; no bash by default.</li>
+<li>Real Pi ingestion requires UJIMU_PI_INGESTION_ENABLED=true.</li>
+<li>The app records status and makes ingested knowledge available to chat.</li>
+<li>Failures remain visible for admin review.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Pipeline and state storage.</h2>
+<pre>server/utils/ingestion/detect.ts
+server/utils/ingestion/state.ts
+server/utils/ingestion/storage.ts
+server/utils/ingestion/pi-runner.ts
+server/utils/ingestion/run.ts
+server/utils/ingestion/registry.ts
+server/plugins/specialist-registry.ts</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
+<ul>
+<li>Server-side source storage places a source in the correct specialist raw/ directory.</li>
+<li>Startup and manual reload identify raw files that have not been ingested.</li>
+<li>Already-ingested files are not duplicated when unchanged.</li>
+<li>Pi ingestion runs one textual source at a time when explicitly enabled.</li>
+<li>When Pi ingestion is disabled, pending files remain pending.</li>
+<li>Unreadable or unsupported PDFs are reported without corrupting ingestion state.</li>
+<li>Ingested legislation sources produce citation metadata based on original file titles and legal article references.</li>
+</ul>
+</div></section>
+    </main>
+    <div class="navhint">← → / space to navigate</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      const progressBar = document.getElementById("progressBar");
+      let idx = 0;
+      total.textContent = slides.length;
+      function update() {
+        slides.forEach((slide, i) => slide.classList.toggle("active", i === idx));
+        current.textContent = idx + 1;
+        progressBar.style.width = `${((idx + 1) / slides.length) * 100}%`;
+        window.location.hash = `s${idx + 1}`;
+      }
+      function go(next) { idx = Math.max(0, Math.min(next, slides.length - 1)); update(); }
+      document.addEventListener("keydown", (event) => {
+        if (["ArrowRight", "PageDown", " "].includes(event.key)) { event.preventDefault(); go(idx + 1); }
+        if (["ArrowLeft", "PageUp"].includes(event.key)) { event.preventDefault(); go(idx - 1); }
+        if (event.key === "Home") go(0);
+        if (event.key === "End") go(slides.length - 1);
+      });
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("a, button")) return;
+        event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1);
+      });
+      const match = window.location.hash.match(/s(\d+)/);
+      if (match) idx = Math.max(0, Math.min(Number(match[1]) - 1, slides.length - 1));
+      update();
+    </script>
+  </body>
+</html>

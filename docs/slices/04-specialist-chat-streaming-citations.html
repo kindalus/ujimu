@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 4 — Specialist chat, streaming &amp; citations</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+:root {
+  --bg: #070707;
+  --text: #f5f5f0;
+  --muted: #b9b7ad;
+  --faint: #77746b;
+  --line: rgba(255,255,255,.14);
+  --yellow: #f9d616;
+  --yellow-soft: rgba(249,214,22,.16);
+  --panel: rgba(12,12,12,.62);
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(249,214,22,.14), transparent 28%),
+    radial-gradient(circle at 88% 78%, rgba(210,16,52,.10), transparent 30%),
+    linear-gradient(135deg, #030303 0%, #111 50%, #050505 100%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .24;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+.deck { width: 100vw; height: 100vh; position: relative; }
+.slide {
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 7vh 10vw 8vh;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(12px) scale(.99);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.slide.active { display: flex; opacity: 1; transform: translateY(0) scale(1); }
+.frame {
+  width: min(1180px, 100%);
+  min-height: min(690px, 76vh);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  box-shadow: 0 28px 90px rgba(0,0,0,.42);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  position: relative;
+  overflow: hidden;
+}
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(249,214,22,.08) 48%, transparent 100%);
+  opacity: .55;
+}
+.content { position: relative; z-index: 1; }
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin-bottom: 1.2rem;
+  color: var(--yellow);
+  font-size: .82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+}
+.kicker::before {
+  content: "";
+  width: 2.2rem;
+  height: .18rem;
+  border-radius: 99px;
+  background: var(--yellow);
+  box-shadow: 0 0 22px rgba(249,214,22,.45);
+}
+h1,h2 { font-family: var(--font-display); letter-spacing: -.045em; line-height: .96; margin: 0; }
+h1 { font-size: clamp(3.2rem, 7vw, 7rem); }
+h2 { max-width: 980px; font-size: clamp(2.25rem, 5vw, 5rem); }
+p.lead { max-width: 850px; margin: 1.35rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.55rem); line-height: 1.45; }
+ul { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; gap: .85rem; }
+li { display: flex; gap: .8rem; align-items: flex-start; color: #e8e7df; font-size: clamp(1rem, 1.55vw, 1.26rem); line-height: 1.38; }
+li::before { content: ""; flex: 0 0 .58rem; width: .58rem; height: .58rem; margin-top: .5rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 18px rgba(249,214,22,.38); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.card { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 1.05rem; min-height: 118px; }
+.card strong { display: block; color: var(--yellow); font-family: var(--font-display); font-size: 1.1rem; margin-bottom: .38rem; }
+.card span { color: var(--muted); line-height: 1.4; }
+.flow { display: flex; align-items: stretch; gap: .7rem; margin-top: 2rem; }
+.node { flex: 1; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.055); padding: 1rem; text-align: center; font-weight: 800; }
+.arrow { align-self: center; color: var(--yellow); font-size: 1.5rem; }
+pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px solid var(--line); background: rgba(0,0,0,.54); color: #fff8c8; font-size: clamp(.76rem, 1.1vw, .96rem); line-height: 1.45; overflow: auto; }
+.callout { margin-top: 1.7rem; padding: 1rem 1.2rem; border-radius: 18px; border: 1px solid rgba(249,214,22,.30); background: var(--yellow-soft); color: #fff9d1; max-width: 850px; line-height: 1.45; font-weight: 650; }
+.pills { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 2rem; }
+.pill { border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.06); padding: .62rem .85rem; font-weight: 800; color: #f8f6e8; }
+.topbar { position: fixed; top: 1.2rem; left: 50%; z-index: 10; transform: translateX(-50%); width: min(1180px,80vw); display: flex; justify-content: space-between; color: rgba(245,245,240,.68); font-size: .84rem; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 900; color: #fffef6; }
+.brand-dot { width: .75rem; height: .75rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 20px rgba(249,214,22,.7); }
+.slide-counter { position: fixed; right: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.72); font-weight: 800; }
+.navhint { position: fixed; left: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.45); font-size: .85rem; }
+.progress { position: fixed; left: 0; bottom: 0; z-index: 12; height: 4px; width: 100vw; background: rgba(255,255,255,.08); }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #fff2a0); box-shadow: 0 0 22px rgba(249,214,22,.55); transition: width 180ms ease; }
+@media (max-width: 1024px) { .slide { padding: 6vh 6vw 8vh; } .frame { min-height: 74vh; padding: 2rem; } .grid-3 { grid-template-columns: 1fr; } .grid-2 { grid-template-columns: 1fr; } }
+@media print { body { overflow: visible; background: #080808; } body::before, .topbar, .slide-counter, .progress, .navhint { display: none; } .deck { height: auto; } .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; } }
+</style>
+  </head>
+  <body>
+    <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 4 · chat</div></div>
+    <main class="deck">
+<section class="slide"><div class="frame content"><div class="kicker">Slice 4</div><h1>Specialist chat, streaming &amp; citations</h1>
+<p class="lead">Let an anonymous first-time visitor choose a specialist, ask repeated questions, receive streamed grounded answers, and see citations or a safe fallback each time.</p>
+<div class="pills">
+<span class="pill">streaming</span>
+<span class="pill">citations</span>
+<span class="pill">AI notice</span>
+<span class="pill">specialist scope</span>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>The chat is scoped before the first token.</h2>
+<p class="lead">A user must choose a specialist before asking. Each submitted question then runs through the same scoped engine: selected wiki only, streamed answer, citations at the end, or a fail-closed insufficiency response.</p>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Refined direction</div><h2>Hybrid engine, public chat loop.</h2>
+<ul>
+<li>Build the anonymous first-time visitor path first.</li>
+<li>Allow repeated questions in the same selected-specialist page.</li>
+<li>Use a swappable chat engine: fake deterministic runner in tests, with real Pi chat deferred until citation hardening.</li>
+<li>Fail closed when wiki evidence is missing instead of using general model knowledge.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Not doing</div><h2>Keep the first chat slice sharp.</h2>
+<ul>
+<li>No authentication, subscriptions, quotas, or payments.</li>
+<li>No durable conversation history or edit-and-rewind semantics.</li>
+<li>No admin upload or ingestion controls.</li>
+<li>No cross-specialist context switching inside a single response.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Assumptions to validate</div><h2>The smallest useful answer still needs trust signals.</h2>
+<ul>
+<li>Users will understand that citations, not fluent prose, are the trust anchor.</li>
+<li>Existing wiki/source metadata is enough to decide whether to answer or fail closed.</li>
+<li>Streaming improves perceived usefulness enough to justify protocol complexity.</li>
+<li>A fake runner can prove product behaviour while Pi integration remains explicitly gated.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Contract and grounding.</h2>
+<ul>
+<li>The chat endpoint streams NDJSON over POST with delta, citation, done, and error events.</li>
+<li>Missing evidence is a normal assistant response with grounded=false, not an HTTP error.</li>
+<li>The fallback explains, without technical detail, what kind of official source or context would be needed.</li>
+<li>The server performs a deterministic evidence pre-check, and the chat engine must still fail closed for question-specific gaps.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Locked decisions</div><h2>Runtime and UI behaviour.</h2>
+<ul>
+<li>Conversation state is in-memory page state only for this slice.</li>
+<li>Pi chat remains inactive in this slice, even though the future activation flag is reserved as UJIMU_PI_CHAT_ENABLED=true.</li>
+<li>When no real chat runner is configured, the endpoint streams a service-unavailable assistant response with grounded=false.</li>
+<li>The Pi chat runner uses cwd = specialist root with read/search tools only and is instructed not to read raw source files at answer time; this is a prompt-level restriction to revisit after testing.</li>
+<li>For this slice, engine citations use the structured sourceTitle/sourceFile/articleRefs contract, but Pi citation-control hardening will be revisited with the raw-access restriction.</li>
+<li>The Pi chat runner does not parse model citations in this slice; tests use an injected fake runner and production falls back safely until Pi chat hardening is implemented.</li>
+<li>If a user asks while an answer is streaming, the UI shows a visible queue of up to three pending questions where pending questions can be cancelled or reordered.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">User flow</div><h2>The happy path is intentionally narrow.</h2>
+<div class="flow">
+<div class="node">choose specialist</div>
+<div class="arrow">→</div>
+<div class="node">read AI notice</div>
+<div class="arrow">→</div>
+<div class="node">ask question</div>
+<div class="arrow">→</div>
+<div class="node">stream answer</div>
+<div class="arrow">→</div>
+<div class="node">show citations/fallback</div>
+<div class="arrow">↺</div>
+<div class="node">ask another</div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Server contract</div><h2>One chat endpoint, specialist required.</h2>
+<pre>POST /api/chat
+{
+  &quot;specialistId&quot;: &quot;iva&quot;,
+  &quot;question&quot;: &quot;...&quot;,
+  &quot;clientTimezone&quot;: &quot;Africa/Luanda&quot;
+}
+
+response content-type: application/x-ndjson
+stream events: delta | citation | done | error</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Response discipline</div><h2>The assistant does not fill gaps with general knowledge.</h2>
+<ul>
+<li>Use only the selected specialist wiki and its traceable sources.</li>
+<li>If the wiki cannot support the answer, stream a normal assistant response explaining that the current sources are insufficient.</li>
+<li>The insufficiency response should also say, in non-technical terms, what kind of official source or context would be needed to answer safely.</li>
+<li>Do not cite internal wiki page names to end users.</li>
+<li>Keep citations until the end of the answer.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Citation format</div><h2>Legislation answers cite instruments and articles.</h2>
+<pre>{
+  &quot;type&quot;: &quot;citation&quot;,
+  &quot;citation&quot;: {
+    &quot;sourceTitle&quot;: &quot;Código do IVA&quot;,
+    &quot;sourceFile&quot;: &quot;raw/codigo-iva.md&quot;,
+    &quot;articleRefs&quot;: [&quot;Artigo 1.º&quot;, &quot;Artigo 12.º&quot;]
+  }
+}</pre>
+<div class="callout">The UI renders citations in a separate Fontes section below the streamed answer. The assistant text does not need to contain citation markup.</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">AI notice</div><h2>Every specialist makes the limitation visible.</h2>
+<p class="lead">User-facing copy should clearly say that content is generated by AI, may contain errors, and should be confirmed against the cited sources.</p>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Integration points</div><h2>Chat depends on earlier and later slices.</h2>
+<div class="grid-2">
+<div class="card"><strong>Specialists</strong><span>Reads the validated specialist registry.</span></div>
+<div class="card"><strong>Ingestion</strong><span>Requires wiki/source metadata for grounded answers.</span></div>
+<div class="card"><strong>Quotas</strong><span>Out of scope here; a later slice will add checks before starting the stream.</span></div>
+<div class="card"><strong>History</strong><span>Out of scope here; this slice keeps an in-page turn loop without durable history.</span></div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>Streaming path through Nuxt.</h2>
+<pre>components/chat/ChatShell.vue
+components/chat/MessageStream.vue
+server/api/chat.post.ts
+server/utils/chat/engine.ts
+server/utils/chat/pi-runner.ts
+server/utils/chat/citations.ts
+server/utils/chat/context.ts</pre>
+<div class="callout">The chat engine should be swappable: acceptance tests use an injected fake runner, while production falls back safely until a future Pi chat hardening slice implements real structured citations.</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
+<ul>
+<li>An anonymous first-time visitor cannot ask a question until a specialist is selected.</li>
+<li>Each submitted question streams progressively rather than appearing only at completion.</li>
+<li>If the user submits while an answer is streaming, the question appears in a visible queue and can be cancelled or reordered before it runs.</li>
+<li>The visible queue accepts up to three pending questions, with controls to cancel and reorder them.</li>
+<li>The user can ask another question in the same selected-specialist page and get the same streamed citation/fallback behaviour.</li>
+<li>The final response includes citations at the end when the answer is substantive.</li>
+<li>Unsupported questions or missing wiki evidence result in an insufficiency response, not a hallucinated answer.</li>
+<li>The AI-generated-content warning is visible in the specialist chat experience.</li>
+</ul>
+</div></section>
+    </main>
+    <div class="navhint">← → / space to navigate</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      const progressBar = document.getElementById("progressBar");
+      let idx = 0;
+      total.textContent = slides.length;
+      function update() {
+        slides.forEach((slide, i) => slide.classList.toggle("active", i === idx));
+        current.textContent = idx + 1;
+        progressBar.style.width = `${((idx + 1) / slides.length) * 100}%`;
+        window.location.hash = `s${idx + 1}`;
+      }
+      function go(next) { idx = Math.max(0, Math.min(next, slides.length - 1)); update(); }
+      document.addEventListener("keydown", (event) => {
+        if (["ArrowRight", "PageDown", " "].includes(event.key)) { event.preventDefault(); go(idx + 1); }
+        if (["ArrowLeft", "PageUp"].includes(event.key)) { event.preventDefault(); go(idx - 1); }
+        if (event.key === "Home") go(0);
+        if (event.key === "End") go(slides.length - 1);
+      });
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("a, button")) return;
+        event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1);
+      });
+      const match = window.location.hash.match(/s(\d+)/);
+      if (match) idx = Math.max(0, Math.min(Number(match[1]) - 1, slides.length - 1));
+      update();
+    </script>
+  </body>
+</html>

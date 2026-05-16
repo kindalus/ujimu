@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Brainstorming Inicial</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+      :root {
+        --bg: #070707;
+        --panel: rgba(20, 20, 20, 0.82);
+        --panel-strong: rgba(255, 255, 255, 0.08);
+        --text: #f5f5f0;
+        --muted: #b9b7ad;
+        --faint: #77746b;
+        --line: rgba(255, 255, 255, 0.14);
+        --yellow: #f9d616;
+        --yellow-soft: rgba(249, 214, 22, 0.16);
+        --red: #d21034;
+        --font-display: "Space Grotesk", sans-serif;
+        --font-body: "Inter", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: var(--font-body);
+        color: var(--text);
+        background:
+          radial-gradient(circle at 12% 12%, rgba(249, 214, 22, 0.13), transparent 26%),
+          radial-gradient(circle at 88% 78%, rgba(210, 16, 52, 0.10), transparent 28%),
+          linear-gradient(135deg, #030303 0%, #111 48%, #050505 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.28;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+      }
+
+      .deck {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 7vh 10vw 8vh;
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transform: translateY(12px) scale(0.99);
+        transition: opacity 220ms ease, transform 220ms ease;
+      }
+
+      .slide.active {
+        display: flex;
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .frame {
+        width: min(1180px, 100%);
+        min-height: min(690px, 76vh);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        padding: clamp(2rem, 5vw, 4.5rem);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(120deg, transparent 0%, rgba(249, 214, 22, 0.08) 48%, transparent 100%);
+        opacity: 0.55;
+      }
+
+      .content {
+        position: relative;
+        z-index: 1;
+      }
+
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-bottom: 1.2rem;
+        color: var(--yellow);
+        font-size: 0.82rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      .kicker::before {
+        content: "";
+        width: 2.2rem;
+        height: 0.18rem;
+        border-radius: 99px;
+        background: var(--yellow);
+        box-shadow: 0 0 22px rgba(249, 214, 22, 0.45);
+      }
+
+      h1, h2 {
+        font-family: var(--font-display);
+        letter-spacing: -0.045em;
+        line-height: 0.96;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(3.6rem, 8vw, 7.6rem);
+      }
+
+      h2 {
+        max-width: 980px;
+        font-size: clamp(2.3rem, 5.2vw, 5.1rem);
+      }
+
+      p.lead {
+        max-width: 820px;
+        margin: 1.45rem 0 0;
+        color: var(--muted);
+        font-size: clamp(1.15rem, 2.1vw, 1.65rem);
+        line-height: 1.45;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 2rem 0 0;
+        display: grid;
+        gap: 0.9rem;
+      }
+
+      li {
+        display: flex;
+        gap: 0.8rem;
+        align-items: flex-start;
+        color: #e8e7df;
+        font-size: clamp(1.02rem, 1.7vw, 1.34rem);
+        line-height: 1.38;
+      }
+
+      li::before {
+        content: "";
+        flex: 0 0 0.58rem;
+        width: 0.58rem;
+        height: 0.58rem;
+        margin-top: 0.55rem;
+        border-radius: 999px;
+        background: var(--yellow);
+        box-shadow: 0 0 18px rgba(249, 214, 22, 0.38);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(8, 8, 8, 0.58);
+        padding: 1.2rem;
+        min-height: 132px;
+      }
+
+      .card strong {
+        display: block;
+        color: var(--yellow);
+        font-family: var(--font-display);
+        font-size: 1.18rem;
+        margin-bottom: 0.42rem;
+      }
+
+      .card span {
+        color: var(--muted);
+        line-height: 1.42;
+      }
+
+      .metric {
+        margin-top: 2rem;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        padding: 1.1rem 1.35rem;
+        border-radius: 18px;
+        border: 1px solid rgba(249, 214, 22, 0.32);
+        background: var(--yellow-soft);
+      }
+
+      .metric .num {
+        color: var(--yellow);
+        font-family: var(--font-display);
+        font-size: clamp(2.5rem, 5vw, 4.7rem);
+        line-height: 0.9;
+      }
+
+      .metric .label {
+        color: #f4f1cf;
+        font-weight: 700;
+        max-width: 360px;
+      }
+
+      .pill-row {
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-top: 2rem;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        color: #f8f6e8;
+        padding: 0.65rem 0.9rem;
+        font-weight: 700;
+      }
+
+      .diagram {
+        margin-top: 2rem;
+        display: flex;
+        align-items: stretch;
+        gap: 0.72rem;
+      }
+
+      .node {
+        flex: 1;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255,255,255,0.055);
+        padding: 1rem;
+        text-align: center;
+        color: #f7f6ee;
+        font-weight: 800;
+      }
+
+      .arrow {
+        align-self: center;
+        color: var(--yellow);
+        font-size: 1.6rem;
+      }
+
+      pre {
+        margin-top: 1.5rem;
+        padding: 1.2rem;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.54);
+        color: #fff8c8;
+        font-size: clamp(0.78rem, 1.15vw, 1rem);
+        line-height: 1.45;
+        overflow: auto;
+      }
+
+      .quote {
+        max-width: 900px;
+        margin-top: 2rem;
+        padding-left: 1.35rem;
+        border-left: 0.28rem solid var(--yellow);
+        color: #fffbe0;
+        font-size: clamp(1.35rem, 2.5vw, 2.1rem);
+        line-height: 1.22;
+        font-family: var(--font-display);
+      }
+
+      .split-note {
+        margin-top: 1.5rem;
+        color: var(--faint);
+        font-size: 0.95rem;
+      }
+
+      .topbar {
+        position: fixed;
+        top: 1.2rem;
+        left: 50%;
+        z-index: 10;
+        transform: translateX(-50%);
+        width: min(1180px, 80vw);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: rgba(245, 245, 240, 0.68);
+        font-size: 0.84rem;
+        letter-spacing: 0.02em;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 900;
+        color: #fffef6;
+      }
+
+      .brand-dot {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 999px;
+        background: var(--yellow);
+        box-shadow: 0 0 20px rgba(249, 214, 22, 0.7);
+      }
+
+      .slide-counter {
+        position: fixed;
+        right: 2.2rem;
+        bottom: 1.7rem;
+        z-index: 10;
+        color: rgba(245, 245, 240, 0.72);
+        font-weight: 800;
+      }
+
+      .progress {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        z-index: 12;
+        height: 4px;
+        width: 100vw;
+        background: rgba(255,255,255,0.08);
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--yellow), #fff2a0);
+        box-shadow: 0 0 22px rgba(249, 214, 22, 0.55);
+        transition: width 180ms ease;
+      }
+
+      .navhint {
+        position: fixed;
+        left: 2.2rem;
+        bottom: 1.7rem;
+        z-index: 10;
+        color: rgba(245, 245, 240, 0.45);
+        font-size: 0.85rem;
+      }
+
+      @media (max-width: 1024px) {
+        .slide { padding: 6vh 6vw 8vh; }
+        .frame { min-height: 74vh; padding: 2rem; }
+        .grid-3 { grid-template-columns: 1fr; }
+      }
+
+      @media print {
+        body { overflow: visible; background: #080808; }
+        body::before, .topbar, .slide-counter, .progress, .navhint { display: none; }
+        .deck { height: auto; }
+        .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand"><span class="brand-dot"></span> Ujimu</div>
+      <div>Brainstorming inicial · produto de especialistas com wikis</div>
+    </div>
+
+    <main class="deck">
+      <section class="slide active">
+        <div class="frame content">
+          <div class="kicker">Brainstorming inicial</div>
+          <h1>Ujimu</h1>
+          <p class="lead">Uma aplicação de chat onde cada resposta nasce de uma wiki especializada, citada e mantida como conhecimento vivo.</p>
+          <div class="pill-row">
+            <span class="pill">Nuxt</span>
+            <span class="pill">Pi code agent</span>
+            <span class="pill">LLM Wiki</span>
+            <span class="pill">pt-PT pré-AO</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Ponto de partida</div>
+          <h2>Não é “um chatbot”; é uma mesa de especialistas.</h2>
+          <p class="lead">O utilizador escolhe uma especialidade, faz perguntas em linguagem natural e recebe respostas fundamentadas apenas na documentação dessa área.</p>
+          <ul>
+            <li>Especialistas separados por domínio.</li>
+            <li>Wikis públicas como base inicial.</li>
+            <li>Citações obrigatórias em cada resposta substantiva.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Problema</div>
+          <h2>A informação legal existe, mas é difícil de usar.</h2>
+          <p class="lead">O público geral precisa de orientação rápida, mas a documentação está dispersa, técnica e muitas vezes sem síntese prática.</p>
+          <div class="grid-3">
+            <div class="card"><strong>Dispersão</strong><span>Fontes oficiais, PDFs, regulamentos e notas estão espalhados.</span></div>
+            <div class="card"><strong>Linguagem</strong><span>O texto legal raramente responde à pergunta concreta do utilizador.</span></div>
+            <div class="card"><strong>Confiança</strong><span>Sem citação, a resposta é apenas opinião do modelo.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Proposta</div>
+          <h2>Resposta curta, fonte visível, limite claro.</h2>
+          <p class="lead">O produto deve responder com clareza e mostrar de onde veio a informação. Se a wiki não suportar a resposta, deve dizê-lo.</p>
+          <div class="quote">“Não sei com base nesta documentação” é uma resposta válida — e útil.</div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Público-alvo</div>
+          <h2>Primeiro público: utilizadores gerais.</h2>
+          <p class="lead">Pessoas que precisam de entender obrigações, termos e regras antes de avançar para uma decisão ou procurar apoio profissional.</p>
+          <ul>
+            <li>Empresários individuais e pequenas empresas.</li>
+            <li>Trabalhadores e empregadores.</li>
+            <li>Importadores, despachantes e interessados em pauta aduaneira.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Primeiras especialidades</div>
+          <h2>Começar onde a dor é frequente.</h2>
+          <div class="grid-2">
+            <div class="card"><strong>Legislação de facturação</strong><span>Regras, obrigações, documentos e dúvidas recorrentes.</span></div>
+            <div class="card"><strong>Legislação de IVA</strong><span>Incidência, taxas, isenções, prazos e enquadramentos.</span></div>
+            <div class="card"><strong>Legislação laboral</strong><span>Contratos, direitos, deveres, prazos e procedimentos.</span></div>
+            <div class="card"><strong>Pauta aduaneira</strong><span>Classificação, códigos, direitos e contexto de importação.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Objectivo do MVP</div>
+          <h2>Provar interesse real, não escala.</h2>
+          <div class="metric"><span class="num">50</span><span class="label">visitantes distintos por mês como primeiro sinal de validação.</span></div>
+          <ul>
+            <li>Medir visitas, perguntas por especialidade e repetição de temas.</li>
+            <li>Observar se os utilizadores voltam e consultam histórico.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Princípio central</div>
+          <h2>A wiki manda; o modelo executa.</h2>
+          <p class="lead">O motor de IA não deve “saber” fora da especialidade. Deve ler, sintetizar e citar o que a wiki permite.</p>
+          <div class="diagram">
+            <div class="node">Pergunta</div><div class="arrow">→</div>
+            <div class="node">Wiki da especialidade</div><div class="arrow">→</div>
+            <div class="node">Resposta citada</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">LLM Wiki</div>
+          <h2>Conhecimento que se acumula.</h2>
+          <p class="lead">Ao contrário de RAG genérico, a wiki deve consolidar leituras, páginas, relações e sínteses que ficam disponíveis para consultas futuras.</p>
+          <ul>
+            <li>Documentos originais ficam separados.</li>
+            <li>Páginas da wiki são mantidas e cruzadas.</li>
+            <li>Em legislação, alterações são tratadas como sucessão/versionamento.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Tipos de wiki</div>
+          <h2>O tipo vem das predefinições LLM Wiki.</h2>
+          <p class="lead">Cada especialidade escolhe um dos tipos suportados pelo skill. As primeiras especialidades usam legislação/regulatório.</p>
+          <div class="grid-2">
+            <div class="card"><strong>Investigação</strong><span>Projectos de pesquisa, conceitos, fontes e teses.</span></div>
+            <div class="card"><strong>Livro</strong><span>Companheiro de leitura, capítulos, personagens e temas.</span></div>
+            <div class="card"><strong>Pessoal/diário</strong><span>Temas, projectos, objectivos e padrões pessoais.</span></div>
+            <div class="card"><strong>Negócio/equipa</strong><span>Projectos, decisões, clientes e conhecimento interno.</span></div>
+            <div class="card"><strong>Help-desk/FAQ</strong><span>Artigos de apoio, categorias, políticas e glossário.</span></div>
+            <div class="card"><strong>Engenharia</strong><span>Componentes, runbooks, ADRs e documentação técnica.</span></div>
+            <div class="card"><strong>Legislação/regulatório</strong><span>Leis, artigos, definições, alterações e tópicos.</span></div>
+            <div class="card"><strong>Domínio personalizado</strong><span>Estrutura definida quando nenhuma predefinição chega.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Especialidade em disco</div>
+          <h2>Uma pasta, uma configuração, uma wiki.</h2>
+          <p class="lead">Cada especialidade deve poder ser carregada no arranque, criada pela administração ou recarregada a pedido.</p>
+          <pre>~/.local/share/ujimu/
+  specialties/
+    iva/
+      specialist.yaml
+      raw/
+      wiki/
+      ingest/state.json</pre>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Configuração YAML</div>
+          <h2>Metadados e comportamento no mesmo sítio.</h2>
+          <pre>id: iva
+name: "Legislação de IVA"
+wiki_type: "legislation-regulatory"
+visibility: "public"
+system_prompt: "Responder apenas com base na wiki."
+quotas_enabled: true
+citations_required: true</pre>
+          <p class="split-note">Estrutura inicial; campos exactos devem ser especificados antes da implementação.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Ingestão</div>
+          <h2>O sistema deve notar o que falta ingerir.</h2>
+          <p class="lead">As fontes oficiais entram sempre como ficheiros — PDF, TXT, MD ou semelhantes — guardados em raw/ antes da ingestão.</p>
+          <ul>
+            <li>No arranque e no recarregamento manual, a aplicação procura documentos pendentes.</li>
+          </ul>
+          <div class="diagram">
+            <div class="node">Upload</div><div class="arrow">→</div>
+            <div class="node">raw/</div><div class="arrow">→</div>
+            <div class="node">Ingestão</div><div class="arrow">→</div>
+            <div class="node">wiki/</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Citações</div>
+          <h2>A resposta precisa de provas visíveis.</h2>
+          <p class="lead">Cada resposta deve apontar para páginas da wiki e, quando adequado, para os documentos de origem usados por essas páginas.</p>
+          <ul>
+            <li>Separar resposta, notas e referências.</li>
+            <li>Mostrar quando a fonte é insuficiente.</li>
+            <li>Evitar citações vagas como “segundo a documentação”.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Aviso ao utilizador</div>
+          <h2>Cada especialista deve mostrar o limite da IA.</h2>
+          <p class="lead">O utilizador deve ver claramente que o conteúdo é gerado por IA, pode conter erros e deve ser confirmado nas fontes citadas.</p>
+          <ul>
+            <li>O aviso deve estar associado à experiência de cada especialista.</li>
+            <li>A resposta não deve substituir validação profissional quando necessária.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Perguntas repetidas</div>
+          <h2>As dúvidas dos utilizadores tornam-se sinal editorial.</h2>
+          <p class="lead">O backend regista perguntas por especialidade. Repetição alta sugere lacuna, necessidade de página nova ou melhor organização da wiki.</p>
+          <ul>
+            <li>Não criar conteúdo automaticamente sem curadoria.</li>
+            <li>Mostrar temas recorrentes à administração.</li>
+            <li>Medir perguntas sem transformar analytics em fonte de verdade.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Chat</div>
+          <h2>Antes da pergunta, escolher o especialista.</h2>
+          <p class="lead">A consulta começa pela selecção da especialidade. A conversa fica limitada a essa área até o utilizador iniciar outra consulta.</p>
+          <div class="diagram">
+            <div class="node">Escolher especialidade</div><div class="arrow">→</div>
+            <div class="node">Perguntar</div><div class="arrow">→</div>
+            <div class="node">Receber resposta citada</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Histórico</div>
+          <h2>Utilizadores registados recuperam contexto.</h2>
+          <p class="lead">O histórico deve ser organizado por especialidade e limitado às 20 últimas conversas ou consultas relevantes.</p>
+          <ul>
+            <li>O utilizador pode continuar uma sessão anterior.</li>
+            <li>Pode apagar qualquer conversa do histórico.</li>
+            <li>IVA, laboral, facturação e pauta mantêm históricos separados.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Continuação de sessão</div>
+          <h2>Voltar atrás deve reescrever o futuro.</h2>
+          <p class="lead">Se o utilizador saltar para uma pergunta anterior e a alterar, tudo o que vinha depois é removido da conversa.</p>
+          <div class="diagram">
+            <div class="node">Pergunta antiga</div><div class="arrow">→</div>
+            <div class="node">Alteração</div><div class="arrow">→</div>
+            <div class="node">Novas interacções</div>
+          </div>
+          <p class="split-note">No MVP, isto substitui a continuação; não cria uma ramificação paralela.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Quotas</div>
+          <h2>Limites simples para controlar custo.</h2>
+          <div class="grid-3">
+            <div class="card"><strong>Anónimo</strong><span>5 pedidos/dia ou 20 pedidos/semana, identificado por cookie.</span></div>
+            <div class="card"><strong>Registado</strong><span>20 pedidos/dia e 100 pedidos/semana, sem subscrição.</span></div>
+            <div class="card"><strong>Subscritor</strong><span>Sem limite diário; limite semanal parametrizável, começando em 5000.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Cookies e abuso</div>
+          <h2>O cookie identifica; o servidor decide.</h2>
+          <p class="lead">Cookies ajudam a reconhecer utilizadores anónimos, mas as quotas devem ser impostas no backend para evitar manipulação.</p>
+          <ul>
+            <li>Associar pedidos a cookie, IP e sinais anti-abuso com cuidado.</li>
+            <li>Não bloquear utilizadores legítimos por excesso de agressividade.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Autenticação</div>
+          <h2>Entrar sem fricção.</h2>
+          <p class="lead">O registo deve suportar OTP por email ou telemóvel, com passkeys como opção moderna e segura.</p>
+          <div class="grid-3">
+            <div class="card"><strong>Email</strong><span>Código temporário para entrada rápida.</span></div>
+            <div class="card"><strong>Telemóvel</strong><span>OTP para utilizadores que preferem contacto directo.</span></div>
+            <div class="card"><strong>Passkeys</strong><span>Entrada sem palavra-passe, resistente a phishing.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Subscrição</div>
+          <h2>Valor pago: profundidade e continuidade.</h2>
+          <p class="lead">A subscrição trimestral começa em 50 000,00 AOA e remove publicidade, mantendo limite semanal parametrizável.</p>
+          <ul>
+            <li>Multicaixa Express, Referência Multicaixa e QR Code.</li>
+            <li>VISA, tentando integração com Stripe.</li>
+            <li>Experiência sem anúncios e maior continuidade de uso.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Publicidade</div>
+          <h2>Zonas preparadas, mas discretas.</h2>
+          <p class="lead">Utilizadores sem subscrição podem ver anúncios. O desenho deve prever dimensões comuns sem prejudicar leitura e citações.</p>
+          <div class="pill-row">
+            <span class="pill">728×90</span>
+            <span class="pill">300×250</span>
+            <span class="pill">320×50</span>
+            <span class="pill">160×600</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Administração</div>
+          <h2>Criar especialistas sem mexer no código.</h2>
+          <p class="lead">Administradores devem criar especialidades, editar prompts, escolher a predefinição LLM Wiki, fazer upload e ver estado de ingestão.</p>
+          <ul>
+            <li>Formulário para metadados e prompt especializado.</li>
+            <li>Upload de documentos por especialidade.</li>
+            <li>Recarregamento on-demand e auditoria de alterações.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">UI</div>
+          <h2>Chat escuro, sóbrio, com amarelo de Angola.</h2>
+          <p class="lead">Preto e branco como base; amarelo como acento para foco, estados activos e chamadas de atenção.</p>
+          <div class="grid-3">
+            <div class="card"><strong>Confiança</strong><span>Layout limpo, pouca ornamentação, boa legibilidade.</span></div>
+            <div class="card"><strong>Clareza</strong><span>Citações fáceis de abrir e comparar.</span></div>
+            <div class="card"><strong>Foco</strong><span>A pergunta e a resposta devem dominar o ecrã.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Nuxt</div>
+          <h2>Uma plataforma para produto e backend.</h2>
+          <p class="lead">Nuxt pode servir a interface, rotas de API, autenticação, quotas e integração com o motor Pi.</p>
+          <ul>
+            <li>Server routes para chat, quota, ingestão e administração.</li>
+            <li>Componentes de chat e citações no frontend.</li>
+            <li>Configuração por ambiente para a pasta das wikis.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Pi code agent</div>
+          <h2>O motor de IA embutido no produto.</h2>
+          <p class="lead">Pi funciona como harness de agente. A aplicação deve passar contexto, especialidade e regras de citação de forma controlada.</p>
+          <ul>
+            <li>Usar documentação oficial antes de integrar.</li>
+            <li>Conter o agente dentro da wiki seleccionada.</li>
+            <li>Guardar logs suficientes para auditoria e melhoria.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Arquitectura inicial</div>
+          <h2>Fluxo mínimo de uma pergunta.</h2>
+          <div class="diagram">
+            <div class="node">Nuxt UI</div><div class="arrow">→</div>
+            <div class="node">API chat</div><div class="arrow">→</div>
+            <div class="node">Quota</div><div class="arrow">→</div>
+            <div class="node">Pi + wiki</div><div class="arrow">→</div>
+            <div class="node">Resposta</div>
+          </div>
+          <p class="split-note">A camada de quota deve bloquear antes de invocar o motor de IA.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Dados</div>
+          <h2>Guardar o suficiente, não tudo sem critério.</h2>
+          <p class="lead">É preciso registar perguntas, quotas, histórico e estado de ingestão, mantendo privacidade e separação por especialidade.</p>
+          <ul>
+            <li>Perguntas agregadas para descobrir lacunas.</li>
+            <li>Histórico limitado, apagável e truncado quando a sessão é editada.</li>
+            <li>Eventos administrativos auditáveis.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Segurança</div>
+          <h2>O risco maior é confiança indevida.</h2>
+          <p class="lead">Como há legislação envolvida, a aplicação deve ser prudente: citar, limitar, registar e avisar quando não existe base documental.</p>
+          <ul>
+            <li>Não responder fora da wiki.</li>
+            <li>Mostrar aviso visível de conteúdo gerado por IA e possível erro.</li>
+            <li>Sanitizar uploads e entradas do utilizador.</li>
+            <li>Proteger contactos, histórico e estado de autenticação.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Experiências possíveis</div>
+          <h2>Três direcções a explorar.</h2>
+          <div class="grid-3">
+            <div class="card"><strong>Consulta rápida</strong><span>Pergunta directa, resposta curta e citações.</span></div>
+            <div class="card"><strong>Guia passo-a-passo</strong><span>Fluxos guiados para temas frequentes.</span></div>
+            <div class="card"><strong>Biblioteca comentada</strong><span>Navegar pelas wikis como fonte de aprendizagem.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Foco recomendado</div>
+          <h2>MVP: consulta rápida com rastreabilidade.</h2>
+          <p class="lead">A primeira versão deve provar que pessoas perguntam, entendem a resposta e confiam mais quando vêem fontes.</p>
+          <ul>
+            <li>Escolher especialidade → perguntar → resposta citada.</li>
+            <li>Quotas e autenticação suficientes para operar.</li>
+            <li>Admin mínimo para gerir wikis e uploads.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Não fazer já</div>
+          <h2>Foco é dizer não.</h2>
+          <ul>
+            <li>Não começar com wikis privadas por cliente.</li>
+            <li>Não prometer aconselhamento jurídico definitivo.</li>
+            <li>Não automatizar criação de conteúdo sem revisão.</li>
+            <li>Não optimizar para escala antes das 50 visitas/mês.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Hipóteses a validar</div>
+          <h2>O produto depende destas apostas.</h2>
+          <ul>
+            <li>O público geral formula perguntas legais em linguagem natural.</li>
+            <li>Citações aumentam confiança e reduzem risco.</li>
+            <li>Quatro especialidades iniciais são suficientes para gerar procura.</li>
+            <li>Limites gratuitos não travam a adopção inicial.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Decisões clarificadas</div>
+          <h2>As dúvidas principais já têm direcção.</h2>
+          <ul>
+            <li>Aviso de IA e possibilidade de erro em cada especialista.</li>
+            <li>Fontes oficiais submetidas como ficheiros e guardadas em raw/.</li>
+            <li>Subscrição trimestral a 50 000,00 AOA.</li>
+            <li>Histórico retomável, editável e apagável pelo utilizador.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="frame content">
+          <div class="kicker">Próximos passos</div>
+          <h2>Transformar a ideia em especificação.</h2>
+          <ul>
+            <li>Definir o modelo de dados e o schema YAML da especialidade.</li>
+            <li>Desenhar o fluxo de chat, citações, quotas e histórico.</li>
+            <li>Escolher uma especialidade piloto e montar a primeira wiki.</li>
+            <li>Escrever a especificação técnica antes de implementar.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <div class="navhint">← → / espaço para navegar</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      const progressBar = document.getElementById("progressBar");
+      let idx = 0;
+
+      total.textContent = slides.length;
+
+      function update() {
+        slides.forEach((slide, i) => slide.classList.toggle("active", i === idx));
+        current.textContent = idx + 1;
+        progressBar.style.width = `${((idx + 1) / slides.length) * 100}%`;
+        window.location.hash = `s${idx + 1}`;
+      }
+
+      function go(next) {
+        idx = Math.max(0, Math.min(next, slides.length - 1));
+        update();
+      }
+
+      document.addEventListener("keydown", (event) => {
+        if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+          event.preventDefault();
+          go(idx + 1);
+        }
+        if (["ArrowLeft", "PageUp"].includes(event.key)) {
+          event.preventDefault();
+          go(idx - 1);
+        }
+        if (event.key === "Home") go(0);
+        if (event.key === "End") go(slides.length - 1);
+      });
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("a, button")) return;
+        event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1);
+      });
+
+      const match = window.location.hash.match(/s(\d+)/);
+      if (match) idx = Math.max(0, Math.min(Number(match[1]) - 1, slides.length - 1));
+      update();
+    </script>
+  </body>
+</html>

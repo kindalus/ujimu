@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 7 — Conversation history &amp; editing</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+:root {
+  --bg: #070707;
+  --text: #f5f5f0;
+  --muted: #b9b7ad;
+  --faint: #77746b;
+  --line: rgba(255,255,255,.14);
+  --yellow: #f9d616;
+  --yellow-soft: rgba(249,214,22,.16);
+  --panel: rgba(12,12,12,.62);
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(249,214,22,.14), transparent 28%),
+    radial-gradient(circle at 88% 78%, rgba(210,16,52,.10), transparent 30%),
+    linear-gradient(135deg, #030303 0%, #111 50%, #050505 100%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .24;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+.deck { width: 100vw; height: 100vh; position: relative; }
+.slide {
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 7vh 10vw 8vh;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(12px) scale(.99);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.slide.active { display: flex; opacity: 1; transform: translateY(0) scale(1); }
+.frame {
+  width: min(1180px, 100%);
+  min-height: min(690px, 76vh);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  box-shadow: 0 28px 90px rgba(0,0,0,.42);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  position: relative;
+  overflow: hidden;
+}
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(249,214,22,.08) 48%, transparent 100%);
+  opacity: .55;
+}
+.content { position: relative; z-index: 1; }
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin-bottom: 1.2rem;
+  color: var(--yellow);
+  font-size: .82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+}
+.kicker::before {
+  content: "";
+  width: 2.2rem;
+  height: .18rem;
+  border-radius: 99px;
+  background: var(--yellow);
+  box-shadow: 0 0 22px rgba(249,214,22,.45);
+}
+h1,h2 { font-family: var(--font-display); letter-spacing: -.045em; line-height: .96; margin: 0; }
+h1 { font-size: clamp(3.2rem, 7vw, 7rem); }
+h2 { max-width: 980px; font-size: clamp(2.25rem, 5vw, 5rem); }
+p.lead { max-width: 850px; margin: 1.35rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.55rem); line-height: 1.45; }
+ul { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; gap: .85rem; }
+li { display: flex; gap: .8rem; align-items: flex-start; color: #e8e7df; font-size: clamp(1rem, 1.55vw, 1.26rem); line-height: 1.38; }
+li::before { content: ""; flex: 0 0 .58rem; width: .58rem; height: .58rem; margin-top: .5rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 18px rgba(249,214,22,.38); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; margin-top: 2rem; }
+.card { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 1.05rem; min-height: 118px; }
+.card strong { display: block; color: var(--yellow); font-family: var(--font-display); font-size: 1.1rem; margin-bottom: .38rem; }
+.card span { color: var(--muted); line-height: 1.4; }
+.flow { display: flex; align-items: stretch; gap: .7rem; margin-top: 2rem; }
+.node { flex: 1; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.055); padding: 1rem; text-align: center; font-weight: 800; }
+.arrow { align-self: center; color: var(--yellow); font-size: 1.5rem; }
+pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px solid var(--line); background: rgba(0,0,0,.54); color: #fff8c8; font-size: clamp(.76rem, 1.1vw, .96rem); line-height: 1.45; overflow: auto; }
+.callout { margin-top: 1.7rem; padding: 1rem 1.2rem; border-radius: 18px; border: 1px solid rgba(249,214,22,.30); background: var(--yellow-soft); color: #fff9d1; max-width: 850px; line-height: 1.45; font-weight: 650; }
+.pills { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 2rem; }
+.pill { border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.06); padding: .62rem .85rem; font-weight: 800; color: #f8f6e8; }
+.topbar { position: fixed; top: 1.2rem; left: 50%; z-index: 10; transform: translateX(-50%); width: min(1180px,80vw); display: flex; justify-content: space-between; color: rgba(245,245,240,.68); font-size: .84rem; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 900; color: #fffef6; }
+.brand-dot { width: .75rem; height: .75rem; border-radius: 999px; background: var(--yellow); box-shadow: 0 0 20px rgba(249,214,22,.7); }
+.slide-counter { position: fixed; right: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.72); font-weight: 800; }
+.navhint { position: fixed; left: 2.2rem; bottom: 1.7rem; z-index: 10; color: rgba(245,245,240,.45); font-size: .85rem; }
+.progress { position: fixed; left: 0; bottom: 0; z-index: 12; height: 4px; width: 100vw; background: rgba(255,255,255,.08); }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #fff2a0); box-shadow: 0 0 22px rgba(249,214,22,.55); transition: width 180ms ease; }
+@media (max-width: 1024px) { .slide { padding: 6vh 6vw 8vh; } .frame { min-height: 74vh; padding: 2rem; } .grid-3 { grid-template-columns: 1fr; } .grid-2 { grid-template-columns: 1fr; } }
+@media print { body { overflow: visible; background: #080808; } body::before, .topbar, .slide-counter, .progress, .navhint { display: none; } .deck { height: auto; } .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; } }
+</style>
+  </head>
+  <body>
+    <div class="topbar"><div class="brand"><span class="brand-dot"></span> Ujimu</div><div>Slice 7 · history</div></div>
+    <main class="deck">
+<section class="slide"><div class="frame content"><div class="kicker">Slice 7</div><h1>Conversation history &amp; editing</h1>
+<p class="lead">Give registered users the latest 20 sessions per specialist, with resume, hard delete, and destructive edit behaviour.</p>
+<div class="pills">
+<span class="pill">20 sessions</span>
+<span class="pill">resume</span>
+<span class="pill">hard delete</span>
+<span class="pill">truncate after edit</span>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Idea</div><h2>History is useful, but bounded.</h2>
+<p class="lead">Registered users should return to prior specialist sessions without the product becoming a permanent archive.</p>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Scope</div><h2>Only registered users get history.</h2>
+<ul>
+<li>Anonymous users do not get cross-session history in the MVP.</li>
+<li>History is grouped by specialist.</li>
+<li>The list shows the latest 20 conversations/sessions per specialist.</li>
+<li>Conversation deletion is permanent.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Data model</div><h2>Keep conversations linear.</h2>
+<pre>conversations
+  id, user_id, specialist_id, title, created_at, updated_at
+messages
+  id, conversation_id, role, content, parent_order, created_at
+message_citations
+  message_id, source_file, title, article_refs</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Resume</div><h2>Continuing a session appends to the current timeline.</h2>
+<div class="flow">
+<div class="node">open history</div>
+<div class="arrow">→</div>
+<div class="node">choose specialist session</div>
+<div class="arrow">→</div>
+<div class="node">load messages</div>
+<div class="arrow">→</div>
+<div class="node">send new question</div>
+<div class="arrow">→</div>
+<div class="node">append answer</div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Edit behaviour</div><h2>Going back rewrites the future.</h2>
+<p class="lead">When the user edits a prior question and submits it, every later message in that conversation is permanently removed and replaced by the new continuation.</p>
+<div class="flow">
+<div class="node">old question</div>
+<div class="arrow">→</div>
+<div class="node">user edits</div>
+<div class="arrow">→</div>
+<div class="node">delete later messages</div>
+<div class="arrow">→</div>
+<div class="node">send replacement</div>
+<div class="arrow">→</div>
+<div class="node">new continuation</div>
+</div>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Deletion</div><h2>Delete means delete.</h2>
+<ul>
+<li>Deleting a conversation removes messages and citations from SQLite.</li>
+<li>Deleted conversations do not appear in history or analytics views as user history.</li>
+<li>Specialist deletion also deletes all related customer conversations.</li>
+</ul>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Likely implementation areas</div><h2>History touches UI and server state.</h2>
+<pre>components/history/ConversationList.vue
+components/chat/EditQuestion.vue
+server/api/history/*.ts
+server/utils/history/repository.ts
+server/database/migrations/*conversations*.sql</pre>
+</div></section>
+<section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>What must be true when the slice is done.</h2>
+<ul>
+<li>A registered user sees at most 20 latest sessions for a selected specialist.</li>
+<li>Opening a session restores its messages and allows continuation.</li>
+<li>Deleting a conversation permanently removes it from the user history.</li>
+<li>Editing an earlier question permanently removes all later messages before saving the replacement path.</li>
+<li>History for one specialist never appears under another specialist.</li>
+</ul>
+</div></section>
+    </main>
+    <div class="navhint">← → / space to navigate</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const current = document.getElementById("current");
+      const total = document.getElementById("total");
+      const progressBar = document.getElementById("progressBar");
+      let idx = 0;
+      total.textContent = slides.length;
+      function update() {
+        slides.forEach((slide, i) => slide.classList.toggle("active", i === idx));
+        current.textContent = idx + 1;
+        progressBar.style.width = `${((idx + 1) / slides.length) * 100}%`;
+        window.location.hash = `s${idx + 1}`;
+      }
+      function go(next) { idx = Math.max(0, Math.min(next, slides.length - 1)); update(); }
+      document.addEventListener("keydown", (event) => {
+        if (["ArrowRight", "PageDown", " "].includes(event.key)) { event.preventDefault(); go(idx + 1); }
+        if (["ArrowLeft", "PageUp"].includes(event.key)) { event.preventDefault(); go(idx - 1); }
+        if (event.key === "Home") go(0);
+        if (event.key === "End") go(slides.length - 1);
+      });
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("a, button")) return;
+        event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1);
+      });
+      const match = window.location.hash.match(/s(\d+)/);
+      if (match) idx = Math.max(0, Math.min(Number(match[1]) - 1, slides.length - 1));
+      update();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Slices de Trabalho</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+      :root {
+        --bg: #070707;
+        --text: #f5f5f0;
+        --muted: #b9b7ad;
+        --line: rgba(255, 255, 255, 0.14);
+        --yellow: #f9d616;
+        --yellow-soft: rgba(249, 214, 22, 0.16);
+        --font-display: "Space Grotesk", sans-serif;
+        --font-body: "Inter", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: var(--font-body);
+        color: var(--text);
+        background:
+          radial-gradient(circle at 14% 14%, rgba(249, 214, 22, 0.15), transparent 28%),
+          radial-gradient(circle at 86% 76%, rgba(210, 16, 52, 0.10), transparent 30%),
+          linear-gradient(135deg, #030303 0%, #111 52%, #050505 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.24;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7vh 10vw;
+      }
+
+      .frame {
+        width: min(1180px, 100%);
+        min-height: min(690px, 76vh);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        padding: clamp(2rem, 5vw, 4.5rem);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(120deg, transparent 0%, rgba(249, 214, 22, 0.08) 48%, transparent 100%);
+      }
+
+      .content { position: relative; z-index: 1; }
+
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-bottom: 1.2rem;
+        color: var(--yellow);
+        font-size: 0.82rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      .kicker::before {
+        content: "";
+        width: 2.2rem;
+        height: 0.18rem;
+        border-radius: 99px;
+        background: var(--yellow);
+        box-shadow: 0 0 22px rgba(249, 214, 22, 0.45);
+      }
+
+      h1 {
+        max-width: 960px;
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(3.2rem, 7vw, 7rem);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+      }
+
+      p.lead {
+        max-width: 850px;
+        margin: 1.45rem 0 0;
+        color: var(--muted);
+        font-size: clamp(1.15rem, 2.1vw, 1.62rem);
+        line-height: 1.45;
+      }
+
+      .pill-row {
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-top: 2rem;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        color: #f8f6e8;
+        padding: 0.65rem 0.9rem;
+        font-weight: 800;
+      }
+
+      .note {
+        margin-top: 2rem;
+        padding: 1rem 1.2rem;
+        border-radius: 18px;
+        border: 1px solid rgba(249, 214, 22, 0.30);
+        background: var(--yellow-soft);
+        color: #fff9d1;
+        max-width: 760px;
+        line-height: 1.45;
+        font-weight: 650;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="slide">
+      <div class="frame content">
+        <div class="kicker">Slices de trabalho</div>
+        <h1>Transformar a visão em fatias implementáveis.</h1>
+        <p class="lead">Cada slice terá um deck próprio com ideia, âmbito, dependências, condições de sucesso e critérios que possam originar testes automatizados sempre que possível.</p>
+        <div class="pill-row">
+          <span class="pill">MVP</span>
+          <span class="pill">Nuxt</span>
+          <span class="pill">Pi code agent</span>
+          <span class="pill">LLM Wiki</span>
+          <span class="pill">Critérios testáveis</span>
+        </div>
+        <div class="note">Estado: slide inicial criado. As perguntas seguintes fecham o âmbito antes de gerar os decks finais de cada slice.</div>
+      </div>
+    </section>
+  </body>
+</html>
