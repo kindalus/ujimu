@@ -43,7 +43,7 @@ Known non-blocking warnings:
 | 04 | [`04-specialist-chat-streaming-citations.html`](./04-specialist-chat-streaming-citations.html) | `verified` | 2026-05-16 | Anonymous chat UI, NDJSON chat endpoint, swappable engine contract, grounding pre-check, citation rendering, visible question queue. |
 | 05 | [`05-quotas-rate-limits.html`](./05-quotas-rate-limits.html) | `verified` | 2026-05-16 | Anonymous chat quota enforcement, quota policy engine, request event log, timezone windows, 429 UI handling. |
 | 06 | [`06-auth-otp-mvp.html`](./06-auth-otp-mvp.html) | `verified` | 2026-05-16 | OTP email/phone auth, JWT session cookie, registered quota subject integration, compact auth UI. |
-| 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `grilled` | — | Grill-me decisions locked; ready for acceptance tests. |
+| 07 | [`07-conversation-history-editing.html`](./07-conversation-history-editing.html) | `acceptance-tested` | — | Acceptance tests written first in `tests/history.acceptance.test.ts`; implementation pending. |
 | 08 | [`08-admin-specialist-management.html`](./08-admin-specialist-management.html) | `planned` | — | Not started. Upload UI and admin protection are expected here, not in Slice 03. |
 | 09 | [`09-question-analytics-content-gaps.html`](./09-question-analytics-content-gaps.html) | `planned` | — | Not started. |
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `planned` | — | Not started. |
@@ -54,7 +54,7 @@ Known non-blocking warnings:
 
 ### Slice 07 — Conversation history & editing
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Idea-refined direction:
 
