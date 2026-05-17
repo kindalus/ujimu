@@ -122,6 +122,7 @@ async function runPiSdkConversion(
       'Operate only inside the current specialist directory.',
       'Convert exactly one raw file into faithful Markdown under raw/.',
       'Do not summarize legislation, tables, articles, rows, or source contents.',
+      'Preserve the source language exactly; do not translate Portuguese or any other language into English.',
       'Do not modify wiki/ during conversion.'
     ]
   })
@@ -154,12 +155,12 @@ Source:
 
 Rules:
 1. Read raw/${source.raw_path} and write only raw/${markdownPath}.
-2. Preserve the source faithfully. Do not summarize, omit, modernize, translate, or invent content.
+2. Preserve the source faithfully in its original language. Do not summarize, omit, modernize, translate, or invent content.
 3. For CSV, write a Markdown table with all rows and columns.
 4. For XLSX, write each sheet as a Markdown heading followed by faithful Markdown tables. If the available tools cannot read the workbook, fail clearly instead of inventing content.
 5. For HTML/HTM, preserve headings, paragraphs, links, lists, and tables as Markdown.
 6. For TXT, preserve text structure and article references.
-7. For PDF, structure the Markdown as well as possible while retaining as much information as possible.
+7. For PDF, structure the Markdown as well as possible while retaining as much information as possible, preserving the original language and wording.
 8. Do not modify wiki/ or any file other than raw/${markdownPath}.
 9. End after the Markdown file has been written.
 `
