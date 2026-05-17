@@ -39,7 +39,7 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
 
   const selectedModel = await resolveTaskModel(modelRegistry, settingsManager, options.modelEnvPrefix)
 
-  return createAgentSession({
+  const result = await createAgentSession({
     cwd: options.cwd,
     resourceLoader: loader,
     tools: options.tools,
@@ -49,6 +49,93 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     modelRegistry,
     ...(selectedModel ? { model: selectedModel as any } : {})
   } as any)
+
+  attachPiDebugLogger(result.session, {
+    task: options.task,
+    cwd: options.cwd,
+    agentDir,
+    tools: options.tools,
+    model: selectedModel
+  })
+
+  return result
+}
+
+interface PiDebugContext {
+  task: PiTaskName
+  cwd: string
+  agentDir: string
+  tools: string[]
+  model: unknown
+}
+
+function attachPiDebugLogger(session: any, context: PiDebugContext): void {
+  if (process.env.UJIMU_PI_DEBUG_ENABLED !== 'true') {
+    return
+  }
+
+  writePiDebugEvent('session_created', context)
+
+  if (typeof session?.subscribe !== 'function') {
+    writePiDebugEvent('session_subscribe_unavailable', { task: context.task })
+    return
+  }
+
+  session.subscribe((event: unknown) => {
+    writePiDebugEvent('session_event', event)
+  })
+}
+
+function writePiDebugEvent(event: string, payload: unknown): void {
+  console.info(JSON.stringify({
+    ts: new Date().toISOString(),
+    event: `ujimu_pi_debug_${event}`,
+    payload: sanitizeDebugPayload(payload)
+  }))
+}
+
+function sanitizeDebugPayload(value: unknown, depth = 0): unknown {
+  if (depth > 8) {
+    return '[max-depth]'
+  }
+
+  if (value === null || typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return redactSensitiveText(value).slice(0, 4000)
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 50).map((item) => sanitizeDebugPayload(item, depth + 1))
+  }
+
+  if (typeof value === 'object') {
+    const sanitized: Record<string, unknown> = {}
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (isSensitiveDebugKey(key)) {
+        sanitized[key] = '[redacted]'
+        continue
+      }
+      sanitized[key] = sanitizeDebugPayload(nestedValue, depth + 1)
+    }
+    return sanitized
+  }
+
+  return undefined
+}
+
+function isSensitiveDebugKey(key: string): boolean {
+  const normalized = key.toLowerCase()
+  return ['authorization', 'auth', 'cookie', 'jwt', 'key', 'password', 'secret', 'session', 'token'].some((part) => normalized.includes(part))
+}
+
+function redactSensitiveText(value: string): string {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .replace(/\b(?:bearer\s+)?[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted-token]')
+    .replace(/\b(?:sk|pk|rk|or)-[A-Za-z0-9_-]{16,}\b/g, '[redacted-key]')
 }
 
 export function createUjimuFileTools(
