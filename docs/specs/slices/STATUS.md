@@ -127,7 +127,7 @@ Locked grill decisions:
 - The consultation agent may cite only the provided `sourceFile` values, and the backend still validates returned citations against the same allowed list.
 - The consultation agent must answer from the specialist wiki, not from `raw/` at answer time. It should not read raw uploaded or generated files during user consultation.
 - If possible, enforce the consultation read/search path policy to `wiki/` plus safe state/citation context; at minimum the prompt must forbid using `raw/` for answers.
-- Scanned PDFs that require OCR fail conversion with `OCR_REQUIRED` when detectable; otherwise use a generic safe `CONVERSION_FAILED` error code.
+- PDF conversion attempts to structure Markdown as well as possible while retaining as much information as possible; safe failures use the generic `CONVERSION_FAILED` error code.
 - OCR remains out of scope, and failed OCR-required sources keep ingestion blocked.
 - Version `.pi/settings.json` with the project-local default provider/model `openrouter` / `moonshotai/kimi-k2.6`, `defaultThinkingLevel = medium`, and `hideThinkingBlock = true`.
 - Version `.pi/models.json` as a minimal custom-provider placeholder with an empty `providers` object; real credentials belong in `.pi/auth.json` or environment variables, with examples in `.pi/auth.json.sample`.

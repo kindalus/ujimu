@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { join } from 'node:path'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
@@ -45,7 +45,7 @@ export class PiConversionDisabledError extends Error {
 
 export class PiConversionError extends Error {
   constructor(
-    public readonly code: 'CONVERSION_FAILED' | 'CONVERSION_OUTPUT_TOO_SMALL' | 'CONVERSION_OUTPUT_TOO_LARGE' | 'OCR_REQUIRED',
+    public readonly code: 'CONVERSION_FAILED' | 'CONVERSION_OUTPUT_TOO_SMALL' | 'CONVERSION_OUTPUT_TOO_LARGE',
     message: string
   ) {
     super(message)
@@ -111,10 +111,6 @@ async function runPiSdkConversion(
   source: IngestionSourceRecord,
   options: PiConversionRunnerOptions
 ): Promise<void> {
-  if (extname(source.raw_path).toLowerCase() === '.pdf' && (await looksLikeScannedPdf(specialist, source))) {
-    throw new PiConversionError('OCR_REQUIRED', 'The PDF appears to require OCR, which is outside the MVP conversion slice.')
-  }
-
   const cwd = specialist.paths.root
   const { session } = await createUjimuPiSession({
     cwd,
@@ -147,15 +143,6 @@ async function runPiSdkConversion(
   }
 }
 
-async function looksLikeScannedPdf(specialist: SpecialistRuntime, source: IngestionSourceRecord): Promise<boolean> {
-  const content = await readFile(join(specialist.paths.raw, source.raw_path)).catch(() => Buffer.alloc(0))
-  if (content.length === 0) return false
-  const text = content.toString('latin1')
-  const textOperatorCount = (text.match(/\bTj\b|\bTJ\b|BT|ET/g) ?? []).length
-  const imageCount = (text.match(/\/Image\b|\/XObject\b/g) ?? []).length
-  return imageCount > 0 && textOperatorCount === 0
-}
-
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
   return `Convert exactly one uploaded source into Markdown.
@@ -172,7 +159,7 @@ Rules:
 4. For XLSX, write each sheet as a Markdown heading followed by faithful Markdown tables. If the available tools cannot read the workbook, fail clearly instead of inventing content.
 5. For HTML/HTM, preserve headings, paragraphs, links, lists, and tables as Markdown.
 6. For TXT, preserve text structure and article references.
-7. For PDF, convert only if the available file tools expose readable text. If OCR is needed, say OCR_REQUIRED and do not invent text.
+7. For PDF, structure the Markdown as well as possible while retaining as much information as possible.
 8. Do not modify wiki/ or any file other than raw/${markdownPath}.
 9. End after the Markdown file has been written.
 `
@@ -279,7 +266,7 @@ function markConversionFailed(source: IngestionSourceRecord, errorCode: string, 
   source.ingestion = {
     status: 'blocked',
     source_path: source.ingestion?.source_path ?? source.conversion.markdown_path,
-    skipped_reason: errorCode === 'OCR_REQUIRED' ? 'ocr_required' : 'conversion_failed',
+    skipped_reason: 'conversion_failed',
     updated_at: now
   }
 }

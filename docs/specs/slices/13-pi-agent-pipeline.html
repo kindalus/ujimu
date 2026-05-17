@@ -195,7 +195,7 @@ stored: raw/lei.original.md</pre>
 <li>CSV/XLSX conversion should preserve tabular content faithfully; XLSX sheet names become headings.</li>
 <li>The conversion agent must not silently summarize tabular sources.</li>
 <li>Generated Markdown is capped by <code>UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES</code>, default 1 MiB.</li>
-<li>Scanned PDFs fail with <code>OCR_REQUIRED</code> when detectable; OCR is out of scope.</li>
+<li>PDF conversion should structure Markdown as well as possible while retaining as much information as possible.</li>
 <li>If content cannot be extracted safely or output is too large, conversion fails and ingestion does not run.</li>
 </ul>
 </div></section>
