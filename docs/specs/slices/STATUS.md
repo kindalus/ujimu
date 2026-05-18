@@ -52,11 +52,11 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-16 | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
-| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `grilled` | — | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; grill-me decisions locked. |
+| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `acceptance-tested` | — | Acceptance tests written and red before implementation. |
 
 ## Slice 14 — PDF to Markdown Gemini tool
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm:
 
@@ -175,9 +175,13 @@ Explicit exclusions:
 - Exposing the tool to ingestion, consultation, or generic Pi sessions.
 - Broad rewrite of the existing Pi conversion/ingestion pipeline.
 
+Acceptance-test status:
+
+- `npm test -- tests/pdf-to-markdown-gemini-tool.acceptance.test.ts` — red before implementation as expected.
+
 Next step:
 
-- Write acceptance tests from the locked success conditions before implementation code.
+- Implement the smallest code changes needed to satisfy the red acceptance tests.
 
 ## Slice 13 — Three Pi agent pipeline
 
