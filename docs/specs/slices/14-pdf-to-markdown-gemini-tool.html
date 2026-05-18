@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Slice 14 — Ferramenta PDF para Markdown via Gemini</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+      :root {
+        --bg: #071018;
+        --line: rgba(148, 163, 184, 0.22);
+        --text: #eef6ff;
+        --muted: #aab8c7;
+        --dim: #6f8296;
+        --accent: #67e8f9;
+        --accent-2: #60a5fa;
+        --success: #86efac;
+        --warning: #facc15;
+        --font-display: "Space Grotesk", sans-serif;
+        --font-body: "Inter", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; overflow: hidden; font-family: var(--font-body); color: var(--text); background: #071018; }
+      body::before {
+        content: ""; position: fixed; inset: 0; pointer-events: none;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 24%),
+          linear-gradient(180deg, rgba(96, 165, 250, 0.07), transparent 38%),
+          radial-gradient(circle at 18% 22%, rgba(103, 232, 249, 0.10), transparent 26%),
+          radial-gradient(circle at 82% 18%, rgba(96, 165, 250, 0.09), transparent 24%),
+          linear-gradient(135deg, #060b12 0%, #0a111a 52%, #070b10 100%);
+      }
+      body::after {
+        content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.11;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+      }
+      .slide { width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center; padding: 8vh 14vw; position: absolute; inset: 0; }
+      .slide.active { display: flex; animation: slideIn 260ms ease-out both; }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(14px) scale(0.992); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      .slide h1, .slide h2 { font-family: var(--font-display); letter-spacing: -0.055em; }
+      .slide h1 { font-size: clamp(3rem, 6.7vw, 6.5rem); line-height: 0.9; }
+      .slide h2 { font-size: clamp(2.25rem, 4.7vw, 4.8rem); line-height: 0.96; }
+      .panel { background: linear-gradient(180deg, rgba(14, 24, 35, 0.92), rgba(8, 15, 23, 0.88)); border: 1px solid var(--line); box-shadow: 0 30px 100px rgba(0,0,0,.38); backdrop-filter: blur(18px); }
+      .soft-panel { background: rgba(255,255,255,.045); border: 1px solid var(--line); }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #d9fbff; background: rgba(103,232,249,.08); border: 1px solid rgba(103,232,249,.13); border-radius: .35rem; padding: .06rem .28rem; }
+      .slide-counter { position: fixed; right: 2rem; bottom: 1.45rem; color: var(--dim); font-size: .86rem; z-index: 20; }
+      .progress { position: fixed; bottom: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 220ms ease; z-index: 20; }
+      .dots { position: fixed; left: 2rem; bottom: 1.6rem; display: flex; gap: .38rem; z-index: 20; }
+      .dot { width: .55rem; height: .55rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(148,163,184,.2); cursor: pointer; }
+      .dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(103,232,249,.46); }
+      @media print { body { overflow: auto; background: #fff; color: #111827; } body::before, body::after { display: none; } .slide { position: relative; display: flex; break-after: page; } .slide-counter, .dots, .progress { display: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="slide active">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Slice 14 · Grelhada</p>
+          <h1 class="max-w-5xl font-bold">Ferramenta PDF para Markdown via Gemini</h1>
+          <p class="mt-7 max-w-3xl text-xl leading-relaxed" style="color: var(--muted)">Slice derivada do brainstorming <code>../pdf-to-markdown-tool-brainstorming.html</code>.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Ideia</p>
+          <h2 class="font-bold">Converter PDFs para Markdown por uma ferramenta Pi controlada</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">A slice adiciona uma ferramenta project-local que chama o Gemini CLI para produzir Markdown fiel a partir de PDFs, mantendo a convenção <code>raw/ficheiro.pdf.md</code>.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Âmbito</p>
+          <h2 class="font-bold">O que entra nesta slice</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>Script Bash <code>pdf_to_markdown.sh</code> local ao projecto.</li>
+            <li>O alvo de saída preserva exactamente o nome da fonte e acrescenta <code>.md</code>, incluindo extensões como <code>.PDF</code>.</li>
+            <li>Ferramenta disponível apenas na sessão do agente de conversão, para fontes PDF, e não exposta aos agentes de ingestão, consulta ou outras sessões Pi.</li>
+            <li>Instruções Gemini para conversão fiel, sem resumo e com nome de saída determinístico.</li>
+            <li>Restrição a PDFs dentro de <code>raw/</code> da especialidade actual.</li>
+            <li>Documentação da dependência operacional no Gemini CLI.</li>
+            <li>Preservação do comportamento actual para fontes que não sejam PDF.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Decisões iniciais</p>
+          <h2 class="font-bold">Base aceite antes do grill-me</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Legislação</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A funcionalidade não é governada nem afectada por legislação.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Arquitectura</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Revisão arquitectónica deferida; usar a arquitectura existente.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Dependência</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>gemini</code> torna-se uma dependência operacional documentada.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Escopo do agente</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A ferramenta é chamada pelo agente de conversão quando a fonte é PDF e não fica disponível para outros agentes.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Escrita do ficheiro</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O script captura/normaliza a saída do Gemini e escreve o Markdown final, em vez de depender do Gemini para escrever directamente.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Limite de caminho</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A ferramenta só aceita PDFs localizados em <code>raw/</code> da especialidade actual.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Timeout inicial</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A chamada ao Gemini CLI deve ter timeout inicial de 10 minutos por PDF.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Tamanho máximo</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O limite de tamanho do Markdown deve reutilizar a validação existente do pipeline, sem segundo limite próprio no script.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Reprocessamento</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Se o Markdown alvo já existir, a ferramenta pode sobrescrevê-lo quando a conversão estiver a ser reprocessada pelo pipeline.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Saída do Gemini</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O Gemini deve devolver apenas Markdown em stdout; o script escreve o ficheiro final.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Formatos não PDF</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">CSV, XLSX, HTML, TXT e outros formatos continuam no fluxo actual, sem usar esta ferramenta.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Disponibilidade Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A criação de sessões Pi deve aceitar ferramentas extra por tarefa e injectar a ferramenta <code>pdf_to_markdown</code> apenas quando <code>task === "conversion"</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Prompt PDF</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Para fontes PDF, o prompt do agente de conversão deve obrigar o uso de <code>pdf_to_markdown</code> e depois terminar.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Falha PDF</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Se <code>pdf_to_markdown</code> falhar, o agente não tenta converter manualmente com ferramentas de ficheiro; a conversão falha claramente.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">CLI indisponível</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Quando <code>gemini</code> não existir no <code>PATH</code>, o estado de conversão deve usar <code>GEMINI_CLI_UNAVAILABLE</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Chave Gemini</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Em operação e smoke tests manuais, além do CLI instalado, <code>GEMINI_API_KEY</code> deve estar definida.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Chave em falta</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>GEMINI_API_KEY</code> ausente deve falhar antes de chamar o CLI com erro <code>GEMINI_API_KEY_MISSING</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Validação dupla</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A extensão Pi valida <code>GEMINI_API_KEY</code> para erro estruturado; o script também valida para execução manual/smoke test.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Erros do script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O script escreve erros prefixados em <code>stderr</code>, como <code>GEMINI_API_KEY_MISSING: ...</code>; a extensão converte-os em erro estruturado.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Normalização de fence</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Se o Gemini devolver uma única fence exterior <code>```markdown</code>, o script remove só esse invólucro, preservando fences internas.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Formato do comando</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O PDF é passado como último argumento no formato <code>gemini -y -p "&lt;instruções&gt;" raw/ficheiro.pdf</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Timeout</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O script usa <code>timeout 600s</code>; se <code>timeout</code> não existir, falha com <code>TIMEOUT_COMMAND_UNAVAILABLE</code> em vez de correr sem limite.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Ambiente de execução</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Não se adiciona dependência operacional macOS/coreutils; produção corre em containers que devem fornecer <code>timeout</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Autenticação Gemini</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Falhas de autenticação/configuração do Gemini CLI devem usar <code>GEMINI_CLI_AUTH_FAILED</code>; restantes falhas usam <code>GEMINI_CONVERSION_FAILED</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Escrita atómica</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O script escreve para ficheiro temporário e faz rename atómico para <code>.pdf.md</code> apenas após validação básica.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Limpeza temporária</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O Bash usa <code>trap</code> para remover ficheiros temporários em falha/interrupção, excepto após rename bem-sucedido.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Validação mínima</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Antes do rename, a saída deve ter pelo menos 20 caracteres não-brancos; o limite máximo continua no pipeline.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Argumento de caminho</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A ferramenta aceita apenas caminho relativo iniciado por <code>raw/</code>; caminhos absolutos são rejeitados.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão PDF</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A ferramenta aceita apenas ficheiros com extensão <code>.pdf</code> de forma case-insensitive, antes de chamar Gemini.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Realpath</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O PDF e o alvo <code>.pdf.md</code> devem resolver por <code>realpath</code> para dentro de <code>raw/</code>; <code>..</code> e symlink escape são rejeitados.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Ficheiro regular</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Antes de chamar Gemini, a entrada deve existir e ser ficheiro regular resolvido dentro de <code>raw/</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Input inválido</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Caminho fora de <code>raw/</code>, não-PDF ou ficheiro inexistente usam o código <code>INVALID_PDF_INPUT</code>, com detalhe na mensagem.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Raiz da especialidade</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O script assume que é executado com <code>cwd</code> igual à raiz da especialidade e não recebe essa raiz como argumento.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Resultado da ferramenta</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A ferramenta devolve apenas metadados estruturados, como <code>status</code>, <code>markdownPath</code> e <code>bytes</code>, nunca o Markdown completo.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">JSON de sucesso</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Em sucesso, o script imprime JSON em <code>stdout</code>; a extensão valida/normaliza antes de devolver ao agente.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Output inválido</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Se o script devolver JSON inválido em sucesso, a extensão falha com <code>PDF_TOOL_INVALID_OUTPUT</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Logs seguros</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A extensão não regista prompt completo, stdout completo, nem conteúdo Markdown; só metadados e erros curtos.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Segredos</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>GEMINI_API_KEY</code> é segredo sensível; erros, stdout, stderr capturado e logs devem ser sanitizados para nunca expor a chave.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Gestão da chave</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A documentação deve exigir <code>GEMINI_API_KEY</code> em variável de ambiente/secret manager, nunca em <code>.pi/settings.json</code>, prompts ou ficheiros versionados.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Prompt Gemini</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O prompt inclui o caminho final esperado, mas instrui o Gemini a não escrever ficheiros e a devolver apenas Markdown em stdout.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Fluxo Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O agente de conversão continua no fluxo: o runner disponibiliza a ferramenta e o prompt obriga a sua chamada para PDFs.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Zonas de implementação</p>
+          <h2 class="font-bold">Ficheiros prováveis</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/tools/pdf_to_markdown.sh</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/extensions/pdf-to-markdown-tool.ts</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Documentação</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>docs/operations.md</code> e/ou documentação de desenvolvimento.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Testes</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Testes de aceitação com <code>gemini</code> e <code>timeout</code> falsos no <code>PATH</code>; Gemini real fica para smoke test operacional/manual.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Teste de escopo</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Os testes devem confirmar que só a sessão <code>conversion</code> recebe <code>pdf_to_markdown</code>; <code>ingestion</code> e <code>chat</code> não recebem.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Teste de segredo</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Testes com <code>GEMINI_API_KEY</code> falsa devem confirmar que a chave não aparece em erros ou resultados devolvidos.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Condições de sucesso</p>
+          <h2 class="font-bold">Critérios observáveis</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>A ferramenta Pi aceita um PDF válido dentro de <code>raw/</code> e calcula o alvo <code>.pdf.md</code>.</li>
+            <li>O comando Gemini inclui instruções de conversão e a nomenclatura final.</li>
+            <li>O script escreve o ficheiro final <code>.pdf.md</code> depois de capturar e validar a saída do Gemini.</li>
+            <li>A chamada ao Gemini CLI respeita um timeout inicial de 10 minutos por PDF.</li>
+            <li>O tamanho máximo do Markdown é validado pelo limite existente do pipeline, evitando regras duplicadas no script.</li>
+            <li>Se <code>raw/ficheiro.pdf.md</code> já existir durante reprocessamento, a ferramenta sobrescreve o alvo de forma idempotente.</li>
+            <li>O Gemini é instruído a devolver apenas Markdown em stdout, sem tentar escrever ficheiros.</li>
+            <li>Fontes PDF obrigam o agente de conversão a usar <code>pdf_to_markdown</code>; fontes não PDF continuam no comportamento actual.</li>
+            <li>Se a ferramenta PDF falhar, a conversão falha imediatamente sem tentativa manual pelas ferramentas de ficheiro.</li>
+            <li>Falhas do Gemini CLI são reportadas claramente e não fingem sucesso.</li>
+            <li>Gemini CLI ausente ou fora do <code>PATH</code> produz erro <code>GEMINI_CLI_UNAVAILABLE</code>.</li>
+            <li>Smoke tests manuais e operação validam que <code>GEMINI_API_KEY</code> está definida, além de <code>gemini</code> estar instalado.</li>
+            <li><code>GEMINI_API_KEY</code> ausente produz <code>GEMINI_API_KEY_MISSING</code> antes de qualquer chamada ao CLI.</li>
+            <li>A extensão Pi e o script Bash validam ambos <code>GEMINI_API_KEY</code>.</li>
+            <li>Erros do script usam prefixos estáveis em <code>stderr</code> para a extensão Pi devolver erro estruturado.</li>
+            <li>Uma única fence Markdown exterior é removida; fences internas legítimas são preservadas.</li>
+            <li>O comando Gemini usa o formato <code>gemini -y -p "&lt;instruções&gt;" raw/ficheiro.pdf</code>, com o PDF como último argumento.</li>
+            <li>O timeout é aplicado com <code>timeout 600s</code>; ausência do comando produz <code>TIMEOUT_COMMAND_UNAVAILABLE</code>.</li>
+            <li>Não há dependência operacional em macOS/coreutils; operação alvo é containerizada e deve incluir <code>timeout</code>.</li>
+            <li>Falhas de autenticação/configuração produzem <code>GEMINI_CLI_AUTH_FAILED</code>; restantes falhas Gemini produzem <code>GEMINI_CONVERSION_FAILED</code>.</li>
+            <li>O ficheiro final é escrito via temporário e rename atómico, evitando Markdown parcial.</li>
+            <li>Ficheiros temporários são removidos em falha/interrupção através de <code>trap</code>.</li>
+            <li>Antes do rename, o script valida pelo menos 20 caracteres não-brancos; o limite máximo fica no pipeline.</li>
+            <li>A ferramenta rejeita caminhos absolutos ou fora de <code>raw/</code>.</li>
+            <li>A entrada deve terminar em <code>.pdf</code>, case-insensitive, antes de qualquer chamada ao Gemini.</li>
+            <li>O alvo preserva a grafia original do caminho e acrescenta <code>.md</code>, por exemplo <code>raw/Documento.PDF.md</code>.</li>
+            <li>A validação por <code>realpath</code> rejeita <code>..</code>, symlinks e qualquer resolução que escape de <code>raw/</code>.</li>
+            <li>A entrada deve existir e ser ficheiro regular antes de chamar Gemini.</li>
+            <li>Inputs inválidos usam código único <code>INVALID_PDF_INPUT</code>, com detalhe na mensagem.</li>
+            <li>O script assume <code>cwd</code> na raiz da especialidade; a interface aceita apenas o caminho relativo do PDF.</li>
+            <li>A ferramenta devolve metadados estruturados sem incluir o conteúdo Markdown completo.</li>
+            <li>Em sucesso, o script imprime JSON com <code>status</code>, <code>markdownPath</code> e <code>bytes</code>; a extensão valida essa resposta.</li>
+            <li>JSON inválido do script em caminho de sucesso produz erro <code>PDF_TOOL_INVALID_OUTPUT</code>.</li>
+            <li>Logs e resultados evitam prompt completo, stdout completo e conteúdo Markdown.</li>
+            <li><code>GEMINI_API_KEY</code> é tratada como segredo e removida de erros, stdout, stderr capturado e logs.</li>
+            <li>A documentação proíbe colocar <code>GEMINI_API_KEY</code> em <code>.pi/settings.json</code>, prompts ou ficheiros versionados.</li>
+            <li>O comando Gemini inclui o caminho final esperado nas instruções, mas proíbe escrita directa de ficheiros.</li>
+            <li>O runner não contorna o agente Pi; disponibiliza a ferramenta apenas à sessão de conversão e o prompt exige a chamada em PDFs.</li>
+            <li>Testes de aceitação usam <code>gemini</code> e <code>timeout</code> falsos no <code>PATH</code>; não invocam credenciais ou serviços reais.</li>
+            <li>A ferramenta Pi exposta ao agente de conversão chama-se exactamente <code>pdf_to_markdown</code>.</li>
+            <li>Testes de escopo confirmam que <code>pdf_to_markdown</code> só está disponível para <code>conversion</code>, nunca para <code>ingestion</code> ou <code>chat</code>.</li>
+            <li>Testes de sanitização confirmam que uma <code>GEMINI_API_KEY</code> falsa não aparece em mensagens de erro ou resultados.</li>
+            <li>A documentação operacional inclui smoke test manual com Gemini real, exigindo <code>gemini</code> no <code>PATH</code> e <code>GEMINI_API_KEY</code> definida.</li>
+            <li>A dependência <code>gemini</code> fica documentada para operação e desenvolvimento.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Exclusões</p>
+          <h2 class="font-bold">O que fica fora</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>Ingestão automática depois da conversão.</li>
+            <li>Garantia própria de OCR para PDFs digitalizados.</li>
+            <li>Execução arbitrária de comandos de shell.</li>
+            <li>Exposição da ferramenta ao agente de ingestão, ao agente de consulta ou a sessões Pi genéricas.</li>
+            <li>Reescrita ampla do pipeline de ingestão/conversão já existente.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Próximos passos</p>
+          <h2 class="font-bold">Escrever testes de aceitação</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">A fase <code>grill-me</code> está fechada. O próximo passo é escrever testes de aceitação a partir das condições de sucesso bloqueadas, antes de qualquer implementação.</p>
+        </div>
+      </section>
+    </main>
+
+    <div class="dots" id="dots"></div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress" id="progress"></div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const dots = document.getElementById('dots');
+      const current = document.getElementById('current');
+      const total = document.getElementById('total');
+      const progress = document.getElementById('progress');
+      let index = 0;
+      total.textContent = String(slides.length);
+      slides.forEach((_, slideIndex) => {
+        const dot = document.createElement('button');
+        dot.className = 'dot' + (slideIndex === 0 ? ' active' : '');
+        dot.type = 'button';
+        dot.setAttribute('aria-label', `Ir para o slide ${slideIndex + 1}`);
+        dot.addEventListener('click', (event) => { event.stopPropagation(); go(slideIndex); });
+        dots.appendChild(dot);
+      });
+      const dotEls = Array.from(document.querySelectorAll('.dot'));
+      function go(next) {
+        slides[index].classList.remove('active');
+        dotEls[index].classList.remove('active');
+        index = Math.max(0, Math.min(next, slides.length - 1));
+        slides[index].classList.add('active');
+        dotEls[index].classList.add('active');
+        current.textContent = String(index + 1);
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+      }
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1); }
+        if (event.key === 'ArrowLeft') { event.preventDefault(); go(index - 1); }
+        if (event.key === 'Home') { event.preventDefault(); go(0); }
+        if (event.key === 'End') { event.preventDefault(); go(slides.length - 1); }
+      });
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        event.clientX > window.innerWidth / 2 ? go(index + 1) : go(index - 1);
+      });
+      go(0);
+    </script>
+  </body>
+</html>

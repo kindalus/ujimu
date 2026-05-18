@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Brainstorming da Ferramenta PDF para Markdown</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+      :root {
+        --bg: #071018;
+        --bg-alt: #0b1520;
+        --panel: rgba(12, 23, 34, 0.78);
+        --panel-strong: rgba(18, 35, 50, 0.88);
+        --line: rgba(148, 163, 184, 0.22);
+        --text: #eef6ff;
+        --muted: #aab8c7;
+        --dim: #6f8296;
+        --accent: #67e8f9;
+        --accent-2: #60a5fa;
+        --success: #86efac;
+        --warning: #facc15;
+        --danger: #fda4af;
+        --font-display: "Space Grotesk", sans-serif;
+        --font-body: "Inter", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: var(--font-body);
+        color: var(--text);
+        background: #071018;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 24%),
+          linear-gradient(180deg, rgba(96, 165, 250, 0.07), transparent 38%),
+          radial-gradient(circle at 18% 22%, rgba(103, 232, 249, 0.10), transparent 26%),
+          radial-gradient(circle at 82% 18%, rgba(96, 165, 250, 0.09), transparent 24%),
+          linear-gradient(135deg, #060b12 0%, #0a111a 52%, #070b10 100%);
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.11;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 8vh 14vw;
+        position: absolute;
+        inset: 0;
+      }
+
+      .slide.active {
+        display: flex;
+        animation: slideIn 260ms ease-out both;
+      }
+
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateY(14px) scale(0.992); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      .slide h1,
+      .slide h2 {
+        font-family: var(--font-display);
+        letter-spacing: -0.055em;
+      }
+
+      .slide h1 {
+        font-size: clamp(3rem, 6.7vw, 6.5rem);
+        line-height: 0.9;
+      }
+
+      .slide h2 {
+        font-size: clamp(2.25rem, 4.7vw, 4.8rem);
+        line-height: 0.96;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, rgba(14, 24, 35, 0.92), rgba(8, 15, 23, 0.88));
+        border: 1px solid var(--line);
+        box-shadow: 0 30px 100px rgba(0, 0, 0, 0.38);
+        backdrop-filter: blur(18px);
+      }
+
+      .soft-panel {
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid var(--line);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        color: #d9fbff;
+        background: rgba(103, 232, 249, 0.08);
+        border: 1px solid rgba(103, 232, 249, 0.13);
+        border-radius: 0.35rem;
+        padding: 0.06rem 0.28rem;
+      }
+
+      .slide-counter {
+        position: fixed;
+        right: 2rem;
+        bottom: 1.45rem;
+        color: var(--dim);
+        font-size: 0.86rem;
+        z-index: 20;
+      }
+
+      .progress {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        transition: width 220ms ease;
+        z-index: 20;
+      }
+
+      .dots {
+        position: fixed;
+        left: 2rem;
+        bottom: 1.6rem;
+        display: flex;
+        gap: 0.38rem;
+        z-index: 20;
+      }
+
+      .dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(148, 163, 184, 0.2);
+        cursor: pointer;
+      }
+
+      .dot.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        box-shadow: 0 0 18px rgba(103, 232, 249, 0.46);
+      }
+
+      @media (max-width: 1024px) {
+        .slide { padding: 7vh 8vw; }
+      }
+
+      @media print {
+        body { overflow: auto; background: #fff; color: #111827; }
+        body::before, body::after { display: none; }
+        .slide { position: relative; display: flex; break-after: page; }
+        .slide-counter, .dots, .progress { display: none; }
+        .panel, .soft-panel { box-shadow: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="slide active">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Brainstorming · Rascunho</p>
+          <h1 class="max-w-5xl font-bold">Ferramenta PDF para Markdown via Gemini CLI</h1>
+          <p class="mt-7 max-w-3xl text-xl leading-relaxed" style="color: var(--muted)">Conceito de ferramenta Pi local ao projecto para converter fontes PDF carregadas em artefactos Markdown determinísticos.</p>
+          <div class="mt-10 flex flex-wrap gap-3">
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Não governada por legislação</span>
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Slice de implementação futura</span>
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Dependência: <code>gemini</code> CLI</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Enquadramento do problema</p>
+          <h2 class="max-w-5xl font-bold">Como poderemos converter PDFs em Markdown fiel sem alargar as capacidades das ferramentas de ficheiros do Pi?</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">O pipeline de ingestão do Ujimu privilegia Markdown. A conversão de PDF é um bloqueio prático quando as fontes só estão disponíveis em PDF.</p>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Direcção confirmada</p>
+          <h2 class="font-bold">Expor <code>pdf_to_markdown.sh</code> como ferramenta de projecto chamável pelo Pi</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>pdf_to_markdown.sh</code> recebe o caminho de um PDF e chama o Gemini CLI com instruções estritas de conversão.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Formato do comando</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>gemini -y -p "&lt;instructions + output filename&gt;" ficheiro.pdf</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Convenção de saída</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>raw/document.pdf</code> passa a <code>raw/document.pdf.md</code>.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Integração com o Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Usar uma extensão Pi para expor uma ferramenta nomeada em vez de execução arbitrária de shell.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Variações consideradas</p>
+          <h2 class="font-bold">Porque esta forma é preferida</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Apenas bash directo</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Mais simples, mas menos controlado e menos descobrível pelo Pi.</p></div>
+            <div class="soft-panel rounded-lg p-5 ring-1 ring-cyan-300/40"><h3 class="font-bold" style="color: var(--success)">Extensão Pi + script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Melhor equilíbrio: script fixo, argumentos tipados e fronteira clara da ferramenta.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Conversor completo em Node</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Mais nativo, mas duplica a capacidade PDF do Gemini e aumenta o custo.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Âmbito MVP</p>
+          <h2 class="font-bold">Menor versão útil</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>Criar um script Bash local ao projecto chamado <code>pdf_to_markdown.sh</code>.</li>
+            <li>Criar uma extensão Pi local ao projecto que registe uma ferramenta para executar esse script.</li>
+            <li>Exigir Markdown fiel, sem resumo, preservação da língua original e caminho de saída determinístico.</li>
+            <li>Documentar instalação, autenticação, configuração e modos de falha operacional do Gemini CLI.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Decisão de dependência</p>
+          <h2 class="font-bold">Gemini CLI torna-se uma dependência operacional</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Documentação necessária</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Registar a dependência antes de considerar a implementação completa.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Expectativa em execução</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>gemini</code> deve estar disponível no <code>PATH</code> e autenticado para uso não interactivo.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Modo de falha</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">CLI ausente ou em falha deixa a conversão falhada e a ingestão bloqueada.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Postura de segurança</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Não expor segredos em prompts, logs ou resultados da ferramenta.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Pressupostos principais</p>
+          <h2 class="font-bold">Aquilo que assumimos como verdadeiro</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>O Gemini CLI consegue ler de forma fiável os PDFs-alvo usados pelos operadores do Ujimu.</li>
+            <li>A autenticação do CLI pode ser configurada com segurança no ambiente de execução.</li>
+            <li>O Markdown gerado pode ser restringido ao caminho de destino determinístico.</li>
+            <li>A dependência externa no CLI da Google é aceitável para esta funcionalidade.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Fora de âmbito</p>
+          <h2 class="font-bold">Exclusões explícitas</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>Sem garantia de OCR para PDFs digitalizados, salvo se o Gemini CLI os tratar na prática.</li>
+            <li>Sem ingestão automática após a conversão na primeira versão.</li>
+            <li>Sem reescrita ampla do pipeline de conversão Pi existente.</li>
+            <li>Sem ferramenta de execução arbitrária de comandos.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Zonas prováveis de implementação</p>
+          <h2 class="font-bold">Onde isto deverá entrar mais tarde</h2>
+          <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script da ferramenta</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/tools/pdf_to_markdown.sh</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/extensions/pdf-to-markdown-tool.ts</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Documentação</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>docs/operations.md</code> e/ou uma nota para programadores.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Testes</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Simular o CLI e verificar formato do comando, nomeação de saída e tratamento de falhas.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Perguntas em aberto</p>
+          <h2 class="font-bold">Perguntas antes de cortar a slice</h2>
+          <ul class="mt-9 grid max-w-4xl gap-4 text-lg leading-relaxed" style="color: var(--muted)">
+            <li>A ferramenta deve ficar limitada às directorias <code>raw/</code> das especialidades?</li>
+            <li>O Gemini deve escrever o ficheiro directamente, ou o script deve capturar stdout e escrever o ficheiro de destino?</li>
+            <li>Que timeout e tamanho máximo de Markdown deve o script impor?</li>
+            <li>Isto deve substituir a conversão de PDF ou começar como auxiliar manual/admin?</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Decisão de arquitectura</p>
+          <h2 class="font-bold">Revisão arquitectónica deferida</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">A integração deve usar a arquitectura existente como base: script local em <code>.pi/tools/</code>, extensão em <code>.pi/extensions/</code>, documentação operacional e implementação através de uma slice dedicada.</p>
+          <div class="mt-10 flex flex-wrap gap-3">
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--accent)">Decisão confirmada pelo utilizador</span>
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Sem deck de arquitectura separado nesta fase</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
+          <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Próximo passo</p>
+          <h2 class="font-bold">Cortar a slice de implementação</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">Este brainstorming passa a fonte da slice <code>14-pdf-to-markdown-gemini-tool.html</code>. A implementação só começa depois de idea-refine, grill-me e testes de aceitação.</p>
+          <div class="mt-10 flex flex-wrap gap-3">
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--accent)">Estado: brainstorming aprovado para slicing</span>
+            <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Sem implementação de código neste passo</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="dots" id="dots"></div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+    <div class="progress" id="progress"></div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const dots = document.getElementById('dots');
+      const current = document.getElementById('current');
+      const total = document.getElementById('total');
+      const progress = document.getElementById('progress');
+      let index = 0;
+
+      total.textContent = String(slides.length);
+
+      slides.forEach((_, slideIndex) => {
+        const dot = document.createElement('button');
+        dot.className = 'dot' + (slideIndex === 0 ? ' active' : '');
+        dot.type = 'button';
+        dot.setAttribute('aria-label', `Ir para o slide ${slideIndex + 1}`);
+        dot.addEventListener('click', (event) => {
+          event.stopPropagation();
+          go(slideIndex);
+        });
+        dots.appendChild(dot);
+      });
+
+      const dotEls = Array.from(document.querySelectorAll('.dot'));
+
+      function go(next) {
+        slides[index].classList.remove('active');
+        dotEls[index].classList.remove('active');
+        index = Math.max(0, Math.min(next, slides.length - 1));
+        slides[index].classList.add('active');
+        dotEls[index].classList.add('active');
+        current.textContent = String(index + 1);
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+      }
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === ' ') {
+          event.preventDefault();
+          go(index + 1);
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          go(index - 1);
+        }
+        if (event.key === 'Home') {
+          event.preventDefault();
+          go(0);
+        }
+        if (event.key === 'End') {
+          event.preventDefault();
+          go(slides.length - 1);
+        }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        event.clientX > window.innerWidth / 2 ? go(index + 1) : go(index - 1);
+      });
+
+      go(0);
+    </script>
+  </body>
+</html>

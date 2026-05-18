@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -52,6 +52,132 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-16 | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
+| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `grilled` | — | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; grill-me decisions locked. |
+
+## Slice 14 — PDF to Markdown Gemini tool
+
+Status: `grilled`
+
+Originating brainstorm:
+
+- [`../pdf-to-markdown-tool-brainstorming.html`](../pdf-to-markdown-tool-brainstorming.html)
+
+Initial direction:
+
+- Treat this feature as not governed or affected by legislation for the Zafir law-material workflow.
+- Defer a broad architecture/design revisit and use the existing project architecture as the implementation baseline.
+- Add a project-local Bash script named `pdf_to_markdown.sh` that calls the Gemini CLI in the form `gemini -y -p "<conversion instructions and final filename>" file.pdf`.
+- Expose the script only to the conversion agent when it processes PDF sources; it must not be available to ingestion, consultation, or generic Pi agents.
+- Make the script capture and normalize Gemini output, then write the final Markdown file itself instead of relying on Gemini to write directly to disk.
+- Restrict accepted PDFs to the current specialist `raw/` directory.
+- Use an initial Gemini CLI timeout of 10 minutes per PDF.
+- Reuse the existing conversion pipeline Markdown-size validation instead of adding a second size limit inside the script.
+- Overwrite an existing target Markdown file only as part of pipeline reprocessing, keeping conversion idempotent.
+- Instruct Gemini to return only Markdown on stdout; the script writes the final file.
+- Keep non-PDF source formats on the existing conversion-agent path without using this tool.
+- Name the Pi tool exposed to the conversion agent exactly `pdf_to_markdown`.
+- Ensure Pi session creation supports task-scoped extra tools and injects `pdf_to_markdown` only for `task === "conversion"`; ingestion and chat remain file-tool-only.
+- For PDF sources, make the conversion prompt require the agent to call `pdf_to_markdown` and then stop; non-PDF prompts keep the current behavior.
+- If `pdf_to_markdown` fails, fail the PDF conversion immediately without attempting manual file-tool conversion.
+- Use a specific `GEMINI_CLI_UNAVAILABLE` conversion error when `gemini` is not installed or is not available on `PATH`.
+- Require operational and manual-smoke-test checks for both `gemini` availability and `GEMINI_API_KEY` being set.
+- Use `GEMINI_API_KEY_MISSING` when `GEMINI_API_KEY` is absent; detect it before invoking the CLI.
+- Validate `GEMINI_API_KEY` in both the Pi extension and the Bash script: the extension gives structured tool errors, while the script stays safe for direct manual/smoke-test execution.
+- Have the script write stable, prefixed error messages to `stderr` such as `GEMINI_API_KEY_MISSING: ...`; the Pi extension parses the prefix and returns structured errors.
+- Normalize a single outer Markdown fence such as ```markdown ... ``` when it wraps the whole Gemini response; preserve legitimate internal fences.
+- Invoke Gemini with the PDF as the final argument in the form `gemini -y -p "<instructions>" raw/file.pdf`.
+- Apply the 10-minute timeout with `timeout 600s`; if `timeout` is unavailable, fail with `TIMEOUT_COMMAND_UNAVAILABLE` rather than running without a limit.
+- Do not add a macOS/coreutils operational dependency: macOS is development-only and production is guaranteed to run in containers that must provide `timeout`.
+- Use `GEMINI_CLI_AUTH_FAILED` for Gemini CLI authentication/configuration failures and `GEMINI_CONVERSION_FAILED` for other Gemini conversion failures.
+- Write Markdown through a temporary file and atomic rename to avoid partial `.pdf.md` artefacts.
+- Use a Bash `trap` to remove temporary files on failure/interruption, except after successful atomic rename.
+- Before atomic rename, validate that Gemini output contains at least 20 non-whitespace characters; maximum-size validation remains in the existing pipeline.
+- Accept only relative PDF paths beginning with `raw/`; reject absolute paths and paths outside `raw/`.
+- Accept only inputs whose path ends in `.pdf`, case-insensitive, before invoking Gemini.
+- Validate with `realpath` that both the source PDF and target `.pdf.md` remain inside the current specialist `raw/` directory; reject `..`, symlink escapes, and any normalized path outside `raw/`.
+- Require the resolved input PDF to exist and be a regular file before invoking Gemini.
+- Use a single `INVALID_PDF_INPUT` code for invalid input validation failures such as paths outside `raw/`, non-PDF input, missing files, or non-regular files; the message carries the detail.
+- Assume the script runs with `cwd` equal to the specialist root and accept only the relative PDF path as input.
+- Return only structured metadata from the Pi tool (`status`, `markdownPath`, `bytes`) and never the full generated Markdown content.
+- Have the Bash script print success JSON on `stdout` with `status`, `markdownPath`, and `bytes`; the Pi extension validates/normalizes that JSON before returning it to the agent.
+- Treat invalid script success JSON as `PDF_TOOL_INVALID_OUTPUT` in the Pi extension.
+- Avoid logging or returning the full Gemini prompt, full stdout, or generated Markdown content; only short metadata/errors are exposed.
+- Treat `GEMINI_API_KEY` as a sensitive secret and sanitize returned errors, captured stdout/stderr, and logs so the key is never exposed.
+- Document that `GEMINI_API_KEY` must live only in environment variables or a secret manager, never in `.pi/settings.json`, prompts, or versioned files.
+- Include the final expected output path in the Gemini prompt while explicitly instructing Gemini not to write files and to return only Markdown on stdout.
+- Keep the conversion Pi agent in the flow; the runner only makes the tool available to the conversion session and the prompt requires using it for PDFs.
+- Use fake `gemini` and `timeout` binaries on `PATH` for automated acceptance tests; real Gemini is reserved for a documented operational/manual smoke test.
+- Document a manual smoke test that requires real `gemini` on `PATH`, real `timeout` in the production/container environment, and `GEMINI_API_KEY` set.
+- Add scope tests confirming `pdf_to_markdown` is only available to `conversion` sessions and never to `ingestion` or `chat` sessions.
+- Add sanitization tests confirming a fake `GEMINI_API_KEY` never appears in returned errors or tool results.
+- Preserve the deterministic output convention by appending `.md` to the exact source path: `raw/file.pdf` → `raw/file.pdf.md`, and `raw/Documento.PDF` → `raw/Documento.PDF.md`.
+- Document `gemini` as an operational dependency before implementation is considered complete.
+
+Likely implementation zones:
+
+- `.pi/tools/pdf_to_markdown.sh`
+- `.pi/extensions/pdf-to-markdown-tool.ts`
+- `docs/operations.md` and/or developer-facing documentation
+- Acceptance tests that put fake `gemini` and `timeout` commands on `PATH` and verify command shape, prompt content, output naming, atomic write behavior, failure handling, timeout invocation, and task-scoped tool availability
+
+Success conditions to refine before implementation:
+
+- The Pi tool accepts a valid PDF path inside the current specialist `raw/` directory and computes the expected target by appending `.md` to the exact source path, preserving case.
+- The Gemini CLI command includes faithful-conversion instructions and the deterministic output filename.
+- The script writes the final `.pdf.md` file after capturing and validating Gemini output.
+- Gemini CLI execution respects an initial 10-minute timeout per PDF.
+- Markdown size validation uses the existing pipeline limit rather than a duplicate script-specific limit.
+- Existing target Markdown files are overwritten during pipeline reprocessing rather than treated as a hard failure.
+- Gemini is instructed to return only Markdown on stdout and not to write files directly.
+- PDF sources require the conversion agent to use `pdf_to_markdown`; non-PDF sources continue through the current conversion-agent behavior.
+- Failed `pdf_to_markdown` execution causes immediate conversion failure without manual PDF conversion fallback.
+- Missing Gemini CLI execution reports `GEMINI_CLI_UNAVAILABLE` and does not report a successful conversion.
+- Operation and documented manual smoke testing verify `gemini` is installed and `GEMINI_API_KEY` is set.
+- Missing `GEMINI_API_KEY` reports `GEMINI_API_KEY_MISSING` before any CLI invocation.
+- Both the Pi extension and Bash script validate `GEMINI_API_KEY`.
+- Script errors use stable `stderr` prefixes that the Pi extension maps into structured tool errors.
+- Script normalization removes only a single whole-response outer Markdown fence and preserves internal fences.
+- Acceptance tests verify Gemini is invoked as `gemini -y -p "<instructions>" raw/file.pdf`, with the PDF as the final argument.
+- Timeout is enforced through `timeout 600s`; missing `timeout` reports `TIMEOUT_COMMAND_UNAVAILABLE`.
+- Documentation does not require macOS coreutils for operation; production container requirements include `timeout`.
+- Gemini CLI authentication/configuration failures report `GEMINI_CLI_AUTH_FAILED`.
+- Other failing Gemini CLI execution reports `GEMINI_CONVERSION_FAILED` and does not report a successful conversion.
+- The final Markdown target is produced via temporary file plus atomic rename after basic output validation.
+- Temporary files are cleaned up on script failure/interruption.
+- Basic script validation rejects output with fewer than 20 non-whitespace characters before rename.
+- The tool rejects absolute paths and paths outside `raw/`.
+- The tool rejects non-PDF inputs with case-insensitive `.pdf` extension validation before any Gemini call.
+- The tool rejects `..`, symlink escapes, and any `realpath` resolution outside the current specialist `raw/` directory.
+- The tool rejects missing inputs and inputs that are not regular files before any Gemini call.
+- Invalid PDF input failures report `INVALID_PDF_INPUT` with a short explanatory message.
+- The script interface does not accept a specialist root argument; it derives context from `cwd`.
+- Tool results include conversion metadata only and do not expose full generated Markdown content.
+- On success, script `stdout` is structured JSON with `status`, `markdownPath`, and `bytes`, and the extension validates it.
+- Invalid script success JSON reports `PDF_TOOL_INVALID_OUTPUT`.
+- Logs/results do not include full prompt, full stdout, or generated Markdown content.
+- Returned errors, captured stdout/stderr, and logs do not expose `GEMINI_API_KEY`.
+- Operations documentation warns not to put `GEMINI_API_KEY` in `.pi/settings.json`, prompts, or versioned files.
+- Gemini prompt includes the final Markdown filename, but direct file writing by Gemini is forbidden.
+- The conversion runner does not bypass the Pi agent for PDFs; the agent calls the tool.
+- Automated tests do not invoke real Gemini credentials or services.
+- Automated tests use fake `timeout` so local macOS development does not require GNU coreutils.
+- Manual smoke test documentation covers real Gemini execution with `GEMINI_API_KEY` set.
+- Automated tests verify the conversion-agent tool is named `pdf_to_markdown`.
+- Automated tests verify task-scoped tool isolation for conversion, ingestion, and chat sessions.
+- Automated tests verify `GEMINI_API_KEY` redaction from errors/results.
+- The new Gemini CLI dependency is documented for setup, authentication, and operational troubleshooting.
+
+Explicit exclusions:
+
+- Automatic ingestion after conversion.
+- First-party OCR guarantees for scanned PDFs.
+- Arbitrary shell command execution.
+- Exposing the tool to ingestion, consultation, or generic Pi sessions.
+- Broad rewrite of the existing Pi conversion/ingestion pipeline.
+
+Next step:
+
+- Write acceptance tests from the locked success conditions before implementation code.
 
 ## Slice 13 — Three Pi agent pipeline
 
