@@ -146,23 +146,43 @@ async function runPiSdkConversion(
 
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
-  return `Convert exactly one uploaded source into Markdown.
+  const inputPath = `raw/${source.raw_path}`
+  const outputPath = `raw/${markdownPath}`
+
+  if (/\.pdf$/i.test(source.raw_path)) {
+    return `Convert exactly one uploaded PDF source into Markdown.
 
 Source:
-- input: raw/${source.raw_path}
-- output: raw/${markdownPath}
+- input: ${inputPath}
+- output: ${outputPath}
 - original checksum: ${source.checksum}
 
 Rules:
-1. Read raw/${source.raw_path} and write only raw/${markdownPath}.
+1. You must call the pdf_to_markdown tool with pdfPath set to ${JSON.stringify(inputPath)}.
+2. The pdf_to_markdown tool is responsible for creating ${outputPath}.
+3. Do not read, edit, write, or manually convert the PDF with file tools.
+4. If pdf_to_markdown fails, fail clearly and do not attempt fallback conversion.
+5. Do not modify wiki/ or any file other than ${outputPath}.
+6. End after the tool reports successful conversion metadata.
+`
+  }
+
+  return `Convert exactly one uploaded source into Markdown.
+
+Source:
+- input: ${inputPath}
+- output: ${outputPath}
+- original checksum: ${source.checksum}
+
+Rules:
+1. Read ${inputPath} and write only ${outputPath}.
 2. Preserve the source faithfully in its original language. Do not summarize, omit, modernize, translate, or invent content.
 3. For CSV, write a Markdown table with all rows and columns.
 4. For XLSX, write each sheet as a Markdown heading followed by faithful Markdown tables. If the available tools cannot read the workbook, fail clearly instead of inventing content.
 5. For HTML/HTM, preserve headings, paragraphs, links, lists, and tables as Markdown.
 6. For TXT, preserve text structure and article references.
-7. For PDF, structure the Markdown as well as possible while retaining as much information as possible, preserving the original language and wording.
-8. Do not modify wiki/ or any file other than raw/${markdownPath}.
-9. End after the Markdown file has been written.
+7. Do not modify wiki/ or any file other than ${outputPath}.
+8. End after the Markdown file has been written.
 `
 }
 

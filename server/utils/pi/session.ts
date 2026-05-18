@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 
 export type PiTaskName = 'conversion' | 'ingestion' | 'chat'
 
@@ -38,11 +39,13 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   await loader.reload()
 
   const selectedModel = await resolveTaskModel(modelRegistry, settingsManager, options.modelEnvPrefix)
+  const customTools = createUjimuCustomToolsForTask(options.task, options.cwd)
 
   const result = await createAgentSession({
     cwd: options.cwd,
     resourceLoader: loader,
     tools: options.tools,
+    customTools,
     sessionManager: SessionManager.inMemory(options.cwd),
     settingsManager,
     authStorage,
@@ -54,7 +57,7 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     task: options.task,
     cwd: options.cwd,
     agentDir,
-    tools: options.tools,
+    tools: [...options.tools, ...customTools.map((tool: any) => tool.name)],
     model: selectedModel
   })
 
@@ -143,6 +146,14 @@ export function createUjimuFileTools(
   toolNames: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
 ): Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'> {
   return toolNames
+}
+
+export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
+  if (task !== 'conversion') {
+    return []
+  }
+
+  return [createPdfToMarkdownTool({ cwd })]
 }
 
 async function resolveTaskModel(

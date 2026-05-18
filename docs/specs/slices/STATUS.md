@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 13:
+Latest full verification after Slice 14:
 
-- `npm test` — passed, 80 tests
+- `npm test` — passed, 85 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Manual real-Pi conversion/ingestion/consultation smoke test — not run; documented in `docs/operations.md` and intentionally excluded from CI because it requires model credentials.
+- Manual real-Pi/Gemini smoke tests — not run; documented in `docs/operations.md` and intentionally excluded from CI because they require model credentials and external service access.
 
 Known non-blocking warnings:
 
@@ -52,11 +52,11 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-16 | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
-| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `acceptance-tested` | — | Acceptance tests written and red before implementation. |
+| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
 
 ## Slice 14 — PDF to Markdown Gemini tool
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm:
 
@@ -175,13 +175,17 @@ Explicit exclusions:
 - Exposing the tool to ingestion, consultation, or generic Pi sessions.
 - Broad rewrite of the existing Pi conversion/ingestion pipeline.
 
-Acceptance-test status:
+Verification status:
 
-- `npm test -- tests/pdf-to-markdown-gemini-tool.acceptance.test.ts` — red before implementation as expected.
+- `npm test -- tests/pdf-to-markdown-gemini-tool.acceptance.test.ts` — passed, 5 tests.
+- `npm test` — passed, 85 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
-Next step:
+Manual smoke status:
 
-- Implement the smallest code changes needed to satisfy the red acceptance tests.
+- Real Gemini CLI smoke test not run; it is documented in `docs/operations.md` and intentionally requires `gemini`, `timeout`, `GEMINI_API_KEY`, and external service access.
 
 ## Slice 13 — Three Pi agent pipeline
 

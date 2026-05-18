@@ -44,6 +44,7 @@ Configure these outside source control:
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — maximum validated converted Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
+- `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `.pi/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
 
 ## Passkey configuration
 
@@ -52,6 +53,27 @@ Passkeys are disabled unless `UJIMU_PASSKEYS_ENABLED=true`. In development, pass
 Passkeys require the correct browser origin and HTTPS in production. OTP continues to be the fallback and recovery path after passkeys are added or removed.
 
 The admin readiness endpoint reports only passkey booleans such as enabled/configured status. It must not expose RP IDs, origins, challenges, public keys, credential IDs, or WebAuthn payloads.
+
+## Gemini PDF-to-Markdown conversion dependency
+
+PDF conversion through the `pdf_to_markdown` tool depends on the Gemini CLI in the production/container runtime:
+
+- `gemini` must be installed and available on `PATH`.
+- `timeout` must be available on `PATH` in the container runtime; the script uses `timeout 600s` per PDF.
+- `GEMINI_API_KEY` must be set in the environment or secret manager.
+- `GEMINI_API_KEY` is sensitive and must not be written to `.pi/settings.json`, prompts, operational logs, or versioned files.
+
+Manual smoke test in a configured non-production environment:
+
+```bash
+command -v gemini
+command -v timeout
+test -n "$GEMINI_API_KEY"
+cd /path/to/specialist-root
+/path/to/ujimu/.pi/tools/pdf_to_markdown.sh raw/small-sample.pdf
+```
+
+Expected result: the command prints JSON metadata only and creates `raw/small-sample.pdf.md`. Do not run this smoke test in CI because it requires real Gemini credentials and an external service call.
 
 ## Pi conversion, ingestion, and consultation smoke test
 
