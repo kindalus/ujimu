@@ -2,6 +2,10 @@
 
 These guidelines are authoritative for agents working in this repository. Follow them unless a more specific instruction from the user overrides them.
 
+## Zafir development process gate
+
+This project must follow the Zafir development process, agents must read and follow the `zafir-development-process` skill.
+
 ## Product premise
 
 Ujimu is a Nuxt-based chat product where users consult a chosen specialist. Each specialist is backed by an LLM Wiki-style knowledge base. Answers must be grounded only in the selected specialist wiki and must cite the supporting documentation.
@@ -28,9 +32,9 @@ The AI engine is the embeddable Pi coding agent harness (`pi.dev`). Treat Pi as 
 - Brainstorming or planning artefacts may be written in European Portuguese pre-1990 only when explicitly requested by the user.
 - Do not mix UI copy language into technical documentation unless documenting exact strings.
 
-## Clarification rule for brainstorming and plans
+## Product-direction clarification rule
 
-Before writing or updating brainstorming files, planning files, specs, roadmaps, or decks, stop and ask the user for clarification whenever there is uncertainty that would affect the content. Do not silently invent product direction. If assumptions are unavoidable, mark them explicitly and ask the user to confirm them.
+Before changing product requirements, roadmap direction, specifications, or other durable planning material, stop and ask the user for clarification whenever there is uncertainty that would affect the content. Do not silently invent product direction. If assumptions are unavoidable, mark them explicitly and ask the user to confirm them.
 
 ## Core product model
 
@@ -44,10 +48,10 @@ Before writing or updating brainstorming files, planning files, specs, roadmaps,
 - Ingestion state is stored per specialist in `ingest/state.json`.
 - Official sources are always submitted as files, such as PDF, TXT, Markdown, or similar formats, and stored in the specialist `raw/` directory before ingestion.
 - There is no raw file size restriction in the MVP.
-- OCR is not required in the MVP; scanned PDFs that need OCR are out of scope until a later slice.
+- OCR is not required in the MVP; scanned PDFs that need OCR are out of scope until a later phase.
 - Pi-backed ingestion uses the Pi SDK in-process, scoped to the specialist directory, with file tools only (`read`, `write`, `edit`, `grep`, `find`, `ls`) and no `bash` by default.
 - Pi-backed ingestion must be explicitly enabled with `UJIMU_PI_INGESTION_ENABLED=true`; when disabled, pending sources remain pending rather than being marked failed.
-- In the initial ingestion slice, PDF files may be stored and detected, but text extraction is not implemented; PDFs are marked failed with an unsupported-source error when ingestion runs.
+- In the initial ingestion implementation, PDF files may be stored and detected, but text extraction is not implemented; PDFs are marked failed with an unsupported-source error when ingestion runs.
 - Administrators can create specialties, choose the LLM Wiki preset, configure fields, define specialist system prompts, and upload documents for ingestion.
 - Administrators can delete a specialty; deleting a specialty must also delete customer conversation history for that specialty.
 
@@ -101,7 +105,7 @@ Before writing or updating brainstorming files, planning files, specs, roadmaps,
 - Quotas must be enforced server-side. Client cookies are an identifier, not an authority.
 - Authentication supports one-time passwords by email and mobile phone in the MVP.
 - SendGrid is the preferred initial email/SMS provider, but provider integration must be abstracted so it can be changed with minimal friction.
-- Passkeys are a later slice, not part of the OTP MVP.
+- Passkeys are a later phase, not part of the OTP MVP.
 - Avoid storing sensitive authentication material in plaintext.
 
 ## Advertising
@@ -158,41 +162,6 @@ Specialist prompt changes do not require audit history in the MVP.
 - Keep user-facing copy separate enough that pre-1990 Portuguese strings can be reviewed consistently.
 - Prefer typed interfaces for specialty configuration, quota policy, authentication state, and citation metadata.
 - Add tests for quota enforcement, specialist loading, ingestion detection, and answer-grounding failure paths.
-- Implementation planning decks should describe success conditions that can be converted into tests; they should not contain concrete test code.
-
-## Project specifications and Zafir slice workflow
-
-Ujimu adopts the Zafir development process, adapted to this repository by migrating specification artefacts to `docs/specs/`.
-
-- Treat `docs/specs/brainstorming-inicial.html` and the slice decks in `docs/specs/slices/` as project specification artefacts, not presentation-only files.
-- Specs, brainstorms, design decisions, architecture decisions, and slice plans should be captured as HTML slide decks under `docs/specs/` unless a more specific user instruction says otherwise.
-- Keep `docs/specs/slices/STATUS.md` as the canonical slice progress tracker and update it whenever a slice changes status or verification state.
-- At the start of every new brainstorm, ask whether the software or feature is governed by legislation. If yes, ask the user to place all relevant legislative material in `docs/specs/laws/`; then consult that folder with the `llm-wiki` skill for brainstorm, design, architecture, slice, implementation, and bug-fix decisions that could be affected by law.
-- Brainstorm first: elicit the objective, technological constraints, design and architecture principles, non-goals, and known boundaries; update the relevant HTML deck after each iteration; use `idea-refine` to sharpen the idea; stop only when the user approves the deck as the spec of record.
-- For existing projects, ask whether the user wants to revisit the current design and architecture before new slicing. If yes, capture the outcome in a design/architecture HTML deck such as `docs/specs/architecture.html`; if no or deferred, record that explicitly in the relevant deck.
-- Cut approved work into sequential slices under `docs/specs/slices/`. Each slice deck must include the idea, scope, locked decisions, likely implementation zones, success conditions, explicit exclusions, and links back to the originating brainstorm and architecture decks. When legislation applies, include the relevant law references.
-- Work on one slice at a time. A slice must be fully verified and green before the next one starts.
-- For slices that have not yet been implemented, update the relevant brainstorm or slice deck whenever a new product idea, technical idea, scope clarification, or implementation decision emerges.
-- Before moving into a new implementation slice, first refine the slice direction with the `idea-refine` skill, then stress-test and lock implementation decisions with the `grill-me` skill.
-- During the `grill-me` step, ask one decision-sharpening question at a time, provide a recommended answer for each question, and resolve dependencies before implementation starts.
-- During `idea-refine` and `grill-me` for an unimplemented slice, update that slice deck so the refined scope and locked decisions are captured before acceptance tests are written.
-- Do not retroactively change the intended scope of an already implemented slice deck. If the implemented slice needs factual corrections or as-built notes, keep them clearly documented as corrections/notes; new behaviour belongs in a future slice.
-- When implementation of a slice starts, write acceptance tests first from the slice success conditions.
-- After acceptance tests exist, implement the remaining code incrementally and use test-driven development where practical: write a failing test, make it pass with the smallest correct change, then refactor while keeping tests green.
-- Keep acceptance tests focused on externally visible slice behaviour rather than implementation details.
-- Use Git as the project change log. Keep commits small and phase-based during each slice.
-- For every new slice, make separate commits for at least: `idea-refine`/spec updates, `grill-me` locked decisions, acceptance-test creation, and implementation after the full verification suite passes.
-- Do not collapse those slice-phase commits into one large commit unless the user explicitly asks for a squash.
-
-## Zafir bug-fix workflow
-
-Bug fixes do not require the full slice workflow, but they must still be disciplined:
-
-- Reproduce and diagnose the issue before touching code.
-- If no existing test covers the behaviour, write a failing test for the bug first.
-- Patch narrowly; avoid drive-by refactors.
-- Run the relevant tests and the full verification suite before considering the fix done.
-- If legislation applies, verify the fix against the relevant material in `docs/specs/laws/` using the `llm-wiki` skill.
 
 ## Suggested specialty directory shape
 
