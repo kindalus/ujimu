@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { resolveUjimuPiToolPath } from './paths'
 
 export const PDF_TO_MARKDOWN_TOOL_NAME = 'pdf_to_markdown'
 
@@ -62,7 +62,7 @@ async function runPdfToMarkdownScript(
     throw createToolError('GEMINI_API_KEY_MISSING', 'GEMINI_API_KEY must be set in the environment.')
   }
 
-  const scriptPath = options.scriptPath ?? join(process.cwd(), '.pi', 'tools', 'pdf_to_markdown.sh')
+  const scriptPath = options.scriptPath ?? resolveUjimuPiToolPath('pdf_to_markdown.sh')
   const result = await runProcess('bash', [scriptPath, params.pdfPath], {
     cwd: options.cwd,
     env: process.env

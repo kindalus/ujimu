@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { createApp, createRouter, toWebHandler } from 'h3'
 import { describe, expect, it } from 'vitest'
 import adminSessionHandler from '../server/api/admin/session.get'
@@ -18,6 +20,8 @@ import type { PiIngestionRunner } from '../server/utils/ingestion/pi-runner'
 import { createSpecialist } from '../server/utils/specialists/manager'
 import { resetSpecialistRegistryForTests } from '../server/utils/specialists/registry'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
+
+const execFileAsync = promisify(execFile)
 
 describe('three Pi agent pipeline acceptance', () => {
   it('renames direct Markdown uploads to .original.md and marks them ready for Markdown-only ingestion', async () => {
@@ -204,23 +208,42 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: false })
   })
 
-  it('uses the project-local llm-wiki skill and safe Pi auth/config files', async () => {
-    const { DefaultResourceLoader, getAgentDir, SettingsManager } = await import('@earendil-works/pi-coding-agent')
-    const loader = new DefaultResourceLoader({
-      cwd: process.cwd(),
-      agentDir: getAgentDir(),
-      settingsManager: SettingsManager.create(process.cwd(), getAgentDir())
-    })
-    await loader.reload()
-    const skills = loader.getSkills()
-    const llmWiki = skills.skills.find((skill) => skill.name === 'llm-wiki')
-    const collision = skills.diagnostics.find((diagnostic: any) => diagnostic.type === 'collision' && diagnostic.collision?.name === 'llm-wiki') as any
+  it('uses a Ujimu Pi agent directory outside Pi CLI .pi discovery', async () => {
+    const { DefaultResourceLoader, SettingsManager } = await import('@earendil-works/pi-coding-agent')
+    const { resolveUjimuPiAgentDir } = await import('../server/utils/pi/paths')
+    const previousAgentDir = process.env.UJIMU_PI_AGENT_DIR
+    delete process.env.UJIMU_PI_AGENT_DIR
 
-    expect(llmWiki?.filePath).toBe(join(process.cwd(), '.pi', 'skills', 'llm-wiki', 'SKILL.md'))
-    expect(collision?.collision.winnerPath).toBe(join(process.cwd(), '.pi', 'skills', 'llm-wiki', 'SKILL.md'))
-    await expect(readFile('.pi/auth.json.sample', 'utf8')).resolves.toContain('OPENROUTER_API_KEY')
-    await expect(readFile('.gitignore', 'utf8')).resolves.toContain('.pi/auth.json')
-    await expect(readFile('.pi/settings.json', 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
+    try {
+      const loaderCwd = await mkdtemp(join(tmpdir(), 'ujimu-pi-loader-'))
+      const agentDir = resolveUjimuPiAgentDir()
+      const loader = new DefaultResourceLoader({
+        cwd: loaderCwd,
+        agentDir,
+        settingsManager: SettingsManager.create(loaderCwd, agentDir)
+      })
+      await loader.reload()
+      const skills = loader.getSkills()
+      const extensions = loader.getExtensions()
+      const llmWiki = skills.skills.find((skill) => skill.name === 'llm-wiki')
+      const trackedPi = await execFileAsync('git', ['ls-files', '.pi'])
+
+      expect(agentDir).toBe(join(process.cwd(), 'config', 'ujimu-pi-agent'))
+      expect(agentDir).not.toBe(join(process.cwd(), '.pi'))
+      expect(llmWiki?.filePath).toBe(join(agentDir, 'skills', 'llm-wiki', 'SKILL.md'))
+      expect(extensions.errors).toEqual([])
+      expect(trackedPi.stdout.trim()).toBe('')
+      await expect(readFile(join(agentDir, 'auth.json.sample'), 'utf8')).resolves.toContain('OPENROUTER_API_KEY')
+      await expect(readFile('.gitignore', 'utf8')).resolves.toContain('config/ujimu-pi-agent/auth.json')
+      await expect(readFile('.gitignore', 'utf8')).resolves.toContain('.pi/')
+      await expect(readFile(join(agentDir, 'settings.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
+    } finally {
+      if (previousAgentDir === undefined) {
+        delete process.env.UJIMU_PI_AGENT_DIR
+      } else {
+        process.env.UJIMU_PI_AGENT_DIR = previousAgentDir
+      }
+    }
   })
 })
 

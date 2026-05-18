@@ -136,7 +136,7 @@ pre { margin-top: 1.5rem; padding: 1.1rem; border-radius: 18px; border: 1px soli
 <span class="pill">conversion</span>
 <span class="pill">ingestion</span>
 <span class="pill">consultation</span>
-<span class="pill">project-local .pi</span>
+<span class="pill">Ujimu Pi agent config</span>
 </div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Brainstorm outcome</div><h2>The pipeline becomes explicit.</h2>
@@ -208,26 +208,24 @@ stored: raw/lei.original.md</pre>
 </ul>
 <div class="callout">The existing file tools remain the boundary: <code>read</code>, <code>write</code>, <code>edit</code>, <code>grep</code>, <code>find</code>, and <code>ls</code>. Consultation should use read/search only.</div>
 </div></section>
-<section class="slide"><div class="frame content"><div class="kicker">Project-local Pi config</div><h2>Ujimu should not depend on a developer's global Pi setup.</h2>
-<pre>.pi/
+<section class="slide"><div class="frame content"><div class="kicker">Ujimu Pi agent config</div><h2>Ujimu should not depend on a developer's global Pi setup.</h2>
+<pre>config/ujimu-pi-agent/
   settings.json
   models.json
   auth.json.sample
   skills/
     llm-wiki/SKILL.md
     llm-wiki/references/**
-  ujimu/
-    agents/
-      conversion-system.md
-      ingestion-system.md
-      consultation-system.md</pre>
+  extensions/
+  tools/</pre>
+<div class="callout">As-built correction after verification: the original project-local <code>.pi/</code> location collided with the Pi CLI during development. Ujimu-owned Pi resources now live under <code>config/ujimu-pi-agent/</code>; repository <code>.pi/</code> is ignored and reserved for developer-local Pi state.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Secrets</div><h2>Auth is local or secret-managed.</h2>
 <ul>
-<li><code>.pi/auth.json</code> must not be committed.</li>
-<li><code>.pi/auth.json.sample</code> documents safe example credentials and provider shapes.</li>
-<li><code>.pi/settings.json</code> defaults to <code>openrouter/moonshotai/kimi-k2.6</code> with medium thinking.</li>
-<li><code>.pi/models.json</code> is a minimal custom-provider placeholder.</li>
+<li><code>config/ujimu-pi-agent/auth.json</code> must not be committed.</li>
+<li><code>config/ujimu-pi-agent/auth.json.sample</code> documents safe example credentials and provider shapes.</li>
+<li><code>config/ujimu-pi-agent/settings.json</code> defaults to <code>openrouter/moonshotai/kimi-k2.6</code> with medium thinking.</li>
+<li><code>config/ujimu-pi-agent/models.json</code> is a minimal custom-provider placeholder.</li>
 <li>If the default lacks auth, fail clearly instead of silently selecting another model.</li>
 <li>Conversion runs create safe admin audit events; consultation avoids new prompt/answer operational logs.</li>
 <li>Automated tests use fake Pi adapters; real Pi is covered by a documented manual smoke path.</li>
@@ -237,7 +235,7 @@ stored: raw/lei.original.md</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Model selection</div><h2>Conversion and ingestion can override the default model.</h2>
 <ul>
-<li>Consultation uses the default model specified by the project-local <code>.pi</code> configuration.</li>
+<li>Consultation uses the default model specified by <code>config/ujimu-pi-agent/settings.json</code>.</li>
 <li>Conversion can use a provider/model/thinking override from environment variables.</li>
 <li>Ingestion can use a separate provider/model/thinking override from environment variables.</li>
 <li>If an override is absent, the agent falls back to the project-local default.</li>
@@ -306,7 +304,7 @@ ingestion.status:
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Project-local llm-wiki controls ingestion.</h2>
 <ul>
-<li>Copy the current <code>llm-wiki</code> skill into <code>.pi/skills/llm-wiki</code>.</li>
+<li>Copy the current <code>llm-wiki</code> skill into <code>config/ujimu-pi-agent/skills/llm-wiki</code>.</li>
 <li>Add a minimal Ujimu override: ingest only Markdown files under <code>raw/</code>.</li>
 <li>Non-Markdown raw files are conversion inputs and must not be ingested directly.</li>
 <li>The project-local copy must win any skill-name collision with global <code>llm-wiki</code>.</li>
@@ -315,7 +313,7 @@ ingestion.status:
 <section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Pi sessions use the Ujimu agent directory.</h2>
 <ul>
 <li>Resolve <code>agentDir</code> from <code>UJIMU_PI_AGENT_DIR</code> when set.</li>
-<li>Fallback to the project-root <code>.pi</code> directory.</li>
+<li>Fallback to the project-root <code>config/ujimu-pi-agent</code> directory.</li>
 <li>Pass the resolved <code>agentDir</code> explicitly to Pi SDK setup.</li>
 <li>All three agents use project-local settings, models, auth convention, and skills.</li>
 </ul>
@@ -323,7 +321,7 @@ ingestion.status:
 <section class="slide"><div class="frame content"><div class="kicker">Locked decision</div><h2>Model overrides are all-or-default.</h2>
 <ul>
 <li>Use an override only when both provider and model are set for that role.</li>
-<li>If neither is set, use the default from <code>.pi/settings.json</code>.</li>
+<li>If neither is set, use the default from <code>config/ujimu-pi-agent/settings.json</code>.</li>
 <li>If only one is set, fail with a configuration error.</li>
 <li>If the model is missing or unauthenticated, fail before starting the Pi session.</li>
 </ul>
@@ -406,10 +404,10 @@ server/utils/chat/engine.ts
 server/utils/pi/session.ts
 server/api/admin/specialists/[id]/raw.post.ts
 server/api/admin/specialists/[id]/conversion/run.post.ts
-.pi/settings.json
-.pi/models.json
-.pi/auth.json.sample
-.pi/skills/llm-wiki/**</pre>
+config/ujimu-pi-agent/settings.json
+config/ujimu-pi-agent/models.json
+config/ujimu-pi-agent/auth.json.sample
+config/ujimu-pi-agent/skills/llm-wiki/**</pre>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Success conditions</div><h2>The slice is done when the pipeline is observable and safe.</h2>
 <ul>

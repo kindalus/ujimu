@@ -7,4 +7,5 @@ node_modules/
 *.log
 .DS_Store
 .local/
-.pi/auth.json
+.pi/
+config/ujimu-pi-agent/auth.json

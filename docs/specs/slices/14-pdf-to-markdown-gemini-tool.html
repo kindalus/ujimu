@@ -135,7 +135,7 @@
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Output inválido</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Se o script devolver JSON inválido em sucesso, a extensão falha com <code>PDF_TOOL_INVALID_OUTPUT</code>.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Logs seguros</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A extensão não regista prompt completo, stdout completo, nem conteúdo Markdown; só metadados e erros curtos.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Segredos</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>GEMINI_API_KEY</code> é segredo sensível; erros, stdout, stderr capturado e logs devem ser sanitizados para nunca expor a chave.</p></div>
-            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Gestão da chave</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A documentação deve exigir <code>GEMINI_API_KEY</code> em variável de ambiente/secret manager, nunca em <code>.pi/settings.json</code>, prompts ou ficheiros versionados.</p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Gestão da chave</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">A documentação deve exigir <code>GEMINI_API_KEY</code> em variável de ambiente/secret manager, nunca em <code>config/ujimu-pi-agent/settings.json</code>, prompts ou ficheiros versionados.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Prompt Gemini</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O prompt inclui o caminho final esperado, mas instrui o Gemini a não escrever ficheiros e a devolver apenas Markdown em stdout.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Fluxo Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">O agente de conversão continua no fluxo: o runner disponibiliza a ferramenta e o prompt obriga a sua chamada para PDFs.</p></div>
           </div>
@@ -147,8 +147,8 @@
           <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Zonas de implementação</p>
           <h2 class="font-bold">Ficheiros prováveis</h2>
           <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/tools/pdf_to_markdown.sh</code></p></div>
-            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/extensions/pdf-to-markdown-tool.ts</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>config/ujimu-pi-agent/tools/pdf_to_markdown.sh</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>config/ujimu-pi-agent/extensions/pdf-to-markdown-tool.ts</code></p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Documentação</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>docs/operations.md</code> e/ou documentação de desenvolvimento.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Testes</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Testes de aceitação com <code>gemini</code> e <code>timeout</code> falsos no <code>PATH</code>; Gemini real fica para smoke test operacional/manual.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Teste de escopo</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Os testes devem confirmar que só a sessão <code>conversion</code> recebe <code>pdf_to_markdown</code>; <code>ingestion</code> e <code>chat</code> não recebem.</p></div>
@@ -197,7 +197,7 @@
             <li>JSON inválido do script em caminho de sucesso produz erro <code>PDF_TOOL_INVALID_OUTPUT</code>.</li>
             <li>Logs e resultados evitam prompt completo, stdout completo e conteúdo Markdown.</li>
             <li><code>GEMINI_API_KEY</code> é tratada como segredo e removida de erros, stdout, stderr capturado e logs.</li>
-            <li>A documentação proíbe colocar <code>GEMINI_API_KEY</code> em <code>.pi/settings.json</code>, prompts ou ficheiros versionados.</li>
+            <li>A documentação proíbe colocar <code>GEMINI_API_KEY</code> em <code>config/ujimu-pi-agent/settings.json</code>, prompts ou ficheiros versionados.</li>
             <li>O comando Gemini inclui o caminho final esperado nas instruções, mas proíbe escrita directa de ficheiros.</li>
             <li>O runner não contorna o agente Pi; disponibiliza a ferramenta apenas à sessão de conversão e o prompt exige a chamada em PDFs.</li>
             <li>Testes de aceitação usam <code>gemini</code> e <code>timeout</code> falsos no <code>PATH</code>; não invocam credenciais ou serviços reais.</li>

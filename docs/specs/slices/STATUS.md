@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,7 +20,7 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 14:
+Latest full verification after the Pi agent directory collision fix:
 
 - `npm test` — passed, 85 tests
 - `npm run typecheck` — passed
@@ -32,6 +32,7 @@ Known non-blocking warnings:
 
 - Nuxt/Tailwind sourcemap warnings during build.
 - VueUse Rollup pure-comment warnings during build.
+- Node `module.register()` deprecation warning during build.
 - `node:sqlite` is external during Nitro build and experimental at runtime under Node.
 
 ## Slice table
@@ -51,7 +52,7 @@ Known non-blocking warnings:
 | 10 | [`10-subscriptions-payments-ads.html`](./10-subscriptions-payments-ads.html) | `verified` | 2026-05-16 | Mockable billing provider MVP, secret webhook confirmation, subscriptions, subscribed quota subject, expiry warning, and ad hiding. |
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
-| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-16 | Three Pi sessions for conversion, ingestion, and consultation; project-local `.pi`; Markdown-first ingestion pipeline. |
+| 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-18 | Three Pi sessions for conversion, ingestion, and consultation; Ujimu Pi agent config under `config/ujimu-pi-agent`; Markdown-first ingestion pipeline. |
 | 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
 
 ## Slice 14 — PDF to Markdown Gemini tool
@@ -103,7 +104,7 @@ Initial direction:
 - Treat invalid script success JSON as `PDF_TOOL_INVALID_OUTPUT` in the Pi extension.
 - Avoid logging or returning the full Gemini prompt, full stdout, or generated Markdown content; only short metadata/errors are exposed.
 - Treat `GEMINI_API_KEY` as a sensitive secret and sanitize returned errors, captured stdout/stderr, and logs so the key is never exposed.
-- Document that `GEMINI_API_KEY` must live only in environment variables or a secret manager, never in `.pi/settings.json`, prompts, or versioned files.
+- Document that `GEMINI_API_KEY` must live only in environment variables or a secret manager, never in `config/ujimu-pi-agent/settings.json`, prompts, or versioned files.
 - Include the final expected output path in the Gemini prompt while explicitly instructing Gemini not to write files and to return only Markdown on stdout.
 - Keep the conversion Pi agent in the flow; the runner only makes the tool available to the conversion session and the prompt requires using it for PDFs.
 - Use fake `gemini` and `timeout` binaries on `PATH` for automated acceptance tests; real Gemini is reserved for a documented operational/manual smoke test.
@@ -115,8 +116,8 @@ Initial direction:
 
 Likely implementation zones:
 
-- `.pi/tools/pdf_to_markdown.sh`
-- `.pi/extensions/pdf-to-markdown-tool.ts`
+- `config/ujimu-pi-agent/tools/pdf_to_markdown.sh`
+- `config/ujimu-pi-agent/extensions/pdf-to-markdown-tool.ts`
 - `docs/operations.md` and/or developer-facing documentation
 - Acceptance tests that put fake `gemini` and `timeout` commands on `PATH` and verify command shape, prompt content, output naming, atomic write behavior, failure handling, timeout invocation, and task-scoped tool availability
 
@@ -156,7 +157,7 @@ Success conditions to refine before implementation:
 - Invalid script success JSON reports `PDF_TOOL_INVALID_OUTPUT`.
 - Logs/results do not include full prompt, full stdout, or generated Markdown content.
 - Returned errors, captured stdout/stderr, and logs do not expose `GEMINI_API_KEY`.
-- Operations documentation warns not to put `GEMINI_API_KEY` in `.pi/settings.json`, prompts, or versioned files.
+- Operations documentation warns not to put `GEMINI_API_KEY` in `config/ujimu-pi-agent/settings.json`, prompts, or versioned files.
 - Gemini prompt includes the final Markdown filename, but direct file writing by Gemini is forbidden.
 - The conversion runner does not bypass the Pi agent for PDFs; the agent calls the tool.
 - Automated tests do not invoke real Gemini credentials or services.
@@ -191,6 +192,8 @@ Manual smoke status:
 
 Status: `verified`
 
+As-built correction (2026-05-18): Ujimu Pi resources were moved from the originally planned project `.pi/` directory to `config/ujimu-pi-agent/` because `.pi/` is a reserved Pi CLI project directory and caused development-time resource discovery collisions. The runtime still honours `UJIMU_PI_AGENT_DIR` for explicit overrides.
+
 Idea-refined direction:
 
 - Split the Pi-backed source and answer flow into three distinct Pi SDK sessions: conversion, ingestion, and consultation.
@@ -204,9 +207,9 @@ Idea-refined direction:
 - Store direct admin Markdown uploads as already-normalized originals by renaming `lei.md` to `lei.original.md` on upload.
 - Reject a direct Markdown upload when the target `raw/<name>.original.md` already exists.
 - Keep traceability from original raw upload to generated/normalized Markdown source, then to wiki pages and user-facing citations.
-- Add project-local Pi configuration under `.pi/` so Ujimu does not depend on a developer's global Pi setup.
-- Version `.pi/settings.json`, `.pi/models.json`, `.pi/auth.json.sample`, and agent skills/prompts, but never commit `.pi/auth.json`.
-- Use the project-local `.pi` default model for consultation.
+- Add Ujimu-owned Pi configuration under `config/ujimu-pi-agent/` so Ujimu does not depend on a developer's global Pi setup or collide with the Pi CLI's reserved project `.pi/` directory.
+- Version `config/ujimu-pi-agent/settings.json`, `config/ujimu-pi-agent/models.json`, `config/ujimu-pi-agent/auth.json.sample`, and agent skills/prompts, but never commit `config/ujimu-pi-agent/auth.json`.
+- Use the `config/ujimu-pi-agent` default model for consultation.
 - Allow conversion and ingestion to override provider/model/thinking level through environment variables; when absent, they fall back to the project-local default.
 - Do not add new Pi tools in this slice. Agent skills are instructions, not capabilities.
 - Keep `bash` disabled by default. Conversion and ingestion may use only the already-approved file tools: `read`, `write`, `edit`, `grep`, `find`, and `ls`. Consultation should use read/search tools only.
@@ -227,13 +230,13 @@ Locked grill decisions:
 - Upload stores the original source, reload/detect updates pending pipeline state, conversion is triggered explicitly, and ingestion is triggered explicitly after conversion succeeds.
 - When ingestion is triggered, it processes only Markdown sources that are ready for ingestion and skips sources whose conversion is pending or failed.
 - Ingestion must not auto-run conversion. The ingestion result should report ingested/skipped counts and safe skipped reasons such as `conversion_pending` and `conversion_failed`.
-- Ujimu ingestion uses the `llm-wiki` skill through a project-local copy under `.pi/skills/llm-wiki`.
+- Ujimu ingestion uses the `llm-wiki` skill through the Ujimu Pi agent copy under `config/ujimu-pi-agent/skills/llm-wiki`.
 - The project-local `llm-wiki` copy adds a minimal Ujimu override: only Markdown files under `raw/` may be ingested; non-Markdown raw files are original uploads for the conversion pipeline and must not be ingested directly.
-- If a global `llm-wiki` skill is also available, the project-local `.pi/skills/llm-wiki` copy must prevail. This was verified through Pi resource loading: the project copy wins the `llm-wiki` collision and the global copy is the loser.
-- Pi SDK sessions resolve their agent directory from `UJIMU_PI_AGENT_DIR` when set, otherwise they fall back to the project-root `.pi` directory.
+- If a global `llm-wiki` skill is also available, the Ujimu Pi agent `config/ujimu-pi-agent/skills/llm-wiki` copy must prevail. This is verified through Pi resource loading using the Ujimu agent directory.
+- Pi SDK sessions resolve their agent directory from `UJIMU_PI_AGENT_DIR` when set, otherwise they fall back to the project-root `config/ujimu-pi-agent` directory.
 - Conversion, ingestion, and consultation sessions must pass this resolved `agentDir` explicitly to Pi SDK session/resource-loader/model-registry setup so they use the project-local settings, models, auth sample convention, and skills.
 - Conversion and ingestion model overrides are valid only when both provider and model environment variables are set for that role.
-- If neither provider nor model override is set for a role, that role uses the project-local default model from `.pi/settings.json`.
+- If neither provider nor model override is set for a role, that role uses the default model from `config/ujimu-pi-agent/settings.json`.
 - If only one of provider/model is set, or if the configured model does not exist or lacks configured authentication, fail with a clear configuration error before starting the Pi session.
 - Do not infer providers from model IDs and do not silently fall back from a malformed override to the default model.
 - Pi-backed agent execution is enabled per role with `UJIMU_PI_CONVERSION_ENABLED=true`, `UJIMU_PI_INGESTION_ENABLED=true`, and `UJIMU_PI_CHAT_ENABLED=true`.
@@ -263,8 +266,8 @@ Locked grill decisions:
 - If possible, enforce the consultation read/search path policy to `wiki/` plus safe state/citation context; at minimum the prompt must forbid using `raw/` for answers.
 - PDF conversion attempts to structure Markdown as well as possible while retaining as much information as possible; safe failures use the generic `CONVERSION_FAILED` error code.
 - OCR remains out of scope, and failed OCR-required sources keep ingestion blocked.
-- Version `.pi/settings.json` with the project-local default provider/model `openrouter` / `moonshotai/kimi-k2.6`, `defaultThinkingLevel = medium`, and `hideThinkingBlock = true`.
-- Version `.pi/models.json` as a minimal custom-provider placeholder with an empty `providers` object; real credentials belong in `.pi/auth.json` or environment variables, with examples in `.pi/auth.json.sample`.
+- Version `config/ujimu-pi-agent/settings.json` with the Ujimu Pi agent default provider/model `openrouter` / `moonshotai/kimi-k2.6`, `defaultThinkingLevel = medium`, and `hideThinkingBlock = true`.
+- Version `config/ujimu-pi-agent/models.json` as a minimal custom-provider placeholder with an empty `providers` object; real credentials belong in `config/ujimu-pi-agent/auth.json` or environment variables, with examples in `config/ujimu-pi-agent/auth.json.sample`.
 - If the project-local default model lacks configured authentication, Pi-backed sessions must fail with a clear configuration error rather than silently selecting another available model.
 - Admin-triggered conversion runs create admin audit events with safe counts and error-code summaries.
 - Ingestion continues using/expanding existing admin audit behaviour.
@@ -309,10 +312,10 @@ Potential implementation zones:
 - `server/api/admin/specialists/[id]/raw.post.ts`
 - `server/api/admin/specialists/[id]/conversion/run.post.ts`
 - `.gitignore`
-- `.pi/settings.json`
-- `.pi/models.json`
-- `.pi/auth.json.sample`
-- `.pi/skills/llm-wiki/**`
+- `config/ujimu-pi-agent/settings.json`
+- `config/ujimu-pi-agent/models.json`
+- `config/ujimu-pi-agent/auth.json.sample`
+- `config/ujimu-pi-agent/skills/llm-wiki/**`
 
 Acceptance tests written first in:
 
@@ -332,9 +335,9 @@ Success conditions covered by acceptance tests:
 - When an original file changes, the generated Markdown artefact is overwritten; when the original has not changed, conversion is skipped.
 - Ingestion reads only Markdown sources and preserves original-source traceability in citation metadata.
 - Consultation uses a real Pi SDK runner with the project-local default Pi model, returns a validated structured NDJSON answer/citation event stream, and produces answers grounded in the selected specialist wiki with user-facing citations.
-- `.pi/auth.json` is ignored/untracked, while `.pi/auth.json.sample` documents safe configuration examples.
+- `config/ujimu-pi-agent/auth.json` is ignored/untracked, while `config/ujimu-pi-agent/auth.json.sample` documents safe configuration examples; `.pi/` is ignored so developers can use the Pi CLI without loading Ujimu resources.
 - Conversion and ingestion model overrides are read from environment variables and fall back to the project-local default when absent.
-- The project-local `llm-wiki` skill prevails over any global skill with the same name and instructs ingestion to use only Markdown files under `raw/`.
+- The Ujimu Pi agent `llm-wiki` skill under `config/ujimu-pi-agent/skills/llm-wiki` is loaded without relying on the repository `.pi/` directory and instructs ingestion to use only Markdown files under `raw/`.
 - No new Pi tools are introduced; tests prove the expected tool allowlists for each agent role.
 
 Out of scope for this slice:
@@ -347,9 +350,9 @@ Out of scope for this slice:
 
 Verification completed:
 
-- `npm test` — passed, 80 tests.
+- `npm test` — passed, 85 tests.
 - `npm run typecheck` — passed.
-- `npm run build` — passed with existing Nuxt/Tailwind/VueUse warnings.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 12 — Passkeys post-MVP

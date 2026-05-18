@@ -282,8 +282,8 @@
           <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Zonas prováveis de implementação</p>
           <h2 class="font-bold">Onde isto deverá entrar mais tarde</h2>
           <div class="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script da ferramenta</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/tools/pdf_to_markdown.sh</code></p></div>
-            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>.pi/extensions/pdf-to-markdown-tool.ts</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Script da ferramenta</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>config/ujimu-pi-agent/tools/pdf_to_markdown.sh</code></p></div>
+            <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Extensão Pi</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>config/ujimu-pi-agent/extensions/pdf-to-markdown-tool.ts</code></p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Documentação</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)"><code>docs/operations.md</code> e/ou uma nota para programadores.</p></div>
             <div class="soft-panel rounded-lg p-5"><h3 class="font-bold text-white">Testes</h3><p class="mt-2 leading-relaxed" style="color: var(--muted)">Simular o CLI e verificar formato do comando, nomeação de saída e tratamento de falhas.</p></div>
           </div>
@@ -307,7 +307,7 @@
         <div class="panel rounded-lg w-full max-w-6xl p-10 lg:p-16">
           <p class="mb-5 text-xs font-extrabold uppercase tracking-[0.22em]" style="color: var(--accent)">Decisão de arquitectura</p>
           <h2 class="font-bold">Revisão arquitectónica deferida</h2>
-          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">A integração deve usar a arquitectura existente como base: script local em <code>.pi/tools/</code>, extensão em <code>.pi/extensions/</code>, documentação operacional e implementação através de uma slice dedicada.</p>
+          <p class="mt-8 max-w-4xl text-xl leading-relaxed" style="color: var(--muted)">A integração deve usar a arquitectura existente como base: script local em <code>config/ujimu-pi-agent/tools/</code>, extensão em <code>config/ujimu-pi-agent/extensions/</code>, documentação operacional e implementação através de uma slice dedicada. Nota as-built: <code>.pi/</code> fica reservado para o Pi CLI do programador.</p>
           <div class="mt-10 flex flex-wrap gap-3">
             <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--accent)">Decisão confirmada pelo utilizador</span>
             <span class="soft-panel rounded-lg px-4 py-2 text-sm" style="color: var(--muted)">Sem deck de arquitectura separado nesta fase</span>

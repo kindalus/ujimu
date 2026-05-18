@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
+import { resolveUjimuPiAgentDir } from './paths'
 
 export type PiTaskName = 'conversion' | 'ingestion' | 'chat'
 
@@ -10,10 +11,6 @@ export interface CreateUjimuPiSessionOptions {
   tools: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
   appendSystemPromptOverride?: () => string[]
   modelEnvPrefix?: string
-}
-
-export function resolveUjimuPiAgentDir(): string {
-  return resolve(process.env.UJIMU_PI_AGENT_DIR || join(process.cwd(), '.pi'))
 }
 
 export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions): Promise<{ session: any }> {
@@ -184,7 +181,7 @@ async function resolveTaskModel(
 function resolveConfiguredModel(modelRegistry: any, provider: string, model: string): unknown {
   const resolved = modelRegistry.find(provider, model)
   if (!resolved) {
-    throw new Error(`Configured Pi model ${provider}/${model} is not available in .pi/models.json or built-in models.`)
+    throw new Error(`Configured Pi model ${provider}/${model} is not available in the Ujimu Pi agent models.json or built-in models.`)
   }
 
   if (!modelRegistry.hasConfiguredAuth(resolved)) {

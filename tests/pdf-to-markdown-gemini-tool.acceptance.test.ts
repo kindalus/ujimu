@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
-const SCRIPT_PATH = join(process.cwd(), '.pi', 'tools', 'pdf_to_markdown.sh')
+const SCRIPT_PATH = join(process.cwd(), 'config', 'ujimu-pi-agent', 'tools', 'pdf_to_markdown.sh')
 
 describe('PDF to Markdown Gemini tool acceptance', () => {
   it('converts a raw PDF through gemini stdout, writes Markdown atomically, and returns metadata only', async () => {
