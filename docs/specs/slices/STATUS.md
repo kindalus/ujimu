@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,13 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after the Pi agent directory collision fix:
+Latest full verification after Slice 15 Podman container deployment:
 
-- `npm test` — passed, 85 tests
+- `npm test` — passed, 90 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Manual real-Pi/Gemini smoke tests — not run; documented in `docs/operations.md` and intentionally excluded from CI because they require model credentials and external service access.
+- `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
+- Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
+- Manual real-Pi/Gemini conversion smoke tests — not run; documented in `docs/operations.md` and intentionally excluded from CI because they require model credentials and external service access.
 
 Known non-blocking warnings:
 
@@ -54,6 +56,88 @@ Known non-blocking warnings:
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-18 | Three Pi sessions for conversion, ingestion, and consultation; Ujimu Pi agent config under `config/ujimu-pi-agent`; Markdown-first ingestion pipeline. |
 | 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
+| 15 | [`15-podman-container-deployment.html`](./15-podman-container-deployment.html) | `verified` | 2026-05-19 | Podman-compatible image, prod/test env profiles, lifecycle scripts, persistent Pi/Ujimu mounts, and manual deployment documentation. |
+
+## Slice 15 — Podman container deployment
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-container-deployment.html`](../brainstorm-container-deployment.html)
+- [`../container-deployment-architecture.html`](../container-deployment-architecture.html)
+
+Initial direction:
+
+- Build one Dockerfile-compatible image for both production and test Podman containers.
+- Create and run as internal Unix user/group `ujimu:ujimu` with home `/home/ujimu`.
+- Install Gemini CLI in the image with `npm install -g @google/gemini-cli`.
+- Default runtime timezone to `Africa/Luanda` through `TZ`, while allowing ENV override.
+- Use in-container persistent mount points `/home/ujimu/.pi` and `/home/ujimu/.local/share/ujimu`.
+- Map production host storage to `/srv/ujimu/prod/pi` and `/srv/ujimu/prod/data`.
+- Map test host storage to `/srv/ujimu/test/pi` and `/srv/ujimu/test/data`.
+- Use one Podman network named `ujimu`.
+- Use `ujimu-prod` on host port `3000` and `ujimu-test` on host port `3001`.
+- Add lifecycle scripts under `scripts/container/`: `build.sh`, `create.sh`, `deploy.sh`, `redeploy.sh`, and `remove.sh`.
+- Add env examples under `config/container/prod.env.example` and `config/container/test.env.example`; real env files and secrets remain outside Git.
+- Test profile must use the existing in-code mock/no-op provider paths for auth, payments, and communication.
+- CI/CD, reverse proxy, TLS, DNS, certificates, new provider implementations, and committed real secrets are excluded.
+
+Acceptance conditions:
+
+- The image builds and can run the Nuxt production server as `ujimu:ujimu`.
+- `gemini` is available on `PATH` inside the image.
+- Scripts select the correct names, ports, env examples, network, and volume mappings for both `prod` and `test`.
+- Redeploy replaces the container without deleting host Pi or Ujimu data directories.
+- Test profile does not require or configure real external auth, payment, or communication provider secrets.
+- Documentation describes manual deploy, redeploy, persistence, and known CI/CD deferral.
+
+Implemented files:
+
+- `Dockerfile`
+- `.dockerignore`
+- `.gitignore`
+- `scripts/container/build.sh`
+- `scripts/container/create.sh`
+- `scripts/container/deploy.sh`
+- `scripts/container/redeploy.sh`
+- `scripts/container/remove.sh`
+- `scripts/container/lib.sh`
+- `config/container/prod.env.example`
+- `config/container/test.env.example`
+- `docs/operations.md`
+- `tests/container-deployment.acceptance.test.ts`
+
+Verification plan:
+
+- `npm test` passed, including `tests/container-deployment.acceptance.test.ts`.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+- `npm audit --audit-level=high` passed with 0 vulnerabilities.
+- `scripts/container/build.sh` passed under Podman and produced `localhost/ujimu:latest`.
+- Container smoke checks passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`.
+- Real Gemini/API conversion smoke tests were not run because they require external credentials.
+
+Refinement and grill decisions:
+
+- Use `node:26-trixie-slim` as the Dockerfile base.
+- Use a multi-stage Dockerfile: build with `npm ci` and `npm run build`, then copy only Nuxt/Nitro `.output` plus required runtime config into the final image.
+- Do not copy full `node_modules` into the final image unless smoke testing proves it necessary.
+- Container listens on internal `HOST=0.0.0.0` and `PORT=3000`; profile scripts vary only host port mapping.
+- Real env files default to `config/container/prod.env` and `config/container/test.env`, are gitignored, and can be overridden with `UJIMU_ENV_FILE`.
+- Lifecycle scripts create missing host directories with `mkdir -p` but never delete persistent data.
+- Default image tag is `localhost/ujimu:latest`, overridable with `UJIMU_IMAGE`.
+- `create.sh` fails if the target container already exists; `redeploy.sh` owns replacement.
+- `deploy.sh` creates the container if missing, otherwise restarts it; structural config changes require `redeploy.sh`.
+- `redeploy.sh` builds, stops/removes any existing target container, recreates it, starts it, and never deletes persistent directories.
+- `remove.sh` removes only the target container, not images, networks, env files, or persistent directories.
+- Dockerfile includes a Node-based `HEALTHCHECK` against `/healthz`.
+- Add `.dockerignore` that excludes build output, local dependencies, logs, env files, and real secrets while keeping versioned Pi config resources available.
+- Runtime image installs only `ca-certificates` and `coreutils`; healthcheck uses Node instead of curl/wget.
+- `test.env.example` uses `NODE_ENV=development` and `UJIMU_AUTH_FAKE_DELIVERY_ENABLED=true` to activate existing fake OTP delivery.
+- Set `UJIMU_PI_AGENT_DIR=/app/config/ujimu-pi-agent` in env examples.
+- Both prod and test env examples enable `UJIMU_PI_CONVERSION_ENABLED=true`, `UJIMU_PI_INGESTION_ENABLED=true`, and `UJIMU_PI_CHAT_ENABLED=true`.
+- `prod.env.example` highlights required secrets; lifecycle scripts do not validate secret completeness.
 
 ## Slice 14 — PDF to Markdown Gemini tool
 
@@ -210,7 +294,8 @@ Idea-refined direction:
 - Add Ujimu-owned Pi configuration under `config/ujimu-pi-agent/` so Ujimu does not depend on a developer's global Pi setup or collide with the Pi CLI's reserved project `.pi/` directory.
 - Version `config/ujimu-pi-agent/settings.json`, `config/ujimu-pi-agent/models.json`, `config/ujimu-pi-agent/auth.json.sample`, and agent skills/prompts, but never commit `config/ujimu-pi-agent/auth.json`.
 - Use the `config/ujimu-pi-agent` default model for consultation.
-- Allow conversion and ingestion to override provider/model/thinking level through environment variables; when absent, they fall back to the project-local default.
+- Allow conversion and ingestion to override provider/model through environment variables; when absent, they fall back to the project-local default.
+- As-built correction: the earlier Slice 13 planning keys `UJIMU_PI_CONVERSION_THINKING_LEVEL` and `UJIMU_PI_INGESTION_THINKING_LEVEL` are not read by the current runtime. Treat them as obsolete/no-op environment keys unless a future slice explicitly implements per-role thinking-level overrides.
 - Do not add new Pi tools in this slice. Agent skills are instructions, not capabilities.
 - Keep `bash` disabled by default. Conversion and ingestion may use only the already-approved file tools: `read`, `write`, `edit`, `grep`, `find`, and `ls`. Consultation should use read/search tools only.
 - If PDF, DOCX, or HTML content cannot be extracted safely with the existing tools, conversion fails safely and ingestion does not advance for that source.

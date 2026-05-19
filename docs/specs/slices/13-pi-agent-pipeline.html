@@ -236,17 +236,16 @@ stored: raw/lei.original.md</pre>
 <section class="slide"><div class="frame content"><div class="kicker">Model selection</div><h2>Conversion and ingestion can override the default model.</h2>
 <ul>
 <li>Consultation uses the default model specified by <code>config/ujimu-pi-agent/settings.json</code>.</li>
-<li>Conversion can use a provider/model/thinking override from environment variables.</li>
-<li>Ingestion can use a separate provider/model/thinking override from environment variables.</li>
+<li>Conversion can use a provider/model override from environment variables.</li>
+<li>Ingestion can use a separate provider/model override from environment variables.</li>
 <li>If an override is absent, the agent falls back to the project-local default.</li>
 </ul>
 <pre>UJIMU_PI_CONVERSION_PROVIDER
 UJIMU_PI_CONVERSION_MODEL
-UJIMU_PI_CONVERSION_THINKING_LEVEL
 
 UJIMU_PI_INGESTION_PROVIDER
-UJIMU_PI_INGESTION_MODEL
-UJIMU_PI_INGESTION_THINKING_LEVEL</pre>
+UJIMU_PI_INGESTION_MODEL</pre>
+<div class="callout">As-built note: the earlier Slice 13 planning keys <code>UJIMU_PI_CONVERSION_THINKING_LEVEL</code> and <code>UJIMU_PI_INGESTION_THINKING_LEVEL</code> are not read by the current runtime. Treat them as obsolete/no-op environment keys unless a future slice explicitly implements per-role thinking-level overrides.</div>
 </div></section>
 <section class="slide"><div class="frame content"><div class="kicker">Traceability</div><h2>Every answer must trace back through the pipeline.</h2>
 <ul>

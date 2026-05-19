@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+.nuxt
+.output
+coverage
+.env
+.env.*
+!.env.example
+!.env.sample
+config/container/*.env
+config/ujimu-pi-agent/auth.json
+*.log
+.DS_Store
+.local
+.pi

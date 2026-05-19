@@ -119,6 +119,60 @@ mv "$UJIMU_DATA_DIR/db/ujimu-restored.sqlite" "$UJIMU_DATA_DIR/db/ujimu.sqlite"
 
 Restart the app and check `/healthz` plus `/api/admin/ops/readyz`.
 
+## Podman container deployment
+
+Ujimu provides a single Podman-compatible image with production and test profiles. The same image is configured at runtime by env files and host volume mappings.
+
+Build the default local image:
+
+```bash
+scripts/container/build.sh
+```
+
+Default image tag: `localhost/ujimu:latest`. Override with `UJIMU_IMAGE` when needed.
+
+Profile defaults:
+
+| Profile | Container | Host port | Pi host dir | Ujimu data host dir |
+| --- | --- | --- | --- | --- |
+| `prod` | `ujimu-prod` | `3000` | `/srv/ujimu/prod/pi` | `/srv/ujimu/prod/data` |
+| `test` | `ujimu-test` | `3001` | `/srv/ujimu/test/pi` | `/srv/ujimu/test/data` |
+
+Inside the container both profiles use:
+
+```text
+/home/ujimu/.pi
+/home/ujimu/.local/share/ujimu
+```
+
+The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, and sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`. It includes Gemini CLI through `npm install -g @google/gemini-cli` and exposes a `/healthz` Dockerfile healthcheck.
+
+Create real env files from the examples, keeping secrets out of Git:
+
+```bash
+cp config/container/prod.env.example config/container/prod.env
+cp config/container/test.env.example config/container/test.env
+```
+
+Alternatively point scripts at an external env file:
+
+```bash
+UJIMU_ENV_FILE=/secure/path/prod.env scripts/container/deploy.sh prod
+```
+
+Lifecycle scripts:
+
+```bash
+scripts/container/create.sh prod|test    # create network, dirs, and stopped container; fails if container exists
+scripts/container/deploy.sh prod|test    # create if missing, otherwise restart
+scripts/container/redeploy.sh prod|test  # build, replace container, start; preserves host data
+scripts/container/remove.sh prod|test    # remove only the target container
+```
+
+The scripts create missing profile host directories with `mkdir -p`, but never delete Pi or Ujimu data directories, images, networks, env files, or secrets. Reverse proxy, TLS, DNS, certificates, and CI/CD automation are intentionally outside this deployment slice.
+
+The test profile enables existing fake/no-op auth delivery and mock billing paths while keeping Pi conversion, ingestion, and chat enabled for validation. Do not put real external auth, payment, or communication provider secrets in `test.env`.
+
 ## Deployment quality gate
 
 Every change should pass:

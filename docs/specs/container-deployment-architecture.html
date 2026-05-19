@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Container Deployment Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+      :root { --text:#f5f5f0; --muted:#b9b7ad; --line:rgba(255,255,255,.14); --yellow:#f9d616; --yellow-soft:rgba(249,214,22,.16); --red:#d21034; --panel:rgba(20,20,20,.82); --font-display:"Space Grotesk",sans-serif; --font-body:"Inter",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; overflow:hidden; font-family:var(--font-body); color:var(--text); background:radial-gradient(circle at 12% 12%,rgba(249,214,22,.13),transparent 26%),radial-gradient(circle at 88% 78%,rgba(210,16,52,.10),transparent 28%),linear-gradient(135deg,#030303 0%,#111 48%,#050505 100%); }
+      body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.28; background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); background-size:44px 44px; mask-image:radial-gradient(circle at center,black,transparent 78%); }
+      .deck { width:100vw; height:100vh; position:relative; }
+      .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 10vw 8vh; position:absolute; inset:0; opacity:0; transform:translateY(12px) scale(.99); transition:opacity 220ms ease, transform 220ms ease; }
+      .slide.active { display:flex; opacity:1; transform:translateY(0) scale(1); }
+      .frame { width:min(1180px,100%); min-height:min(690px,76vh); border:1px solid var(--line); border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 28px 90px rgba(0,0,0,.42); padding:clamp(2rem,5vw,4.5rem); position:relative; overflow:hidden; }
+      .frame::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(120deg,transparent 0%,rgba(249,214,22,.08) 48%,transparent 100%); opacity:.55; }
+      .content { position:relative; z-index:1; }
+      .kicker { display:inline-flex; align-items:center; gap:.55rem; margin-bottom:1.2rem; color:var(--yellow); font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.16em; }
+      .kicker::before { content:""; width:2.2rem; height:.18rem; border-radius:99px; background:var(--yellow); }
+      h1,h2 { font-family:var(--font-display); letter-spacing:-.045em; line-height:.96; margin:0; }
+      h1 { font-size:clamp(3.2rem,7vw,7rem); } h2 { max-width:980px; font-size:clamp(2.25rem,5vw,5rem); }
+      p.lead { max-width:900px; margin:1.35rem 0 0; color:var(--muted); font-size:clamp(1.08rem,2vw,1.55rem); line-height:1.45; }
+      ul { list-style:none; padding:0; margin:2rem 0 0; display:grid; gap:.85rem; }
+      li { display:flex; gap:.8rem; align-items:flex-start; color:#e8e7df; font-size:clamp(1rem,1.55vw,1.24rem); line-height:1.38; }
+      li::before { content:""; flex:0 0 .58rem; width:.58rem; height:.58rem; margin-top:.5rem; border-radius:999px; background:var(--yellow); box-shadow:0 0 18px rgba(249,214,22,.38); }
+      .grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .grid-3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .card { border:1px solid var(--line); border-radius:18px; background:var(--panel); padding:1.05rem; min-height:118px; }
+      .card strong { display:block; color:var(--yellow); font-family:var(--font-display); font-size:1.1rem; margin-bottom:.38rem; }
+      .card span { color:var(--muted); line-height:1.4; }
+      .flow { display:flex; align-items:stretch; gap:.7rem; margin-top:2rem; }
+      .node { flex:1; border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.055); padding:1rem; text-align:center; font-weight:800; }
+      .arrow { align-self:center; color:var(--yellow); font-size:1.5rem; }
+      .callout { margin-top:1.7rem; padding:1rem 1.2rem; border-radius:18px; border:1px solid rgba(249,214,22,.30); background:var(--yellow-soft); color:#fff9d1; max-width:900px; line-height:1.45; font-weight:650; }
+      code { color:#fff8c8; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:8px; padding:.1rem .35rem; }
+      .topbar { position:fixed; top:1.2rem; left:50%; z-index:10; transform:translateX(-50%); width:min(1180px,80vw); display:flex; justify-content:space-between; color:rgba(245,245,240,.68); font-size:.84rem; }
+      .counter { position:fixed; bottom:1.4rem; right:2rem; z-index:10; color:rgba(245,245,240,.7); font-size:.9rem; }
+      @media print { body{overflow:visible;} .slide{display:flex; position:relative; page-break-after:always;} .topbar,.counter{display:none;} }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><span>Ujimu container deployment</span><span>Architecture deck — draft</span></div>
+    <main class="deck">
+      <section class="slide active"><div class="frame"><div class="content"><div class="kicker">Architecture</div><h1>Podman deployment shape</h1><p class="lead">A single immutable Ujimu image, two runtime profiles, host-persisted Pi and Ujimu data, and small lifecycle scripts that make manual deploys repeatable.</p></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Source</div><h2>Derived from approved brainstorm</h2><ul><li>Brainstorm deck: <code>docs/specs/brainstorm-container-deployment.html</code>.</li><li>One image serves production and test profiles.</li><li>Test profile uses existing in-code mock/no-op provider paths.</li><li>CI/CD is deferred until the manual deployment contract is proven.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Image design</div><h2>Build once, configure at runtime</h2><div class="grid-3"><div class="card"><strong>Base</strong><span>Node 22-compatible container because package engines require Node >= 22.18.</span></div><div class="card"><strong>Build</strong><span>Install npm dependencies, run Nuxt build, and ship the production output.</span></div><div class="card"><strong>Gemini</strong><span>Install <code>@google/gemini-cli</code> globally for PDF-to-Markdown conversion support.</span></div></div></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Runtime layout</div><h2>Host data survives redeploys</h2><ul><li>Image creates and runs as Unix user/group <code>ujimu:ujimu</code>.</li><li>The in-container Ujimu home directory is <code>/home/ujimu</code>.</li><li>Mount production host storage from <code>/srv/ujimu/prod/pi</code> and <code>/srv/ujimu/prod/data</code>.</li><li>Mount test host storage from <code>/srv/ujimu/test/pi</code> and <code>/srv/ujimu/test/data</code>.</li><li>Inside the container, both profiles use <code>/home/ujimu/.pi</code> and <code>/home/ujimu/.local/share/ujimu</code>.</li><li>Set <code>UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu</code> inside the runtime environment.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Profiles</div><h2>Two containers, one network</h2><div class="flow"><div class="node">ujimu image</div><div class="arrow">→</div><div class="node">ujimu-prod :3000</div><div class="arrow">+</div><div class="node">ujimu-test :3001</div></div><div class="callout">Both containers attach to the <code>ujimu</code> Podman network. Reverse proxy and TLS remain outside the feature boundary.</div></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Test isolation</div><h2>Environment selects existing no-op paths</h2><ul><li>Auth: enable fake OTP delivery only where the app permits non-production fake delivery.</li><li>Billing: use the existing mock checkout/provider boundary.</li><li>Communication: do not configure SendGrid or other real outbound providers in test env.</li><li>Passkeys and external integrations remain disabled unless deliberately enabled.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Timezone</div><h2>Default Africa/Luanda, override by ENV</h2><ul><li>Container should default <code>TZ=Africa/Luanda</code>.</li><li>Env files may override <code>TZ</code> for another IANA timezone.</li><li>Application-level quota logic already falls back to Africa/Luanda for invalid/missing user timezones.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Scripts</div><h2>Small commands over orchestration</h2><ul><li><code>build.sh</code> builds/tags the Ujimu image.</li><li><code>create.sh prod|test</code> creates network, directories, and a stopped container.</li><li><code>deploy.sh prod|test</code> creates if needed, then starts/restarts.</li><li><code>redeploy.sh prod|test</code> rebuilds, replaces the container, and preserves mounted data.</li><li><code>remove.sh prod|test</code> removes only the container, never persistent host data.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Non-goals</div><h2>Keep this slice narrow</h2><ul><li>No CI/CD pipeline yet.</li><li>No TLS, reverse proxy, domain, or certificate automation.</li><li>No new auth/payment/communication provider implementations.</li><li>No backup scheduler; document backup expectations only if needed.</li><li>No Kubernetes/Compose abstraction unless Podman scripts become insufficient.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Open design questions</div><h2>Need alignment before slicing</h2><ul><li>Resolved: use fixed in-container runtime home <code>/home/ujimu</code>.</li><li>Resolved: the image creates internal <code>ujimu:ujimu</code> and runs as that user.</li><li>Resolved: prod and test use the same in-container mount points.</li><li>Resolved: deployment maps those mount points to <code>/srv/ujimu/prod/*</code> and <code>/srv/ujimu/test/*</code> host locations.</li></ul></div></div></section>
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Iteration log</div><h2>Architecture iteration 1</h2><ul><li>Inspected existing provider boundaries: fake OTP delivery, mock billing checkout, Pi config envs, and Ujimu data-dir defaults.</li><li>Captured a single-image, two-profile architecture with mounted persistent Pi/Ujimu state.</li><li>Deferred CI/CD and reverse proxy concerns to keep this deployment feature focused.</li><li>Iteration 2: user chose fixed <code>/home/ujimu</code> in-container paths and internal image user/group <code>ujimu:ujimu</code>.</li><li>Iteration 3: clarified that prod/test share the same in-container mount points but map to different host volumes at deployment time.</li><li>Iteration 4: user confirmed host conventions <code>/srv/ujimu/prod/pi</code>, <code>/srv/ujimu/prod/data</code>, <code>/srv/ujimu/test/pi</code>, and <code>/srv/ujimu/test/data</code>.</li></ul></div></div></section>
+    </main>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = document.querySelectorAll('.slide'); let idx = 0; document.getElementById('total').textContent = slides.length;
+      function go(i){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(i, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+      document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(idx + 1); } if (e.key === 'ArrowLeft') go(idx - 1); });
+      document.addEventListener('click', e => { e.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+    </script>
+  </body>
+</html>
