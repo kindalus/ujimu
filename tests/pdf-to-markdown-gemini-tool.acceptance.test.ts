@@ -11,6 +11,11 @@ describe('PDF to Markdown Gemini tool acceptance', () => {
   it('converts a raw PDF through gemini stdout, writes Markdown atomically, and returns metadata only', async () => {
     const workspace = await createPdfWorkspace('Documento.PDF')
     const fakeBin = await createFakeGeminiBin({ mode: 'success' })
+    await writeFile(join(fakeBin.bin, 'pdftotext'), `#!/usr/bin/env bash
+echo "pdftotext must not be used" >&2
+exit 88
+`)
+    await chmod(join(fakeBin.bin, 'pdftotext'), 0o755)
 
     const result = await runPdfTool(workspace.root, ['raw/Documento.PDF'], {
       PATH: `${fakeBin.bin}:${process.env.PATH ?? ''}`,
@@ -34,6 +39,7 @@ describe('PDF to Markdown Gemini tool acceptance', () => {
     expect(geminiArgs[0]).toBe('-y')
     expect(geminiArgs[1]).toBe('-p')
     expect(geminiArgs[2]).toContain('@raw/Documento.PDF')
+    expect(geminiArgs[2]).toContain('complete PDF from first page to last page')
     expect(geminiArgs[2]).toContain('raw/Documento.PDF.md')
     expect(geminiArgs[2].toLowerCase()).toContain('stdout')
     expect(geminiArgs[2].toLowerCase()).toContain('markdown')
@@ -41,31 +47,6 @@ describe('PDF to Markdown Gemini tool acceptance', () => {
     const timeoutArgs = await readNullSeparatedArgs(fakeBin.timeoutLog)
     expect(timeoutArgs[0]).toBe('600s')
     expect(timeoutArgs[1]).toBe('gemini')
-  })
-
-  it('prefers local pdftotext extraction when available and sufficiently complete', async () => {
-    const workspace = await createPdfWorkspace('Documento.PDF')
-    const fakeBin = await createFakeGeminiBin({ mode: 'success' })
-    await writeFile(join(fakeBin.bin, 'pdftotext'), `#!/usr/bin/env bash
-set -euo pipefail
-if [ "$1" != "-layout" ]; then exit 93; fi
-cat <<'TEXT'
-# Documento via pdftotext
-
-Texto extraído localmente com conteúdo suficiente.
-TEXT
-`)
-    await chmod(join(fakeBin.bin, 'pdftotext'), 0o755)
-
-    const result = await runPdfTool(workspace.root, ['raw/Documento.PDF'], {
-      PATH: `${fakeBin.bin}:${process.env.PATH ?? ''}`,
-      GEMINI_API_KEY: 'test-gemini-api-key'
-    })
-
-    expect(result.code).toBe(0)
-    expect(existsSync(fakeBin.geminiLog)).toBe(false)
-    const markdown = await readFile(join(workspace.root, 'raw', 'Documento.PDF.md'), 'utf8')
-    expect(markdown).toContain('Documento via pdftotext')
   })
 
   it('rejects invalid PDF inputs before invoking gemini', async () => {
