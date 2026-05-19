@@ -2,9 +2,11 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createPdfToMarkdownTool } from '../pi/pdf-to-markdown-tool'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
+import { extractArticleRefs, inferSourceTitle } from './metadata'
 import { writeIngestionState } from './state'
 import type { IngestionSourceRecord, IngestionState } from './types'
 
@@ -114,6 +116,9 @@ async function runPiSdkConversion(
 ): Promise<void> {
   if (/\.pdf$/i.test(source.raw_path)) {
     await assertPdfConversionPrerequisites()
+    const tool = createPdfToMarkdownTool({ cwd: specialist.paths.root })
+    await tool.execute('pdf-conversion', { pdfPath: `raw/${source.raw_path}` })
+    return
   }
 
   const cwd = specialist.paths.root
@@ -271,6 +276,13 @@ async function validateConvertedMarkdown(
     throw new PiConversionError('CONVERSION_OUTPUT_TOO_SMALL', 'Converted Markdown is too small to ingest safely.')
   }
 
+  const articleRefs = extractArticleRefs(text)
+  if (articleRefs.length > 0) {
+    source.article_refs = articleRefs
+  }
+  if (!source.title.trim() || source.title === source.raw_path.replace(/[-_]+/g, ' ').replace(/\.\w+$/u, '').trim()) {
+    source.title = inferSourceTitle(source.raw_path, text)
+  }
   source.conversion!.markdown_checksum = toChecksum(content)
 }
 

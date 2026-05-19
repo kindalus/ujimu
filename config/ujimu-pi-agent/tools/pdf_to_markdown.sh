@@ -79,7 +79,7 @@ if [ -L "$target_rel" ]; then
   fail "INVALID_PDF_INPUT" "Symlink Markdown targets are not allowed."
 fi
 
-prompt="Convert the attached PDF into faithful Markdown.
+prompt="Convert @${pdf_rel} into faithful Markdown.
 
 Input PDF: ${pdf_rel}
 Final Markdown filename: ${target_rel}
@@ -105,7 +105,7 @@ cleanup() {
 trap cleanup EXIT
 
 set +e
-gemini_output="$(timeout 600s gemini -y -p "$prompt" "$pdf_rel" 2>"$stderr_tmp")"
+gemini_output="$(timeout 600s gemini -y -p "$prompt" 2>"$stderr_tmp")"
 gemini_status=$?
 set -e
 

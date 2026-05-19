@@ -30,9 +30,10 @@ describe('PDF to Markdown Gemini tool acceptance', () => {
     expect(markdown).toContain('Texto convertido com conteúdo suficiente.')
 
     const geminiArgs = await readNullSeparatedArgs(fakeBin.geminiLog)
+    expect(geminiArgs).toHaveLength(3)
     expect(geminiArgs[0]).toBe('-y')
     expect(geminiArgs[1]).toBe('-p')
-    expect(geminiArgs.at(-1)).toBe('raw/Documento.PDF')
+    expect(geminiArgs[2]).toContain('@raw/Documento.PDF')
     expect(geminiArgs[2]).toContain('raw/Documento.PDF.md')
     expect(geminiArgs[2].toLowerCase()).toContain('stdout')
     expect(geminiArgs[2].toLowerCase()).toContain('markdown')
