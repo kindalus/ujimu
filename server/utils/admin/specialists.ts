@@ -15,6 +15,20 @@ const ALLOWED_RAW_SOURCE_EXTENSIONS = new Set([
   '.markdown'
 ])
 
+const GENERATED_MARKDOWN_SUFFIXES = ['.pdf.md', '.txt.md', '.docx.md', '.html.md', '.htm.md', '.csv.md', '.xlsx.md']
+
+const COMPATIBLE_UPLOAD_CONTENT_TYPES: Record<string, Set<string>> = {
+  '.pdf': new Set(['application/pdf']),
+  '.txt': new Set(['text/plain', 'application/octet-stream']),
+  '.md': new Set(['text/markdown', 'text/plain', 'application/octet-stream']),
+  '.markdown': new Set(['text/markdown', 'text/plain', 'application/octet-stream']),
+  '.html': new Set(['text/html', 'application/xhtml+xml', 'application/octet-stream']),
+  '.htm': new Set(['text/html', 'application/xhtml+xml', 'application/octet-stream']),
+  '.csv': new Set(['text/csv', 'text/plain', 'application/vnd.ms-excel', 'application/octet-stream']),
+  '.docx': new Set(['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream']),
+  '.xlsx': new Set(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'])
+}
+
 export interface AdminSpecialistPayload {
   id: string
   name: string
@@ -67,5 +81,19 @@ export function countSources(sources: IngestionSourceRecord[]): SourceStatusCoun
 }
 
 export function isAllowedRawSourceFileName(fileName: string): boolean {
-  return ALLOWED_RAW_SOURCE_EXTENSIONS.has(extname(fileName).toLowerCase())
+  return ALLOWED_RAW_SOURCE_EXTENSIONS.has(extname(fileName).toLowerCase()) && !isGeneratedMarkdownArtifactName(fileName)
+}
+
+export function isCompatibleRawSourceContentType(fileName: string, contentType: string | undefined): boolean {
+  const normalizedContentType = contentType?.split(';', 1)[0]?.trim().toLowerCase()
+  if (!normalizedContentType) {
+    return true
+  }
+
+  return COMPATIBLE_UPLOAD_CONTENT_TYPES[extname(fileName).toLowerCase()]?.has(normalizedContentType) ?? false
+}
+
+export function isGeneratedMarkdownArtifactName(fileName: string): boolean {
+  const normalized = fileName.trim().toLowerCase()
+  return GENERATED_MARKDOWN_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
 }

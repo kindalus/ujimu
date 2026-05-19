@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRouterParam, readMultipartFormData, setResponseStatus } from 'h3'
 import { recordAdminAuditEvent } from '../../../../utils/admin/audit'
 import { requireAdmin } from '../../../../utils/admin/guards'
-import { isAllowedRawSourceFileName } from '../../../../utils/admin/specialists'
+import { isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../../utils/db'
 import { RawSourceStorageError, storeRawSource } from '../../../../utils/ingestion/storage'
 import { getSpecialistById } from '../../../../utils/specialists/registry'
@@ -19,6 +19,9 @@ export default defineEventHandler(async (event) => {
     const file = await readUploadFile(event)
     if (!isAllowedRawSourceFileName(file.filename)) {
       throw createError({ statusCode: 400, statusMessage: 'Unsupported source file type' })
+    }
+    if (!isCompatibleRawSourceContentType(file.filename, file.contentType)) {
+      throw createError({ statusCode: 400, statusMessage: 'Upload content type does not match source filename' })
     }
 
     const stored = await storeRawSource(specialist, {
@@ -58,7 +61,7 @@ function getRequiredSpecialistId(event: Parameters<typeof getRouterParam>[0]): s
   return id
 }
 
-async function readUploadFile(event: Parameters<typeof readMultipartFormData>[0]): Promise<{ filename: string; data: Buffer }> {
+async function readUploadFile(event: Parameters<typeof readMultipartFormData>[0]): Promise<{ filename: string; data: Buffer; contentType?: string }> {
   const parts = await readMultipartFormData(event).catch(() => undefined)
   const file = parts?.find((part) => part.name === 'file' && part.filename)
 
@@ -66,5 +69,6 @@ async function readUploadFile(event: Parameters<typeof readMultipartFormData>[0]
     throw createError({ statusCode: 400, statusMessage: 'Missing upload file' })
   }
 
-  return { filename: file.filename, data: file.data }
+  const contentType = typeof file.type === 'string' ? file.type : undefined
+  return { filename: file.filename, data: file.data, ...(contentType ? { contentType } : {}) }
 }

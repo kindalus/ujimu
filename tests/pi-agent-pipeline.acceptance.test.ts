@@ -40,6 +40,12 @@ describe('three Pi agent pipeline acceptance', () => {
         content: '# Duplicado\n\nArtigo 2.º\nTexto duplicado.'
       })
     ).rejects.toMatchObject({ code: 'RAW_SOURCE_ALREADY_EXISTS' })
+    await expect(
+      storeRawSource(specialist, {
+        fileName: 'lei.txt.md',
+        content: '# Artefacto gerado\n\nArtigo 2.º\nTexto duplicado.'
+      })
+    ).rejects.toMatchObject({ code: 'GENERATED_MARKDOWN_ARTIFACT' })
 
     const state = await scanSpecialistRawSources(specialist)
     const source = state.sources['lei.original.md'] as any
@@ -154,6 +160,47 @@ describe('three Pi agent pipeline acceptance', () => {
     })
     expect(state.sources['pendente.docx'].ingestion.status).toBe('blocked')
     expect(state.sources['manual.original.md'].ingestion.status).toBe('ingested')
+  })
+
+  it('rejects generated Markdown artefact and mismatched MIME uploads at the admin boundary', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedAdmin(dataDir)
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const routePath = '../server/api/admin/specialists/[id]/conversion/run.post'
+    const conversionModule = await import(routePath) as { default: unknown }
+    const fetchAdmin = createAdminFetch(dataDir, conversionModule.default)
+
+    const generatedResponse = await fetchAdmin(uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.txt.md', '# Generated'))
+    expect(generatedResponse.status).toBe(400)
+
+    const mismatchResponse = await fetchAdmin(
+      uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.md', '# Lei', 'application/x-msdownload')
+    )
+    expect(mismatchResponse.status).toBe(400)
+  })
+
+  it('fails PDF conversion quickly when PDF tool prerequisites are unavailable', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedAdmin(dataDir)
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const routePath = '../server/api/admin/specialists/[id]/conversion/run.post'
+    const conversionModule = await import(routePath) as { default: unknown }
+    const fetchAdmin = createAdminFetch(dataDir, conversionModule.default)
+
+    const previousGeminiApiKey = process.env.GEMINI_API_KEY
+    delete process.env.GEMINI_API_KEY
+    try {
+      await fetchAdmin(uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.pdf', '%PDF-1.7 placeholder', 'application/pdf'))
+      await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/sources/reload', { method: 'POST' }))
+      const response = await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/conversion/run', { method: 'POST' }))
+
+      expect(response.status).toBe(200)
+      const payload = await response.json() as { failed: number; sources: Array<{ conversion?: { error_message?: string } }> }
+      expect(payload.failed).toBe(1)
+      expect(payload.sources[0]?.conversion?.error_message).toContain('GEMINI_API_KEY_MISSING')
+    } finally {
+      restoreEnv('GEMINI_API_KEY', previousGeminiApiKey)
+    }
   })
 
   it('requires the manual admin conversion endpoint and audits safe conversion counts', async () => {
@@ -441,9 +488,9 @@ function createAdminFetch(dataDir: string, conversionHandler: unknown): (request
   }
 }
 
-function uploadRequest(url: string, fileName: string, content: string): Request {
+function uploadRequest(url: string, fileName: string, content: string, contentType = 'text/plain'): Request {
   const form = new FormData()
-  form.set('file', new Blob([content], { type: 'text/plain' }), fileName)
+  form.set('file', new Blob([content], { type: contentType }), fileName)
   return new Request(url, {
     method: 'POST',
     headers: sessionHeaders('admin-user'),

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -111,6 +112,10 @@ async function runPiSdkConversion(
   source: IngestionSourceRecord,
   options: PiConversionRunnerOptions
 ): Promise<void> {
+  if (/\.pdf$/i.test(source.raw_path)) {
+    await assertPdfConversionPrerequisites()
+  }
+
   const cwd = specialist.paths.root
   const { session } = await createUjimuPiSession({
     cwd,
@@ -142,6 +147,28 @@ async function runPiSdkConversion(
   } finally {
     session.dispose()
   }
+}
+
+async function assertPdfConversionPrerequisites(): Promise<void> {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new PiConversionError('CONVERSION_FAILED', 'GEMINI_API_KEY_MISSING: GEMINI_API_KEY must be set in the environment.')
+  }
+
+  if (!(await commandExists('gemini'))) {
+    throw new PiConversionError('CONVERSION_FAILED', 'GEMINI_CLI_UNAVAILABLE: gemini CLI is not available on PATH.')
+  }
+
+  if (!(await commandExists('timeout'))) {
+    throw new PiConversionError('CONVERSION_FAILED', 'TIMEOUT_COMMAND_UNAVAILABLE: timeout command is not available on PATH.')
+  }
+}
+
+function commandExists(command: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('sh', ['-c', `command -v ${command} >/dev/null 2>&1`], { stdio: 'ignore' })
+    child.on('error', () => resolve(false))
+    child.on('close', (code) => resolve(code === 0))
+  })
 }
 
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {

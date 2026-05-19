@@ -11,6 +11,7 @@ import { createSessionToken } from '../server/utils/auth/session'
 import { initializeDatabase } from '../server/utils/db'
 import { writeOperationalEvent } from '../server/utils/ops/logger'
 import { storeRawSource, RawSourceStorageError } from '../server/utils/ingestion/storage'
+import { createSecurityHeaders } from '../server/utils/security/headers'
 import { createSpecialist } from '../server/utils/specialists/manager'
 import { resetSpecialistRegistryForTests } from '../server/utils/specialists/registry'
 
@@ -31,6 +32,11 @@ describe('security, operations, and observability acceptance', () => {
     expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin')
     expect(response.headers.get('permissions-policy')).toContain('camera=()')
     expect(response.headers.get('content-security-policy')).toContain("default-src 'self'")
+  })
+
+  it('allows Vite worker blobs only outside production CSP', () => {
+    expect(createSecurityHeaders({ NODE_ENV: 'development' })['content-security-policy']).toContain("worker-src 'self' blob:")
+    expect(createSecurityHeaders({ NODE_ENV: 'production' })['content-security-policy']).not.toContain('worker-src')
   })
 
   it('writes daily JSONL operational events with sanitized metadata only', async () => {

@@ -10,7 +10,7 @@ export interface StoreRawSourceInput {
 
 export class RawSourceStorageError extends Error {
   constructor(
-    public readonly code: 'INVALID_RAW_FILENAME' | 'RAW_SOURCE_ALREADY_EXISTS',
+    public readonly code: 'INVALID_RAW_FILENAME' | 'RAW_SOURCE_ALREADY_EXISTS' | 'GENERATED_MARKDOWN_ARTIFACT',
     message: string
   ) {
     super(message)
@@ -61,7 +61,20 @@ function normalizeMarkdownUploadName(fileName: string): string {
     return fileName
   }
 
+  if (isGeneratedMarkdownArtifactName(fileName)) {
+    throw new RawSourceStorageError(
+      'GENERATED_MARKDOWN_ARTIFACT',
+      `Generated Markdown artefact "${fileName}" cannot be uploaded as an original source.`
+    )
+  }
+
   return `${fileName.slice(0, -extension.length)}.original.md`
+}
+
+function isGeneratedMarkdownArtifactName(fileName: string): boolean {
+  const normalized = fileName.trim().toLowerCase()
+  return ['.pdf.md', '.txt.md', '.docx.md', '.html.md', '.htm.md', '.csv.md', '.xlsx.md']
+    .some((suffix) => normalized.endsWith(suffix))
 }
 
 async function pathExists(path: string): Promise<boolean> {
