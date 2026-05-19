@@ -43,6 +43,31 @@ describe('PDF to Markdown Gemini tool acceptance', () => {
     expect(timeoutArgs[1]).toBe('gemini')
   })
 
+  it('prefers local pdftotext extraction when available and sufficiently complete', async () => {
+    const workspace = await createPdfWorkspace('Documento.PDF')
+    const fakeBin = await createFakeGeminiBin({ mode: 'success' })
+    await writeFile(join(fakeBin.bin, 'pdftotext'), `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" != "-layout" ]; then exit 93; fi
+cat <<'TEXT'
+# Documento via pdftotext
+
+Texto extraído localmente com conteúdo suficiente.
+TEXT
+`)
+    await chmod(join(fakeBin.bin, 'pdftotext'), 0o755)
+
+    const result = await runPdfTool(workspace.root, ['raw/Documento.PDF'], {
+      PATH: `${fakeBin.bin}:${process.env.PATH ?? ''}`,
+      GEMINI_API_KEY: 'test-gemini-api-key'
+    })
+
+    expect(result.code).toBe(0)
+    expect(existsSync(fakeBin.geminiLog)).toBe(false)
+    const markdown = await readFile(join(workspace.root, 'raw', 'Documento.PDF.md'), 'utf8')
+    expect(markdown).toContain('Documento via pdftotext')
+  })
+
   it('rejects invalid PDF inputs before invoking gemini', async () => {
     const workspace = await createPdfWorkspace('lei.pdf')
     await writeFile(join(workspace.root, 'raw', 'not-a-pdf.txt'), 'texto')

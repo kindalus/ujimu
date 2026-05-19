@@ -94,6 +94,31 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
+  it('uses the source title as citation detail when an ingested non-article source has no article refs', async () => {
+    const { specialtiesRoot } = await createTempSpecialist('iva')
+    await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot, {
+      articleRefs: []
+    })
+
+    const events = await collectChatEvents(
+      await createChatEventStreamFromBody(
+        { specialistId: 'iva', question: 'Qual é o valor do projecto?' },
+        { specialtiesRoot, piChatEnabled: true, runner: fakeRunner() }
+      )
+    )
+
+    expect(events.map((event) => event.type)).toEqual(['delta', 'citation', 'done'])
+    expect(events[1]).toEqual({
+      type: 'citation',
+      citation: {
+        sourceTitle: 'Código do IVA',
+        sourceFile: 'raw/codigo-iva.original.md',
+        articleRefs: ['Código do IVA']
+      }
+    })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
   it('converts a grounded engine result without citations into a safe fallback', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
@@ -164,7 +189,8 @@ async function createTempSpecialist(id: string): Promise<{
 
 async function createIngestedSource(
   getSpecialistById: (id: string, options: { specialtiesRoot: string }) => Promise<SpecialistRuntime | undefined>,
-  specialtiesRoot: string
+  specialtiesRoot: string,
+  options: { articleRefs?: string[] } = {}
 ): Promise<void> {
   const specialist = await getSpecialistById('iva', { specialtiesRoot })
   if (!specialist) {
@@ -179,6 +205,7 @@ async function createIngestedSource(
   const state = await scanSpecialistRawSources(specialist)
   state.sources['codigo-iva.original.md'].status = 'ingested'
   state.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
+  state.sources['codigo-iva.original.md'].article_refs = options.articleRefs ?? ['Artigo 1.º']
   state.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
   await writeIngestionState(specialist.paths.ingestState, state)
 }

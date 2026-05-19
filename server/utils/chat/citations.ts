@@ -8,16 +8,17 @@ export function isUsableCitationSource(source: IngestionSourceRecord): boolean {
   return (
     (source.status === 'ingested' || source.ingestion?.status === 'ingested') &&
     source.title.trim().length > 0 &&
-    source.raw_path.trim().length > 0 &&
-    source.article_refs.some((articleRef) => articleRef.trim().length > 0)
+    source.raw_path.trim().length > 0
   )
 }
 
 export function sourceToChatCitation(source: IngestionSourceRecord): ChatCitation {
+  const articleRefs = source.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
+
   return {
     sourceTitle: source.title.trim(),
     sourceFile: `raw/${source.raw_path}`,
-    articleRefs: source.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
+    articleRefs: articleRefs.length > 0 ? articleRefs : [source.title.trim()]
   }
 }
 

@@ -104,6 +104,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
+if command -v pdftotext >/dev/null 2>&1; then
+  set +e
+  pdftotext_output="$(pdftotext -layout "$pdf_rel" - 2>/dev/null)"
+  pdftotext_status=$?
+  set -e
+
+  pdftotext_nonwhite_count="$(printf '%s' "$pdftotext_output" | tr -d '[:space:]' | wc -c | tr -d ' ')"
+  if [ "$pdftotext_status" -eq 0 ] && [ "${pdftotext_nonwhite_count:-0}" -ge 20 ]; then
+    tmp_path="$(mktemp "${target_real}.tmp.XXXXXX")"
+    printf '%s\n' "$pdftotext_output" > "$tmp_path"
+    bytes="$(wc -c < "$tmp_path" | tr -d ' ')"
+    mv "$tmp_path" "$target_real"
+    tmp_path=""
+
+    node -e 'console.log(JSON.stringify({ status: "converted", markdownPath: process.argv[1], bytes: Number(process.argv[2]) }))' "$target_rel" "$bytes"
+    exit 0
+  fi
+fi
+
 set +e
 gemini_output="$(timeout 600s gemini -y -p "$prompt" 2>"$stderr_tmp")"
 gemini_status=$?
