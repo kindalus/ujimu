@@ -85,13 +85,13 @@ Input PDF: ${pdf_rel}
 Final Markdown filename: ${target_rel}
 
 Rules:
-- Return only the Markdown content on stdout.
+- Write the complete Markdown conversion directly to ${target_rel}.
+- Do not return the converted document on stdout; stdout may be truncated for long PDFs.
 - Process the complete PDF from first page to last page; do not stop at a cover page or table of contents.
-- Do not write files directly; the wrapper script will write ${target_rel}.
 - Preserve the original language and wording as faithfully as possible.
 - Do not summarize, omit, modernize, translate, or invent content.
 - Preserve headings, articles, lists, tables, references, and visible structure where possible.
-- Do not wrap the response in a Markdown code fence."
+- Do not wrap the file content in a Markdown code fence."
 
 stderr_tmp="$(mktemp "${target_real}.stderr.XXXXXX")"
 tmp_path=""
@@ -106,7 +106,7 @@ cleanup() {
 trap cleanup EXIT
 
 set +e
-gemini_output="$(timeout 600s gemini -y -p "$prompt" 2>"$stderr_tmp")"
+timeout 600s gemini -y -p "$prompt" > /dev/null 2>"$stderr_tmp"
 gemini_status=$?
 set -e
 
@@ -118,26 +118,20 @@ if [ "$gemini_status" -ne 0 ]; then
   fail "GEMINI_CONVERSION_FAILED" "Gemini CLI failed with exit code ${gemini_status}."
 fi
 
-normalized="$(printf '%s' "$gemini_output" | node -e '
-let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => { input += chunk; });
-process.stdin.on("end", () => {
-  const trimmed = input.trim();
-  const match = trimmed.match(/^```(?:markdown)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
-  process.stdout.write(match ? `${match[1]}\n` : input);
-});
-')"
-
-nonwhite_count="$(printf '%s' "$normalized" | tr -d '[:space:]' | wc -c | tr -d ' ')"
-if [ "${nonwhite_count:-0}" -lt 20 ]; then
-  fail "GEMINI_CONVERSION_FAILED" "Gemini output is too small to be a safe Markdown conversion."
+if [ ! -f "$target_real" ]; then
+  fail "GEMINI_CONVERSION_FAILED" "Gemini did not create the expected Markdown file."
 fi
 
-tmp_path="$(mktemp "${target_real}.tmp.XXXXXX")"
-printf '%s' "$normalized" > "$tmp_path"
-bytes="$(wc -c < "$tmp_path" | tr -d ' ')"
-mv "$tmp_path" "$target_real"
-tmp_path=""
+case "$(realpath "$target_real" 2>/dev/null)" in
+  "$raw_real"/*) ;;
+  *) fail "GEMINI_CONVERSION_FAILED" "Gemini wrote the Markdown target outside raw/." ;;
+esac
 
+nonwhite_count="$(tr -d '[:space:]' < "$target_real" | wc -c | tr -d ' ')"
+if [ "${nonwhite_count:-0}" -lt 20 ]; then
+  fail "GEMINI_CONVERSION_FAILED" "Gemini output file is too small to be a safe Markdown conversion."
+fi
+
+bytes="$(wc -c < "$target_real" | tr -d ' ')"
+chmod 600 "$target_real" 2>/dev/null || true
 node -e 'console.log(JSON.stringify({ status: "converted", markdownPath: process.argv[1], bytes: Number(process.argv[2]) }))' "$target_rel" "$bytes"

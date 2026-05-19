@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 const SCRIPT_PATH = join(process.cwd(), 'config', 'ujimu-pi-agent', 'tools', 'pdf_to_markdown.sh')
 
 describe('PDF to Markdown Gemini tool acceptance', () => {
-  it('converts a raw PDF through gemini stdout, writes Markdown atomically, and returns metadata only', async () => {
+  it('converts a raw PDF by letting gemini write the final Markdown file and returns metadata only', async () => {
     const workspace = await createPdfWorkspace('Documento.PDF')
     const fakeBin = await createFakeGeminiBin({ mode: 'success' })
     await writeFile(join(fakeBin.bin, 'pdftotext'), `#!/usr/bin/env bash
@@ -41,7 +41,7 @@ exit 88
     expect(geminiArgs[2]).toContain('@raw/Documento.PDF')
     expect(geminiArgs[2]).toContain('complete PDF from first page to last page')
     expect(geminiArgs[2]).toContain('raw/Documento.PDF.md')
-    expect(geminiArgs[2].toLowerCase()).toContain('stdout')
+    expect(geminiArgs[2]).toContain('Do not return the converted document on stdout')
     expect(geminiArgs[2].toLowerCase()).toContain('markdown')
 
     const timeoutArgs = await readNullSeparatedArgs(fakeBin.timeoutLog)
@@ -143,12 +143,10 @@ if [ "${options.mode}" = "auth-failure" ]; then
   echo "authentication failed for $GEMINI_API_KEY" >&2
   exit 7
 fi
-cat <<'MARKDOWN'
-\`\`\`markdown
+cat > raw/Documento.PDF.md <<'MARKDOWN'
 # Documento
 
 Texto convertido com conteúdo suficiente.
-\`\`\`
 MARKDOWN
 `)
   await chmod(join(bin, 'timeout'), 0o755)
