@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 20 inline ads work:
+Latest full verification after Slice 21 admin routing work:
 
-- `npm test` — passed, 109 tests
+- `npm test` — passed, 110 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Chrome DevTools browser check — passed: the chat page renders without permanent advertising side panels, `.ad-panel`/`.ads-section` are absent, inline ad placement is reserved for the message stream, and console output has no errors or warnings beyond Nuxt development info logs.
+- Chrome DevTools browser check — passed: `/admin`, `/admin/specialists`, and `/admin/specialists/demo` render the expected unauthenticated/admin-blocking surfaces; dynamic specialist detail routing is active; console output has no errors or warnings beyond Nuxt development info logs.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -71,7 +71,7 @@ Known non-blocking warnings:
 | 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `verified` | 2026-05-21 | Conversation history moved into the drawer; OTP/passkey login opens as an on-demand Nuxt UI modal; permanent auth/history side panels removed. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
-| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `acceptance-tested` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
+| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
 ## UI redesign planned slices
@@ -103,12 +103,12 @@ Planned order:
 3. Slice 18 moves history and authentication to on-demand drawer/modal flows. — verified 2026-05-21.
 4. Slice 19 moves subscription management to `/subscription`. — verified 2026-05-21.
 5. Slice 20 inserts ads into the chat stream without obstructing citations. — verified 2026-05-21.
-6. Slice 21 restructures admin specialist/source management into subpages. — refined and grilled 2026-05-21.
+6. Slice 21 restructures admin specialist/source management into subpages. — verified 2026-05-21.
 7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
 
 ## Slice 21 — Admin routing specialists and sources
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -130,14 +130,24 @@ Implementation sources checked:
 - Nuxt 4 routing documentation: `https://nuxt.com/docs/4.x/getting-started/routing`
 - Nuxt UI component documentation for Button, Input, Textarea, and Badge: `https://ui.nuxt.com/components/button`, `https://ui.nuxt.com/components/input`, `https://ui.nuxt.com/components/textarea`, `https://ui.nuxt.com/components/badge`
 
-Acceptance tests:
+Implemented files:
 
-- `tests/admin-ui.acceptance.test.ts` now expects `/admin`, `/admin/specialists`, and `/admin/specialists/[id]` to split specialist administration.
-- The route split test was run red with `npm test -- tests/admin-ui.acceptance.test.ts --reporter=verbose`; it failed because the new specialist subpages do not yet exist.
+- `pages/admin/index.vue`
+- `pages/admin/specialists/index.vue`
+- `pages/admin/specialists/[id].vue`
+- `utils/admin-ui.ts`
+- `tests/admin-ui.acceptance.test.ts`
+- `docs/specs/slices/21-admin-routing-specialists-sources.html`
+- `docs/specs/slices/STATUS.md`
 
-Next verification target:
+Verification completed:
 
-- Implement the subpages and make the admin UI acceptance test pass.
+- `npm test -- tests/admin-ui.acceptance.test.ts --reporter=verbose` — failed before implementation, then passed.
+- `npm test` — passed, 110 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
+- Chrome DevTools browser check — passed on port 3100; `/admin`, `/admin/specialists`, and `/admin/specialists/demo` rendered the expected route-specific surfaces, dynamic detail routing worked, and console output had only Nuxt development info logs.
 
 ## Slice 20 — Inline ads chat polish
 

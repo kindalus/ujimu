@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 const adminDashboardPath = 'pages/admin/index.vue'
-const adminSpecialistsPath = 'pages/admin/specialists.vue'
+const adminSpecialistsPath = 'pages/admin/specialists/index.vue'
 const adminSpecialistDetailPath = 'pages/admin/specialists/[id].vue'
 
 async function readAdminPages() {
@@ -33,11 +33,11 @@ describe('admin specialist management UI acceptance', () => {
     expect(specialists).toContain('/api/admin/specialists')
     expect(specialists).toContain('Criar especialidade')
     expect(specialists).toContain('Especialidades')
-    expect(specialists).toContain('to="/admin/specialists/')
+    expect(specialists).toContain('`/admin/specialists/${specialist.id}`')
     expect(specialists).not.toContain('/raw')
     expect(specialists).not.toContain('/api/admin/analytics/questions')
 
-    expect(detail).toContain('useRoute')
+    expect(detail).toContain('window.location.pathname')
     expect(detail).toContain('/api/admin/specialists')
     expect(detail).toContain('/raw')
     expect(detail).toContain('/sources/reload')
