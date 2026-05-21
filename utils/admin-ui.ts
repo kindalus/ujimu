@@ -42,6 +42,56 @@ export interface AdminSpecialistsResponse {
   specialists: AdminSpecialist[]
 }
 
+export interface MonthlyVisitorsResponse {
+  month: string
+  distinctVisitors: number
+}
+
+export interface ContentGapCandidate {
+  specialistId: string
+  fingerprint: string
+  normalizedQuestion: string
+  latestQuestion: string
+  countLast30Days: number
+  countSinceReview: number
+  totalCount: number
+  insufficientContextCount: number
+  firstOccurredAt: string
+  lastOccurredAt: string
+  reviewedAt: string | null
+}
+
+export interface RecentQuestionAnalytics {
+  id: string
+  specialistId: string
+  outcome: 'answered' | 'insufficient_context'
+  questionText: string
+  normalizedQuestion: string
+  fingerprint: string
+  occurredAt: string
+  userTimezone: string
+}
+
+export interface QuestionAnalyticsResponse {
+  candidates: ContentGapCandidate[]
+  recentQuestions: RecentQuestionAnalytics[]
+}
+
+export interface AdminReadinessResponse {
+  ok: boolean
+  checks: {
+    database: boolean
+    dataDirectoryWritable: boolean
+    operationalLogsWritable: boolean
+    migrationsApplied: number
+    billingWebhookSecretConfigured: boolean
+    sessionSecretConfigured: boolean
+    otpPepperConfigured: boolean
+    passkeysEnabled: boolean
+    passkeysConfigured: boolean
+  }
+}
+
 export interface ApiErrorPayload {
   error?: {
     code?: string
@@ -78,5 +128,11 @@ export function pipelineStatusColor(status: string): AdminBadgeColor {
   if (['ingested', 'converted', 'not_required'].includes(status)) return 'success'
   if (['pending', 'processing', 'blocked'].includes(status)) return 'warning'
   if (status === 'failed') return 'error'
+  return 'neutral'
+}
+
+export function booleanStatusColor(value: boolean | undefined): AdminBadgeColor {
+  if (value === true) return 'success'
+  if (value === false) return 'error'
   return 'neutral'
 }
