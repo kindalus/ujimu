@@ -71,7 +71,7 @@ Known non-blocking warnings:
 | 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `verified` | 2026-05-21 | Conversation history moved into the drawer; OTP/passkey login opens as an on-demand Nuxt UI modal; permanent auth/history side panels removed. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
-| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `grilled` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
+| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `acceptance-tested` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
 ## UI redesign planned slices
@@ -108,7 +108,7 @@ Planned order:
 
 ## Slice 21 — Admin routing specialists and sources
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -130,9 +130,14 @@ Implementation sources checked:
 - Nuxt 4 routing documentation: `https://nuxt.com/docs/4.x/getting-started/routing`
 - Nuxt UI component documentation for Button, Input, Textarea, and Badge: `https://ui.nuxt.com/components/button`, `https://ui.nuxt.com/components/input`, `https://ui.nuxt.com/components/textarea`, `https://ui.nuxt.com/components/badge`
 
+Acceptance tests:
+
+- `tests/admin-ui.acceptance.test.ts` now expects `/admin`, `/admin/specialists`, and `/admin/specialists/[id]` to split specialist administration.
+- The route split test was run red with `npm test -- tests/admin-ui.acceptance.test.ts --reporter=verbose`; it failed because the new specialist subpages do not yet exist.
+
 Next verification target:
 
-- Add acceptance tests for the new admin route split, run them red, then implement the subpages.
+- Implement the subpages and make the admin UI acceptance test pass.
 
 ## Slice 20 — Inline ads chat polish
 
