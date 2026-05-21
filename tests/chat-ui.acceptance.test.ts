@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 describe('anonymous specialist chat UI acceptance', () => {
   it('exposes specialist selection, AI notice, citation area, and a visible pending-question queue', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
+    const drawer = await readFile('components/AppDrawer.vue', 'utf8')
+    const shellSources = `${page}\n${drawer}`
 
     expect(page).toContain('/api/specialists')
     expect(page).toContain('/api/chat')
@@ -22,7 +24,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('/api/auth/session')
     expect(page).toContain('/api/auth/logout')
     expect(page).toContain('/api/admin/session')
-    expect(page).toContain('Administração')
+    expect(shellSources).toContain('Administração')
     expect(page).toContain('/api/history?specialistId=')
     expect(page).toContain('/api/history/')
     expect(page).toContain('Histórico')
@@ -31,9 +33,9 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('Editar')
     expect(page).toContain('conversationId')
     expect(page).toContain('replaceFromMessageId')
-    expect(page).toContain('Entrar')
+    expect(shellSources).toContain('Entrar')
     expect(page).toContain('Telemóvel')
-    expect(page).toContain('Sair')
+    expect(shellSources).toContain('Sair')
     expect(page).toContain(':disabled="!canSubmitQuestion"')
   })
 })

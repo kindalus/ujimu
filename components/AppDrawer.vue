@@ -20,8 +20,23 @@ const emit = defineEmits<{
 
 const drawerOpen = ref(false)
 const drawerPinned = ref(false)
+const pendingAuthOpen = ref(false)
+const temporaryDrawerContent = ref<HTMLElement | null>(null)
 
 const accountLabel = computed(() => props.userLabel || 'Conta')
+
+function openDrawer(event?: MouseEvent): void {
+  if (event?.currentTarget instanceof HTMLElement) {
+    event.currentTarget.blur()
+  }
+  drawerOpen.value = true
+  window.setTimeout(focusTemporaryDrawerStart, 0)
+}
+
+function focusTemporaryDrawerStart(): void {
+  const firstInteractive = temporaryDrawerContent.value?.querySelector<HTMLElement>('a, button')
+  firstInteractive?.focus()
+}
 
 function closeTemporaryDrawer(): void {
   if (!drawerPinned.value) {
@@ -30,7 +45,33 @@ function closeTemporaryDrawer(): void {
 }
 
 function openAuth(): void {
-  closeTemporaryDrawer()
+  if (drawerPinned.value) {
+    emitOpenAuth()
+    return
+  }
+
+  pendingAuthOpen.value = true
+  drawerOpen.value = false
+
+  window.setTimeout(() => {
+    if (pendingAuthOpen.value) {
+      pendingAuthOpen.value = false
+      emitOpenAuth()
+    }
+  }, 250)
+}
+
+function handleDrawerAnimationEnd(open: boolean): void {
+  if (!open && pendingAuthOpen.value) {
+    pendingAuthOpen.value = false
+    emitOpenAuth()
+  }
+}
+
+function emitOpenAuth(): void {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
   emit('openAuth')
 }
 
@@ -42,6 +83,20 @@ function logout(): void {
 
 <template>
   <div class="app-drawer-shell" :class="{ pinned: drawerPinned }">
+    <UButton
+      type="button"
+      color="neutral"
+      variant="ghost"
+      icon="i-lucide-menu"
+      :aria-label="openLabel"
+      aria-haspopup="dialog"
+      :aria-expanded="drawerOpen"
+      class="app-drawer-trigger"
+      @click="openDrawer"
+    >
+      <span class="sr-only">{{ openLabel }}</span>
+    </UButton>
+
     <UDrawer
       v-model:open="drawerOpen"
       direction="left"
@@ -51,20 +106,10 @@ function logout(): void {
         body: 'p-0',
         footer: 'p-4 border-t border-white/10'
       }"
+      @animation-end="handleDrawerAnimationEnd"
     >
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-menu"
-        :aria-label="openLabel"
-        class="app-drawer-trigger"
-      >
-        <span class="sr-only">{{ openLabel }}</span>
-      </UButton>
-
       <template #body>
-        <nav class="app-drawer-content" aria-label="Navegação principal">
+        <nav ref="temporaryDrawerContent" class="app-drawer-content" aria-label="Navegação principal">
           <div class="app-drawer-brand">
             <span class="app-drawer-logo" aria-hidden="true">U</span>
             <div>
@@ -112,6 +157,8 @@ function logout(): void {
           >
             Entrar
           </UButton>
+
+          <slot name="history" :close="closeTemporaryDrawer" />
         </nav>
       </template>
 
@@ -160,6 +207,7 @@ function logout(): void {
         <UButton v-if="!isAuthenticated" type="button" color="primary" variant="soft" icon="i-lucide-log-in" block @click="openAuth">
           Entrar
         </UButton>
+        <slot name="history" :close="closeTemporaryDrawer" />
         <UButton type="button" color="neutral" variant="soft" block @click="drawerPinned = false">
           Desafixar
         </UButton>

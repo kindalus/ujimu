@@ -515,8 +515,8 @@ async function loadHistory(): Promise<void> {
   }
 }
 
-async function openConversation(conversationId: string): Promise<void> {
-  if (isStreaming.value) return
+async function openConversation(conversationId: string): Promise<boolean> {
+  if (isStreaming.value) return false
 
   try {
     const response = await fetch(`/api/history/${encodeURIComponent(conversationId)}`)
@@ -543,8 +543,17 @@ async function openConversation(conversationId: string): Promise<void> {
     editingMessageId.value = ''
     quotaError.value = ''
     void loadHistory()
+    return true
   } catch {
     historyError.value = 'Não foi possível retomar a conversa.'
+    return false
+  }
+}
+
+async function openConversationFromDrawer(conversationId: string, close: () => void): Promise<void> {
+  const opened = await openConversation(conversationId)
+  if (opened) {
+    close()
   }
 }
 
@@ -887,7 +896,53 @@ function formatDisplayDate(value: string | undefined): string {
         open-label="Abrir navegação"
         @open-auth="authPanelOpen = true"
         @logout="logout"
-      />
+      >
+        <template #history="{ close }">
+          <section class="drawer-history-panel" aria-labelledby="drawer-history-title">
+            <div class="drawer-history-heading">
+              <h2 id="drawer-history-title">Histórico</h2>
+              <small v-if="selectedSpecialistId && isAuthenticated">20 últimas</small>
+            </div>
+            <p v-if="!isAuthenticated" class="panel-note">Entre para ver o histórico.</p>
+            <p v-else-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
+            <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
+            <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
+            <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
+            <ol v-else class="history-list">
+              <li
+                v-for="conversation in historyConversations"
+                :key="conversation.id"
+                :class="{ active: conversation.id === activeConversationId }"
+              >
+                <strong>{{ conversation.title }}</strong>
+                <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
+                <div class="history-actions">
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="primary"
+                    variant="ghost"
+                    :disabled="isStreaming"
+                    @click="openConversationFromDrawer(conversation.id, close)"
+                  >
+                    Retomar
+                  </UButton>
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="isStreaming"
+                    @click="deleteHistoryConversation(conversation.id)"
+                  >
+                    Apagar
+                  </UButton>
+                </div>
+              </li>
+            </ol>
+          </section>
+        </template>
+      </AppDrawer>
       <span>Ujimu</span>
     </div>
 
@@ -1080,133 +1135,7 @@ function formatDisplayDate(value: string | undefined): string {
         </UChatPrompt>
       </section>
 
-      <aside class="ad-panel" aria-label="Conta, histórico, subscrição e publicidade">
-        <section class="auth-panel" aria-label="Autenticação">
-          <div v-if="isAuthenticated" class="auth-session">
-            <span>Ligado como {{ authSession.user?.displayContact }}</span>
-            <div class="auth-actions">
-              <UButton v-if="adminAvailable" to="/admin" color="primary" variant="soft" size="sm">
-                Administração
-              </UButton>
-              <UButton to="/account/security" color="primary" variant="soft" size="sm">
-                Segurança da conta
-              </UButton>
-              <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
-                Sair
-              </UButton>
-            </div>
-          </div>
-
-          <div v-else class="auth-entry">
-            <div class="auth-actions">
-              <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
-                Entrar
-              </UButton>
-              <UButton
-                type="button"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                v-if="passkeySignInAvailable"
-                :disabled="!passkeysSupported"
-                :loading="passkeyPending"
-                @click="signInWithPasskey"
-              >
-                Entrar com passkey
-              </UButton>
-            </div>
-            <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
-
-            <form v-if="authPanelOpen" class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
-              <div class="auth-channel" role="group" aria-label="Canal de autenticação">
-                <UButton
-                  type="button"
-                  size="xs"
-                  :color="authChannel === 'email' ? 'primary' : 'neutral'"
-                  :variant="authChannel === 'email' ? 'soft' : 'ghost'"
-                  @click="authChannel = 'email'"
-                >
-                  Email
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  :color="authChannel === 'phone' ? 'primary' : 'neutral'"
-                  :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
-                  @click="authChannel = 'phone'"
-                >
-                  Telemóvel
-                </UButton>
-              </div>
-
-              <label class="auth-field" for="auth-contact">
-                <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
-                <UInput
-                  id="auth-contact"
-                  v-model="authContact"
-                  :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
-                  :disabled="authPending || authStep === 'verify'"
-                />
-              </label>
-
-              <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
-                <span>Código</span>
-                <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
-              </label>
-
-              <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-              <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
-
-              <UButton type="submit" color="primary" size="sm" :loading="authPending">
-                {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
-              </UButton>
-            </form>
-          </div>
-        </section>
-
-        <section v-if="isAuthenticated" class="history-panel" aria-labelledby="history-title">
-          <div class="history-heading">
-            <h2 id="history-title">Histórico</h2>
-            <small v-if="selectedSpecialistId">20 últimas</small>
-          </div>
-          <p v-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
-          <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
-          <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
-          <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
-          <ol v-else class="history-list">
-            <li
-              v-for="conversation in historyConversations"
-              :key="conversation.id"
-              :class="{ active: conversation.id === activeConversationId }"
-            >
-              <strong>{{ conversation.title }}</strong>
-              <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
-              <div class="history-actions">
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="primary"
-                  variant="ghost"
-                  :disabled="isStreaming"
-                  @click="openConversation(conversation.id)"
-                >
-                  Retomar
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="isStreaming"
-                  @click="deleteHistoryConversation(conversation.id)"
-                >
-                  Apagar
-                </UButton>
-              </div>
-            </li>
-          </ol>
-        </section>
-
+      <aside class="ad-panel" aria-label="Subscrição e publicidade">
         <section class="billing-panel" aria-labelledby="billing-title">
           <p class="section-label">Subscrição</p>
           <h2 id="billing-title">Plano trimestral — 50 000,00 AOA</h2>
@@ -1251,6 +1180,78 @@ function formatDisplayDate(value: string | undefined): string {
       </aside>
     </section>
   </main>
+
+  <UModal
+    v-model:open="authPanelOpen"
+    title="Entrar"
+    description="Receba um código por email ou telemóvel para continuar."
+    class="auth-modal"
+  >
+    <template #body>
+      <div class="auth-entry">
+        <div class="auth-actions">
+          <UButton
+            type="button"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            v-if="passkeySignInAvailable"
+            :disabled="!passkeysSupported"
+            :loading="passkeyPending"
+            @click="signInWithPasskey"
+          >
+            Entrar com passkey
+          </UButton>
+        </div>
+        <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
+
+        <form class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
+          <div class="auth-channel" role="group" aria-label="Canal de autenticação">
+            <UButton
+              type="button"
+              size="xs"
+              :color="authChannel === 'email' ? 'primary' : 'neutral'"
+              :variant="authChannel === 'email' ? 'soft' : 'ghost'"
+              @click="authChannel = 'email'"
+            >
+              Email
+            </UButton>
+            <UButton
+              type="button"
+              size="xs"
+              :color="authChannel === 'phone' ? 'primary' : 'neutral'"
+              :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
+              @click="authChannel = 'phone'"
+            >
+              Telemóvel
+            </UButton>
+          </div>
+
+          <label class="auth-field" for="auth-contact">
+            <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
+            <UInput
+              id="auth-contact"
+              v-model="authContact"
+              :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
+              :disabled="authPending || authStep === 'verify'"
+            />
+          </label>
+
+          <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
+            <span>Código</span>
+            <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
+          </label>
+
+          <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
+          <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+
+          <UButton type="submit" color="primary" size="sm" :loading="authPending">
+            {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
+          </UButton>
+        </form>
+      </div>
+    </template>
+  </UModal>
 </template>
 
 <style scoped>
@@ -1316,29 +1317,12 @@ h3 {
   font-size: 1rem;
 }
 
-.auth-panel {
-  position: relative;
-  z-index: 1;
-  border: 1px solid rgba(249, 214, 22, 0.24);
-  border-radius: 22px;
-  padding: 14px;
-  background: rgba(0, 0, 0, 0.22);
-}
-
-.auth-session,
 .auth-entry,
 .auth-channel,
 .auth-form,
 .auth-field {
   display: grid;
   gap: 10px;
-}
-
-.auth-session {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  color: #fff8cc;
-  font-weight: 800;
 }
 
 .auth-actions {
@@ -1397,15 +1381,15 @@ h3 {
   color: #ffd3d3;
 }
 
-.history-panel {
+.drawer-history-panel {
   display: grid;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
-.history-heading,
+.drawer-history-heading,
 .history-actions,
 .message-actions,
 .editing-banner {
@@ -1415,9 +1399,17 @@ h3 {
   gap: 10px;
 }
 
-.history-heading small,
+.drawer-history-heading small,
 .history-list small {
   color: var(--ujimu-muted);
+}
+
+.drawer-history-heading h2 {
+  font-size: 1rem;
+}
+
+.drawer-history-panel .panel-note {
+  margin: 0;
 }
 
 .history-list {
@@ -1707,10 +1699,6 @@ h3 {
   display: grid;
   align-content: start;
   gap: 14px;
-}
-
-.history-panel h2 {
-  font-size: 1rem;
 }
 
 .billing-panel,

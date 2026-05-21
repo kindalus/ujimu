@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest'
 describe('passkey UI acceptance', () => {
   it('exposes passkey sign-in and account-security management entry points', async () => {
     const mainPage = await readFile('pages/index.vue', 'utf8')
+    const drawer = await readFile('components/AppDrawer.vue', 'utf8')
+    const shellSources = `${mainPage}\n${drawer}`
 
     expect(mainPage).toContain('Entrar com passkey')
-    expect(mainPage).toContain('Segurança da conta')
-    expect(mainPage).toContain('/account/security')
+    expect(shellSources).toContain('Segurança da conta')
+    expect(shellSources).toContain('/account/security')
     expect(mainPage).toContain('/api/auth/passkeys/authentication/options')
     expect(mainPage).toContain('/api/auth/passkeys/authentication/verify')
   })

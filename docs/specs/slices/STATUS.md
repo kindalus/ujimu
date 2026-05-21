@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 17 two-row Gemini-style prompt correction:
+Latest full verification after Slice 18 history/auth drawer work:
 
-- `npm test` — passed, 99 tests
+- `npm test` — passed, 101 tests
 - `npm run typecheck` — passed
-- `npm run build` — passed
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Chrome DevTools browser check — passed: page starts in the chat workspace without the old hero, client hydration works, the prompt appears as a bottom-anchored two-row Gemini-style composer with the specialist selector on the top-right line, login expands on demand, and console has no errors.
+- Chrome DevTools browser check — passed: page starts in the chat workspace without the old hero, client hydration works, the drawer opens with focus moved into drawer navigation, history appears in the drawer, the login action opens a Nuxt UI modal on demand, and console has no errors or warnings beyond Nuxt development info logs.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -68,7 +68,7 @@ Known non-blocking warnings:
 | 15 | [`15-podman-container-deployment.html`](./15-podman-container-deployment.html) | `verified` | 2026-05-19 | Podman-compatible image, prod/test env profiles, lifecycle scripts, persistent Pi/Ujimu mounts, and manual deployment documentation. |
 | 16 | [`16-ui-shell-drawer-foundation.html`](./16-ui-shell-drawer-foundation.html) | `verified` | 2026-05-21 | Shared `AppDrawer.vue` using Nuxt UI `UDrawer`; main chat page uses drawer with existing-route links only and desktop pin option. |
 | 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `verified` | 2026-05-21 | Chat-first workspace using Nuxt UI chat components, parts adapter, bottom-anchored two-row Gemini-style prompt with specialist selector, specialist empty state, and no hero block. |
-| 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `planned` | — | Conversation history in the drawer and login/auth actions only on demand. |
+| 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `verified` | 2026-05-21 | Conversation history moved into the drawer; OTP/passkey login opens as an on-demand Nuxt UI modal; permanent auth/history side panels removed. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `planned` | — | Dedicated `/subscription` page and removal of permanent billing blocks from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `planned` | — | Inline ad placements after every randomized 5–10 assistant responses for eligible users. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `planned` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
@@ -100,11 +100,49 @@ Planned order:
 
 1. Slice 16 establishes the shared shell and drawer foundation. — verified 2026-05-21.
 2. Slice 17 redesigns the public chat workspace and specialist prompt, including the bottom-anchored two-row Gemini-style prompt correction. — verified 2026-05-21.
-3. Slice 18 moves history and authentication to on-demand drawer/modal flows.
+3. Slice 18 moves history and authentication to on-demand drawer/modal flows. — verified 2026-05-21.
 4. Slice 19 moves subscription management to `/subscription`.
 5. Slice 20 inserts ads into the chat stream without obstructing citations.
 6. Slice 21 restructures admin specialist/source management into subpages.
 7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
+
+## Slice 18 — History/auth drawer
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Refinement and grill decisions:
+
+- Keep conversation history in the shared drawer, not in a permanent side panel or a dedicated history page.
+- Add a reusable history slot to `AppDrawer.vue` and provide the current page history UI through that slot.
+- Keep the existing history endpoints, conversation ownership, resume/delete behavior, and edit/replace semantics unchanged.
+- Move OTP/passkey login into an on-demand `UModal` opened from the drawer.
+- Keep account-security and admin entry points in the drawer, not in the chat side panel.
+- Keep the chat side panel limited to subscription and advertising until their later slices.
+- Move focus into the drawer when it opens so browser accessibility checks do not report hidden focused descendants.
+
+Implemented files:
+
+- `components/AppDrawer.vue`
+- `pages/index.vue`
+- `tests/ui-redesign-history-auth-drawer.acceptance.test.ts`
+- `tests/chat-ui.acceptance.test.ts`
+- `tests/passkeys-ui.acceptance.test.ts`
+- `docs/specs/slices/18-history-auth-drawer.html`
+- `docs/specs/slices/STATUS.md`
+
+Verification completed:
+
+- `npm test -- tests/ui-redesign-history-auth-drawer.acceptance.test.ts` — failed before implementation, then passed.
+- `npm test` — passed, 101 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
+- Chrome DevTools browser check — passed on port 3100; the drawer shows history/login affordances, login opens as a modal, focus moves into the drawer, and the console has no errors or unexpected warnings.
 
 ## Slice 17 — Chat workspace with Nuxt UI
 
