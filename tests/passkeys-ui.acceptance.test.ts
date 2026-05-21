@@ -5,13 +5,14 @@ describe('passkey UI acceptance', () => {
   it('exposes passkey sign-in and account-security management entry points', async () => {
     const mainPage = await readFile('pages/index.vue', 'utf8')
     const drawer = await readFile('components/AppDrawer.vue', 'utf8')
-    const shellSources = `${mainPage}\n${drawer}`
+    const authModal = await readFile('components/AuthModal.vue', 'utf8')
+    const shellSources = `${mainPage}\n${drawer}\n${authModal}`
 
-    expect(mainPage).toContain('Entrar com passkey')
+    expect(shellSources).toContain('Entrar com passkey')
     expect(shellSources).toContain('Segurança da conta')
     expect(shellSources).toContain('/account/security')
-    expect(mainPage).toContain('/api/auth/passkeys/authentication/options')
-    expect(mainPage).toContain('/api/auth/passkeys/authentication/verify')
+    expect(shellSources).toContain('/api/auth/passkeys/authentication/options')
+    expect(shellSources).toContain('/api/auth/passkeys/authentication/verify')
   })
 
   it('provides a dedicated account-security page for adding, listing, and removing passkeys', async () => {

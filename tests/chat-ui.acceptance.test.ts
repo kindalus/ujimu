@@ -5,7 +5,8 @@ describe('anonymous specialist chat UI acceptance', () => {
   it('exposes specialist selection, AI notice, citation area, and a visible pending-question queue', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
     const drawer = await readFile('components/AppDrawer.vue', 'utf8')
-    const shellSources = `${page}\n${drawer}`
+    const authModal = await readFile('components/AuthModal.vue', 'utf8')
+    const shellSources = `${page}\n${drawer}\n${authModal}`
 
     expect(page).toContain('/api/specialists')
     expect(page).toContain('/api/chat')
@@ -19,8 +20,8 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('Fontes')
     expect(page).toContain('quotaError')
     expect(page).toContain('Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.')
-    expect(page).toContain('/api/auth/otp/request')
-    expect(page).toContain('/api/auth/otp/verify')
+    expect(shellSources).toContain('/api/auth/otp/request')
+    expect(shellSources).toContain('/api/auth/otp/verify')
     expect(page).toContain('/api/auth/session')
     expect(page).toContain('/api/auth/logout')
     expect(page).toContain('/api/admin/session')
@@ -34,7 +35,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('conversationId')
     expect(page).toContain('replaceFromMessageId')
     expect(shellSources).toContain('Entrar')
-    expect(page).toContain('Telemóvel')
+    expect(shellSources).toContain('Telemóvel')
     expect(shellSources).toContain('Sair')
     expect(page).toContain(':disabled="!canSubmitQuestion"')
   })

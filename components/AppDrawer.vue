@@ -122,6 +122,10 @@ function logout(): void {
             Chat
           </UButton>
 
+          <UButton to="/subscription" color="neutral" variant="ghost" icon="i-lucide-credit-card" block @click="closeTemporaryDrawer">
+            Subscrição
+          </UButton>
+
           <UButton
             v-if="adminAvailable"
             to="/admin"
@@ -190,6 +194,9 @@ function logout(): void {
 
         <UButton to="/" color="neutral" variant="ghost" icon="i-lucide-message-circle" block>
           Chat
+        </UButton>
+        <UButton to="/subscription" color="neutral" variant="ghost" icon="i-lucide-credit-card" block>
+          Subscrição
         </UButton>
         <UButton v-if="adminAvailable" to="/admin" color="neutral" variant="ghost" icon="i-lucide-shield" block>
           Administração

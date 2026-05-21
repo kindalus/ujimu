@@ -55,29 +55,6 @@ interface BillingStatusResponse {
   }
 }
 
-interface BillingCheckoutResponse {
-  checkout: {
-    id: string
-    provider: BillingProvider
-    method: BillingPaymentMethod
-    status: 'pending'
-    instructions: string
-  }
-}
-
-interface PasskeyAuthenticationOptionsResponse {
-  options: Record<string, unknown>
-}
-
-type BillingProvider = 'appy_pay' | 'stripe'
-type BillingPaymentMethod = 'multicaixa_express' | 'multicaixa_reference' | 'qr_code' | 'visa'
-
-interface BillingMethodOption {
-  label: string
-  provider: BillingProvider
-  method: BillingPaymentMethod
-}
-
 interface HistoryConversationSummary {
   id: string
   specialistId: string
@@ -165,8 +142,6 @@ interface ApiErrorPayload {
 }
 
 const quotaLimitMessage = 'Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.'
-const otpRequestSuccessMessage = 'Se o contacto estiver correcto, enviaremos um código de acesso.'
-const billingCheckoutSuccessMessage = 'Pagamento criado. A subscrição será activada depois da confirmação do pagamento.'
 const defaultBillingStatus: BillingStatusResponse = {
   authenticated: false,
   subscribed: false,
@@ -175,12 +150,6 @@ const defaultBillingStatus: BillingStatusResponse = {
   expiryWarning: null,
   ads: { visible: true }
 }
-const billingMethodOptions: BillingMethodOption[] = [
-  { label: 'Multicaixa Express', provider: 'appy_pay', method: 'multicaixa_express' },
-  { label: 'Referência Multicaixa', provider: 'appy_pay', method: 'multicaixa_reference' },
-  { label: 'QR Code', provider: 'appy_pay', method: 'qr_code' },
-  { label: 'VISA', provider: 'stripe', method: 'visa' }
-]
 const queueLimit = 3
 let idCounter = 0
 
@@ -202,27 +171,12 @@ const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
-const authChannel = ref<'email' | 'phone'>('email')
-const authContact = ref('')
-const authCode = ref('')
-const authStep = ref<'request' | 'verify'>('request')
-const authMessage = ref('')
-const authError = ref('')
-const authPending = ref(false)
 const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
-const billingPending = ref(false)
-const billingError = ref('')
-const billingMessage = ref('')
-const billingCheckoutPendingMethod = ref<BillingPaymentMethod | ''>('')
-const passkeysSupported = ref(false)
-const passkeyPending = ref(false)
-const passkeyError = ref('')
 
 onMounted(() => {
   void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
-  void detectPasskeySupport()
 })
 
 const selectedSpecialist = computed(() =>
@@ -248,11 +202,6 @@ const chatStatus = computed(() => {
 })
 const hasSpecialists = computed(() => specialists.value.length > 0)
 const isAuthenticated = computed(() => authSession.value.authenticated)
-const passkeySignInAvailable = computed(
-  () => passkeysSupported.value && Boolean(authSession.value.passkeys?.passkeysEnabled && authSession.value.passkeys.passkeysConfigured)
-)
-const billingPriceLabel = computed(() => `${formatBillingAmount(billingStatus.value.plan.amount.value)} AOA`)
-const billingExpiryLabel = computed(() => formatDisplayDate(billingStatus.value.subscription?.expiresAt))
 const canWriteQuestion = computed(
   () => Boolean(selectedSpecialist.value) && queuedQuestions.value.length < queueLimit
 )
@@ -292,9 +241,6 @@ async function loadAuthSession(): Promise<void> {
 }
 
 async function loadBillingStatus(): Promise<void> {
-  billingPending.value = true
-  billingError.value = ''
-
   try {
     const response = await fetch('/api/billing/status')
     billingStatus.value = response.ok
@@ -302,42 +248,6 @@ async function loadBillingStatus(): Promise<void> {
       : { ...defaultBillingStatus }
   } catch {
     billingStatus.value = { ...defaultBillingStatus }
-    billingError.value = 'Não foi possível carregar o estado da subscrição.'
-  } finally {
-    billingPending.value = false
-  }
-}
-
-async function startBillingCheckout(provider: BillingProvider, method: BillingPaymentMethod): Promise<void> {
-  if (!isAuthenticated.value) {
-    authPanelOpen.value = true
-    billingError.value = 'Entre para subscrever.'
-    return
-  }
-
-  billingCheckoutPendingMethod.value = method
-  billingError.value = ''
-  billingMessage.value = ''
-
-  try {
-    const response = await fetch('/api/billing/checkout', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider, method })
-    })
-
-    if (!response.ok) {
-      billingError.value = 'Não foi possível iniciar o pagamento.'
-      return
-    }
-
-    const payload = (await response.json()) as BillingCheckoutResponse
-    billingMessage.value = payload.checkout.instructions || billingCheckoutSuccessMessage
-    void loadBillingStatus()
-  } catch {
-    billingError.value = 'Não foi possível iniciar o pagamento.'
-  } finally {
-    billingCheckoutPendingMethod.value = ''
   }
 }
 
@@ -353,125 +263,11 @@ async function loadAdminSession(): Promise<void> {
   }
 }
 
-async function requestOtpCode(): Promise<void> {
-  authPending.value = true
-  authError.value = ''
-  authMessage.value = ''
-
-  try {
-    const response = await fetch('/api/auth/otp/request', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ channel: authChannel.value, contact: authContact.value })
-    })
-
-    if (!response.ok) {
-      authError.value = response.status === 503
-        ? 'Não foi possível enviar o código neste momento. Tente novamente mais tarde.'
-        : 'Verifique o contacto e tente novamente.'
-      return
-    }
-
-    authStep.value = 'verify'
-    authMessage.value = otpRequestSuccessMessage
-  } catch {
-    authError.value = 'Não foi possível enviar o código neste momento. Tente novamente mais tarde.'
-  } finally {
-    authPending.value = false
-  }
-}
-
-async function verifyOtpCode(): Promise<void> {
-  authPending.value = true
-  authError.value = ''
-
-  try {
-    const response = await fetch('/api/auth/otp/verify', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        channel: authChannel.value,
-        contact: authContact.value,
-        code: authCode.value
-      })
-    })
-
-    if (!response.ok) {
-      authError.value = 'Código inválido ou expirado.'
-      return
-    }
-
-    authSession.value = (await response.json()) as AuthSessionResponse
-    void loadHistory()
-    void loadAdminSession()
-    void loadBillingStatus()
-    authPanelOpen.value = false
-    authStep.value = 'request'
-    authContact.value = ''
-    authCode.value = ''
-    authMessage.value = ''
-  } catch {
-    authError.value = 'Não foi possível verificar o código. Tente novamente.'
-  } finally {
-    authPending.value = false
-  }
-}
-
-async function detectPasskeySupport(): Promise<void> {
-  try {
-    const { browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
-    passkeysSupported.value = browserSupportsWebAuthn()
-  } catch {
-    passkeysSupported.value = false
-  }
-}
-
-async function signInWithPasskey(): Promise<void> {
-  if (!passkeysSupported.value) {
-    passkeyError.value = 'Este dispositivo ou navegador não suporta passkeys. Use o código por email ou telemóvel.'
-    return
-  }
-
-  passkeyPending.value = true
-  passkeyError.value = ''
-
-  try {
-    const optionsResponse = await fetch('/api/auth/passkeys/authentication/options', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({})
-    })
-    if (!optionsResponse.ok) {
-      passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
-      return
-    }
-
-    const { startAuthentication } = await import('@simplewebauthn/browser')
-    const payload = (await optionsResponse.json()) as PasskeyAuthenticationOptionsResponse
-    const credential = await startAuthentication({
-      optionsJSON: payload.options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON']
-    })
-    const verifyResponse = await fetch('/api/auth/passkeys/authentication/verify', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(credential)
-    })
-
-    if (!verifyResponse.ok) {
-      passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
-      return
-    }
-
-    authSession.value = (await verifyResponse.json()) as AuthSessionResponse
-    authPanelOpen.value = false
-    void loadHistory()
-    void loadAdminSession()
-    void loadBillingStatus()
-  } catch {
-    passkeyError.value = 'Não foi possível confirmar a passkey. Tente novamente ou use o código de acesso.'
-  } finally {
-    passkeyPending.value = false
-  }
+function handleAuthenticatedSession(session: AuthSessionResponse): void {
+  authSession.value = session
+  void loadHistory()
+  void loadAdminSession()
+  void loadBillingStatus()
 }
 
 async function logout(): Promise<void> {
@@ -482,13 +278,7 @@ async function logout(): Promise<void> {
   activeConversationId.value = ''
   activeConversationTitle.value = ''
   authPanelOpen.value = false
-  authStep.value = 'request'
-  authCode.value = ''
-  authMessage.value = ''
-  authError.value = ''
   billingStatus.value = { ...defaultBillingStatus }
-  billingMessage.value = ''
-  billingError.value = ''
   void loadBillingStatus()
 }
 
@@ -871,19 +661,6 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${idCounter}`
 }
 
-function formatBillingAmount(value: string): string {
-  const parsed = Number.parseFloat(value)
-  if (!Number.isFinite(parsed)) return '50 000,00'
-  return new Intl.NumberFormat('pt-PT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(parsed)
-}
-
-function formatDisplayDate(value: string | undefined): string {
-  if (!value) return ''
-  return new Intl.DateTimeFormat('pt-PT', { dateStyle: 'medium' }).format(new Date(value))
-}
 </script>
 
 <template>
@@ -947,7 +724,7 @@ function formatDisplayDate(value: string | undefined): string {
     </div>
 
 
-    <section class="workspace" aria-label="Área de consulta">
+    <section class="workspace" :class="{ 'workspace-chat-only': !billingStatus.ads.visible }" aria-label="Área de consulta">
       <section class="chat-panel" aria-labelledby="page-title">
         <div class="chat-header">
           <div>
@@ -1084,6 +861,13 @@ function formatDisplayDate(value: string | undefined): string {
           </UButton>
         </div>
 
+        <div v-if="billingStatus.expiryWarning" class="subscription-alert" role="alert">
+          <span>A sua subscrição termina em menos de uma semana.</span>
+          <UButton to="/subscription" size="xs" color="primary" variant="ghost">
+            Gerir subscrição
+          </UButton>
+        </div>
+
         <UChatPrompt
           id="question"
           v-model="question"
@@ -1135,44 +919,8 @@ function formatDisplayDate(value: string | undefined): string {
         </UChatPrompt>
       </section>
 
-      <aside class="ad-panel" aria-label="Subscrição e publicidade">
-        <section class="billing-panel" aria-labelledby="billing-title">
-          <p class="section-label">Subscrição</p>
-          <h2 id="billing-title">Plano trimestral — 50 000,00 AOA</h2>
-          <p class="billing-price">{{ billingPriceLabel }} <span>por trimestre</span></p>
-          <p v-if="billingPending" class="panel-note">A carregar subscrição...</p>
-          <template v-else>
-            <p v-if="billingStatus.subscribed" class="billing-status">
-              Subscrição activa até {{ billingExpiryLabel }}. Não verá publicidade enquanto a subscrição estiver activa.
-            </p>
-            <p v-else class="billing-status">
-              Entre para subscrever, remover publicidade e usar os limites de subscritor.
-            </p>
-            <p v-if="billingStatus.expiryWarning" class="billing-warning" role="alert">
-              A sua subscrição termina em menos de uma semana.
-            </p>
-          </template>
-
-          <p v-if="billingMessage" class="billing-message">{{ billingMessage }}</p>
-          <p v-if="billingError" class="billing-error" role="alert">{{ billingError }}</p>
-
-          <div class="billing-actions" aria-label="Métodos de pagamento">
-            <UButton
-              v-for="option in billingMethodOptions"
-              :key="option.method"
-              type="button"
-              color="primary"
-              variant="soft"
-              size="xs"
-              :loading="billingCheckoutPendingMethod === option.method"
-              @click="startBillingCheckout(option.provider, option.method)"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-        </section>
-
-        <section v-if="billingStatus.ads.visible" aria-label="Publicidade" class="ads-section">
+      <aside v-if="billingStatus.ads.visible" class="ad-panel" aria-label="Publicidade">
+        <section aria-label="Publicidade" class="ads-section">
           <p class="section-label">Publicidade</p>
           <div class="ad-slot">300 × 250</div>
           <div class="ad-slot wide">728 × 90</div>
@@ -1181,77 +929,11 @@ function formatDisplayDate(value: string | undefined): string {
     </section>
   </main>
 
-  <UModal
+  <AuthModal
     v-model:open="authPanelOpen"
-    title="Entrar"
-    description="Receba um código por email ou telemóvel para continuar."
-    class="auth-modal"
-  >
-    <template #body>
-      <div class="auth-entry">
-        <div class="auth-actions">
-          <UButton
-            type="button"
-            color="neutral"
-            variant="soft"
-            size="sm"
-            v-if="passkeySignInAvailable"
-            :disabled="!passkeysSupported"
-            :loading="passkeyPending"
-            @click="signInWithPasskey"
-          >
-            Entrar com passkey
-          </UButton>
-        </div>
-        <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
-
-        <form class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
-          <div class="auth-channel" role="group" aria-label="Canal de autenticação">
-            <UButton
-              type="button"
-              size="xs"
-              :color="authChannel === 'email' ? 'primary' : 'neutral'"
-              :variant="authChannel === 'email' ? 'soft' : 'ghost'"
-              @click="authChannel = 'email'"
-            >
-              Email
-            </UButton>
-            <UButton
-              type="button"
-              size="xs"
-              :color="authChannel === 'phone' ? 'primary' : 'neutral'"
-              :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
-              @click="authChannel = 'phone'"
-            >
-              Telemóvel
-            </UButton>
-          </div>
-
-          <label class="auth-field" for="auth-contact">
-            <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
-            <UInput
-              id="auth-contact"
-              v-model="authContact"
-              :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
-              :disabled="authPending || authStep === 'verify'"
-            />
-          </label>
-
-          <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
-            <span>Código</span>
-            <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
-          </label>
-
-          <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-          <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
-
-          <UButton type="submit" color="primary" size="sm" :loading="authPending">
-            {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
-          </UButton>
-        </form>
-      </div>
-    </template>
-  </UModal>
+    :auth-session="authSession"
+    @authenticated="handleAuthenticatedSession"
+  />
 </template>
 
 <style scoped>
@@ -1317,52 +999,16 @@ h3 {
   font-size: 1rem;
 }
 
-.auth-entry,
-.auth-channel,
-.auth-form,
-.auth-field {
-  display: grid;
-  gap: 10px;
-}
-
-.auth-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.auth-channel {
-  grid-template-columns: repeat(2, max-content);
-}
-
-.auth-field {
-  color: var(--ujimu-muted);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.auth-message,
-.auth-error {
-  margin: 0;
-  line-height: 1.4;
-  font-size: 0.9rem;
-}
-
-.auth-message {
-  color: #fff8cc;
-}
-
-.auth-error {
-  color: #ffd3d3;
-}
-
 .workspace {
   display: grid;
   align-items: start;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   gap: 18px;
   margin-top: 18px;
+}
+
+.workspace-chat-only {
+  grid-template-columns: 1fr;
 }
 
 .chat-panel,
@@ -1392,7 +1038,8 @@ h3 {
 .drawer-history-heading,
 .history-actions,
 .message-actions,
-.editing-banner {
+.editing-banner,
+.subscription-alert {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1636,7 +1283,8 @@ h3 {
   color: #c7c4bb;
 }
 
-.editing-banner {
+.editing-banner,
+.subscription-alert {
   border: 1px solid rgba(249, 214, 22, 0.24);
   border-radius: 16px;
   padding: 10px;
@@ -1693,62 +1341,17 @@ h3 {
 }
 
 .ad-panel,
-.billing-panel,
-.ads-section,
-.billing-actions {
+.ads-section {
   display: grid;
   align-content: start;
   gap: 14px;
 }
 
-.billing-panel,
 .ads-section {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 22px;
   padding: 14px;
   background: rgba(0, 0, 0, 0.14);
-}
-
-.billing-price {
-  margin: 0;
-  color: #fff8cc;
-  font-size: 1.35rem;
-  font-weight: 900;
-}
-
-.billing-price span,
-.billing-status {
-  color: var(--ujimu-muted);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.billing-status,
-.billing-warning,
-.billing-message,
-.billing-error {
-  margin: 0;
-}
-
-.billing-warning,
-.billing-message,
-.billing-error {
-  border-radius: 16px;
-  padding: 10px;
-  line-height: 1.35;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.billing-warning,
-.billing-message {
-  color: #fff8cc;
-  background: rgba(249, 214, 22, 0.11);
-}
-
-.billing-error {
-  color: #ffd3d3;
-  background: rgba(210, 16, 52, 0.16);
 }
 
 .ad-slot {
