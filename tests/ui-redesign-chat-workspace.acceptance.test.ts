@@ -26,6 +26,15 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(page).toContain('Conteúdo gerado por IA. Pode conter erros. Confirme sempre a resposta nas fontes citadas. As respostas não substituem aconselhamento profissional.')
   })
 
+  it('updates streamed chat turns through reactive message references', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+
+    expect(page).toContain('const reactiveUserMessage = messages.value[messages.value.length - 1]!')
+    expect(page).toContain('const reactiveAssistantMessage = messages.value[messages.value.length - 1]!')
+    expect(page).toContain('await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage)')
+    expect(page).not.toContain('await readChatStream(response, assistantMessage, userMessage)')
+  })
+
   it('presents the prompt as a Gemini-style bottom composer', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
 

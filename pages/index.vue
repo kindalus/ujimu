@@ -494,6 +494,7 @@ async function startQuestion(
   }
 
   messages.value.push(userMessage)
+  const reactiveUserMessage = messages.value[messages.value.length - 1]!
   isStreaming.value = true
 
   try {
@@ -534,24 +535,24 @@ async function startQuestion(
       return
     }
 
-    const assistantMessage: ChatMessage = {
+    messages.value.push({
       id: createId('assistant'),
       role: 'assistant',
       text: '',
       citations: [],
       status: 'streaming'
-    }
-    messages.value.push(assistantMessage)
+    })
+    const reactiveAssistantMessage = messages.value[messages.value.length - 1]!
 
-    await readChatStream(response, assistantMessage, userMessage)
+    await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage)
 
-    if (previousMessages && assistantMessage.status === 'error') {
+    if (previousMessages && reactiveAssistantMessage.status === 'error') {
       messages.value = previousMessages
       return
     }
 
-    if (assistantMessage.status === 'streaming') {
-      assistantMessage.status = 'done'
+    if (reactiveAssistantMessage.status === 'streaming') {
+      reactiveAssistantMessage.status = 'done'
     }
   } catch {
     if (previousMessages) {
