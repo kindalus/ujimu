@@ -19,8 +19,9 @@ The AI engine is the embeddable Pi coding agent harness (`pi.dev`). Treat Pi as 
 - The initial MVP success target is 50 distinct visits per month.
 - The initial wiki model is one public wiki per specialty.
 - The first planned specialties should use the LLM Wiki `legislation/regulatory` preset.
-- The initial subscription price is 50,000.00 AOA per quarter.
-- Initial payment methods are Multicaixa Express, Multicaixa Reference, QR Code, and VISA. VISA should be attempted through Stripe if technically and commercially available.
+- The target post-payment subscription price is 50,000.00 AOA per quarter.
+- The launch scope excludes live payments. Appy Pay for Multicaixa Express, Multicaixa Reference, and QR Code, plus Stripe/VISA validation, are post-launch integrations.
+- SendGrid email/SMS integration is post-launch; the launch OTP/contact-delivery path must be clarified before production if OTP remains in launch scope.
 - The application stack is Nuxt with TypeScript, Nuxt UI for components and theme definition, and npm.
 - Persistent application data uses SQLite without an ORM.
 - The default SQLite database location is `<UJIMU_DATA_DIR>/db/ujimu.sqlite`.
@@ -28,8 +29,9 @@ The AI engine is the embeddable Pi coding agent harness (`pi.dev`). Treat Pi as 
 ## Language rules
 
 - All project documentation, technical notes, ADRs, specs, code comments intended as documentation, and agent-facing files must be written in English.
+- Exception: Zafir HTML slide decks under `docs/specs/` and `docs/specs/slices/` must always be written in European Portuguese using pre-1990 orthography. Technical identifiers, file paths, API names, package names, code snippets, and quoted source text may retain their original spelling.
 - All user-facing UI copy must be written in European Portuguese using pre-1990 orthography.
-- Brainstorming or planning artefacts may be written in European Portuguese pre-1990 only when explicitly requested by the user.
+- Brainstorming or planning artefacts that are not Zafir HTML slide decks may be written in European Portuguese pre-1990 only when explicitly requested by the user.
 - Do not mix UI copy language into technical documentation unless documenting exact strings.
 
 ## Product-direction clarification rule
@@ -95,16 +97,18 @@ Before changing product requirements, roadmap direction, specifications, or othe
 - Anonymous users are tracked with browser cookies and are limited to 5 requests per day or 20 requests per week.
 - Registered users without a subscription are limited to 20 requests per day and 100 requests per week.
 - Subscribed users have no daily limit by default, but have a configurable weekly limit; the initial target is 5000 requests per week.
-- The initial subscription period is quarterly, priced at 50,000.00 AOA per quarter.
-- Appy Pay is the provider for Multicaixa Express, Multicaixa Reference, and QR Code payments.
-- Payment methods should also support VISA; validate Stripe as the preferred VISA integration path.
-- Subscriptions activate automatically after payment confirmation.
+- The target post-payment subscription period is quarterly, priced at 50,000.00 AOA per quarter.
+- Live payments are not part of the first launch scope.
+- Post-launch payment integration target: Appy Pay for Multicaixa Express, Multicaixa Reference, and QR Code payments.
+- Post-launch payment methods should also support VISA; validate Stripe as the preferred VISA integration path.
+- Once live payments are introduced, subscriptions activate automatically after payment confirmation.
 - There is no grace period after subscription expiry.
 - When a subscription has less than one week remaining, the application must show an expiry warning.
 - Quotas are evaluated in the user's timezone.
 - Quotas must be enforced server-side. Client cookies are an identifier, not an authority.
 - Authentication supports one-time passwords by email and mobile phone in the MVP.
-- SendGrid is the preferred initial email/SMS provider, but provider integration must be abstracted so it can be changed with minimal friction.
+- SendGrid integration is deferred until after launch; notification provider integration must remain abstracted so it can be added or changed with minimal friction.
+- The production launch delivery path for OTP email/SMS remains an open product/operations question while SendGrid is deferred.
 - Passkeys are a later phase, not part of the OTP MVP.
 - Avoid storing sensitive authentication material in plaintext.
 

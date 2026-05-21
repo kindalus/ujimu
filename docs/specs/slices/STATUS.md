@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,15 +20,22 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 15 Podman container deployment:
+Latest full verification after Slice 16 UI shell/drawer foundation:
 
-- `npm test` — passed, 90 tests
+- `npm test` — passed, 96 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
-- Manual real-Pi/Gemini conversion smoke tests — not run; documented in `docs/operations.md` and intentionally excluded from CI because they require model credentials and external service access.
+- Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
+- Gemini CLI PDF-to-Markdown smoke tests, 2026-05-20 — passed in non-production temporary directories with the real `gemini` CLI and a user-provided `GEMINI_API_KEY`: direct `pdf_to_markdown.sh` produced `raw/small-sample.pdf.md`, and the admin upload/conversion endpoint converted `sample.pdf` to `sample.pdf.md`; both preserved the expected article/day text. These remain intentionally excluded from CI because they require external credentials and service access.
+
+Launch roadmap note as of 2026-05-20:
+
+- The first launch scope excludes live payments.
+- Appy Pay, Stripe/VISA, and SendGrid integrations are deferred until after launch.
+- The OTP/contact-delivery path for production launch remains an open product/operations question if OTP remains in launch scope without SendGrid.
 
 Known non-blocking warnings:
 
@@ -36,6 +43,7 @@ Known non-blocking warnings:
 - VueUse Rollup pure-comment warnings during build.
 - Node `module.register()` deprecation warning during build.
 - `node:sqlite` is external during Nitro build and experimental at runtime under Node.
+- Real Pi smoke finding: the committed default `openrouter/moonshotai/kimi-k2.6` converted the TXT source but timed out during ingestion at the current 5-minute ingestion timeout. Do not treat the default Pi model choice as production-validated until a follow-up decision confirms it or changes it.
 
 ## Slice table
 
@@ -57,6 +65,79 @@ Known non-blocking warnings:
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-18 | Three Pi sessions for conversion, ingestion, and consultation; Ujimu Pi agent config under `config/ujimu-pi-agent`; Markdown-first ingestion pipeline. |
 | 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
 | 15 | [`15-podman-container-deployment.html`](./15-podman-container-deployment.html) | `verified` | 2026-05-19 | Podman-compatible image, prod/test env profiles, lifecycle scripts, persistent Pi/Ujimu mounts, and manual deployment documentation. |
+| 16 | [`16-ui-shell-drawer-foundation.html`](./16-ui-shell-drawer-foundation.html) | `verified` | 2026-05-21 | Shared `AppDrawer.vue` using Nuxt UI `UDrawer`; main chat page uses drawer with existing-route links only and desktop pin option. |
+| 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `planned` | — | Chat-first workspace using Nuxt UI chat components where they fit, specialist selector in prompt, no hero block. |
+| 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `planned` | — | Conversation history in the drawer and login/auth actions only on demand. |
+| 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `planned` | — | Dedicated `/subscription` page and removal of permanent billing blocks from chat. |
+| 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `planned` | — | Inline ad placements after every randomized 5–10 assistant responses for eligible users. |
+| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `planned` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
+| 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
+
+## UI redesign planned slices
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Planning decisions:
+
+- Zafir slide decks for this project must be written in European Portuguese using pre-1990 orthography.
+- Treat the UI redesign as a whole-product reformulation, but implement it as sequential verified slices.
+- Use Nuxt UI broadly and validate official Nuxt UI documentation before implementing framework-specific patterns.
+- Use Nuxt UI chat components where they fit, with a visual adapter from Ujimu's current chat message model to the expected chat-message shape.
+- Keep the chat backend, grounding, citations, quotas, billing rules, authentication methods, ingestion, and admin authorization semantics unchanged unless a later slice explicitly approves a narrow interface change.
+- Navigation should use an on-demand drawer on desktop and mobile, not a persistent sidebar.
+- Conversation history belongs in the drawer, not a dedicated page for this redesign.
+- Subscriptions move to `/subscription`.
+- Admin management moves to subpages under `/admin`.
+- Ads appear in the message stream after a randomized interval of 5–10 assistant responses for eligible users.
+
+Planned order:
+
+1. Slice 16 establishes the shared shell and drawer foundation. — verified 2026-05-21.
+2. Slice 17 redesigns the public chat workspace and specialist prompt.
+3. Slice 18 moves history and authentication to on-demand drawer/modal flows.
+4. Slice 19 moves subscription management to `/subscription`.
+5. Slice 20 inserts ads into the chat stream without obstructing citations.
+6. Slice 21 restructures admin specialist/source management into subpages.
+7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
+
+## Slice 16 — UI shell and drawer foundation
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Locked decisions:
+
+- The drawer shows only links to routes that already exist in this slice.
+- Future-route placeholders such as `/subscription` and admin subpages are excluded until their own slices.
+- Mobile uses a narrow drawer.
+- Desktop uses a wider navigation-panel style drawer.
+- Desktop users may pin the drawer, but it is closed by default to preserve the on-demand navigation direction.
+- Only the drawer is extracted into a reusable component in this slice; the full shell remains in `pages/index.vue` for now.
+
+Implemented files:
+
+- `components/AppDrawer.vue`
+- `pages/index.vue`
+- `tests/ui-redesign-shell.acceptance.test.ts`
+- `docs/specs/slices/16-ui-shell-drawer-foundation.html`
+- `docs/specs/slices/STATUS.md`
+
+Verification completed:
+
+- `npm test -- tests/ui-redesign-shell.acceptance.test.ts` — failed before implementation, then passed.
+- `npm test` — passed, 96 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
 
 ## Slice 15 — Podman container deployment
 

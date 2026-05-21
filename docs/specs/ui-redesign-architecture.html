@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Arquitectura da reformulação da UI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+      :root { --bg:#050505; --text:#f7f6ef; --muted:#b9b7ad; --line:rgba(255,255,255,.14); --yellow:#f9d616; --yellow-soft:rgba(249,214,22,.14); --red:#d21034; --panel:rgba(22,22,22,.84); --font-display:"Space Grotesk",sans-serif; --font-body:"Inter",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; overflow:hidden; font-family:var(--font-body); color:var(--text); background:radial-gradient(circle at 12% 12%,rgba(249,214,22,.12),transparent 26%),radial-gradient(circle at 86% 80%,rgba(210,16,52,.10),transparent 30%),linear-gradient(135deg,#020202 0%,#101010 48%,#050505 100%); }
+      body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.22; background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); background-size:44px 44px; mask-image:radial-gradient(circle at center,black,transparent 78%); }
+      .deck { width:100vw; height:100vh; position:relative; }
+      .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 10vw 8vh; position:absolute; inset:0; opacity:0; transform:translateY(12px) scale(.99); transition:opacity 220ms ease, transform 220ms ease; }
+      .slide.active { display:flex; opacity:1; transform:translateY(0) scale(1); }
+      .frame { width:min(1180px,100%); min-height:min(690px,76vh); border:1px solid var(--line); border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 28px 90px rgba(0,0,0,.42); padding:clamp(2rem,5vw,4.5rem); position:relative; overflow:hidden; }
+      .frame::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(120deg,transparent 0%,rgba(249,214,22,.08) 48%,transparent 100%); opacity:.55; }
+      .content { position:relative; z-index:1; }
+      .kicker { display:inline-flex; align-items:center; gap:.55rem; margin-bottom:1.2rem; color:var(--yellow); font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.16em; }
+      .kicker::before { content:""; width:2.2rem; height:.18rem; border-radius:99px; background:var(--yellow); }
+      h1,h2 { font-family:var(--font-display); letter-spacing:-.045em; line-height:.96; margin:0; }
+      h1 { font-size:clamp(3.2rem,7vw,7rem); } h2 { max-width:980px; font-size:clamp(2.25rem,5vw,5rem); }
+      p.lead { max-width:930px; margin:1.35rem 0 0; color:var(--muted); font-size:clamp(1.08rem,2vw,1.55rem); line-height:1.45; }
+      ul { list-style:none; padding:0; margin:2rem 0 0; display:grid; gap:.85rem; }
+      li { display:flex; gap:.8rem; align-items:flex-start; color:#e8e7df; font-size:clamp(1rem,1.55vw,1.24rem); line-height:1.38; }
+      li::before { content:""; flex:0 0 .58rem; width:.58rem; height:.58rem; margin-top:.5rem; border-radius:999px; background:var(--yellow); box-shadow:0 0 18px rgba(249,214,22,.38); }
+      .grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .grid-3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .card { border:1px solid var(--line); border-radius:18px; background:var(--panel); padding:1.05rem; min-height:118px; }
+      .card strong { display:block; color:var(--yellow); font-family:var(--font-display); font-size:1.1rem; margin-bottom:.38rem; }
+      .card span { color:var(--muted); line-height:1.4; }
+      .callout { margin-top:1.7rem; padding:1rem 1.2rem; border-radius:18px; border:1px solid rgba(249,214,22,.30); background:var(--yellow-soft); color:#fff9d1; max-width:930px; line-height:1.45; font-weight:650; }
+      code { color:#fff8c8; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:8px; padding:.1rem .35rem; }
+      .topbar { position:fixed; top:1.2rem; left:50%; z-index:10; transform:translateX(-50%); width:min(1180px,80vw); display:flex; justify-content:space-between; color:rgba(245,245,240,.68); font-size:.84rem; }
+      .counter { position:fixed; bottom:1.4rem; right:2rem; z-index:10; color:rgba(245,245,240,.7); font-size:.9rem; }
+      @media (max-width:900px){ .grid-2,.grid-3{grid-template-columns:1fr;} .frame{min-height:80vh;} }
+      @media print { body{overflow:visible;} .slide{display:flex; position:relative; page-break-after:always;} .topbar,.counter{display:none;} }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><span>Reformulação da UI do Ujimu</span><span>Arquitectura — aprovada</span></div>
+    <main class="deck">
+      <section class="slide active"><div class="frame"><div class="content"><div class="kicker">Arquitectura</div><h1>UI como aplicação de consulta</h1><p class="lead">Desenhar a nova estrutura de interface antes de cortar slices: chat como superfície principal, navegação por drawer, fluxos de conta/subscrição separados e admin operacional.</p></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Origem</div><h2>Brainstorming aprovado</h2><ul><li>Deck de origem: <code>docs/specs/brainstorm-ui-redesign.html</code>.</li><li>Direcção: reformulação completa da UI, não apenas o chat público.</li><li>Regra: decks Zafir escritos em português europeu pré-1990.</li><li>Referências visuais: <code>docs/screenshots/</code>, com accent Ujimu amarelo em vez da côr de referência.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Base técnica</div><h2>Preservar a arquitectura de produto existente</h2><ul><li>Manter Nuxt 4, TypeScript, Nuxt UI, SQLite e APIs server-side existentes.</li><li>Não alterar contratos de chat, quotas, histórico, ingestão, citações ou billing mock nesta reformulação.</li><li>Reestruturar a camada visual e de navegação em torno de componentes Nuxt UI.</li><li>Adicionar páginas ou componentes de apresentação quando isso reduzir o tamanho e a fragilidade de <code>pages/index.vue</code> e <code>pages/admin/index.vue</code>.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Componentes de chat</div><h2>Validação técnica inicial</h2><ul><li>O pacote instalado <code>@nuxt/ui@4.7.1</code> inclui componentes de chat: <code>UChatMessages</code>, <code>UChatMessage</code>, <code>UChatPrompt</code> e <code>UChatPromptSubmit</code>.</li><li>Os tipos destes componentes esperam mensagens no formato <code>UIMessage</code> do pacote <code>ai</code>, usando <code>parts</code>.</li><li>O modelo interno actual usa <code>ChatMessage</code> próprio com texto, citações, estado e IDs de histórico.</li><li>Decisão provável: criar um adaptador visual de mensagens, sem mudar o contrato do endpoint <code>/api/chat</code> nesta fase.</li></ul><div class="callout">Antes de implementar, a documentação oficial do Nuxt UI deve ser consultada para confirmar os padrões recomendados e evitar APIs obsoletas.</div></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Mapa de superfícies</div><h2>Quatro superfícies, uma linguagem</h2><div class="grid-2"><div class="card"><strong>Chat</strong><span>Superfície principal: mensagens, prompt, especialista, citações, fila e anúncios em linha.</span></div><div class="card"><strong>Drawer</strong><span>Navegação a pedido: histórico, novo chat, conta, subscrições, segurança e admin quando aplicável.</span></div><div class="card"><strong>Subscrições</strong><span>Página própria para plano, estado, aviso de expiração e acções de checkout mock.</span></div><div class="card"><strong>Admin</strong><span>Consola operacional para especialistas, fontes, ingestão, analytics e readiness.</span></div></div></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Chat shell</div><h2>Estrutura proposta</h2><ul><li>Topo compacto com botão de drawer, nome do produto e acções contextuais mínimas.</li><li>Área central de mensagens com largura controlada e scroll dedicado.</li><li>Quando não existem mensagens, mostrar cartão informativo do especialista seleccionado dentro da área de mensagens.</li><li>Prompt fixo no fundo, com dropdown de especialista, textarea, submit, estado de quota e erros.</li><li>Sem hero separado; a primeira interacção é escrever a pergunta.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Drawer</div><h2>Navegação a pedido</h2><ul><li>Drawer abre por botão, em desktop e mobile; não há barra lateral persistente.</li><li>Conteúdo do drawer: novo chat, histórico, subscrições, segurança da conta, admin e terminar sessão quando aplicável.</li><li>Login aparece como acção contextual no drawer ou em modal quando uma operação o exige.</li><li>Histórico mantém limite de 20 conversas por especialista, mas deixa de competir com a leitura da resposta.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Mensagens</div><h2>Fluxo de conversa e publicidade</h2><ul><li>Mensagens do utilizador e do assistente vivem no painel principal de mensagens.</li><li>Citações ficam associadas ao fim da resposta do assistente, mantendo a política actual.</li><li>Anúncios entram como itens inertes entre respostas do assistente elegíveis.</li><li>O contador de anúncios usa respostas do assistente, escolhendo o próximo intervalo entre 5 e 10 respostas.</li><li>Ao editar uma pergunta anterior, o estado visual deve mostrar que a continuação será substituída.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Subscrições e login</div><h2>Separar tarefas de conta do chat</h2><ul><li>Criar página dedicada de subscrição para plano, estado actual, aviso de expiração e acções de checkout mock.</li><li>Remover blocos de subscrição permanentes da página principal de chat.</li><li>Login passa a modal ou página a pedido, accionado por quotas, histórico, subscrição, segurança ou admin.</li><li>Manter OTP e passkeys existentes; a reformulação não cria novo método de autenticação.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Admin</div><h2>Consola operacional em vez de painel único denso</h2><ul><li>Usar componentes Nuxt UI para navegação, cards, formulários, tabelas, badges, tabs e modais.</li><li>Organizar por tarefas: especialistas, fontes/conversão/ingestão, analytics/content gaps e operações.</li><li>Preferir lista + detalhe a formulários longos sempre visíveis.</li><li>Mostrar estados de fonte, erros e acções administrativas com hierarquia clara.</li><li>Manter todas as verificações de admin no servidor.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Risco técnico</div><h2>Principal risco: adaptação ao formato de chat do Nuxt UI</h2><ul><li>Os componentes do Nuxt UI parecem optimizados para <code>UIMessage</code> do pacote <code>ai</code>.</li><li>O backend actual emite NDJSON próprio com eventos <code>delta</code>, <code>citation</code>, <code>history</code> e <code>done</code>.</li><li>A adaptação deve ser feita na camada de apresentação para evitar mexer no motor de grounding.</li><li>Se o componente de chat não aceitar bem citações e anúncios, usar os componentes menores de Nuxt UI para compor a experiência sem abandonar o design system.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Decisões fechadas</div><h2>Iteração 2 da arquitectura</h2><ul><li>O histórico de conversas fica no drawer; não haverá página dedicada de pesquisa/listagem nesta reformulação inicial.</li><li>O admin passa a subpáginas sob <code>/admin</code>, em vez de continuar como página única densa.</li><li>A página de subscrição usará a rota <code>/subscription</code>.</li><li>Será criado um adaptador visual para converter as mensagens actuais para o formato esperado pelos componentes <code>UChat*</code> do Nuxt UI, mantendo o backend de chat como está.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Registo de iteração</div><h2>Iterações 1–2</h2><ul><li>Iteração 1: criado o rascunho de arquitectura a partir do brainstorming aprovado.</li><li>Iteração 1: identificado o risco principal no encaixe entre mensagens Ujimu e componentes <code>UChat*</code>.</li><li>Iteração 2: histórico confirmado no drawer.</li><li>Iteração 2: admin confirmado em subpáginas.</li><li>Iteração 2: rota de subscrição confirmada como <code>/subscription</code>.</li><li>Iteração 2: aprovado adaptador visual para mensagens, sem alterar o backend de chat.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Aprovação</div><h2>Arquitectura aprovada</h2><p class="lead">Este deck foi aprovado pelo utilizador. A reformulação pode agora ser cortada em slices de implementação, mantendo a sequência Zafir e a verificação slice a slice.</p></div></div></section>
+    </main>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = document.querySelectorAll('.slide'); let idx = 0; document.getElementById('total').textContent = slides.length;
+      function go(i){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(i, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+      document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(idx + 1); } if (e.key === 'ArrowLeft') go(idx - 1); });
+      document.addEventListener('click', e => { e.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+    </script>
+  </body>
+</html>

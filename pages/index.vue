@@ -841,6 +841,18 @@ function formatDisplayDate(value: string | undefined): string {
 
 <template>
   <main class="home-shell" aria-labelledby="page-title">
+    <div class="app-shell-bar">
+      <AppDrawer
+        :is-authenticated="isAuthenticated"
+        :admin-available="adminAvailable"
+        :user-label="authSession.user?.displayContact"
+        open-label="Abrir navegação"
+        @open-auth="authPanelOpen = true"
+        @logout="logout"
+      />
+      <span>Ujimu</span>
+    </div>
+
     <section class="hero-panel">
       <div class="brand-mark" aria-hidden="true">U</div>
       <p class="eyebrow">Ujimu</p>
@@ -1196,6 +1208,24 @@ function formatDisplayDate(value: string | undefined): string {
   min-height: 100vh;
   margin: 0 auto;
   padding: 32px 0;
+}
+
+.app-shell-bar {
+  position: sticky;
+  top: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  margin-bottom: 18px;
+  border: 1px solid var(--ujimu-line);
+  border-radius: 999px;
+  padding: 6px 12px 6px 6px;
+  color: var(--ujimu-muted);
+  background: rgba(10, 10, 10, 0.78);
+  backdrop-filter: blur(18px);
+  font-weight: 800;
 }
 
 .hero-panel,

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Brainstorming da reformulação da UI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+      :root { --bg:#050505; --text:#f7f6ef; --muted:#b9b7ad; --faint:#7c786d; --line:rgba(255,255,255,.14); --yellow:#f9d616; --yellow-soft:rgba(249,214,22,.14); --red:#d21034; --panel:rgba(22,22,22,.84); --panel-2:rgba(255,255,255,.06); --font-display:"Space Grotesk",sans-serif; --font-body:"Inter",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; overflow:hidden; font-family:var(--font-body); color:var(--text); background:radial-gradient(circle at 14% 14%,rgba(249,214,22,.13),transparent 24%),radial-gradient(circle at 88% 76%,rgba(210,16,52,.10),transparent 30%),linear-gradient(135deg,#020202 0%,#101010 50%,#050505 100%); }
+      body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.22; background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); background-size:44px 44px; mask-image:radial-gradient(circle at center,black,transparent 78%); }
+      .deck { width:100vw; height:100vh; position:relative; }
+      .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 10vw 8vh; position:absolute; inset:0; opacity:0; transform:translateY(12px) scale(.99); transition:opacity 220ms ease, transform 220ms ease; }
+      .slide.active { display:flex; opacity:1; transform:translateY(0) scale(1); }
+      .frame { width:min(1180px,100%); min-height:min(690px,76vh); border:1px solid var(--line); border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 28px 90px rgba(0,0,0,.42); padding:clamp(2rem,5vw,4.5rem); position:relative; overflow:hidden; }
+      .frame::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(120deg,transparent 0%,rgba(249,214,22,.08) 48%,transparent 100%); opacity:.55; }
+      .content { position:relative; z-index:1; }
+      .kicker { display:inline-flex; align-items:center; gap:.55rem; margin-bottom:1.2rem; color:var(--yellow); font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.16em; }
+      .kicker::before { content:""; width:2.2rem; height:.18rem; border-radius:99px; background:var(--yellow); }
+      h1,h2 { font-family:var(--font-display); letter-spacing:-.045em; line-height:.96; margin:0; }
+      h1 { font-size:clamp(3.2rem,7vw,7rem); } h2 { max-width:980px; font-size:clamp(2.25rem,5vw,5rem); }
+      p.lead { max-width:930px; margin:1.35rem 0 0; color:var(--muted); font-size:clamp(1.08rem,2vw,1.55rem); line-height:1.45; }
+      ul { list-style:none; padding:0; margin:2rem 0 0; display:grid; gap:.85rem; }
+      li { display:flex; gap:.8rem; align-items:flex-start; color:#e8e7df; font-size:clamp(1rem,1.55vw,1.24rem); line-height:1.38; }
+      li::before { content:""; flex:0 0 .58rem; width:.58rem; height:.58rem; margin-top:.5rem; border-radius:999px; background:var(--yellow); box-shadow:0 0 18px rgba(249,214,22,.38); }
+      .grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .grid-3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+      .card { border:1px solid var(--line); border-radius:18px; background:var(--panel); padding:1.05rem; min-height:118px; }
+      .card strong { display:block; color:var(--yellow); font-family:var(--font-display); font-size:1.1rem; margin-bottom:.38rem; }
+      .card span { color:var(--muted); line-height:1.4; }
+      .callout { margin-top:1.7rem; padding:1rem 1.2rem; border-radius:18px; border:1px solid rgba(249,214,22,.30); background:var(--yellow-soft); color:#fff9d1; max-width:930px; line-height:1.45; font-weight:650; }
+      code { color:#fff8c8; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:8px; padding:.1rem .35rem; }
+      .topbar { position:fixed; top:1.2rem; left:50%; z-index:10; transform:translateX(-50%); width:min(1180px,80vw); display:flex; justify-content:space-between; color:rgba(245,245,240,.68); font-size:.84rem; }
+      .counter { position:fixed; bottom:1.4rem; right:2rem; z-index:10; color:rgba(245,245,240,.7); font-size:.9rem; }
+      @media (max-width:900px){ .grid-2,.grid-3{grid-template-columns:1fr;} .frame{min-height:80vh;} }
+      @media print { body{overflow:visible;} .slide{display:flex; position:relative; page-break-after:always;} .topbar,.counter{display:none;} }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><span>Reformulação da UI do Ujimu</span><span>Deck de brainstorming — vivo</span></div>
+    <main class="deck">
+      <section class="slide active"><div class="frame"><div class="content"><div class="kicker">Brainstorming</div><h1>Reformulação da UI</h1><p class="lead">Aproximar o Ujimu de uma experiência familiar de chat de IA, baseada em Nuxt UI, usando a direcção dos screenshots sem perder o modelo de fundamentação legal e regulamentar.</p></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Como poderemos</div><h2>Fazer o Ujimu parecer uma consulta focalizada?</h2><p class="lead">O produto principal deve começar directamente no chat, tornar a escolha do especialista natural na zona do prompt, evitar respostas em painéis laterais e retirar login e subscrição do caminho principal da consulta.</p></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Valor para o utilizador</div><h2>Reduzir fricção cognitiva</h2><ul><li>O utilizador chega para fazer uma pergunta a um especialista, não para ler um bloco de boas-vindas.</li><li>A equipa passa a trabalhar com primitivas do Nuxt UI em vez de estruturas visuais demasiado próprias.</li><li>Subscrições e login passam a ser tarefas contextuais, não distracções permanentes.</li><li>As páginas de gestão tornam-se ferramentas operacionais claras, não painéis densos e frágeis.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Contexto governante</div><h2>Restrições já presentes no projecto</h2><ul><li>Não existe directoria <code>docs/wiki/</code>; as instruções do repositório e os specs existentes são a fonte governante.</li><li>A cópia visível ao utilizador deve permanecer em português europeu pré-1990.</li><li>As respostas continuam obrigatoriamente fundamentadas na wiki do especialista escolhido e com citações.</li><li>As sessões de chat ficam no especialista seleccionado até o utilizador iniciar nova consulta.</li><li>A publicidade não pode prejudicar a leitura das respostas nem das citações.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Regra de língua</div><h2>Decks em português europeu pré-1990</h2><ul><li>Os slide decks de brainstorming, arquitectura e slices deste fluxo devem estar escritos em português europeu pré-1990.</li><li>A regra aplica-se ao conteúdo visível dos decks, incluindo títulos, decisões, perguntas abertas e registos de iteração.</li><li>Código, nomes de ficheiros, APIs, componentes e marcas técnicas mantêm a grafia original quando necessário.</li><li>Esta decisão corrige este deck e passa a orientar os próximos decks da reformulação da UI.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Direcção dos screenshots</div><h2>Padrões retirados das referências</h2><div class="grid-2"><div class="card"><strong>Chat primeiro</strong><span>Área escura ao estilo Gemini, prompt como objecto principal e sem hero antes da primeira pergunta.</span></div><div class="card"><strong>Controlos no contexto</strong><span>O selector de especialista vive junto ao prompt, com um padrão compacto de dropdown.</span></div><div class="card"><strong>Painéis a pedido</strong><span>Histórico, conta, definições e subscrição surgem apenas quando necessários.</span></div><div class="card"><strong>Admin/editor</strong><span>Gestão ao estilo Gem: secções de formulário claras, pré-visualização, separadores e navegação lateral.</span></div></div></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Alterações explícitas</div><h2>Direcção pedida</h2><ul><li>Usar Nuxt UI de forma ampla, incluindo os seus componentes de chat de IA quando aplicável.</li><li>Remover o actual bloco de boas-vindas em estilo hero e começar pelo espaço de chat.</li><li>Mover subscrições para uma página separada.</li><li>Accionar login apenas quando necessário, sem bloco permanente no ecrã principal.</li><li>Escolher especialistas através de um dropdown na zona do prompt.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Mensagens e anúncios</div><h2>Manter a conversa num só lugar</h2><ul><li>As mensagens devem aparecer dentro do painel de mensagens, não em painéis laterais.</li><li>A informação do especialista aparece na área de mensagens apenas enquanto a conversa está vazia.</li><li>Os espaços publicitários tornam-se itens intercalados no fluxo de mensagens.</li><li>Os anúncios aparecem aleatoriamente a cada 5–10 respostas do assistente para utilizadores elegíveis.</li><li>As citações devem continuar legíveis e nunca ser encobertas por publicidade.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Base actual</div><h2>Zonas prováveis de implementação</h2><div class="grid-2"><div class="card"><strong><code>pages/index.vue</code></strong><span>Concentra hoje chat, autenticação, facturação, histórico, fila, escolha de especialista, anúncios e cópia de boas-vindas.</span></div><div class="card"><strong><code>pages/admin/index.vue</code></strong><span>A consola administrativa actual é própria e densa; precisa de componentes de página e layout do Nuxt UI.</span></div><div class="card"><strong><code>app.config.ts</code></strong><span>Já configura as cores do Nuxt UI com o amarelo Ujimu como token primário.</span></div><div class="card"><strong><code>assets/css/main.css</code></strong><span>Contém a fundação visual escura/amarela e o fundo actual.</span></div></div></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Direcção convergida</div><h2>Uma reformulação coerente da UI</h2><div class="grid-3"><div class="card"><strong>Área de chat</strong><span>Canvas único de chat, drawer a pedido, dropdown de especialista no prompt e informação inicial do especialista em linha.</span></div><div class="card"><strong>Nuxt UI nativo</strong><span>Priorizar primitivas de página, modal, formulário, dropdown, tabela e chat de IA do Nuxt UI em vez de estruturas próprias.</span></div><div class="card"><strong>Páginas operacionais</strong><span>Reformular admin, conta/segurança, subscrições e readiness como superfícies coerentes da aplicação.</span></div></div><div class="callout">Decisão: tratar isto como uma reformulação única de UI, mas implementá-la em slices para que cada superfície seja verificada com segurança.</div></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Pressupostos ocultos</div><h2>Validar antes do desenho</h2><ul><li>Os componentes de chat do Nuxt UI encaixam no actual modelo de streaming NDJSON e eventos de citação.</li><li>Publicidade aleatória a cada 5–10 respostas do assistente não prejudica a leitura legal/regulamentar.</li><li>Mover subscrições não prejudica a visibilidade de quotas e avisos de expiração.</li><li>Login a pedido continua compreensível para quotas e recuperação de conta por utilizadores anónimos.</li><li>“Páginas de backend” significa superfícies de gestão e operação, não rotas de API do servidor.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Fora do âmbito por agora</div><h2>Manter a reformulação contida</h2><ul><li>Não alterar fundamentação, citações, ingestão, quotas nem regras de subscrição.</li><li>Não introduzir integração real de pagamentos nesta reformulação de UI.</li><li>Não acrescentar novo método de autenticação para além de OTP/passkeys existentes.</li><li>Não reescrever APIs de servidor salvo necessidade segura para suportar a UI.</li><li>Não copiar a marca Gemini; os screenshots definem direcção de interacção, não identidade visual.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Decisões</div><h2>Decisões da iteração 2</h2><ul><li>“Páginas de backend” inclui admin e superfícies operacionais/de conta: <code>/admin</code>, conta/segurança, subscrições, readiness e vistas de gestão relacionadas.</li><li>A reformulação deve abranger todo o produto, não apenas o chat público.</li><li>A navegação em desktop e mobile deve usar drawer a pedido, não barra lateral persistente.</li><li>Anúncios em linha devem ser inseridos após respostas do assistente, aleatoriamente a cada 5–10 respostas para utilizadores elegíveis.</li><li>Não há material adicional de desenho para já além de <code>docs/screenshots/</code>.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Registo de iteração</div><h2>Iterações 1–3</h2><ul><li>Iteração 1: foi pedida uma reformulação Nuxt UI-first com componentes próprios de chat de IA quando possível.</li><li>Iteração 1: screenshots em <code>docs/screenshots/</code> definem uma direcção tipo Gemini, com diferença no accent Ujimu.</li><li>Iteração 1: o chat deve remover o hero, manter mensagens centrais e colocar o especialista no prompt.</li><li>Iteração 2: a reformulação passa a cobrir chat, subscrições/login e superfícies admin/conta/backend.</li><li>Iteração 2: navegação por drawer a pedido; anúncios contam respostas do assistente.</li><li>Iteração 3: todos os slide decks deste fluxo devem estar em português europeu pré-1990.</li></ul></div></div></section>
+
+      <section class="slide"><div class="frame"><div class="content"><div class="kicker">Aprovação</div><h2>Brainstorming aprovado</h2><p class="lead">Este deck foi aprovado pelo utilizador e passa a ser o registo de referência da reformulação da UI. O próximo passo é desenho e arquitectura, seguido de slices verificáveis.</p></div></div></section>
+    </main>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = document.querySelectorAll('.slide'); let idx = 0; document.getElementById('total').textContent = slides.length;
+      function go(i){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(i, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+      document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(idx + 1); } if (e.key === 'ArrowLeft') go(idx - 1); });
+      document.addEventListener('click', e => { e.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+    </script>
+  </body>
+</html>

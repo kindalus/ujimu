@@ -2,6 +2,8 @@
 
 This runbook captures the MVP operational checks required before production use. Keep secrets in environment variables or a secret manager; never commit `.env` files.
 
+Launch roadmap note: live payments are not part of the first launch scope. Appy Pay, Stripe/VISA, and SendGrid integrations are deferred until after launch. Before production launch, clarify the OTP/contact-delivery path if OTP authentication remains in launch scope without SendGrid.
+
 ## Health and readiness
 
 - Public liveness: `GET /healthz`
@@ -30,7 +32,7 @@ Configure these outside source control:
 
 - `UJIMU_SESSION_SECRET` — recommended for durable JWT session validation across restarts.
 - `UJIMU_OTP_PEPPER` — recommended for durable OTP verification across restarts.
-- `UJIMU_BILLING_WEBHOOK_SECRET` — required for billing webhook confirmation.
+- `UJIMU_BILLING_WEBHOOK_SECRET` — required only when billing webhook confirmation is enabled; live Appy Pay and Stripe/VISA integrations are post-launch.
 - `UJIMU_ADMIN_CONTACTS` — required to grant the single `admin` role.
 - `UJIMU_PASSKEYS_ENABLED` — set to `true` to expose passkey registration and login.
 - `UJIMU_PASSKEY_RP_ID` — WebAuthn relying-party ID; required in production when passkeys are enabled.
@@ -83,7 +85,7 @@ Expected result: the command prints JSON metadata only and creates `raw/small-sa
 
 ## Pi conversion, ingestion, and consultation smoke test
 
-Run this smoke path only in a configured non-production environment with `config/ujimu-pi-agent/auth.json` present outside source control or credentials provided through environment variables, and with the Pi enable flags set deliberately:
+Run this smoke path only in a configured non-production environment with `config/ujimu-pi-agent/auth.json` present outside source control or credentials provided through environment variables, and with the Pi enable flags set deliberately. Before production, run it with the exact provider/model configuration intended for production; a successful smoke with a temporary model proves the pipeline shape, not the final production model choice.
 
 1. Upload a small official source through the admin console.
 2. Click `Executar conversão` and confirm that `raw/<original filename>.md` is created and the source state becomes conversion `converted` / ingestion `pending`.
@@ -172,6 +174,8 @@ scripts/container/remove.sh prod|test    # remove only the target container
 The scripts create missing profile host directories with `mkdir -p`, but never delete Pi or Ujimu data directories, images, networks, env files, or secrets. Reverse proxy, TLS, DNS, certificates, and CI/CD automation are intentionally outside this deployment slice.
 
 The test profile enables existing fake/no-op auth delivery and mock billing paths while keeping Pi conversion, ingestion, and chat enabled for validation. Do not put real external auth, payment, or communication provider secrets in `test.env`.
+
+For first launch, do not require live Appy Pay, Stripe/VISA, or SendGrid configuration. Those provider integrations are planned for post-launch work.
 
 ## Deployment quality gate
 
