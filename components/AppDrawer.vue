@@ -39,9 +39,16 @@ function focusTemporaryDrawerStart(): void {
 }
 
 function closeTemporaryDrawer(): void {
-  if (!drawerPinned.value) {
-    drawerOpen.value = false
-  }
+  drawerOpen.value = false
+}
+
+function pinDrawer(): void {
+  drawerPinned.value = true
+  drawerOpen.value = false
+}
+
+function unpinDrawer(): void {
+  drawerPinned.value = false
 }
 
 function openAuth(): void {
@@ -175,7 +182,14 @@ function logout(): void {
             </UButton>
           </div>
 
-          <UButton type="button" color="neutral" variant="soft" block @click="drawerPinned = !drawerPinned">
+          <UButton
+            type="button"
+            color="neutral"
+            variant="soft"
+            block
+            class="pin-drawer-button"
+            @click="drawerPinned ? unpinDrawer() : pinDrawer()"
+          >
             {{ drawerPinned ? 'Desafixar' : 'Fixar' }}
           </UButton>
         </div>
@@ -215,7 +229,7 @@ function logout(): void {
           Entrar
         </UButton>
         <slot name="history" :close="closeTemporaryDrawer" />
-        <UButton type="button" color="neutral" variant="soft" block @click="drawerPinned = false">
+        <UButton type="button" color="neutral" variant="soft" block @click="unpinDrawer">
           Desafixar
         </UButton>
       </nav>
@@ -279,11 +293,16 @@ function logout(): void {
   justify-content: space-between;
 }
 
-.app-drawer-persistent {
+.app-drawer-persistent,
+.pin-drawer-button {
   display: none;
 }
 
 @media (min-width: 1024px) {
+  .pin-drawer-button {
+    display: flex;
+  }
+
   .app-drawer-persistent {
     position: fixed;
     inset: 0 auto 0 0;
