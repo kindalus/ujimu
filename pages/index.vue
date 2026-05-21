@@ -1037,18 +1037,13 @@ function formatDisplayDate(value: string | undefined): string {
           variant="soft"
           :rows="1"
           :maxrows="6"
+          autoresize
           :placeholder="'Pergunte ao Ujimu.'"
           :disabled="!canWriteQuestion"
           @submit="submitQuestion"
         >
-          <template #leading>
-            <span class="prompt-plus-button" aria-hidden="true">
-              <UIcon name="i-lucide-plus" />
-            </span>
-          </template>
-
-          <template #trailing>
-            <div class="prompt-toolbar">
+          <template #header>
+            <div class="prompt-specialist-row">
               <span class="sr-only">{{ composerHelp }}</span>
               <USelect
                 id="specialist-select"
@@ -1058,18 +1053,28 @@ function formatDisplayDate(value: string | undefined): string {
                 :items="specialistSelectItems"
                 placeholder="Especialidade"
                 aria-label="Especialidade"
-                :disabled="isStreaming || specialistsPending || !hasSpecialists"
+                :disabled="isStreaming || specialistsPending"
                 @update:model-value="selectSpecialistFromPrompt"
               />
-              <span class="prompt-mic-button" aria-hidden="true">
-                <UIcon name="i-lucide-mic" />
+            </div>
+          </template>
+
+          <template #footer>
+            <div class="prompt-toolbar">
+              <span class="prompt-plus-button" aria-hidden="true">
+                <UIcon name="i-lucide-plus" />
               </span>
-              <UChatPromptSubmit
-                class="prompt-submit"
-                :status="'ready'"
-                :disabled="!canSubmitQuestion"
-                :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
-              />
+              <div class="prompt-action-group">
+                <span class="prompt-mic-button" aria-hidden="true">
+                  <UIcon name="i-lucide-mic" />
+                </span>
+                <UChatPromptSubmit
+                  class="prompt-submit"
+                  :status="'ready'"
+                  :disabled="!canSubmitQuestion"
+                  :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
+                />
+              </div>
             </div>
           </template>
         </UChatPrompt>
@@ -1444,8 +1449,10 @@ h3 {
 
 .chat-panel {
   display: grid;
+  height: calc(100dvh - 128px);
   min-height: 640px;
-  grid-template-rows: auto auto minmax(280px, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-auto-rows: auto;
   gap: 18px;
 }
 
@@ -1468,6 +1475,7 @@ h3 {
 
 .messages {
   display: grid;
+  min-height: 0;
   align-content: start;
   gap: 14px;
   overflow: auto;
@@ -1601,47 +1609,39 @@ h3 {
 }
 
 .gemini-prompt {
+  align-self: end;
+  display: grid;
   width: min(860px, 100%);
-  min-height: 70px;
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  padding: 0;
+  border-radius: 32px;
+  padding: 12px 14px 14px;
   background: rgba(36, 36, 36, 0.96);
   box-shadow: 0 18px 56px rgba(0, 0, 0, 0.32);
 }
 
-.gemini-prompt :deep([data-slot="root"]) {
+.gemini-prompt :deep([data-slot="header"]),
+.gemini-prompt :deep([data-slot="footer"]) {
+  padding: 0;
+}
+
+.gemini-prompt :deep([data-slot="body"]) {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
 .gemini-prompt :deep(textarea) {
-  min-height: 68px;
-  padding: 23px 330px 19px 64px;
+  min-height: 44px;
+  padding: 7px 8px 9px;
   color: #f7f4e8;
   background: transparent;
-  line-height: 1.35;
+  line-height: 1.45;
   resize: none;
 }
 
 .gemini-prompt :deep(textarea::placeholder) {
   color: #c7c4bb;
-}
-
-.gemini-prompt :deep([data-slot="leading"]) {
-  inset-inline-start: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.gemini-prompt :deep([data-slot="trailing"]) {
-  inset-inline-end: 10px;
-  top: 50%;
-  width: auto;
-  transform: translateY(-50%);
-  pointer-events: auto;
 }
 
 .editing-banner {
@@ -1653,10 +1653,24 @@ h3 {
   line-height: 1.35;
 }
 
-.prompt-toolbar {
+.prompt-specialist-row {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.prompt-toolbar,
+.prompt-action-group {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.prompt-toolbar {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .prompt-plus-button,
@@ -1674,7 +1688,8 @@ h3 {
 }
 
 .prompt-specialist-control {
-  max-width: 184px;
+  width: min(260px, 100%);
+  max-width: 260px;
   border-radius: 999px;
   color: #f7f4e8;
 }
@@ -1769,6 +1784,7 @@ h3 {
   }
 
   .chat-panel {
+    height: calc(100dvh - 104px);
     min-height: 560px;
   }
 
@@ -1779,29 +1795,14 @@ h3 {
 
 @media (max-width: 720px) {
   .gemini-prompt {
-    min-height: 122px;
-    border-radius: 30px;
+    border-radius: 28px;
+    padding: 12px;
   }
 
   .gemini-prompt :deep(textarea) {
-    min-height: 112px;
-    padding: 18px 18px 64px 56px;
+    min-height: 48px;
+    padding: 8px 4px;
   }
 
-  .gemini-prompt :deep([data-slot="trailing"]) {
-    inset-inline: 12px;
-    top: auto;
-    bottom: 10px;
-    transform: none;
-  }
-
-  .prompt-toolbar {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  .prompt-specialist-control {
-    max-width: min(210px, calc(100vw - 180px));
-  }
 }
 </style>

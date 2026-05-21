@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 17 Gemini-style prompt correction:
+Latest full verification after Slice 17 two-row Gemini-style prompt correction:
 
 - `npm test` — passed, 99 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Chrome DevTools browser check — passed: page starts in the chat workspace without the old hero, client hydration works, the prompt appears as a rounded Gemini-style bottom composer, login expands on demand, and console has no errors.
+- Chrome DevTools browser check — passed: page starts in the chat workspace without the old hero, client hydration works, the prompt appears as a bottom-anchored two-row Gemini-style composer with the specialist selector on the top-right line, login expands on demand, and console has no errors.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -67,7 +67,7 @@ Known non-blocking warnings:
 | 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
 | 15 | [`15-podman-container-deployment.html`](./15-podman-container-deployment.html) | `verified` | 2026-05-19 | Podman-compatible image, prod/test env profiles, lifecycle scripts, persistent Pi/Ujimu mounts, and manual deployment documentation. |
 | 16 | [`16-ui-shell-drawer-foundation.html`](./16-ui-shell-drawer-foundation.html) | `verified` | 2026-05-21 | Shared `AppDrawer.vue` using Nuxt UI `UDrawer`; main chat page uses drawer with existing-route links only and desktop pin option. |
-| 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `verified` | 2026-05-21 | Chat-first workspace using Nuxt UI chat components, parts adapter, Gemini-style prompt with specialist selector, specialist empty state, and no hero block. |
+| 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `verified` | 2026-05-21 | Chat-first workspace using Nuxt UI chat components, parts adapter, bottom-anchored two-row Gemini-style prompt with specialist selector, specialist empty state, and no hero block. |
 | 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `planned` | — | Conversation history in the drawer and login/auth actions only on demand. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `planned` | — | Dedicated `/subscription` page and removal of permanent billing blocks from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `planned` | — | Inline ad placements after every randomized 5–10 assistant responses for eligible users. |
@@ -99,7 +99,7 @@ Planning decisions:
 Planned order:
 
 1. Slice 16 establishes the shared shell and drawer foundation. — verified 2026-05-21.
-2. Slice 17 redesigns the public chat workspace and specialist prompt, including the Gemini-style prompt correction. — verified 2026-05-21.
+2. Slice 17 redesigns the public chat workspace and specialist prompt, including the bottom-anchored two-row Gemini-style prompt correction. — verified 2026-05-21.
 3. Slice 18 moves history and authentication to on-demand drawer/modal flows.
 4. Slice 19 moves subscription management to `/subscription`.
 5. Slice 20 inserts ads into the chat stream without obstructing citations.
@@ -119,7 +119,7 @@ Refinement and grill decisions:
 
 - Use `UChatMessages`, `UChatMessage`, `UChatPrompt`, and `UChatPromptSubmit` for the public chat surface.
 - Keep Ujimu's existing chat backend and message model; adapt current `ChatMessage.text` into Nuxt UI `parts` for rendering.
-- Put the specialist selector inside a Gemini-style rounded prompt composer with `USelect`, without a visible form-style label.
+- Put the specialist selector on the top-right line inside a bottom-anchored Gemini-style rounded prompt composer with `USelect`, without a visible form-style label.
 - Changing specialist still starts a new consultation by clearing messages, queue, active conversation, and editing state.
 - The empty chat message area shows selected specialist name and description, or asks the user to choose a specialist.
 - Keep authentication, history, billing, and advertising in auxiliary panels until their own slices.
@@ -140,7 +140,7 @@ Verification completed:
 - `npm run typecheck` — passed.
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
 - `npm audit --audit-level=high` — passed with 0 vulnerabilities.
-- Chrome DevTools browser check — passed on port 3100; the prompt appears as a rounded Gemini-style bottom composer and the console has no errors.
+- Chrome DevTools browser check — passed on port 3100; the prompt appears as a bottom-anchored two-row Gemini-style composer, the specialist selector is on the top-right line and not disabled just because no specialist is selected, and the console has no errors.
 
 ## Slice 16 — UI shell and drawer foundation
 
