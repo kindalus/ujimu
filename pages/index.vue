@@ -137,6 +137,21 @@ interface ChatMessage {
   status: 'streaming' | 'done' | 'error'
 }
 
+interface ChatUiTextPart {
+  type: 'text'
+  text: string
+}
+
+interface ChatUiMessage extends ChatMessage {
+  parts: ChatUiTextPart[]
+}
+
+interface SpecialistSelectItem {
+  label: string
+  value: string
+  description: string
+}
+
 interface QueuedQuestion {
   id: string
   text: string
@@ -213,6 +228,24 @@ onMounted(() => {
 const selectedSpecialist = computed(() =>
   specialists.value.find((specialist) => specialist.id === selectedSpecialistId.value)
 )
+const specialistSelectItems = computed<SpecialistSelectItem[]>(() =>
+  specialists.value.map((specialist) => ({
+    label: specialist.name,
+    value: specialist.id,
+    description: specialist.description
+  }))
+)
+const chatUiMessages = computed<ChatUiMessage[]>(() =>
+  messages.value.map((message) => ({
+    ...message,
+    parts: [{ type: 'text', text: message.text || (message.status === 'streaming' ? 'A preparar resposta...' : '') }]
+  }))
+)
+const chatStatus = computed(() => {
+  if (messages.value.some((message) => message.status === 'error')) return 'error'
+  if (isStreaming.value) return 'streaming'
+  return 'ready'
+})
 const hasSpecialists = computed(() => specialists.value.length > 0)
 const isAuthenticated = computed(() => authSession.value.authenticated)
 const passkeySignInAvailable = computed(
@@ -581,6 +614,11 @@ function selectSpecialist(specialistId: string): void {
   void loadHistory()
 }
 
+function selectSpecialistFromPrompt(value: unknown): void {
+  if (typeof value !== 'string') return
+  selectSpecialist(value)
+}
+
 function submitQuestion(): void {
   const text = question.value.trim()
   if (!canSubmitQuestion.value || !text) return
@@ -853,181 +891,15 @@ function formatDisplayDate(value: string | undefined): string {
       <span>Ujimu</span>
     </div>
 
-    <section class="hero-panel">
-      <div class="brand-mark" aria-hidden="true">U</div>
-      <p class="eyebrow">Ujimu</p>
-      <h1 id="page-title">Consulte especialistas com respostas citadas.</h1>
-      <p class="hero-copy">
-        Escolha uma especialidade, faça a sua pergunta e confirme a resposta nas
-        fontes apresentadas no fim.
-      </p>
-
-      <section class="auth-panel" aria-label="Autenticação">
-        <div v-if="isAuthenticated" class="auth-session">
-          <span>Ligado como {{ authSession.user?.displayContact }}</span>
-          <div class="auth-actions">
-            <UButton v-if="adminAvailable" to="/admin" color="primary" variant="soft" size="sm">
-              Administração
-            </UButton>
-            <UButton to="/account/security" color="primary" variant="soft" size="sm">
-              Segurança da conta
-            </UButton>
-            <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
-              Sair
-            </UButton>
-          </div>
-        </div>
-
-        <div v-else class="auth-entry">
-          <div class="auth-actions">
-            <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
-              Entrar
-            </UButton>
-            <UButton
-              type="button"
-              color="neutral"
-              variant="soft"
-              size="sm"
-              v-if="passkeySignInAvailable"
-              :disabled="!passkeysSupported"
-              :loading="passkeyPending"
-              @click="signInWithPasskey"
-            >
-              Entrar com passkey
-            </UButton>
-          </div>
-          <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
-
-          <form v-if="authPanelOpen" class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
-            <div class="auth-channel" role="group" aria-label="Canal de autenticação">
-              <UButton
-                type="button"
-                size="xs"
-                :color="authChannel === 'email' ? 'primary' : 'neutral'"
-                :variant="authChannel === 'email' ? 'soft' : 'ghost'"
-                @click="authChannel = 'email'"
-              >
-                Email
-              </UButton>
-              <UButton
-                type="button"
-                size="xs"
-                :color="authChannel === 'phone' ? 'primary' : 'neutral'"
-                :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
-                @click="authChannel = 'phone'"
-              >
-                Telemóvel
-              </UButton>
-            </div>
-
-            <label class="auth-field" for="auth-contact">
-              <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
-              <UInput
-                id="auth-contact"
-                v-model="authContact"
-                :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
-                :disabled="authPending || authStep === 'verify'"
-              />
-            </label>
-
-            <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
-              <span>Código</span>
-              <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
-            </label>
-
-            <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-            <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
-
-            <UButton type="submit" color="primary" size="sm" :loading="authPending">
-              {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
-            </UButton>
-          </form>
-        </div>
-      </section>
-    </section>
 
     <section class="workspace" aria-label="Área de consulta">
-      <aside class="specialist-panel" aria-labelledby="specialist-title">
-        <p class="section-label">Especialidade</p>
-        <h2 id="specialist-title">Escolha uma especialidade</h2>
-
-        <p v-if="specialistsPending" class="panel-note">A carregar especialidades...</p>
-        <p v-else-if="specialistsError" class="panel-note error">
-          Não foi possível carregar as especialidades.
-        </p>
-        <p v-else-if="!hasSpecialists" class="panel-note">
-          Ainda não há especialidades disponíveis. Volte mais tarde.
-        </p>
-
-        <div v-else class="specialist-list" aria-label="Especialidades disponíveis">
-          <UButton
-            v-for="specialist in specialists"
-            :key="specialist.id"
-            type="button"
-            :color="specialist.id === selectedSpecialistId ? 'primary' : 'neutral'"
-            :variant="specialist.id === selectedSpecialistId ? 'soft' : 'ghost'"
-            size="lg"
-            block
-            class="specialist-button"
-            :disabled="isStreaming"
-            @click="selectSpecialist(specialist.id)"
-          >
-            <span>{{ specialist.name }}</span>
-            <small>{{ specialist.description }}</small>
-          </UButton>
-        </div>
-
-        <section v-if="isAuthenticated" class="history-panel" aria-labelledby="history-title">
-          <div class="history-heading">
-            <h3 id="history-title">Histórico</h3>
-            <small v-if="selectedSpecialistId">20 últimas</small>
-          </div>
-          <p v-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
-          <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
-          <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
-          <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
-          <ol v-else class="history-list">
-            <li
-              v-for="conversation in historyConversations"
-              :key="conversation.id"
-              :class="{ active: conversation.id === activeConversationId }"
-            >
-              <strong>{{ conversation.title }}</strong>
-              <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
-              <div class="history-actions">
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="primary"
-                  variant="ghost"
-                  :disabled="isStreaming"
-                  @click="openConversation(conversation.id)"
-                >
-                  Retomar
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="isStreaming"
-                  @click="deleteHistoryConversation(conversation.id)"
-                >
-                  Apagar
-                </UButton>
-              </div>
-            </li>
-          </ol>
-        </section>
-      </aside>
-
-      <section class="chat-panel" aria-labelledby="chat-title">
+      <section class="chat-panel" aria-labelledby="page-title">
         <div class="chat-header">
           <div>
             <p class="section-label">Consulta</p>
-            <h2 id="chat-title">
+            <h1 id="page-title">
               {{ activeConversationTitle || selectedSpecialist?.name || 'Faça uma pergunta' }}
-            </h2>
+            </h1>
           </div>
           <UBadge color="primary" variant="soft" size="lg">{{ statusLabel }}</UBadge>
         </div>
@@ -1038,50 +910,69 @@ function formatDisplayDate(value: string | undefined): string {
 
         <div class="messages" aria-live="polite">
           <div v-if="messages.length === 0" class="empty-chat">
-            <p>A resposta aparecerá aqui quando o chat estiver activo.</p>
-            <small>As citações serão apresentadas no fim da resposta.</small>
+            <template v-if="selectedSpecialist">
+              <p>{{ selectedSpecialist?.name }}</p>
+              <small>{{ selectedSpecialist?.description }}</small>
+              <small>As citações serão apresentadas no fim da resposta.</small>
+            </template>
+            <template v-else>
+              <p>Escolha uma especialidade</p>
+              <small>A resposta aparecerá aqui quando o chat estiver activo.</small>
+            </template>
           </div>
 
-          <article
-            v-for="message in messages"
+          <UChatMessages
             v-else
-            :key="message.id"
-            class="message"
-            :class="`message-${message.role}`"
+            :messages="chatUiMessages"
+            :status="chatStatus"
+            should-auto-scroll
+            class="ujimu-chat-messages"
           >
-            <p class="message-label">{{ message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
-            <p class="message-text">
-              {{ message.text || (message.status === 'streaming' ? 'A preparar resposta...' : '') }}
-            </p>
-
-            <div v-if="message.role === 'user' && message.historyMessageId" class="message-actions">
-              <UButton
-                type="button"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                :disabled="isStreaming"
-                @click="startEditingQuestion(message)"
-              >
-                Editar
-              </UButton>
-            </div>
-
-            <section
-              v-if="message.role === 'assistant' && message.citations.length > 0"
-              class="citations"
-              aria-label="Fontes"
+            <UChatMessage
+              v-for="message in chatUiMessages"
+              :id="message.id"
+              :key="message.id"
+              :role="message.role"
+              :parts="message.parts"
+              :side="message.role === 'user' ? 'right' : 'left'"
+              :variant="message.role === 'user' ? 'soft' : 'naked'"
+              class="message"
+              :class="`message-${message.role}`"
             >
-              <h3>Fontes</h3>
-              <ol>
-                <li v-for="citation in message.citations" :key="`${message.id}-${citation.sourceTitle}`">
-                  <strong>{{ citation.sourceTitle }}</strong>
-                  <span>{{ citation.articleRefs.join(', ') }}</span>
-                  <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
-                </li>
-              </ol>
-            </section>
-          </article>
+              <template #content>
+                <p class="message-label">{{ message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
+                <p class="message-text">{{ message.parts[0]?.text }}</p>
+
+                <div v-if="message.role === 'user' && message.historyMessageId" class="message-actions">
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="isStreaming"
+                    @click="startEditingQuestion(message)"
+                  >
+                    Editar
+                  </UButton>
+                </div>
+
+                <section
+                  v-if="message.role === 'assistant' && message.citations.length > 0"
+                  class="citations"
+                  aria-label="Fontes"
+                >
+                  <h3>Fontes</h3>
+                  <ol>
+                    <li v-for="citation in message.citations" :key="`${message.id}-${citation.sourceTitle}`">
+                      <strong>{{ citation.sourceTitle }}</strong>
+                      <span>{{ citation.articleRefs.join(', ') }}</span>
+                      <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
+                    </li>
+                  </ol>
+                </section>
+              </template>
+            </UChatMessage>
+          </UChatMessages>
         </div>
 
         <p v-if="quotaError" class="quota-error" role="alert">
@@ -1131,31 +1022,182 @@ function formatDisplayDate(value: string | undefined): string {
           </ol>
         </section>
 
-        <form class="composer" @submit.prevent="submitQuestion">
-          <div v-if="editingMessageId" class="editing-banner">
-            <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
-            <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
-              Cancelar edição
-            </UButton>
-          </div>
-          <label for="question">Pergunta</label>
-          <UTextarea
-            id="question"
-            v-model="question"
-            :rows="4"
-            placeholder="Escreva a sua pergunta depois de seleccionar uma especialidade."
-            :disabled="!canWriteQuestion"
-          />
-          <div class="composer-actions">
-            <small>{{ composerHelp }}</small>
-            <UButton type="submit" color="primary" :disabled="!canSubmitQuestion">
-              {{ editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar' }}
-            </UButton>
-          </div>
-        </form>
+        <UChatPrompt
+          v-model="question"
+          class="composer"
+          variant="soft"
+          :rows="4"
+          :placeholder="selectedSpecialist ? 'Escreva a sua pergunta.' : 'Escolha uma especialidade antes de escrever.'"
+          :disabled="!canWriteQuestion"
+          @submit="submitQuestion"
+        >
+          <template #header>
+            <div v-if="editingMessageId" class="editing-banner">
+              <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
+              <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
+                Cancelar edição
+              </UButton>
+            </div>
+
+            <div class="prompt-specialist">
+              <label for="specialist-select">Especialidade</label>
+              <USelect
+                id="specialist-select"
+                v-model="selectedSpecialistId"
+                :items="specialistSelectItems"
+                placeholder="Escolha uma especialidade"
+                :disabled="isStreaming || specialistsPending || !hasSpecialists"
+                @update:model-value="selectSpecialistFromPrompt"
+              />
+              <small v-if="specialistsPending">A carregar especialidades...</small>
+              <small v-else-if="specialistsError" class="error">Não foi possível carregar as especialidades.</small>
+              <small v-else-if="!hasSpecialists">Ainda não há especialidades disponíveis. Volte mais tarde.</small>
+              <small v-else-if="selectedSpecialist">{{ selectedSpecialist.description }}</small>
+            </div>
+          </template>
+
+          <template #footer>
+            <div class="composer-actions">
+              <small>{{ composerHelp }}</small>
+              <UChatPromptSubmit
+                :status="'ready'"
+                :disabled="!canSubmitQuestion"
+                :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
+              >
+                {{ editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar' }}
+              </UChatPromptSubmit>
+            </div>
+          </template>
+        </UChatPrompt>
       </section>
 
-      <aside class="ad-panel" aria-label="Subscrição e publicidade">
+      <aside class="ad-panel" aria-label="Conta, histórico, subscrição e publicidade">
+        <section class="auth-panel" aria-label="Autenticação">
+          <div v-if="isAuthenticated" class="auth-session">
+            <span>Ligado como {{ authSession.user?.displayContact }}</span>
+            <div class="auth-actions">
+              <UButton v-if="adminAvailable" to="/admin" color="primary" variant="soft" size="sm">
+                Administração
+              </UButton>
+              <UButton to="/account/security" color="primary" variant="soft" size="sm">
+                Segurança da conta
+              </UButton>
+              <UButton type="button" color="neutral" variant="soft" size="sm" @click="logout">
+                Sair
+              </UButton>
+            </div>
+          </div>
+
+          <div v-else class="auth-entry">
+            <div class="auth-actions">
+              <UButton type="button" color="primary" variant="soft" size="sm" @click="authPanelOpen = !authPanelOpen">
+                Entrar
+              </UButton>
+              <UButton
+                type="button"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                v-if="passkeySignInAvailable"
+                :disabled="!passkeysSupported"
+                :loading="passkeyPending"
+                @click="signInWithPasskey"
+              >
+                Entrar com passkey
+              </UButton>
+            </div>
+            <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
+
+            <form v-if="authPanelOpen" class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
+              <div class="auth-channel" role="group" aria-label="Canal de autenticação">
+                <UButton
+                  type="button"
+                  size="xs"
+                  :color="authChannel === 'email' ? 'primary' : 'neutral'"
+                  :variant="authChannel === 'email' ? 'soft' : 'ghost'"
+                  @click="authChannel = 'email'"
+                >
+                  Email
+                </UButton>
+                <UButton
+                  type="button"
+                  size="xs"
+                  :color="authChannel === 'phone' ? 'primary' : 'neutral'"
+                  :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
+                  @click="authChannel = 'phone'"
+                >
+                  Telemóvel
+                </UButton>
+              </div>
+
+              <label class="auth-field" for="auth-contact">
+                <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
+                <UInput
+                  id="auth-contact"
+                  v-model="authContact"
+                  :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
+                  :disabled="authPending || authStep === 'verify'"
+                />
+              </label>
+
+              <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
+                <span>Código</span>
+                <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
+              </label>
+
+              <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
+              <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+
+              <UButton type="submit" color="primary" size="sm" :loading="authPending">
+                {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
+              </UButton>
+            </form>
+          </div>
+        </section>
+
+        <section v-if="isAuthenticated" class="history-panel" aria-labelledby="history-title">
+          <div class="history-heading">
+            <h2 id="history-title">Histórico</h2>
+            <small v-if="selectedSpecialistId">20 últimas</small>
+          </div>
+          <p v-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
+          <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
+          <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
+          <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
+          <ol v-else class="history-list">
+            <li
+              v-for="conversation in historyConversations"
+              :key="conversation.id"
+              :class="{ active: conversation.id === activeConversationId }"
+            >
+              <strong>{{ conversation.title }}</strong>
+              <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
+              <div class="history-actions">
+                <UButton
+                  type="button"
+                  size="xs"
+                  color="primary"
+                  variant="ghost"
+                  :disabled="isStreaming"
+                  @click="openConversation(conversation.id)"
+                >
+                  Retomar
+                </UButton>
+                <UButton
+                  type="button"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="isStreaming"
+                  @click="deleteHistoryConversation(conversation.id)"
+                >
+                  Apagar
+                </UButton>
+              </div>
+            </li>
+          </ol>
+        </section>
+
         <section class="billing-panel" aria-labelledby="billing-title">
           <p class="section-label">Subscrição</p>
           <h2 id="billing-title">Plano trimestral — 50 000,00 AOA</h2>
@@ -1228,7 +1270,6 @@ function formatDisplayDate(value: string | undefined): string {
   font-weight: 800;
 }
 
-.hero-panel,
 .workspace > * {
   border: 1px solid var(--ujimu-line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
@@ -1236,36 +1277,6 @@ function formatDisplayDate(value: string | undefined): string {
   backdrop-filter: blur(18px);
 }
 
-.hero-panel {
-  position: relative;
-  overflow: hidden;
-  min-height: 260px;
-  padding: clamp(28px, 5vw, 64px);
-  border-radius: 32px;
-}
-
-.hero-panel::after {
-  position: absolute;
-  inset: auto -10% -50% 44%;
-  height: 260px;
-  content: "";
-  background: radial-gradient(circle, rgba(249, 214, 22, 0.22), transparent 64%);
-}
-
-.brand-mark {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  margin-bottom: 22px;
-  border-radius: 18px;
-  color: #050505;
-  background: var(--ujimu-yellow);
-  font-weight: 900;
-  box-shadow: 0 0 32px rgba(249, 214, 22, 0.34);
-}
-
-.eyebrow,
 .section-label {
   margin: 0 0 10px;
   color: var(--ujimu-yellow);
@@ -1285,7 +1296,7 @@ h3 {
 
 h1 {
   max-width: 780px;
-  font-size: clamp(3rem, 7vw, 6.7rem);
+  font-size: clamp(2rem, 4vw, 3.6rem);
 }
 
 h2 {
@@ -1296,19 +1307,9 @@ h3 {
   font-size: 1rem;
 }
 
-.hero-copy {
-  max-width: 720px;
-  margin: 22px 0 0;
-  color: var(--ujimu-muted);
-  font-size: clamp(1.1rem, 2vw, 1.45rem);
-  line-height: 1.5;
-}
-
 .auth-panel {
   position: relative;
   z-index: 1;
-  max-width: 520px;
-  margin-top: 24px;
   border: 1px solid rgba(249, 214, 22, 0.24);
   border-radius: 22px;
   padding: 14px;
@@ -1365,39 +1366,15 @@ h3 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(180px, 240px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   gap: 18px;
   margin-top: 18px;
 }
 
-.specialist-panel,
 .chat-panel,
 .ad-panel {
   border-radius: 28px;
   padding: 22px;
-}
-
-.specialist-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 24px;
-}
-
-.specialist-button {
-  justify-content: flex-start;
-  border-radius: 18px;
-}
-
-.specialist-button span,
-.specialist-button small {
-  display: block;
-  text-align: left;
-}
-
-.specialist-button small {
-  margin-top: 4px;
-  color: var(--ujimu-muted);
-  font-weight: 500;
 }
 
 .panel-note {
@@ -1630,6 +1607,27 @@ h3 {
   line-height: 1.35;
 }
 
+.prompt-specialist {
+  display: grid;
+  gap: 8px;
+}
+
+.prompt-specialist label {
+  color: var(--ujimu-yellow);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.prompt-specialist small {
+  color: var(--ujimu-muted);
+}
+
+.prompt-specialist small.error {
+  color: #ffd3d3;
+}
+
 .composer :deep(textarea) {
   resize: vertical;
   border-radius: 22px;
@@ -1642,6 +1640,10 @@ h3 {
   display: grid;
   align-content: start;
   gap: 14px;
+}
+
+.history-panel h2 {
+  font-size: 1rem;
 }
 
 .billing-panel,

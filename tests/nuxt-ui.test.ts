@@ -35,7 +35,7 @@ describe('Nuxt UI integration', () => {
 
     expect(app).toContain('<UApp>')
     expect(page).toContain('<UButton')
-    expect(page).toContain('<UTextarea')
+    expect(page).toContain('<UChatPrompt')
     expect(page).toContain('<UBadge')
   })
 })
