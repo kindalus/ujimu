@@ -71,7 +71,7 @@ Known non-blocking warnings:
 | 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `verified` | 2026-05-21 | Conversation history moved into the drawer; OTP/passkey login opens as an on-demand Nuxt UI modal; permanent auth/history side panels removed. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
-| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `planned` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
+| 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `grilled` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
 ## UI redesign planned slices
@@ -103,8 +103,36 @@ Planned order:
 3. Slice 18 moves history and authentication to on-demand drawer/modal flows. — verified 2026-05-21.
 4. Slice 19 moves subscription management to `/subscription`. — verified 2026-05-21.
 5. Slice 20 inserts ads into the chat stream without obstructing citations. — verified 2026-05-21.
-6. Slice 21 restructures admin specialist/source management into subpages.
+6. Slice 21 restructures admin specialist/source management into subpages. — refined and grilled 2026-05-21.
 7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
+
+## Slice 21 — Admin routing specialists and sources
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Refinement and grill decisions:
+
+- Keep `/admin` as a lightweight administrative entry and non-redesigned operational summary until the analytics/ops polish slice.
+- Move specialist listing and creation to `/admin/specialists`.
+- Move specialist editing, source upload, source reload, conversion, ingestion, and deletion to `/admin/specialists/[id]`.
+- Preserve all existing admin API endpoints, server-side authorization, audit events, specialist model, and Pi pipeline semantics.
+- Show source pipeline states as clear textual badges and continue to use structured API error messages without exposing secrets.
+- Keep non-admin and unauthenticated access messages on every admin route.
+
+Implementation sources checked:
+
+- Nuxt 4 pages directory and file-based routing documentation: `https://nuxt.com/docs/4.x/guide/directory-structure/pages`
+- Nuxt 4 routing documentation: `https://nuxt.com/docs/4.x/getting-started/routing`
+- Nuxt UI component documentation for Button, Input, Textarea, and Badge: `https://ui.nuxt.com/components/button`, `https://ui.nuxt.com/components/input`, `https://ui.nuxt.com/components/textarea`, `https://ui.nuxt.com/components/badge`
+
+Next verification target:
+
+- Add acceptance tests for the new admin route split, run them red, then implement the subpages.
 
 ## Slice 20 — Inline ads chat polish
 
