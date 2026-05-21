@@ -72,7 +72,7 @@ Known non-blocking warnings:
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
-| 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `grilled` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
+| 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `acceptance-tested` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
 ## UI redesign planned slices
 
@@ -108,7 +108,7 @@ Planned order:
 
 ## Slice 22 — Admin analytics and operations polish
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -130,9 +130,14 @@ Implementation sources checked:
 - Nuxt 4 routing documentation: `https://nuxt.com/docs/4.x/getting-started/routing`
 - Nuxt UI component documentation for Button and Badge: `https://ui.nuxt.com/components/button`, `https://ui.nuxt.com/components/badge`
 
+Acceptance tests:
+
+- `tests/admin-ui.acceptance.test.ts` now expects `/admin/analytics`, `/admin/ops`, and a simplified `/admin` index.
+- The route split test was run red with `npm test -- tests/admin-ui.acceptance.test.ts --reporter=verbose`; it failed because the analytics and ops pages do not yet exist.
+
 Next verification target:
 
-- Add acceptance tests for `/admin/analytics`, `/admin/ops`, and the simplified `/admin` index; run them red before implementation.
+- Implement the analytics and operations subpages and make the admin UI acceptance test pass.
 
 ## Slice 21 — Admin routing specialists and sources
 
