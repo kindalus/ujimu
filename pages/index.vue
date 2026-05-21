@@ -264,7 +264,7 @@ const statusLabel = computed(() => {
   return 'Seleccione'
 })
 const composerHelp = computed(() => {
-  if (!hasSpecialists.value) return 'Ainda não há especialidades disponíveis.'
+  if (!hasSpecialists.value) return 'Ainda não há especialidades disponíveis. Volte mais tarde.'
   if (!selectedSpecialist.value) return 'Seleccione uma especialidade antes de escrever.'
   if (queuedQuestions.value.length >= queueLimit) return 'A fila de perguntas está cheia.'
   if (isStreaming.value) return 'A pergunta será adicionada à fila.'
@@ -1022,50 +1022,54 @@ function formatDisplayDate(value: string | undefined): string {
           </ol>
         </section>
 
+        <div v-if="editingMessageId" class="editing-banner">
+          <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
+          <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
+            Cancelar edição
+          </UButton>
+        </div>
+
         <UChatPrompt
+          id="question"
           v-model="question"
-          class="composer"
+          name="question"
+          class="composer gemini-prompt"
           variant="soft"
-          :rows="4"
-          :placeholder="selectedSpecialist ? 'Escreva a sua pergunta.' : 'Escolha uma especialidade antes de escrever.'"
+          :rows="1"
+          :maxrows="6"
+          :placeholder="'Pergunte ao Ujimu.'"
           :disabled="!canWriteQuestion"
           @submit="submitQuestion"
         >
-          <template #header>
-            <div v-if="editingMessageId" class="editing-banner">
-              <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
-              <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
-                Cancelar edição
-              </UButton>
-            </div>
+          <template #leading>
+            <span class="prompt-plus-button" aria-hidden="true">
+              <UIcon name="i-lucide-plus" />
+            </span>
+          </template>
 
-            <div class="prompt-specialist">
-              <label for="specialist-select">Especialidade</label>
+          <template #trailing>
+            <div class="prompt-toolbar">
+              <span class="sr-only">{{ composerHelp }}</span>
               <USelect
                 id="specialist-select"
                 v-model="selectedSpecialistId"
+                name="specialist-select"
+                class="prompt-specialist-control"
                 :items="specialistSelectItems"
-                placeholder="Escolha uma especialidade"
+                placeholder="Especialidade"
+                aria-label="Especialidade"
                 :disabled="isStreaming || specialistsPending || !hasSpecialists"
                 @update:model-value="selectSpecialistFromPrompt"
               />
-              <small v-if="specialistsPending">A carregar especialidades...</small>
-              <small v-else-if="specialistsError" class="error">Não foi possível carregar as especialidades.</small>
-              <small v-else-if="!hasSpecialists">Ainda não há especialidades disponíveis. Volte mais tarde.</small>
-              <small v-else-if="selectedSpecialist">{{ selectedSpecialist.description }}</small>
-            </div>
-          </template>
-
-          <template #footer>
-            <div class="composer-actions">
-              <small>{{ composerHelp }}</small>
+              <span class="prompt-mic-button" aria-hidden="true">
+                <UIcon name="i-lucide-mic" />
+              </span>
               <UChatPromptSubmit
+                class="prompt-submit"
                 :status="'ready'"
                 :disabled="!canSubmitQuestion"
                 :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
-              >
-                {{ editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar' }}
-              </UChatPromptSubmit>
+              />
             </div>
           </template>
         </UChatPrompt>
@@ -1366,6 +1370,7 @@ h3 {
 
 .workspace {
   display: grid;
+  align-items: start;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   gap: 18px;
   margin-top: 18px;
@@ -1445,7 +1450,6 @@ h3 {
 }
 
 .chat-header,
-.composer-actions,
 .queue-panel > div:first-child {
   display: flex;
   align-items: flex-start;
@@ -1592,10 +1596,52 @@ h3 {
 }
 
 .composer {
-  display: grid;
-  gap: 10px;
   color: var(--ujimu-muted);
   font-weight: 700;
+}
+
+.gemini-prompt {
+  width: min(860px, 100%);
+  min-height: 70px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(36, 36, 36, 0.96);
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.32);
+}
+
+.gemini-prompt :deep([data-slot="root"]) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.gemini-prompt :deep(textarea) {
+  min-height: 68px;
+  padding: 23px 330px 19px 64px;
+  color: #f7f4e8;
+  background: transparent;
+  line-height: 1.35;
+  resize: none;
+}
+
+.gemini-prompt :deep(textarea::placeholder) {
+  color: #c7c4bb;
+}
+
+.gemini-prompt :deep([data-slot="leading"]) {
+  inset-inline-start: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.gemini-prompt :deep([data-slot="trailing"]) {
+  inset-inline-end: 10px;
+  top: 50%;
+  width: auto;
+  transform: translateY(-50%);
+  pointer-events: auto;
 }
 
 .editing-banner {
@@ -1607,30 +1653,36 @@ h3 {
   line-height: 1.35;
 }
 
-.prompt-specialist {
-  display: grid;
+.prompt-toolbar {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.prompt-specialist label {
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.prompt-plus-button,
+.prompt-mic-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 999px;
+  color: #f7f4e8;
 }
 
-.prompt-specialist small {
-  color: var(--ujimu-muted);
+.prompt-mic-button {
+  color: #ddd9cf;
 }
 
-.prompt-specialist small.error {
-  color: #ffd3d3;
+.prompt-specialist-control {
+  max-width: 184px;
+  border-radius: 999px;
+  color: #f7f4e8;
 }
 
-.composer :deep(textarea) {
-  resize: vertical;
-  border-radius: 22px;
+.prompt-submit {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
 }
 
 .ad-panel,
@@ -1722,6 +1774,34 @@ h3 {
 
   .message {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .gemini-prompt {
+    min-height: 122px;
+    border-radius: 30px;
+  }
+
+  .gemini-prompt :deep(textarea) {
+    min-height: 112px;
+    padding: 18px 18px 64px 56px;
+  }
+
+  .gemini-prompt :deep([data-slot="trailing"]) {
+    inset-inline: 12px;
+    top: auto;
+    bottom: 10px;
+    transform: none;
+  }
+
+  .prompt-toolbar {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .prompt-specialist-control {
+    max-width: min(210px, calc(100vw - 180px));
   }
 }
 </style>

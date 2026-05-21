@@ -25,4 +25,17 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(page).toContain('selectedSpecialist?.description')
     expect(page).toContain('Conteúdo gerado por IA. Pode conter erros. Confirme sempre a resposta nas fontes citadas. As respostas não substituem aconselhamento profissional.')
   })
+
+  it('presents the prompt as a Gemini-style bottom composer', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+
+    expect(page).toContain('class="composer gemini-prompt"')
+    expect(page).toContain('prompt-plus-button')
+    expect(page).toContain('prompt-specialist-control')
+    expect(page).toContain('prompt-mic-button')
+    expect(page).toContain('prompt-submit')
+    expect(page).not.toContain('<label for="specialist-select">Especialidade</label>')
+    expect(page).toMatch(/<UChatPrompt[\s\S]*:rows="1"[\s\S]*prompt-plus-button[\s\S]*<USelect[\s\S]*prompt-specialist-control[\s\S]*prompt-mic-button[\s\S]*<UChatPromptSubmit[\s\S]*prompt-submit/)
+    expect(page).toMatch(/\.workspace\s*\{[\s\S]*align-items:\s*start/)
+  })
 })
