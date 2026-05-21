@@ -31,7 +31,7 @@ describe('UI redesign subscription page acceptance', () => {
     expect(chatPage).not.toContain('/api/billing/checkout')
     expect(chatPage).not.toContain('Métodos de pagamento')
     expect(chatPage).not.toContain('Plano trimestral — 50 000,00 AOA')
-    expect(chatPage).toContain('billingStatus.ads.visible')
+    expect(chatPage).toContain('billingStatus.value.ads.visible')
     expect(chatPage).toContain('Publicidade')
   })
 

@@ -20,7 +20,7 @@ describe('billing and advertising UI acceptance', () => {
     const page = await readFile('pages/index.vue', 'utf8')
 
     expect(page).toContain('/api/billing/status')
-    expect(page).toContain('billingStatus.ads.visible')
+    expect(page).toContain('billingStatus.value.ads.visible')
     expect(page).toContain('Publicidade')
     expect(page).not.toContain('/api/billing/checkout')
     expect(page).not.toContain('class="billing-panel"')

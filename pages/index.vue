@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import {
+  buildInlineAdStreamItems,
+  countCompletedAssistantResponses,
+  extendInlineAdSchedule
+} from '../utils/inline-ads'
 
 interface PublicSpecialist {
   id: string
@@ -172,6 +177,7 @@ const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
+const inlineAdSchedule = ref<number[]>([])
 
 onMounted(() => {
   void recordVisit()
@@ -195,6 +201,12 @@ const chatUiMessages = computed<ChatUiMessage[]>(() =>
     parts: [{ type: 'text', text: message.text || (message.status === 'streaming' ? 'A preparar resposta...' : '') }]
   }))
 )
+const completedAssistantResponseCount = computed(() => countCompletedAssistantResponses(messages.value))
+const chatStreamItems = computed(() => buildInlineAdStreamItems(
+  chatUiMessages.value,
+  inlineAdSchedule.value,
+  billingStatus.value.ads.visible
+))
 const chatStatus = computed(() => {
   if (messages.value.some((message) => message.status === 'error')) return 'error'
   if (isStreaming.value) return 'streaming'
@@ -218,6 +230,10 @@ const composerHelp = computed(() => {
   if (queuedQuestions.value.length >= queueLimit) return 'A fila de perguntas está cheia.'
   if (isStreaming.value) return 'A pergunta será adicionada à fila.'
   return 'A resposta será apresentada por partes e com fontes no fim.'
+})
+
+watch(completedAssistantResponseCount, (count) => {
+  inlineAdSchedule.value = extendInlineAdSchedule(inlineAdSchedule.value, count)
 })
 
 async function recordVisit(): Promise<void> {
@@ -724,7 +740,7 @@ function createId(prefix: string): string {
     </div>
 
 
-    <section class="workspace" :class="{ 'workspace-chat-only': !billingStatus.ads.visible }" aria-label="Área de consulta">
+    <section class="workspace" aria-label="Área de consulta">
       <section class="chat-panel" aria-labelledby="page-title">
         <div class="chat-header">
           <div>
@@ -760,50 +776,58 @@ function createId(prefix: string): string {
             should-auto-scroll
             class="ujimu-chat-messages"
           >
-            <UChatMessage
-              v-for="message in chatUiMessages"
-              :id="message.id"
-              :key="message.id"
-              :role="message.role"
-              :parts="message.parts"
-              :side="message.role === 'user' ? 'right' : 'left'"
-              :variant="message.role === 'user' ? 'soft' : 'naked'"
-              class="message"
-              :class="`message-${message.role}`"
-            >
-              <template #content>
-                <p class="message-label">{{ message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
-                <p class="message-text">{{ message.parts[0]?.text }}</p>
+            <template v-for="item in chatStreamItems" :key="item.id">
+              <UChatMessage
+                v-if="item.type === 'message'"
+                :id="item.message.id"
+                :role="item.message.role"
+                :parts="item.message.parts"
+                :side="item.message.role === 'user' ? 'right' : 'left'"
+                :variant="item.message.role === 'user' ? 'soft' : 'naked'"
+                class="message"
+                :class="`message-${item.message.role}`"
+              >
+                <template #content>
+                  <p class="message-label">{{ item.message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
+                  <p class="message-text">{{ item.message.parts[0]?.text }}</p>
 
-                <div v-if="message.role === 'user' && message.historyMessageId" class="message-actions">
-                  <UButton
-                    type="button"
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    :disabled="isStreaming"
-                    @click="startEditingQuestion(message)"
+                  <div v-if="item.message.role === 'user' && item.message.historyMessageId" class="message-actions">
+                    <UButton
+                      type="button"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      :disabled="isStreaming"
+                      @click="startEditingQuestion(item.message)"
+                    >
+                      Editar
+                    </UButton>
+                  </div>
+
+                  <section
+                    v-if="item.message.role === 'assistant' && item.message.citations.length > 0"
+                    class="citations"
+                    aria-label="Fontes"
                   >
-                    Editar
-                  </UButton>
-                </div>
+                    <h3>Fontes</h3>
+                    <ol>
+                      <li v-for="citation in item.message.citations" :key="`${item.message.id}-${citation.sourceTitle}`">
+                        <strong>{{ citation.sourceTitle }}</strong>
+                        <span>{{ citation.articleRefs.join(', ') }}</span>
+                        <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
+                      </li>
+                    </ol>
+                  </section>
+                </template>
+              </UChatMessage>
 
-                <section
-                  v-if="message.role === 'assistant' && message.citations.length > 0"
-                  class="citations"
-                  aria-label="Fontes"
-                >
-                  <h3>Fontes</h3>
-                  <ol>
-                    <li v-for="citation in message.citations" :key="`${message.id}-${citation.sourceTitle}`">
-                      <strong>{{ citation.sourceTitle }}</strong>
-                      <span>{{ citation.articleRefs.join(', ') }}</span>
-                      <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
-                    </li>
-                  </ol>
-                </section>
-              </template>
-            </UChatMessage>
+              <div v-else-if="item.type === 'ad'" class="inline-ad-card" role="complementary" aria-label="Publicidade">
+                <p class="section-label">Publicidade</p>
+                <strong>Espaço publicitário</strong>
+                <span>300 × 250</span>
+                <small>Inserido entre respostas; nunca dentro das fontes.</small>
+              </div>
+            </template>
           </UChatMessages>
         </div>
 
@@ -919,13 +943,6 @@ function createId(prefix: string): string {
         </UChatPrompt>
       </section>
 
-      <aside v-if="billingStatus.ads.visible" class="ad-panel" aria-label="Publicidade">
-        <section aria-label="Publicidade" class="ads-section">
-          <p class="section-label">Publicidade</p>
-          <div class="ad-slot">300 × 250</div>
-          <div class="ad-slot wide">728 × 90</div>
-        </section>
-      </aside>
     </section>
   </main>
 
@@ -1002,17 +1019,12 @@ h3 {
 .workspace {
   display: grid;
   align-items: start;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  grid-template-columns: 1fr;
   gap: 18px;
   margin-top: 18px;
 }
 
-.workspace-chat-only {
-  grid-template-columns: 1fr;
-}
-
-.chat-panel,
-.ad-panel {
+.chat-panel {
   border-radius: 28px;
   padding: 22px;
 }
@@ -1340,33 +1352,35 @@ h3 {
   border-radius: 999px;
 }
 
-.ad-panel,
-.ads-section {
+.inline-ad-card {
   display: grid;
-  align-content: start;
-  gap: 14px;
-}
-
-.ads-section {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 22px;
-  padding: 14px;
-  background: rgba(0, 0, 0, 0.14);
-}
-
-.ad-slot {
-  display: grid;
+  width: min(360px, 100%);
   min-height: 250px;
   place-items: center;
+  align-self: center;
+  justify-self: center;
+  gap: 8px;
+  margin-inline: auto;
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 22px;
-  color: var(--ujimu-faint);
+  padding: 16px;
+  color: var(--ujimu-muted);
   background: rgba(255, 255, 255, 0.035);
-  font-weight: 800;
+  text-align: center;
 }
 
-.ad-slot.wide {
-  min-height: 90px;
+.inline-ad-card strong {
+  color: #f7f4e8;
+  font-size: 1rem;
+}
+
+.inline-ad-card span {
+  color: var(--ujimu-faint);
+  font-weight: 900;
+}
+
+.inline-ad-card small {
+  color: var(--ujimu-faint);
 }
 
 @media (max-width: 1040px) {

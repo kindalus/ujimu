@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 19 subscription page work:
+Latest full verification after Slice 20 inline ads work:
 
-- `npm test` — passed, 104 tests
+- `npm test` — passed, 109 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Chrome DevTools browser check — passed: page starts in the chat workspace without billing checkout controls, `/subscription` renders the plan/checkout page, the drawer links to subscription, the login action opens a Nuxt UI modal on demand, and console has no errors or warnings beyond Nuxt development info logs.
+- Chrome DevTools browser check — passed: the chat page renders without permanent advertising side panels, `.ad-panel`/`.ads-section` are absent, inline ad placement is reserved for the message stream, and console output has no errors or warnings beyond Nuxt development info logs.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -70,7 +70,7 @@ Known non-blocking warnings:
 | 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `verified` | 2026-05-21 | Chat-first workspace using Nuxt UI chat components, parts adapter, bottom-anchored two-row Gemini-style prompt with specialist selector, specialist empty state, and no hero block. |
 | 18 | [`18-history-auth-drawer.html`](./18-history-auth-drawer.html) | `verified` | 2026-05-21 | Conversation history moved into the drawer; OTP/passkey login opens as an on-demand Nuxt UI modal; permanent auth/history side panels removed. |
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
-| 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `planned` | — | Inline ad placements after every randomized 5–10 assistant responses for eligible users. |
+| 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `planned` | — | Admin subpages for specialists, source upload, conversion, and ingestion. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
@@ -102,9 +102,46 @@ Planned order:
 2. Slice 17 redesigns the public chat workspace and specialist prompt, including the bottom-anchored two-row Gemini-style prompt correction. — verified 2026-05-21.
 3. Slice 18 moves history and authentication to on-demand drawer/modal flows. — verified 2026-05-21.
 4. Slice 19 moves subscription management to `/subscription`. — verified 2026-05-21.
-5. Slice 20 inserts ads into the chat stream without obstructing citations.
+5. Slice 20 inserts ads into the chat stream without obstructing citations. — verified 2026-05-21.
 6. Slice 21 restructures admin specialist/source management into subpages.
 7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
+
+## Slice 20 — Inline ads chat polish
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Refinement and grill decisions:
+
+- Replace permanent side advertising panels with inert inline advertisement cards in the chat stream.
+- Schedule advertisements only after completed assistant responses, using a randomized interval between 5 and 10 assistant responses.
+- Keep user messages, streaming assistant messages, and error assistant messages out of the advertisement counter.
+- Continue to use the existing billing status ad visibility flag; subscribed or otherwise ad-free users do not receive inline ad stream items.
+- Keep citations inside assistant message cards and never inside advertising cards.
+- Preserve backend chat, grounding, citation, quota, billing, authentication, ingestion, and admin semantics.
+
+Implemented files:
+
+- `pages/index.vue`
+- `utils/inline-ads.ts`
+- `tests/inline-ads.acceptance.test.ts`
+- `tests/ui-redesign-inline-ads.acceptance.test.ts`
+- `tests/billing-ui.acceptance.test.ts`
+- `tests/ui-redesign-subscription-page.acceptance.test.ts`
+- `docs/specs/slices/STATUS.md`
+
+Verification completed:
+
+- `npm test -- tests/inline-ads.acceptance.test.ts tests/ui-redesign-inline-ads.acceptance.test.ts` — failed before implementation, then passed.
+- `npm test` — passed, 109 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- `npm audit --audit-level=high` — passed with 0 vulnerabilities.
+- Chrome DevTools browser check — passed on port 3100; chat rendered without permanent ad side panels, `.ad-panel`/`.ads-section` were absent, and console output had only Nuxt development info logs.
 
 ## Slice 19 — Subscription page billing UI
 
