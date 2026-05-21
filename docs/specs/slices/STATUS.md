@@ -72,7 +72,7 @@ Known non-blocking warnings:
 | 19 | [`19-subscription-page-billing-ui.html`](./19-subscription-page-billing-ui.html) | `verified` | 2026-05-21 | Dedicated `/subscription` page for billing status and checkout; drawer link added; permanent billing checkout blocks removed from chat. |
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
-| 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `planned` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
+| 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `grilled` | — | Admin analytics/content-gap/ops subpages plus final UI consistency polish. |
 
 ## UI redesign planned slices
 
@@ -104,7 +104,35 @@ Planned order:
 4. Slice 19 moves subscription management to `/subscription`. — verified 2026-05-21.
 5. Slice 20 inserts ads into the chat stream without obstructing citations. — verified 2026-05-21.
 6. Slice 21 restructures admin specialist/source management into subpages. — verified 2026-05-21.
-7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish.
+7. Slice 22 completes admin analytics/ops pages and cross-surface UI polish. — refined and grilled 2026-05-21.
+
+## Slice 22 — Admin analytics and operations polish
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-ui-redesign.html`](../brainstorm-ui-redesign.html)
+- [`../ui-redesign-architecture.html`](../ui-redesign-architecture.html)
+
+Refinement and grill decisions:
+
+- Move visitor counts, content-gap candidates, recent questions, and candidate review actions from `/admin` to `/admin/analytics`.
+- Add `/admin/ops` for admin-only readiness checks using the existing `/api/admin/ops/readyz` endpoint.
+- Keep `/admin` as a lightweight index with navigation cards for specialists, analytics, and operations.
+- Preserve existing analytics, readiness, authorization, audit, and operations API semantics; do not create new metrics or endpoints.
+- Treat analytics as product/editorial signals only; it must not become an answer-grounding source.
+- Display readiness using safe check names, booleans, and counts only; do not expose secrets, paths, or environment values.
+
+Implementation sources checked:
+
+- Nuxt 4 pages directory and file-based routing documentation: `https://nuxt.com/docs/4.x/guide/directory-structure/pages`
+- Nuxt 4 routing documentation: `https://nuxt.com/docs/4.x/getting-started/routing`
+- Nuxt UI component documentation for Button and Badge: `https://ui.nuxt.com/components/button`, `https://ui.nuxt.com/components/badge`
+
+Next verification target:
+
+- Add acceptance tests for `/admin/analytics`, `/admin/ops`, and the simplified `/admin` index; run them red before implementation.
 
 ## Slice 21 — Admin routing specialists and sources
 
