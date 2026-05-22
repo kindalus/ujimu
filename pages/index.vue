@@ -757,191 +757,194 @@ function createId(prefix: string): string {
           Conteúdo gerado por IA. Pode conter erros. Confirme sempre a resposta nas fontes citadas. As respostas não substituem aconselhamento profissional.
         </div>
 
-        <div class="messages" aria-live="polite">
-          <div v-if="messages.length === 0" class="empty-chat">
-            <template v-if="selectedSpecialist">
-              <p>{{ selectedSpecialist?.name }}</p>
-              <small>{{ selectedSpecialist?.description }}</small>
-              <small>As citações serão apresentadas no fim da resposta.</small>
-            </template>
-            <template v-else>
-              <p>Escolha uma especialidade</p>
-              <small>A resposta aparecerá aqui quando o chat estiver activo.</small>
-            </template>
-          </div>
-
-          <UChatMessages
-            v-else
-            :messages="chatUiMessages"
-            :status="chatStatus"
-            should-auto-scroll
-            class="ujimu-chat-messages"
-          >
-            <template v-for="item in chatStreamItems" :key="item.id">
-              <UChatMessage
-                v-if="item.type === 'message'"
-                :id="item.message.id"
-                :role="item.message.role"
-                :parts="item.message.parts"
-                :side="item.message.role === 'user' ? 'right' : 'left'"
-                :variant="item.message.role === 'user' ? 'soft' : 'naked'"
-                class="message"
-                :class="`message-${item.message.role}`"
-              >
-                <template #content>
-                  <p class="message-label">{{ item.message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
-                  <p class="message-text">{{ item.message.parts[0]?.text }}</p>
-
-                  <div v-if="item.message.role === 'user' && item.message.historyMessageId" class="message-actions">
-                    <UButton
-                      type="button"
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      :disabled="isStreaming"
-                      @click="startEditingQuestion(item.message)"
-                    >
-                      Editar
-                    </UButton>
-                  </div>
-
-                  <section
-                    v-if="item.message.role === 'assistant' && item.message.citations.length > 0"
-                    class="citations"
-                    aria-label="Fontes"
-                  >
-                    <h3>Fontes</h3>
-                    <ol>
-                      <li v-for="citation in item.message.citations" :key="`${item.message.id}-${citation.sourceTitle}`">
-                        <strong>{{ citation.sourceTitle }}</strong>
-                        <span>{{ citation.articleRefs.join(', ') }}</span>
-                        <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
-                      </li>
-                    </ol>
-                  </section>
-                </template>
-              </UChatMessage>
-
-              <div v-else-if="item.type === 'ad'" class="inline-ad-card" role="complementary" aria-label="Publicidade">
-                <p class="section-label">Publicidade</p>
-                <strong>Espaço publicitário</strong>
-                <span>300 × 250</span>
-                <small>Inserido entre respostas; nunca dentro das fontes.</small>
-              </div>
-            </template>
-          </UChatMessages>
-        </div>
-
-        <p v-if="quotaError" class="quota-error" role="alert">
-          {{ quotaError }}
-        </p>
-
-        <section v-if="queuedQuestions.length > 0" class="queue-panel" aria-labelledby="queue-title">
-          <div>
-            <h3 id="queue-title">Fila de perguntas</h3>
-            <p>Até {{ queueLimit }} perguntas em espera.</p>
-          </div>
-          <ol>
-            <li v-for="(queuedQuestion, index) in queuedQuestions" :key="queuedQuestion.id">
-              <span>{{ queuedQuestion.text }}</span>
-              <div class="queue-actions">
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="index === 0"
-                  @click="moveQueuedQuestion(index, -1)"
-                >
-                  Subir
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="index === queuedQuestions.length - 1"
-                  @click="moveQueuedQuestion(index, 1)"
-                >
-                  Descer
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  @click="cancelQueuedQuestion(queuedQuestion.id)"
-                >
-                  Remover
-                </UButton>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <div v-if="editingMessageId" class="editing-banner">
-          <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
-          <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
-            Cancelar edição
-          </UButton>
-        </div>
-
-        <div v-if="billingStatus.expiryWarning" class="subscription-alert" role="alert">
-          <span>A sua subscrição termina em menos de uma semana.</span>
-          <UButton to="/subscription" size="xs" color="primary" variant="ghost">
-            Gerir subscrição
-          </UButton>
-        </div>
-
-        <UChatPrompt
-          id="question"
-          v-model="question"
-          name="question"
-          class="composer gemini-prompt"
-          variant="soft"
-          :rows="1"
-          :maxrows="6"
-          autoresize
-          :placeholder="'Pergunte ao Ujimu.'"
-          :disabled="!canWriteQuestion"
-          @submit="submitQuestion"
-        >
-          <template #header>
-            <div class="prompt-specialist-row">
-              <span class="sr-only">{{ composerHelp }}</span>
-              <USelect
-                id="specialist-select"
-                v-model="selectedSpecialistId"
-                name="specialist-select"
-                class="prompt-specialist-control"
-                :items="specialistSelectItems"
-                placeholder="Especialidade"
-                aria-label="Especialidade"
-                :disabled="isStreaming || specialistsPending"
-                @update:model-value="selectSpecialistFromPrompt"
-              />
+        <div class="chat-body" :class="{ 'is-empty': messages.length === 0 }">
+          <div class="messages" aria-live="polite">
+            <div v-if="messages.length === 0" class="empty-chat">
+              <h2 class="empty-title">Em que posso ajudar?</h2>
+              <template v-if="selectedSpecialist">
+                <p class="empty-specialist-name">{{ selectedSpecialist?.name }}</p>
+                <p class="empty-specialist-desc">{{ selectedSpecialist?.description }}</p>
+                <small class="empty-info">As citações serão apresentadas no fim da resposta.</small>
+              </template>
+              <template v-else>
+                <p class="empty-specialist-name">Escolha uma especialidade</p>
+                <small class="empty-info">A resposta aparecerá aqui quando o chat estiver activo.</small>
+              </template>
             </div>
-          </template>
 
-          <template #footer>
-            <div class="prompt-toolbar">
-              <span class="prompt-plus-button" aria-hidden="true">
-                <UIcon name="i-lucide-plus" />
-              </span>
-              <div class="prompt-action-group">
-                <span class="prompt-mic-button" aria-hidden="true">
-                  <UIcon name="i-lucide-mic" />
-                </span>
-                <UChatPromptSubmit
-                  class="prompt-submit"
-                  :status="'ready'"
-                  :disabled="!canSubmitQuestion"
-                  :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
+            <UChatMessages
+              v-else
+              :messages="chatUiMessages"
+              :status="chatStatus"
+              should-auto-scroll
+              class="ujimu-chat-messages"
+            >
+              <template v-for="item in chatStreamItems" :key="item.id">
+                <UChatMessage
+                  v-if="item.type === 'message'"
+                  :id="item.message.id"
+                  :role="item.message.role"
+                  :parts="item.message.parts"
+                  :side="item.message.role === 'user' ? 'right' : 'left'"
+                  :variant="item.message.role === 'user' ? 'soft' : 'naked'"
+                  class="message"
+                  :class="`message-${item.message.role}`"
+                >
+                  <template #content>
+                    <p class="message-label">{{ item.message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
+                    <p class="message-text">{{ item.message.parts[0]?.text }}</p>
+
+                    <div v-if="item.message.role === 'user' && item.message.historyMessageId" class="message-actions">
+                      <UButton
+                        type="button"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        :disabled="isStreaming"
+                        @click="startEditingQuestion(item.message)"
+                      >
+                        Editar
+                      </UButton>
+                    </div>
+
+                    <section
+                      v-if="item.message.role === 'assistant' && item.message.citations.length > 0"
+                      class="citations"
+                      aria-label="Fontes"
+                    >
+                      <h3>Fontes</h3>
+                      <ol>
+                        <li v-for="citation in item.message.citations" :key="`${item.message.id}-${citation.sourceTitle}`">
+                          <strong>{{ citation.sourceTitle }}</strong>
+                          <span>{{ citation.articleRefs.join(', ') }}</span>
+                          <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
+                        </li>
+                      </ol>
+                    </section>
+                  </template>
+                </UChatMessage>
+
+                <div v-else-if="item.type === 'ad'" class="inline-ad-card" role="complementary" aria-label="Publicidade">
+                  <p class="section-label">Publicidade</p>
+                  <strong>Espaço publicitário</strong>
+                  <span>300 × 250</span>
+                  <small>Inserido entre respostas; nunca dentro das fontes.</small>
+                </div>
+              </template>
+            </UChatMessages>
+          </div>
+
+          <p v-if="quotaError" class="quota-error" role="alert">
+            {{ quotaError }}
+          </p>
+
+          <section v-if="queuedQuestions.length > 0" class="queue-panel" aria-labelledby="queue-title">
+            <div>
+              <h3 id="queue-title">Fila de perguntas</h3>
+              <p>Até {{ queueLimit }} perguntas em espera.</p>
+            </div>
+            <ol>
+              <li v-for="(queuedQuestion, index) in queuedQuestions" :key="queuedQuestion.id">
+                <span>{{ queuedQuestion.text }}</span>
+                <div class="queue-actions">
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="index === 0"
+                    @click="moveQueuedQuestion(index, -1)"
+                  >
+                    Subir
+                  </UButton>
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="index === queuedQuestions.length - 1"
+                    @click="moveQueuedQuestion(index, 1)"
+                  >
+                    Descer
+                  </UButton>
+                  <UButton
+                    type="button"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    @click="cancelQueuedQuestion(queuedQuestion.id)"
+                  >
+                    Remover
+                  </UButton>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <div v-if="editingMessageId" class="editing-banner">
+            <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
+            <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
+              Cancelar edição
+            </UButton>
+          </div>
+
+          <div v-if="billingStatus.expiryWarning" class="subscription-alert" role="alert">
+            <span>A sua subscrição termina em menos de uma semana.</span>
+            <UButton to="/subscription" size="xs" color="primary" variant="ghost">
+              Gerir subscrição
+            </UButton>
+          </div>
+
+          <UChatPrompt
+            id="question"
+            v-model="question"
+            name="question"
+            class="composer gemini-prompt"
+            variant="soft"
+            :rows="1"
+            :maxrows="6"
+            autoresize
+            :placeholder="'Pergunte ao Ujimu.'"
+            :disabled="!canWriteQuestion"
+            @submit="submitQuestion"
+          >
+            <template #header>
+              <div class="prompt-specialist-row">
+                <span class="sr-only">{{ composerHelp }}</span>
+                <USelect
+                  id="specialist-select"
+                  v-model="selectedSpecialistId"
+                  name="specialist-select"
+                  class="prompt-specialist-control"
+                  :items="specialistSelectItems"
+                  placeholder="Especialidade"
+                  aria-label="Especialidade"
+                  :disabled="isStreaming || specialistsPending"
+                  @update:model-value="selectSpecialistFromPrompt"
                 />
               </div>
-            </div>
-          </template>
-        </UChatPrompt>
+            </template>
+
+            <template #footer>
+              <div class="prompt-toolbar">
+                <span class="prompt-plus-button" aria-hidden="true">
+                  <UIcon name="i-lucide-plus" />
+                </span>
+                <div class="prompt-action-group">
+                  <span class="prompt-mic-button" aria-hidden="true">
+                    <UIcon name="i-lucide-mic" />
+                  </span>
+                  <UChatPromptSubmit
+                    class="prompt-submit"
+                    :status="'ready'"
+                    :disabled="!canSubmitQuestion"
+                    :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
+                  />
+                </div>
+              </div>
+            </template>
+          </UChatPrompt>
+        </div>
       </section>
 
     </section>
@@ -1103,8 +1106,7 @@ h3 {
   display: grid;
   height: calc(100dvh - 128px);
   min-height: 640px;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  grid-auto-rows: auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -1117,15 +1119,36 @@ h3 {
 }
 
 .notice {
-  border: 1px solid rgba(249, 214, 22, 0.3);
-  border-radius: 20px;
-  padding: 14px 16px;
-  color: #fff8cc;
-  background: var(--ujimu-yellow-soft);
-  line-height: 1.45;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 10px 14px;
+  color: var(--ujimu-muted);
+  background: transparent;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.chat-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 18px;
+}
+
+.chat-body.is-empty {
+  justify-content: center;
+  align-items: center;
+  gap: 28px;
+}
+
+.chat-body.is-empty .messages {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .messages {
+  flex: 1;
   display: grid;
   min-height: 0;
   align-content: start;
@@ -1134,22 +1157,44 @@ h3 {
 }
 
 .empty-chat {
-  display: grid;
-  min-height: 260px;
-  place-items: center;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 24px;
-  padding: 28px;
-  color: var(--ujimu-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px 10px;
   text-align: center;
+  color: var(--ujimu-muted);
 }
 
-.empty-chat p {
+.empty-title {
+  font-family: var(--font-display, "Space Grotesk", sans-serif);
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #ffffff 30%, var(--ujimu-yellow) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+  letter-spacing: -0.03em;
+}
+
+.empty-specialist-name {
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  font-weight: 600;
+  color: #ffffff;
   margin: 0 0 8px;
-  font-size: 1.1rem;
 }
 
-.empty-chat small {
+.empty-specialist-desc {
+  max-width: 600px;
+  font-size: 1.05rem;
+  color: var(--ujimu-muted);
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.empty-info {
+  font-size: 0.85rem;
   color: var(--ujimu-faint);
 }
 
@@ -1170,6 +1215,10 @@ h3 {
 
 .message-assistant {
   justify-self: start;
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .message-label {
@@ -1193,16 +1242,64 @@ h3 {
 }
 
 .citations {
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 14px;
 }
 
 .citations h3 {
   color: var(--ujimu-yellow);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
 }
 
-.citations ol,
+.citations ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.citations li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--ujimu-line);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.citations li:hover {
+  transform: scale(1.02);
+  opacity: 0.95;
+  border-color: rgba(249, 214, 22, 0.35);
+  background: rgba(249, 214, 22, 0.04);
+}
+
+.citations strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.citations span {
+  font-size: 0.85rem;
+  color: var(--ujimu-muted);
+}
+
+.citations small {
+  font-size: 0.75rem;
+  color: var(--ujimu-faint);
+  margin-top: auto;
+}
+
 .queue-panel ol {
   display: grid;
   gap: 10px;
@@ -1211,7 +1308,6 @@ h3 {
   list-style: none;
 }
 
-.citations li,
 .queue-panel li {
   display: grid;
   gap: 4px;
@@ -1220,8 +1316,6 @@ h3 {
   background: rgba(0, 0, 0, 0.18);
 }
 
-.citations span,
-.citations small,
 .queue-panel p,
 .composer small {
   color: var(--ujimu-muted);
@@ -1261,14 +1355,15 @@ h3 {
 }
 
 .gemini-prompt {
-  align-self: end;
+  align-self: center;
   display: grid;
   width: min(860px, 100%);
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 32px;
   padding: 12px 14px 14px;
-  background: rgba(36, 36, 36, 0.96);
+  background: rgba(22, 22, 22, 0.85);
+  backdrop-filter: blur(24px);
   box-shadow: 0 18px 56px rgba(0, 0, 0, 0.32);
 }
 
