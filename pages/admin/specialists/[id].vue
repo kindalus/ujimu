@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse, IngestionSource } from '../../../utils/admin-ui'
+import type { AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse, IngestionRunResponse, IngestionSource } from '../../../utils/admin-ui'
 import { pipelineStatusColor, readAdminApiError } from '../../../utils/admin-ui'
 
 const specialistId = ref('')
@@ -146,9 +146,9 @@ async function runIngestion(): Promise<void> {
     })
     if (!response.ok) throw new Error(await readAdminApiError(response))
 
-    const payload = (await response.json()) as { sources: IngestionSource[] }
+    const payload = (await response.json()) as IngestionRunResponse
     replaceSelectedSources(payload.sources)
-    feedback.value = 'Ingestão concluída.'
+    feedback.value = formatIngestionFeedback(payload)
   })
 }
 
@@ -166,6 +166,17 @@ async function deleteSpecialist(): Promise<void> {
     feedback.value = 'Especialidade apagada.'
     window.location.href = '/admin/specialists'
   })
+}
+
+function formatIngestionFeedback(payload: IngestionRunResponse): string {
+  const counts = payload.counts
+  if (!counts) return 'Ingestão concluída.'
+
+  if (counts.failed > 0) {
+    return `Ingestão terminou com erro: ${counts.ingested} fonte(s) ingerida(s), ${counts.failed} com erro.`
+  }
+
+  return `Ingestão concluída: ${counts.ingested} fonte(s) ingerida(s), ${counts.pending} pendente(s), ${counts.blocked} bloqueada(s).`
 }
 
 function replaceSpecialist(updated: AdminSpecialist): void {

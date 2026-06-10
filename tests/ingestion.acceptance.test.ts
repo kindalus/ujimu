@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -98,10 +98,7 @@ describe('legislation wiki raw ingestion acceptance', () => {
     await scanSpecialistRawSources(specialist)
     const ingested: string[] = []
 
-    await runPendingIngestion(specialist, {
-      piIngestionEnabled: true,
-      runner: fakeRunner((source) => ingested.push(source.raw_path))
-    })
+    await runPendingIngestionWithWikiOutput(specialist, ingested)
 
     const state = await readIngestionState(specialist.paths.ingestState)
     expect(ingested).toEqual(['codigo-iva.original.md'])
@@ -113,6 +110,51 @@ describe('legislation wiki raw ingestion acceptance', () => {
     expect(state.sources['codigo-iva.original.md']).not.toHaveProperty('error_code')
     expect(state.sources['codigo-iva.original.md']).not.toHaveProperty('error_message')
     expect(state.sources['codigo-iva.original.md'].ingested_at).toBeTruthy()
+  })
+
+  it('does not mark ingestion as successful when Pi completes without wiki output', async () => {
+    const specialist = await createTempSpecialist('iva')
+    await storeRawSource(specialist, {
+      fileName: 'codigo-iva.md',
+      content: '# Código do IVA\n\nArtigo 1.º\nTexto legal.'
+    })
+    await scanSpecialistRawSources(specialist)
+
+    await runPendingIngestion(specialist, {
+      piIngestionEnabled: true,
+      runner: fakeRunner()
+    })
+
+    const state = await readIngestionState(specialist.paths.ingestState)
+    expect(state.sources['codigo-iva.original.md']).toMatchObject({
+      status: 'failed',
+      ingestion: {
+        status: 'failed',
+        error_code: 'WIKI_OUTPUT_MISSING'
+      }
+    })
+  })
+
+  it('reprocesses previously ingested sources when the wiki output is missing', async () => {
+    const specialist = await createTempSpecialist('iva')
+    await storeRawSource(specialist, {
+      fileName: 'codigo-iva.md',
+      content: '# Código do IVA\n\nArtigo 1.º\nTexto legal.'
+    })
+    const firstScan = await scanSpecialistRawSources(specialist)
+    firstScan.sources['codigo-iva.original.md'].status = 'ingested'
+    firstScan.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
+    firstScan.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
+    await import('../server/utils/ingestion/state').then(({ writeIngestionState }) =>
+      writeIngestionState(specialist.paths.ingestState, firstScan)
+    )
+    const ingested: string[] = []
+
+    await runPendingIngestionWithWikiOutput(specialist, ingested)
+
+    const state = await readIngestionState(specialist.paths.ingestState)
+    expect(ingested).toEqual(['codigo-iva.original.md'])
+    expect(state.sources['codigo-iva.original.md'].status).toBe('ingested')
   })
 
   it('keeps PDF sources blocked until manual conversion succeeds', async () => {
@@ -159,10 +201,25 @@ async function createTempSpecialist(id: string): Promise<SpecialistRuntime> {
   )
 }
 
-function fakeRunner(onIngest?: (source: Parameters<PiIngestionRunner['ingestSource']>[1]) => void): PiIngestionRunner {
+async function runPendingIngestionWithWikiOutput(specialist: SpecialistRuntime, ingested: string[]): Promise<void> {
+  await runPendingIngestion(specialist, {
+    piIngestionEnabled: true,
+    runner: fakeRunner(async (source, targetSpecialist) => {
+      ingested.push(source.raw_path)
+      await writeFile(join(targetSpecialist.paths.wiki, 'index.md'), `# Wiki\n\nSource: ${source.raw_path}\n`)
+    })
+  })
+}
+
+function fakeRunner(
+  onIngest?: (
+    source: Parameters<PiIngestionRunner['ingestSource']>[1],
+    specialist: SpecialistRuntime
+  ) => void | Promise<void>
+): PiIngestionRunner {
   return {
-    async ingestSource(_specialist, source) {
-      onIngest?.(source)
+    async ingestSource(specialist, source) {
+      await onIngest?.(source, specialist)
       return { summary: `Ingested ${source.raw_path}` }
     }
   }

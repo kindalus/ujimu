@@ -48,6 +48,8 @@ describe('admin specialist management UI acceptance', () => {
     expect(detail).toContain('/sources/reload')
     expect(detail).toContain('/conversion/run')
     expect(detail).toContain('/ingestion/run')
+    expect(detail).toContain('formatIngestionFeedback')
+    expect(detail).toContain('Ingestão terminou com erro')
     expect(detail).toContain('Editar especialidade')
     expect(detail).toContain('Carregar fonte')
     expect(detail).toContain('Recarregar fontes')

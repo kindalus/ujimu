@@ -149,7 +149,10 @@ describe('three Pi agent pipeline acceptance', () => {
 
     await runPendingIngestion(specialist, {
       piIngestionEnabled: true,
-      runner: fakeIngestionRunner((source: any) => ingestedMarkdownPaths.push(source.ingestion.source_path))
+      runner: fakeIngestionRunner(async (source: any, targetSpecialist) => {
+        ingestedMarkdownPaths.push(source.ingestion.source_path)
+        await writeFile(join(targetSpecialist.paths.wiki, 'index.md'), `# Wiki\n\nIngested ${source.ingestion.source_path}\n`)
+      })
     })
 
     expect(ingestedMarkdownPaths).toEqual(['lei.pdf.md', 'manual.original.md'])
@@ -381,10 +384,15 @@ function markdownOriginalSource(specialistId: string, rawPath: string, title: st
   }
 }
 
-function fakeIngestionRunner(onIngest: (source: Parameters<PiIngestionRunner['ingestSource']>[1]) => void): PiIngestionRunner {
+function fakeIngestionRunner(
+  onIngest: (
+    source: Parameters<PiIngestionRunner['ingestSource']>[1],
+    specialist: SpecialistRuntime
+  ) => void | Promise<void>
+): PiIngestionRunner {
   return {
-    async ingestSource(_specialist, source) {
-      onIngest(source)
+    async ingestSource(specialist, source) {
+      await onIngest(source, specialist)
       return { summary: `Ingested ${(source as any).ingestion.source_path}` }
     }
   }

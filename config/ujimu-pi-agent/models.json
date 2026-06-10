@@ -1,3 +1,11 @@
 {
-  "providers": {}
+  "providers": {
+    "openrouter": {
+      "modelOverrides": {
+        "moonshotai/kimi-k2.6": {
+          "maxTokens": 8192
+        }
+      }
+    }
+  }
 }

@@ -42,6 +42,19 @@ export interface AdminSpecialistsResponse {
   specialists: AdminSpecialist[]
 }
 
+export interface SourceStatusCounts {
+  pending: number
+  processing: number
+  ingested: number
+  failed: number
+  blocked: number
+}
+
+export interface IngestionRunResponse {
+  sources: IngestionSource[]
+  counts?: SourceStatusCounts
+}
+
 export interface MonthlyVisitorsResponse {
   month: string
   distinctVisitors: number

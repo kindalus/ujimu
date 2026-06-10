@@ -1,3 +1,5 @@
+import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
 import { createPiSdkIngestionRunner, PiIngestionError, type PiIngestionRunner } from './pi-runner'
@@ -28,6 +30,9 @@ export async function runPendingIngestion(
   const state = await scanSpecialistRawSources(specialist)
   const staleCutoffMs = resolveStaleProcessingMinutes(options.staleProcessingMinutes) * 60 * 1000
   const now = new Date()
+  if (!(await hasWikiMarkdownFiles(specialist.paths.wiki))) {
+    markIngestedSourcesWithMissingWikiOutput(state, now)
+  }
   const pendingSources = Object.values(state.sources)
     .filter((source) => shouldRunIngestion(source, now, staleCutoffMs))
     .sort((left, right) => left.raw_path.localeCompare(right.raw_path))
@@ -91,6 +96,12 @@ async function processSource(input: {
 
   try {
     await runner.ingestSource(specialist, source, { timeoutMs })
+    if (!(await hasWikiMarkdownFiles(specialist.paths.wiki))) {
+      throw new PiIngestionError(
+        'WIKI_OUTPUT_MISSING',
+        'Pi ingestion completed without creating wiki Markdown files.'
+      )
+    }
     markIngested(source)
   } catch (error) {
     markFailed(
@@ -101,6 +112,39 @@ async function processSource(input: {
   }
 
   await writeIngestionState(specialist.paths.ingestState, state)
+}
+
+async function hasWikiMarkdownFiles(root: string): Promise<boolean> {
+  const entries = await readdir(root, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return []
+    throw error
+  })
+
+  for (const entry of entries) {
+    const entryPath = join(root, entry.name)
+    if (entry.isDirectory() && await hasWikiMarkdownFiles(entryPath)) {
+      return true
+    }
+
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function markIngestedSourcesWithMissingWikiOutput(state: IngestionState, now: Date): void {
+  for (const source of Object.values(state.sources)) {
+    if (source.status === 'ingested' || source.ingestion?.status === 'ingested') {
+      markFailed(
+        source,
+        'WIKI_OUTPUT_MISSING',
+        'Pi ingestion completed without creating wiki Markdown files.',
+        now
+      )
+    }
+  }
 }
 
 function markProcessing(source: IngestionSourceRecord): void {
@@ -134,8 +178,8 @@ function markIngested(source: IngestionSourceRecord): void {
   }
 }
 
-function markFailed(source: IngestionSourceRecord, errorCode: string, errorMessage: string): void {
-  const now = new Date().toISOString()
+function markFailed(source: IngestionSourceRecord, errorCode: string, errorMessage: string, failedAt = new Date()): void {
+  const now = failedAt.toISOString()
   source.status = 'failed'
   source.error_code = errorCode
   source.error_message = errorMessage

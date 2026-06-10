@@ -20,7 +20,7 @@ export interface PiSdkIngestionOptions {
 
 export class PiIngestionError extends Error {
   constructor(
-    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED',
+    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING',
     message: string
   ) {
     super(message)
