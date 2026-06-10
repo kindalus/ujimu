@@ -23,6 +23,8 @@ export interface IngestionSource {
     skipped_reason?: string
     error_message?: string
   }
+  previous_checksum?: string
+  replaced_at?: string
   error_code?: string
   error_message?: string
 }

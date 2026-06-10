@@ -3,6 +3,7 @@ import { recordAdminAuditEvent } from '../../../../utils/admin/audit'
 import { requireAdmin } from '../../../../utils/admin/guards'
 import { isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../../utils/db'
+import { scanSpecialistRawSources } from '../../../../utils/ingestion/detect'
 import { RawSourceStorageError, storeRawSource } from '../../../../utils/ingestion/storage'
 import { getSpecialistById } from '../../../../utils/specialists/registry'
 
@@ -26,18 +27,21 @@ export default defineEventHandler(async (event) => {
 
     const stored = await storeRawSource(specialist, {
       fileName: file.filename,
-      content: file.data
+      content: file.data,
+      replaceExisting: true
     })
+    const state = await scanSpecialistRawSources(specialist)
+    const source = state.sources[stored.relativePath]
 
     recordAdminAuditEvent(database, {
       admin,
-      action: 'raw_source_uploaded',
+      action: stored.replaced ? 'raw_source_replaced' : 'raw_source_uploaded',
       specialistId,
       metadata: { filename: stored.relativePath, bytes: file.data.length }
     })
 
-    setResponseStatus(event, 201)
-    return { stored: { relativePath: stored.relativePath } }
+    setResponseStatus(event, stored.replaced ? 200 : 201)
+    return { stored: { relativePath: stored.relativePath }, replaced: stored.replaced, source }
   } catch (error) {
     if (error instanceof RawSourceStorageError) {
       throw createError({

@@ -6,6 +6,7 @@ export type AdminAuditAction =
   | 'specialist_created'
   | 'specialist_updated'
   | 'raw_source_uploaded'
+  | 'raw_source_replaced'
   | 'sources_reloaded'
   | 'conversion_run'
   | 'conversion_skipped_disabled'

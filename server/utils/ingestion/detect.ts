@@ -135,13 +135,14 @@ function createPendingRecord(input: {
   const isMarkdown = MARKDOWN_RAW_EXTENSIONS.has(input.extension)
   const markdownPath = isMarkdown ? input.rawPath : toGeneratedMarkdownPath(input.rawPath)
   const previousChecksum = input.existing?.checksum
+  const wasReplaced = Boolean(previousChecksum && previousChecksum !== input.checksum)
 
   return {
     source_id: `${input.rawPath}#${input.checksum}`,
     specialist_id: input.specialistId,
     raw_path: input.rawPath,
     checksum: input.checksum,
-    ...(previousChecksum && previousChecksum !== input.checksum ? { previous_checksum: previousChecksum } : {}),
+    ...(wasReplaced ? { previous_checksum: previousChecksum, replaced_at: input.now } : {}),
     status: isMarkdown ? 'pending' : 'blocked',
     title,
     article_refs: articleRefs,

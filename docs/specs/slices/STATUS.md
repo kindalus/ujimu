@@ -20,7 +20,7 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 24 specialist availability/access work:
+Latest full verification after Slice 25 source replacement/refresh work:
 
 - `npm test` — passed, 125 tests
 - `npm run typecheck` — passed
@@ -75,13 +75,13 @@ Known non-blocking warnings:
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
-| 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `grilled` | — | Source upload/replacement and source-status refresh without manual conversion UI. |
+| 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `planned` | — | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
 
 ## Slice 25 — Source upload, replacement, and refresh
 
-Status: `grilled`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -98,7 +98,25 @@ Refinement and grill decisions:
 
 Acceptance tests:
 
-- Pending: write before implementation.
+- Updated `tests/admin.acceptance.test.ts` so duplicate logical source upload now replaces the source, returns `replaced: true`, exposes current source state, stores previous checksum/replacement timestamp internally, and audits `raw_source_replaced` without source content.
+- Updated `tests/admin-ui.acceptance.test.ts` so the detail page exposes “Actualizar estado” and no longer exposes “Recarregar fontes” or “Executar conversão”.
+- Confirmed RED with `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added explicit replacement support to raw source storage while preserving duplicate rejection for callers that do not opt in.
+- Marked replaced sources in `ingest/state.json` with `previous_checksum` and `replaced_at` when checksums change.
+- Updated the admin raw upload endpoint to allow replacement, refresh the affected source state immediately, return the current source, and audit upload vs replacement separately.
+- Removed manual conversion action from the specialist detail UI and renamed source refresh to “Actualizar estado”.
+
+Verification:
+
+- `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm test -- tests/ingestion.acceptance.test.ts tests/security-ops.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed after adding `raw_source_replaced` to audit action types.
+- `npm test` — passed, 125 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 24 — Specialist availability and access control
 

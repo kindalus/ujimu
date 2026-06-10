@@ -34,6 +34,7 @@ export interface IngestionSourceRecord {
   conversion?: SourceConversionState
   ingestion?: SourceIngestionState
   previous_checksum?: string
+  replaced_at?: string
   error_code?: string
   error_message?: string
   detected_at: string
@@ -49,4 +50,5 @@ export interface IngestionState {
 export interface StoredRawSource {
   relativePath: string
   absolutePath: string
+  replaced: boolean
 }

@@ -6,6 +6,7 @@ import type { StoredRawSource } from './types'
 export interface StoreRawSourceInput {
   fileName: string
   content: string | Buffer
+  replaceExisting?: boolean
 }
 
 export class RawSourceStorageError extends Error {
@@ -26,7 +27,8 @@ export async function storeRawSource(
   const absolutePath = join(specialist.paths.raw, relativePath)
 
   await mkdir(specialist.paths.raw, { recursive: true })
-  if (await pathExists(absolutePath)) {
+  const replaced = await pathExists(absolutePath)
+  if (replaced && !input.replaceExisting) {
     throw new RawSourceStorageError(
       'RAW_SOURCE_ALREADY_EXISTS',
       `Raw source filename "${relativePath}" already exists.`
@@ -34,7 +36,7 @@ export async function storeRawSource(
   }
   await writeFile(absolutePath, input.content)
 
-  return { relativePath, absolutePath }
+  return { relativePath, absolutePath, replaced }
 }
 
 function sanitizeRawFileName(fileName: string): string {

@@ -107,11 +107,15 @@ async function uploadRawSource(): Promise<void> {
       body: form
     })
     if (!response.ok) throw new Error(await readAdminApiError(response))
-    feedback.value = 'Fonte carregada. Recarregue as fontes para actualizar o estado.'
+    const payload = (await response.json()) as { replaced: boolean; source?: IngestionSource }
+    if (payload.source) {
+      replaceOneSource(payload.source)
+    }
+    feedback.value = payload.replaced ? 'Fonte substituída. Execute a ingestão para actualizar a wiki.' : 'Fonte carregada. Execute a ingestão para actualizar a wiki.'
   })
 }
 
-async function reloadSources(): Promise<void> {
+async function refreshSources(): Promise<void> {
   if (!specialist.value) return
 
   await runAdminAction(async () => {
@@ -122,22 +126,7 @@ async function reloadSources(): Promise<void> {
 
     const payload = (await response.json()) as { sources: IngestionSource[] }
     replaceSelectedSources(payload.sources)
-    feedback.value = 'Fontes recarregadas.'
-  })
-}
-
-async function runConversion(): Promise<void> {
-  if (!specialist.value) return
-
-  await runAdminAction(async () => {
-    const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}/conversion/run`, {
-      method: 'POST'
-    })
-    if (!response.ok) throw new Error(await readAdminApiError(response))
-
-    const payload = (await response.json()) as { sources: IngestionSource[]; converted?: number; failed?: number }
-    replaceSelectedSources(payload.sources)
-    feedback.value = `Conversão concluída: ${payload.converted ?? 0} fonte(s) convertida(s), ${payload.failed ?? 0} com erro.`
+    feedback.value = 'Estado actualizado.'
   })
 }
 
@@ -193,6 +182,15 @@ function replaceSpecialist(updated: AdminSpecialist): void {
 function replaceSelectedSources(sources: IngestionSource[]): void {
   if (!specialist.value) return
   replaceSpecialist({ ...specialist.value, sources })
+}
+
+function replaceOneSource(source: IngestionSource): void {
+  if (!specialist.value) return
+  const sources = [
+    ...specialist.value.sources.filter((item) => item.raw_path !== source.raw_path),
+    source
+  ].sort((left, right) => left.raw_path.localeCompare(right.raw_path))
+  replaceSelectedSources(sources)
 }
 
 async function runAdminAction(action: () => Promise<void>): Promise<void> {
@@ -291,11 +289,8 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
           <UButton type="button" color="primary" variant="soft" :loading="pending" @click="uploadRawSource">
             Carregar fonte
           </UButton>
-          <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="reloadSources">
-            Recarregar fontes
-          </UButton>
-          <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="runConversion">
-            Executar conversão
+          <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="refreshSources">
+            Actualizar estado
           </UButton>
           <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="runIngestion">
             Executar ingestão
@@ -323,6 +318,7 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
               <UBadge :color="pipelineStatusColor(source.ingestion.status)" variant="soft">{{ source.ingestion.status }}</UBadge>
               {{ source.ingestion.source_path }}
             </small>
+            <small v-if="source.replaced_at">Fonte substituída; aguarda nova ingestão.</small>
             <small v-if="source.error_message" class="source-error">{{ source.error_message }}</small>
             <small v-if="source.conversion?.error_message" class="source-error">{{ source.conversion.error_message }}</small>
             <small v-if="source.ingestion?.error_message" class="source-error">{{ source.ingestion.error_message }}</small>
