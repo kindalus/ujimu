@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ujimu — Arquitectura — Fontes, ingestão e acesso restricto</title>
+  <style>
+    :root { --bg:#050505; --panel:#151515; --text:#f7f6ef; --muted:#b9b7ad; --line:rgba(255,255,255,.16); --yellow:#f9d616; }
+    * { box-sizing: border-box; }
+    body { margin:0; overflow:hidden; font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--text); background:radial-gradient(circle at 14% 10%, rgba(249,214,22,.15), transparent 27%), linear-gradient(135deg, #020202, #111 52%, #050505); }
+    .deck { width:100vw; height:100vh; position:relative; }
+    .slide { position:absolute; inset:0; display:none; align-items:center; justify-content:center; padding:7vh 9vw; }
+    .slide.active { display:flex; }
+    .frame { width:min(1120px, 100%); min-height:min(680px, 78vh); padding:clamp(2rem, 5vw, 4.25rem); border:1px solid var(--line); border-radius:28px; background:linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); box-shadow:0 24px 80px rgba(0,0,0,.45); }
+    .kicker { color:var(--yellow); text-transform:uppercase; letter-spacing:.16em; font-size:.78rem; font-weight:800; margin-bottom:1rem; }
+    h1, h2 { margin:0; max-width:980px; font-family:"Space Grotesk", Inter, system-ui, sans-serif; line-height:.98; letter-spacing:-.045em; }
+    h1 { font-size:clamp(3rem, 7vw, 6.4rem); }
+    h2 { font-size:clamp(2.2rem, 5vw, 4.8rem); }
+    p.lead { max-width:920px; color:var(--muted); font-size:clamp(1.08rem, 2vw, 1.45rem); line-height:1.45; }
+    ul { list-style:none; padding:0; margin:2rem 0 0; display:grid; gap:.85rem; }
+    li { color:#ebe9de; font-size:clamp(1rem, 1.6vw, 1.18rem); line-height:1.42; display:flex; gap:.8rem; }
+    li::before { content:""; width:.55rem; height:.55rem; flex:0 0 .55rem; margin-top:.48rem; border-radius:50%; background:var(--yellow); }
+    .grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+    .card { border:1px solid var(--line); border-radius:18px; padding:1rem; background:rgba(10,10,10,.72); min-height:120px; }
+    .card strong { display:block; color:var(--yellow); margin-bottom:.35rem; }
+    .card span { color:var(--muted); line-height:1.4; }
+    code { color:#fff4a8; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:7px; padding:.05rem .3rem; }
+    pre { white-space:pre-wrap; color:#f8f2c6; border:1px solid var(--line); background:rgba(0,0,0,.36); border-radius:18px; padding:1rem; line-height:1.42; font-size:.95rem; }
+    .topbar, .counter { position:fixed; z-index:5; color:rgba(247,246,239,.66); font-size:.85rem; }
+    .topbar { top:1.2rem; left:50%; transform:translateX(-50%); width:min(1120px,82vw); display:flex; justify-content:space-between; }
+    .counter { right:2rem; bottom:1.3rem; }
+    .callout { margin-top:1.5rem; padding:1rem 1.2rem; border-radius:18px; border:1px solid rgba(249,214,22,.35); background:rgba(249,214,22,.13); color:#fff8cf; font-weight:650; line-height:1.45; }
+    @media (max-width:850px) { .grid { grid-template-columns:1fr; } .frame { min-height:82vh; } }
+    @media print { body { overflow:visible; } .slide { display:flex; position:relative; page-break-after:always; } .topbar, .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <div class="topbar"><span>Arquitectura</span><span>Fontes, ingestão e acesso restricto</span></div>
+  <main class="deck">
+    <section class="slide active"><div class="frame"><div class="kicker">Origem</div><h1>Arquitectura incremental</h1><p class="lead">Desenho técnico para implementar <code>docs/specs/brainstorm-admin-source-ingestion-access.html</code> sem reescrever o produto: manter Nuxt, SQLite, ficheiros de especialista e Pi, acrescentando metadados, permissões e jobs persistentes.</p></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Base aceite</div><h2>Manter a arquitectura existente</h2><ul><li><code>specialist.yaml</code> continua a ser a fonte de metadados e runtime settings do especialista.</li><li><code>raw/</code>, <code>wiki/</code> e <code>ingest/state.json</code> continuam a existir por especialista.</li><li>SQLite continua a guardar utilizadores, histórico, analytics, auditoria e passa a guardar a fila recuperável.</li><li>Pi continua a executar conversão e ingestão quando os flags correspondentes estão activos.</li><li>Validação e autorização continuam no servidor; a UI apenas reflecte estados.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Modelo do especialista</div><h2>Estado e visibilidade no YAML</h2><pre>specialist.yaml
+  status: active | suspended
+  allowed_emails:
+    - pessoa@exemplo.ao
+
+Regra:
+  status omitted => active
+  allowed_emails omitted or [] => público</pre><ul><li>O admin pode editar <code>status</code> e uma textarea com um email por linha.</li><li>A API pública só devolve especialistas activos acessíveis ao utilizador actual.</li><li>O chat, a listagem de histórico e a retoma de conversa validam acesso no servidor.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Autorização por especialista</div><h2>Uma função central de acesso</h2><ul><li>Criar utilitário server-side: <code>canUseSpecialist(specialist, subject)</code>.</li><li>Especialista suspenso: invisível e indisponível para todos os não-admins.</li><li><code>allowed_emails</code> vazia: acesso público para anónimos e autenticados.</li><li><code>allowed_emails</code> preenchida: exige utilizador autenticado com identidade verificada correspondente.</li><li>Endpoints de admin continuam protegidos por <code>requireAdmin</code> e podem ver todos os especialistas.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Fontes oficiais</div><h2>Upload e substituição como uma operação</h2><ul><li>Upload novo grava o ficheiro em <code>raw/</code> usando a convenção segura existente.</li><li>Upload com o mesmo nome lógico substitui a fonte actual e marca internamente a fonte anterior como substituída.</li><li>A versão antiga não precisa de aparecer na UI, mas a auditoria regista acção, nome e tamanho.</li><li>Após upload/substituição, o estado da fonte fica pendente de ingestão, sem botão de conversão.</li><li>O botão global “recarregar fontes” passa a ser “Actualizar estado”, lendo apenas o estado actual das fontes oficiais.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Pipeline</div><h2>Conversão é etapa interna da ingestão</h2><ul><li>O endpoint de conversão manual deixa de ser usado pela UI e fica candidato a remoção/depreciação em slice próprio.</li><li>O worker de ingestão faz: detectar/normalizar fonte → converter se necessário → validar Markdown → ingerir para wiki.</li><li>Estados existentes <code>conversion</code> e <code>ingestion</code> podem continuar em <code>ingest/state.json</code> para compatibilidade visual e debug.</li><li>Se conversão falhar, a fonte fica com erro de conversão e a ingestão fica bloqueada/falhada sem prender a UI.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Fila recuperável</div><h2>Jobs persistidos em SQLite</h2><pre>background_jobs
+  id TEXT PRIMARY KEY
+  type TEXT CHECK ('specialist_ingestion')
+  specialist_id TEXT NOT NULL
+  status TEXT CHECK ('queued','running','succeeded','failed','cancelled')
+  attempts INTEGER NOT NULL
+  max_attempts INTEGER NOT NULL
+  locked_at TEXT
+  locked_by TEXT
+  last_error_code TEXT
+  last_error_message TEXT
+  created_at TEXT
+  updated_at TEXT
+  completed_at TEXT</pre><ul><li>O comando “Executar ingestão” cria job e responde imediatamente com <code>202</code>.</li><li>Ao arrancar, jobs <code>queued</code> ou <code>running</code> antigos podem ser retomados por worker recuperável.</li><li>Um lock simples evita dois workers no mesmo job.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Worker</div><h2>Background sem bloquear o pedido</h2><ul><li>O endpoint admin chama <code>enqueueSpecialistIngestionJob</code> e dispara <code>runDueBackgroundJobs</code> sem aguardar o Pi.</li><li>O worker abre a sua própria ligação SQLite e fecha-a ao terminar.</li><li>O estado visível ao admin vem de <code>ingest/state.json</code> mais último job relevante.</li><li>Para testes, o worker aceita runner fake e relógio injectável.</li><li>Em produção simples, o worker pode correr in-process, mas a fonte de verdade é a tabela persistida.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Contratos API</div><h2>Superfícies a mudar</h2><ul><li><code>GET /api/specialists</code>: filtra por sessão/contacto e só expõe especialistas activos acessíveis.</li><li><code>POST /api/admin/specialists/:id/raw</code>: aceita upload inicial ou substituição controlada.</li><li><code>POST /api/admin/specialists/:id/ingestion/run</code>: devolve <code>202</code> com job, não resultado final.</li><li><code>POST /api/admin/specialists/:id/sources/reload</code>: substituir por refresh de estado; manter rota inicialmente como alias se necessário.</li><li><code>PATCH /api/admin/specialists/:id</code>: aceita <code>status</code> e <code>allowed_emails</code>.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">UI admin</div><h2>Menos acções, mais estado</h2><ul><li>Lista de especialistas mostra badges activo/suspenso e restricto/público.</li><li>Ficha do especialista adiciona selector/switch de suspensão e textarea de emails permitidos.</li><li>Zona de fontes oficiais mostra upload/substituição, “Executar ingestão” e “Actualizar estado”.</li><li>Remover da UI “Executar conversão” e “Recarregar fontes”.</li><li>Mensagens dizem que ingestão foi agendada, não concluída.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Segurança</div><h2>Barreiras obrigatórias</h2><ul><li>Não confiar em lista pública de especialistas no cliente; chat e histórico revalidam acesso.</li><li>Normalizar emails para comparação case-insensitive e trim; rejeitar linhas inválidas no admin.</li><li>Uploads continuam limitados por extensão, content-type compatível e caminho dentro de <code>raw/</code>.</li><li>Não devolver allowlist a utilizadores públicos; só admin vê emails permitidos.</li><li>Não expor conteúdo da fonte, prompts, segredos ou stack traces nos erros de job.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Slices propostos</div><h2>Implementar por camadas verificáveis</h2><ul><li><strong>24:</strong> Modelo de especialista activo/suspenso e allowlist, com filtros em listagem/chat/histórico.</li><li><strong>25:</strong> Upload/substituição de fonte e UI de fontes oficiais sem conversão manual.</li><li><strong>26:</strong> Fila recuperável SQLite e ingestão assíncrona com worker in-process.</li><li><strong>27:</strong> Integração do pipeline conversão→ingestão dentro do job e limpeza/depreciação das acções manuais.</li></ul><div class="callout">Cada slice terá testes de aceitação antes da implementação, seguindo TDD.</div></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Aprovação</div><h2>Portão antes de fatiar</h2><p class="lead">Se esta arquitectura estiver correcta, o próximo passo é gerar os decks dos slices em <code>docs/specs/slices/</code>, actualizar <code>STATUS.md</code>, e implementar um slice de cada vez com commits separados de spec, testes e código.</p></div></section>
+  </main>
+  <div class="counter"><span id="n">1</span>/<span id="t">13</span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    let index = 0;
+    const render = () => { slides.forEach((s, i) => s.classList.toggle('active', i === index)); document.getElementById('n').textContent = String(index + 1); document.getElementById('t').textContent = String(slides.length); };
+    addEventListener('keydown', (event) => { if (['ArrowRight','PageDown',' '].includes(event.key)) index = Math.min(slides.length - 1, index + 1); if (['ArrowLeft','PageUp'].includes(event.key)) index = Math.max(0, index - 1); render(); });
+    render();
+  </script>
+</body>
+</html>

@@ -74,6 +74,31 @@ Known non-blocking warnings:
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
+| 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `grilled` | — | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
+| 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `planned` | — | Source upload/replacement and source-status refresh without manual conversion UI. |
+| 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `planned` | — | Recoverable SQLite-backed ingestion jobs. |
+| 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
+
+## Slice 24 — Specialist availability and access control
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-admin-source-ingestion-access.html`](../brainstorm-admin-source-ingestion-access.html)
+- [`../admin-source-ingestion-access-architecture.html`](../admin-source-ingestion-access-architecture.html)
+
+Refinement and grill decisions:
+
+- Keep availability/access metadata in `specialist.yaml` so a specialist remains a directory-backed configuration unit.
+- Treat missing `status` as `active` and missing/empty `allowed_emails` as public access for backwards compatibility.
+- Compare allowlisted emails against verified email identities only; phone identities do not grant email-restricted specialist access.
+- Hide inaccessible specialists from public listing and return not-found-style errors from chat/history to avoid revealing restricted specialists.
+- Admin endpoints continue to see all specialists so suspended or restricted specialists can be repaired.
+
+Acceptance tests:
+
+- Pending: write before implementation.
 
 ## Slice 23 — Development-only allowlisted login
 

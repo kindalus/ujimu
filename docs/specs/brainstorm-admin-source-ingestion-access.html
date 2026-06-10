@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ujimu — Brainstorm — Fontes, ingestão e acesso restricto</title>
+  <style>
+    :root { --bg:#050505; --panel:#151515; --text:#f7f6ef; --muted:#b9b7ad; --line:rgba(255,255,255,.16); --yellow:#f9d616; }
+    * { box-sizing: border-box; }
+    body { margin:0; overflow:hidden; font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--text); background:radial-gradient(circle at 10% 10%, rgba(249,214,22,.16), transparent 28%), linear-gradient(135deg, #020202, #111 52%, #050505); }
+    .deck { width:100vw; height:100vh; position:relative; }
+    .slide { position:absolute; inset:0; display:none; align-items:center; justify-content:center; padding:7vh 9vw; }
+    .slide.active { display:flex; }
+    .frame { width:min(1120px, 100%); min-height:min(680px, 78vh); padding:clamp(2rem, 5vw, 4.25rem); border:1px solid var(--line); border-radius:28px; background:linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); box-shadow:0 24px 80px rgba(0,0,0,.45); }
+    .kicker { color:var(--yellow); text-transform:uppercase; letter-spacing:.16em; font-size:.78rem; font-weight:800; margin-bottom:1rem; }
+    h1, h2 { margin:0; max-width:980px; font-family:"Space Grotesk", Inter, system-ui, sans-serif; line-height:.98; letter-spacing:-.045em; }
+    h1 { font-size:clamp(3rem, 7vw, 6.4rem); }
+    h2 { font-size:clamp(2.2rem, 5vw, 4.8rem); }
+    p.lead { max-width:920px; color:var(--muted); font-size:clamp(1.08rem, 2vw, 1.45rem); line-height:1.45; }
+    ul { list-style:none; padding:0; margin:2rem 0 0; display:grid; gap:.85rem; }
+    li { color:#ebe9de; font-size:clamp(1rem, 1.6vw, 1.18rem); line-height:1.42; display:flex; gap:.8rem; }
+    li::before { content:""; width:.55rem; height:.55rem; flex:0 0 .55rem; margin-top:.48rem; border-radius:50%; background:var(--yellow); }
+    .grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+    .card { border:1px solid var(--line); border-radius:18px; padding:1rem; background:rgba(10,10,10,.72); min-height:120px; }
+    .card strong { display:block; color:var(--yellow); margin-bottom:.35rem; }
+    .card span { color:var(--muted); line-height:1.4; }
+    code { color:#fff4a8; background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:7px; padding:.05rem .3rem; }
+    .topbar, .counter { position:fixed; z-index:5; color:rgba(247,246,239,.66); font-size:.85rem; }
+    .topbar { top:1.2rem; left:50%; transform:translateX(-50%); width:min(1120px,82vw); display:flex; justify-content:space-between; }
+    .counter { right:2rem; bottom:1.3rem; }
+    .callout { margin-top:1.5rem; padding:1rem 1.2rem; border-radius:18px; border:1px solid rgba(249,214,22,.35); background:rgba(249,214,22,.13); color:#fff8cf; font-weight:650; line-height:1.45; }
+    @media (max-width:850px) { .grid { grid-template-columns:1fr; } .frame { min-height:82vh; } }
+    @media print { body { overflow:visible; } .slide { display:flex; position:relative; page-break-after:always; } .topbar, .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <div class="topbar"><span>Brainstorm</span><span>Fontes, ingestão e acesso restricto</span></div>
+  <main class="deck">
+    <section class="slide active"><div class="frame"><div class="kicker">Objectivo</div><h1>Administração de fontes sem fricção</h1><p class="lead">Alinhar a gestão de especialistas com o fluxo real: o administrador carrega ficheiros locais, a conversão acontece como parte da ingestão, o trabalho corre em background e o estado é consultado por actualização explícita.</p></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Contexto governante</div><h2>Restrições já presentes</h2><ul><li>Não existe uma wiki de projecto em <code>docs/wiki/</code> neste repositório; por isso, as instruções do repositório e os specs existentes governam esta alteração.</li><li>Especialistas vivem em directórios com <code>specialist.yaml</code>, <code>raw/</code>, <code>wiki/</code> e <code>ingest/state.json</code>.</li><li>Fontes oficiais entram como ficheiros carregados e só podem sustentar respostas depois de ingeridas na wiki.</li><li>O admin actual separa upload, reload, conversão e ingestão, conforme slices anteriores; este pedido altera esse modelo.</li><li>Permissões, dados sensíveis, ficheiros carregados, histórico e quotas continuam a exigir validação server-side.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Direcção recebida</div><h2>Decisões propostas pelo utilizador</h2><ul><li>O upload de fonte deve representar um ficheiro escolhido no computador do utilizador.</li><li>A conversão da fonte deixa de ser acção explícita; acontece automaticamente durante a ingestão.</li><li>Não há “recarregar fontes” global; cada fonte deve poder ser substituída por novo upload.</li><li>Uma fonte substituída fica marcada como substituída para permitir nova ingestão e preservar rastreabilidade.</li><li>A ingestão é sempre assíncrona: o comando inicia trabalho em background e o estado é conhecido por refresh na zona de fontes oficiais.</li><li>Especialistas podem ser suspensos além de apagados.</li><li>Especialistas podem ter lista de emails autorizados; lista vazia significa acesso público.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Decisões fechadas</div><h2>Modelo confirmado</h2><ul><li>Uma fonte substituída fica marcada internamente; a versão antiga não precisa de aparecer como histórico administrativo na UI.</li><li>Um especialista suspenso desaparece da lista pública de especialistas.</li><li>Conversas antigas de um especialista suspenso não podem ser retomadas pelos utilizadores.</li><li>Quando a lista de emails permitidos não está vazia, utilizadores anónimos não vêem esse especialista.</li><li>A ingestão assíncrona deve usar uma fila recuperável, persistida, capaz de sobreviver a restart ou crash.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Como poderemos</div><h2>Simplificar sem perder rastreabilidade?</h2><div class="grid"><div class="card"><strong>Fluxo único</strong><span>Upload cria ou substitui uma fonte; ingestão faz conversão necessária e actualiza a wiki.</span></div><div class="card"><strong>Estado explícito</strong><span>O administrador vê fonte, versão actual, fila, processamento, erro e conclusão após refresh.</span></div><div class="card"><strong>Menos botões</strong><span>Remover conversão manual e reload global reduz passos e evita estados presos por acções incompletas.</span></div><div class="card"><strong>Acesso por especialista</strong><span>Suspensão e allowlist de emails devem bloquear listagem, chat e retoma de histórico de forma server-side.</span></div></div></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Variações a avaliar</div><h2>Três desenhos possíveis</h2><ul><li><strong>Minimalista:</strong> manter armazenamento actual, esconder conversão manual, criar endpoint de job assíncrono e refresh explícito.</li><li><strong>Versionado:</strong> cada fonte tem identidade estável e versões; substituir cria nova versão e conserva histórico de ingestões.</li><li><strong>Operacional:</strong> adicionar fila persistente de jobs com estados, tentativas e erros, preparando retries e observabilidade futura.</li></ul><div class="callout">A opção minimalista parece a mais alinhada com o MVP, salvo se a rastreabilidade legal exigir versionamento forte já nesta fase.</div></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Questões abertas</div><h2>O que ainda precisa de desenho</h2><ul><li>Qual deve ser o contrato exacto da fila recuperável: tabela SQLite própria, estados, tentativas, bloqueios e retomada ao arrancar.</li><li>Como apresentar a substituição de fonte sem mostrar versões antigas, mas preservando auditabilidade suficiente no servidor.</li><li>Como migrar o modelo actual de estados <code>conversion</code>/<code>ingestion</code> para um fluxo em que a conversão é etapa interna da ingestão.</li><li>Como garantir que especialistas suspensos ou restritos ficam bloqueados em listagem, chat, histórico e endpoints server-side.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Fora do âmbito provisório</div><h2>Evitar alargar demais</h2><ul><li>Não alterar o motor de resposta nem a política de citações, salvo o bloqueio por suspensão/acesso.</li><li>Não criar papéis novos além de admin e utilizador autenticado.</li><li>Não implementar pagamentos, grupos organizacionais ou convites nesta alteração.</li><li>Não substituir SQLite nem introduzir ORM.</li><li>Não transformar analytics em fonte de verdade para respostas.</li></ul></div></section>
+    <section class="slide"><div class="frame"><div class="kicker">Registo de iteração</div><h2>Iterações 1–2</h2><ul><li>Iteração 1: o utilizador corrigiu o modelo de administração — upload local, conversão durante ingestão, sem clique explícito de conversão.</li><li>Iteração 1: refresh passa a ser leitura de estado das fontes oficiais, não redetecção global de fontes.</li><li>Iteração 1: substituição de fonte deve ser uma operação própria e rastreável.</li><li>Iteração 1: ingestão assíncrona em background passa a ser requisito central.</li><li>Iteração 1: gestão de especialistas passa a incluir suspensão e acesso restricto por emails.</li><li>Iteração 2: fonte substituída fica marcada só internamente; especialista suspenso desaparece e não permite retomar histórico.</li><li>Iteração 2: allowlist não vazia oculta o especialista de anónimos; ingestão exige fila recuperável.</li></ul></div></section>
+  </main>
+  <div class="counter"><span id="n">1</span>/<span id="t">8</span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    let index = 0;
+    const render = () => { slides.forEach((s, i) => s.classList.toggle('active', i === index)); document.getElementById('n').textContent = String(index + 1); document.getElementById('t').textContent = String(slides.length); };
+    addEventListener('keydown', (event) => { if (['ArrowRight','PageDown',' '].includes(event.key)) index = Math.min(slides.length - 1, index + 1); if (['ArrowLeft','PageUp'].includes(event.key)) index = Math.max(0, index - 1); render(); });
+    render();
+  </script>
+</body>
+</html>
