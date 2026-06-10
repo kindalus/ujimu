@@ -46,14 +46,15 @@ describe('admin specialist management UI acceptance', () => {
     expect(detail).toContain('/api/admin/specialists')
     expect(detail).toContain('/raw')
     expect(detail).toContain('/sources/reload')
-    expect(detail).toContain('/conversion/run')
+    expect(detail).not.toContain('/conversion/run')
     expect(detail).toContain('/ingestion/run')
     expect(detail).toContain('formatIngestionFeedback')
     expect(detail).toContain('Ingestão terminou com erro')
     expect(detail).toContain('Editar especialidade')
     expect(detail).toContain('Carregar fonte')
-    expect(detail).toContain('Recarregar fontes')
-    expect(detail).toContain('Executar conversão')
+    expect(detail).toContain('Actualizar estado')
+    expect(detail).not.toContain('Recarregar fontes')
+    expect(detail).not.toContain('Executar conversão')
     expect(detail).toContain('Executar ingestão')
     expect(detail).toContain('Apagar especialidade')
     expect(detail).toContain('confirmationId')
@@ -95,10 +96,12 @@ describe('admin specialist management UI acceptance', () => {
     expect(ops).not.toContain('UJIMU_BILLING_WEBHOOK_SECRET')
   })
 
-  it('pre-fills the specialist system prompt when creating a specialist', () => {
-    expect(createEmptySpecialistForm().system_prompt).toBe(
-      'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.'
-    )
+  it('pre-fills safe specialist defaults when creating a specialist', () => {
+    expect(createEmptySpecialistForm()).toMatchObject({
+      system_prompt: 'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.',
+      status: 'active',
+      allowed_emails: ''
+    })
   })
 
   it('keeps unauthenticated and non-admin blocking messages on every admin route', async () => {

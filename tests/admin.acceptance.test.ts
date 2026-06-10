@@ -164,14 +164,29 @@ describe('admin specialist management acceptance', () => {
       uploadRequest('http://local/api/admin/specialists/iva/raw', 'codigo-iva.md', '# Código do IVA\n\nArtigo 1.º')
     )
     expect(upload.status).toBe(201)
-    await expect(upload.json()).resolves.toMatchObject({
-      stored: { relativePath: 'codigo-iva.original.md' }
+    const uploadBody = await upload.json() as { stored: { relativePath: string }; replaced: boolean; source: { raw_path: string; status: string } }
+    expect(uploadBody).toMatchObject({
+      stored: { relativePath: 'codigo-iva.original.md' },
+      replaced: false,
+      source: { raw_path: 'codigo-iva.original.md', status: 'pending' }
     })
 
-    const duplicate = await fetchAdmin(
-      uploadRequest('http://local/api/admin/specialists/iva/raw', 'codigo-iva.md', '# Duplicado')
+    const replacement = await fetchAdmin(
+      uploadRequest('http://local/api/admin/specialists/iva/raw', 'codigo-iva.md', '# Código do IVA\n\nArtigo 2.º')
     )
-    expect(duplicate.status).toBe(409)
+    expect(replacement.status).toBe(200)
+    const replacementBody = await replacement.json() as {
+      stored: { relativePath: string }
+      replaced: boolean
+      source: { raw_path: string; status: string; previous_checksum?: string; replaced_at?: string }
+    }
+    expect(replacementBody).toMatchObject({
+      stored: { relativePath: 'codigo-iva.original.md' },
+      replaced: true,
+      source: { raw_path: 'codigo-iva.original.md', status: 'pending' }
+    })
+    expect(replacementBody.source.previous_checksum).toMatch(/^sha256:/)
+    expect(replacementBody.source.replaced_at).toBeTruthy()
 
     const unsafe = await fetchAdmin(
       uploadRequest('http://local/api/admin/specialists/iva/raw', '../escape.md', '# Mau')
@@ -191,7 +206,7 @@ describe('admin specialist management acceptance', () => {
     )
     expect(reloaded.status).toBe(200)
     await expect(reloaded.json()).resolves.toMatchObject({
-      sources: [expect.objectContaining({ raw_path: 'codigo-iva.original.md', status: 'pending' })]
+      sources: [expect.objectContaining({ raw_path: 'codigo-iva.original.md', status: 'pending', article_refs: ['Artigo 2.º'] })]
     })
 
     const disabledIngestion = await fetchAdmin(
@@ -211,11 +226,14 @@ describe('admin specialist management acceptance', () => {
     const audit = await readAuditEvents(dataDir)
     expect(audit.map((event) => event.action)).toEqual([
       'raw_source_uploaded',
+      'raw_source_replaced',
       'sources_reloaded',
       'ingestion_skipped_disabled'
     ])
     expect(audit[0].metadata_json).toContain('codigo-iva.original.md')
     expect(audit[0].metadata_json).not.toContain('Artigo 1.º')
+    expect(audit[1].metadata_json).toContain('codigo-iva.original.md')
+    expect(audit[1].metadata_json).not.toContain('Artigo 2.º')
   })
 
   it('deletes specialists as product deletion while moving the directory to trash and deleting history', async () => {
