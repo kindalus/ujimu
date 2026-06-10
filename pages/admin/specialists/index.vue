@@ -76,7 +76,7 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
       <div>
         <p class="section-label">Administração</p>
         <h1 id="admin-specialists-title">Especialidades</h1>
-        <p>Crie especialistas e abra cada ficha para gerir fontes, conversão e ingestão.</p>
+        <p>Crie especialistas e abra cada ficha para gerir fontes, acesso e ingestão.</p>
       </div>
       <div class="header-actions">
         <UButton to="/admin" color="neutral" variant="ghost">Painel</UButton>
@@ -110,6 +110,14 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
             <div>
               <strong>{{ specialist.name }}</strong>
               <small>{{ specialist.id }} · {{ specialist.wiki_type }}</small>
+              <div class="status-badges">
+                <UBadge :color="specialist.status === 'active' ? 'success' : 'warning'" variant="soft">
+                  {{ specialist.status === 'active' ? 'Activo' : 'Suspenso' }}
+                </UBadge>
+                <UBadge :color="specialist.allowed_emails.length === 0 ? 'neutral' : 'primary'" variant="soft">
+                  {{ specialist.allowed_emails.length === 0 ? 'Público' : 'Restricto' }}
+                </UBadge>
+              </div>
               <p>{{ specialist.description }}</p>
             </div>
             <UButton :to="`/admin/specialists/${specialist.id}`" color="primary" variant="soft" size="sm">
@@ -133,6 +141,13 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
             </select>
           </label>
           <label>Prompt do especialista<UTextarea v-model="createForm.system_prompt" :rows="5" :disabled="pending" /></label>
+          <label>Estado
+            <select v-model="createForm.status" :disabled="pending">
+              <option value="active">Activo</option>
+              <option value="suspended">Suspenso</option>
+            </select>
+          </label>
+          <label>Emails com acesso<UTextarea v-model="createForm.allowed_emails" :rows="4" placeholder="um email por linha; vazio significa público" :disabled="pending" /></label>
           <label class="checkbox-line"><input v-model="createForm.citations_required" type="checkbox" /> Exigir citações</label>
           <label class="checkbox-line"><input v-model="createForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
           <UButton type="submit" color="primary" :loading="pending">Criar especialidade</UButton>
@@ -171,15 +186,22 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
 }
 
 .header-actions,
-.card-heading {
+.card-heading,
+.status-badges {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.header-actions {
+.header-actions,
+.status-badges {
   flex-wrap: wrap;
+}
+
+.status-badges {
+  justify-content: flex-start;
+  margin-top: 8px;
 }
 
 .admin-hero h1,

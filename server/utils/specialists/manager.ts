@@ -4,6 +4,7 @@ import { parse, stringify } from 'yaml'
 import { deleteConversationHistoryForSpecialist } from '../history/delete'
 import { resolveSpecialistPaths, resolveSpecialtiesRoot, type SpecialistPathOptions } from './paths'
 import {
+  type NormalizedSpecialistConfig,
   type SpecialistConfig,
   type SpecialistRuntime,
   assertValidSpecialistId,
@@ -16,8 +17,8 @@ export interface SpecialistManagerOptions extends SpecialistPathOptions {
 }
 
 export type EditSpecialistInput = Partial<Pick<
-  SpecialistConfig,
-  'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled'
+  NormalizedSpecialistConfig,
+  'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled' | 'status' | 'allowed_emails'
 >>
 
 export interface DeleteSpecialistResult {
@@ -107,7 +108,7 @@ export async function deleteSpecialist(
   return { trashPath }
 }
 
-function stringifySpecialistConfig(config: SpecialistConfig): string {
+function stringifySpecialistConfig(config: NormalizedSpecialistConfig): string {
   return stringify(
     {
       id: config.id,
@@ -116,7 +117,9 @@ function stringifySpecialistConfig(config: SpecialistConfig): string {
       wiki_type: config.wiki_type,
       system_prompt: config.system_prompt,
       citations_required: config.citations_required,
-      streaming_enabled: config.streaming_enabled
+      streaming_enabled: config.streaming_enabled,
+      status: config.status,
+      allowed_emails: config.allowed_emails
     },
     { lineWidth: 0 }
   )

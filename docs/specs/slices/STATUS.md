@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 22 admin analytics/ops work:
+Latest full verification after Slice 24 specialist availability/access work:
 
-- `npm test` — passed, 111 tests
+- `npm test` — passed, 125 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -74,14 +74,14 @@ Known non-blocking warnings:
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
-| 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `grilled` | — | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
+| 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `planned` | — | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `planned` | — | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
 
 ## Slice 24 — Specialist availability and access control
 
-Status: `grilled`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -98,7 +98,25 @@ Refinement and grill decisions:
 
 Acceptance tests:
 
-- Pending: write before implementation.
+- Added `tests/specialist-access.acceptance.test.ts` for legacy YAML defaults, admin create/edit of `status` and `allowed_emails`, public filtering, chat blocking, history blocking, and verified-email allowlist behaviour.
+- Confirmed RED before implementation with `npm test -- tests/specialist-access.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added optional `status` and `allowed_emails` to specialist YAML with active/public defaults.
+- Added a central server-side specialist access utility and applied it to public specialist listing, chat, and history get/list endpoints.
+- Exposed status and allowed emails only in admin payloads and UI, not public payloads.
+- Updated admin create/edit pages and endpoints to manage suspension and one-email-per-line allowlists.
+
+Verification:
+
+- `npm test -- tests/specialist-access.acceptance.test.ts --reporter=verbose` — passed.
+- `npm test -- tests/admin.acceptance.test.ts tests/chat.acceptance.test.ts tests/history.acceptance.test.ts --reporter=verbose` — passed.
+- `npm test -- tests/admin-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 125 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 23 — Development-only allowlisted login
 

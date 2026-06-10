@@ -5,9 +5,9 @@ import { toAdminSpecialistPayload } from '../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../utils/db'
 import { editSpecialist, SpecialistOperationError, type EditSpecialistInput } from '../../../utils/specialists/manager'
 import { getSpecialistById } from '../../../utils/specialists/registry'
-import { SpecialistConfigError } from '../../../utils/specialists/schema'
+import { SpecialistConfigError, normalizeAllowedEmails } from '../../../utils/specialists/schema'
 
-const mutableFields = ['name', 'description', 'system_prompt', 'citations_required', 'streaming_enabled'] as const
+const mutableFields = ['name', 'description', 'system_prompt', 'citations_required', 'streaming_enabled', 'status', 'allowed_emails'] as const
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
@@ -84,6 +84,19 @@ function parseEditInput(body: unknown): EditSpecialistInput {
         throw createError({ statusCode: 400, statusMessage: `Invalid field ${field}` })
       }
       input[field] = value
+      continue
+    }
+
+    if (field === 'status') {
+      if (value !== 'active' && value !== 'suspended') {
+        throw createError({ statusCode: 400, statusMessage: `Invalid field ${field}` })
+      }
+      input.status = value
+      continue
+    }
+
+    if (field === 'allowed_emails') {
+      input.allowed_emails = normalizeAllowedEmails(value)
       continue
     }
 

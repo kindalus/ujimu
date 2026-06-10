@@ -1,4 +1,5 @@
 import { loadSpecialistsFromDisk, type LoadSpecialistsOptions, type SpecialistRegistrySnapshot } from './loader'
+import { filterAccessibleSpecialists, type SpecialistAccessSubject } from './access'
 import { type PublicSpecialist, type SpecialistRuntime, toPublicSpecialist } from './schema'
 
 let registrySnapshot: SpecialistRegistrySnapshot | undefined
@@ -32,10 +33,11 @@ export async function getSpecialistById(
 }
 
 export async function getPublicSpecialists(
-  options: LoadSpecialistsOptions = {}
+  options: LoadSpecialistsOptions & { accessSubject?: SpecialistAccessSubject } = {}
 ): Promise<PublicSpecialist[]> {
   const snapshot = await getSpecialistRegistry(options)
-  return snapshot.specialists.map(toPublicSpecialist)
+  const subject = options.accessSubject ?? { type: 'anonymous' }
+  return filterAccessibleSpecialists(snapshot.specialists, subject).map(toPublicSpecialist)
 }
 
 export function resetSpecialistRegistryForTests(): void {

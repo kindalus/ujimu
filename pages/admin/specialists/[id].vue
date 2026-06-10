@@ -12,7 +12,9 @@ const editForm = ref({
   description: '',
   system_prompt: '',
   citations_required: true,
-  streaming_enabled: true
+  streaming_enabled: true,
+  status: 'active' as 'active' | 'suspended',
+  allowed_emails: ''
 })
 const uploadFile = ref<File | undefined>()
 const confirmationId = ref('')
@@ -63,7 +65,9 @@ function syncEditForm(): void {
     description: specialist.value.description,
     system_prompt: specialist.value.system_prompt,
     citations_required: specialist.value.citations_required,
-    streaming_enabled: specialist.value.streaming_enabled
+    streaming_enabled: specialist.value.streaming_enabled,
+    status: specialist.value.status,
+    allowed_emails: specialist.value.allowed_emails.join('\n')
   }
 }
 
@@ -211,7 +215,7 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
       <div>
         <p class="section-label">Administração</p>
         <h1 id="admin-specialist-title">Ficha da especialidade</h1>
-        <p>Edite metadados, carregue fontes e acompanhe o pipeline desta especialidade.</p>
+        <p>Edite metadados, acesso, fontes e acompanhe o pipeline desta especialidade.</p>
       </div>
       <div class="header-actions">
         <UButton to="/admin/specialists" color="neutral" variant="ghost">Especialidades</UButton>
@@ -246,13 +250,28 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
             <p class="section-label">{{ specialist.id }}</p>
             <h2>Editar especialidade</h2>
           </div>
-          <UBadge color="neutral" variant="soft">{{ specialist.wiki_type }}</UBadge>
+          <div class="status-badges">
+            <UBadge color="neutral" variant="soft">{{ specialist.wiki_type }}</UBadge>
+            <UBadge :color="specialist.status === 'active' ? 'success' : 'warning'" variant="soft">
+              {{ specialist.status === 'active' ? 'Activo' : 'Suspenso' }}
+            </UBadge>
+            <UBadge :color="specialist.allowed_emails.length === 0 ? 'neutral' : 'primary'" variant="soft">
+              {{ specialist.allowed_emails.length === 0 ? 'Público' : 'Restricto' }}
+            </UBadge>
+          </div>
         </div>
 
         <form class="admin-form" @submit.prevent="updateSpecialist">
           <label>Nome<UInput v-model="editForm.name" :disabled="pending" /></label>
           <label>Descrição<UTextarea v-model="editForm.description" :rows="2" :disabled="pending" /></label>
           <label>Prompt do especialista<UTextarea v-model="editForm.system_prompt" :rows="5" :disabled="pending" /></label>
+          <label>Estado
+            <select v-model="editForm.status" :disabled="pending">
+              <option value="active">Activo</option>
+              <option value="suspended">Suspenso</option>
+            </select>
+          </label>
+          <label>Emails com acesso<UTextarea v-model="editForm.allowed_emails" :rows="4" placeholder="um email por linha; vazio significa público" :disabled="pending" /></label>
           <label class="checkbox-line"><input v-model="editForm.citations_required" type="checkbox" /> Exigir citações</label>
           <label class="checkbox-line"><input v-model="editForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
           <UButton type="submit" color="primary" :loading="pending">Guardar alterações</UButton>
@@ -354,7 +373,8 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
 .header-actions,
 .card-heading,
 .tool-actions,
-.source-main-line {
+.source-main-line,
+.status-badges {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -362,8 +382,13 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
 }
 
 .header-actions,
-.tool-actions {
+.tool-actions,
+.status-badges {
   flex-wrap: wrap;
+}
+
+.status-badges {
+  justify-content: flex-end;
 }
 
 .admin-hero h1,

@@ -59,6 +59,8 @@ function parseSpecialistConfig(body: unknown): SpecialistConfig {
     wiki_type: record.wiki_type,
     system_prompt: record.system_prompt,
     citations_required: record.citations_required,
-    streaming_enabled: record.streaming_enabled
+    streaming_enabled: record.streaming_enabled,
+    status: record.status,
+    allowed_emails: record.allowed_emails
   } as SpecialistConfig
 }

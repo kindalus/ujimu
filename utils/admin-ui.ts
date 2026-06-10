@@ -35,6 +35,8 @@ export interface AdminSpecialist {
   system_prompt: string
   citations_required: boolean
   streaming_enabled: boolean
+  status: 'active' | 'suspended'
+  allowed_emails: string[]
   sources: IngestionSource[]
 }
 
@@ -126,7 +128,9 @@ export function createEmptySpecialistForm() {
     wiki_type: 'legislation-regulatory',
     system_prompt: DEFAULT_SPECIALIST_SYSTEM_PROMPT,
     citations_required: true,
-    streaming_enabled: true
+    streaming_enabled: true,
+    status: 'active' as const,
+    allowed_emails: ''
   }
 }
 

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { SpecialistPathOptions } from '../specialists/paths'
 import type { SpecialistRuntime } from '../specialists/schema'
+import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../specialists/access'
 import { getSpecialistById } from '../specialists/registry'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowed } from '../quota/usage'
@@ -76,6 +77,14 @@ export async function createChatEventStream(
   const specialist = await getSpecialistById(specialistId, options)
 
   if (!specialist) {
+    throw specialistNotFound(specialistId)
+  }
+
+  const accessDatabase = options.history?.database ?? options.quota?.database
+  const accessUserId = resolveHistoryUserId(options.history)
+    ?? (options.quota?.subject.type === 'anonymous' ? undefined : options.quota?.subject.id)
+  const accessSubject = resolveSpecialistAccessSubjectFromUser(accessDatabase, accessUserId)
+  if (!canUseSpecialist(specialist, accessSubject)) {
     throw specialistNotFound(specialistId)
   }
 

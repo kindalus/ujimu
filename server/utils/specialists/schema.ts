@@ -9,7 +9,10 @@ export const LLM_WIKI_PRESETS = [
   'custom-domain'
 ] as const
 
+export const SPECIALIST_STATUSES = ['active', 'suspended'] as const
+
 export type LlmWikiPreset = (typeof LLM_WIKI_PRESETS)[number]
+export type SpecialistStatus = (typeof SPECIALIST_STATUSES)[number]
 
 export interface SpecialistConfig {
   id: string
@@ -19,9 +22,16 @@ export interface SpecialistConfig {
   system_prompt: string
   citations_required: boolean
   streaming_enabled: boolean
+  status?: SpecialistStatus
+  allowed_emails?: string[]
 }
 
-export interface SpecialistRuntime extends SpecialistConfig {
+export interface NormalizedSpecialistConfig extends SpecialistConfig {
+  status: SpecialistStatus
+  allowed_emails: string[]
+}
+
+export interface SpecialistRuntime extends NormalizedSpecialistConfig {
   paths: {
     root: string
     config: string
@@ -33,7 +43,7 @@ export interface SpecialistRuntime extends SpecialistConfig {
 }
 
 export type PublicSpecialist = Pick<
-  SpecialistConfig,
+  NormalizedSpecialistConfig,
   'id' | 'name' | 'description' | 'wiki_type' | 'citations_required' | 'streaming_enabled'
 >
 
@@ -44,6 +54,7 @@ export interface SpecialistLoadError {
     | 'INVALID_YAML'
     | 'INVALID_CONFIG'
     | 'INVALID_WIKI_TYPE'
+    | 'INVALID_STATUS'
     | 'ID_DIRECTORY_MISMATCH'
     | 'MISSING_REQUIRED_DIRECTORY'
   specialistId: string
@@ -52,6 +63,7 @@ export interface SpecialistLoadError {
 }
 
 export const SPECIALIST_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function assertValidSpecialistId(id: string): void {
   if (!SPECIALIST_ID_PATTERN.test(id)) {
@@ -62,7 +74,7 @@ export function assertValidSpecialistId(id: string): void {
   }
 }
 
-export function validateSpecialistConfig(input: unknown, directoryId: string): SpecialistConfig {
+export function validateSpecialistConfig(input: unknown, directoryId: string): NormalizedSpecialistConfig {
   if (!isRecord(input)) {
     throw new SpecialistConfigError('INVALID_CONFIG', 'Specialist config must be a YAML mapping.')
   }
@@ -92,11 +104,13 @@ export function validateSpecialistConfig(input: unknown, directoryId: string): S
     wiki_type: wikiType,
     system_prompt: readString(input, 'system_prompt'),
     citations_required: readBoolean(input, 'citations_required'),
-    streaming_enabled: readBoolean(input, 'streaming_enabled')
+    streaming_enabled: readBoolean(input, 'streaming_enabled'),
+    status: readOptionalStatus(input.status),
+    allowed_emails: normalizeAllowedEmails(input.allowed_emails)
   }
 }
 
-export function toPublicSpecialist(specialist: SpecialistRuntime | SpecialistConfig): PublicSpecialist {
+export function toPublicSpecialist(specialist: SpecialistRuntime | NormalizedSpecialistConfig): PublicSpecialist {
   return {
     id: specialist.id,
     name: specialist.name,
@@ -107,6 +121,46 @@ export function toPublicSpecialist(specialist: SpecialistRuntime | SpecialistCon
   }
 }
 
+export function normalizeAllowedEmails(value: unknown): string[] {
+  if (value === undefined || value === null) {
+    return []
+  }
+
+  const entries = typeof value === 'string'
+    ? value.split('\n')
+    : Array.isArray(value)
+      ? value
+      : undefined
+
+  if (!entries) {
+    throw new SpecialistConfigError('INVALID_CONFIG', 'allowed_emails must be a list of emails.')
+  }
+
+  const seen = new Set<string>()
+  const emails: string[] = []
+  for (const entry of entries) {
+    if (typeof entry !== 'string') {
+      throw new SpecialistConfigError('INVALID_CONFIG', 'allowed_emails must contain only strings.')
+    }
+
+    const normalized = normalizeEmail(entry)
+    if (!normalized) continue
+    if (!EMAIL_PATTERN.test(normalized)) {
+      throw new SpecialistConfigError('INVALID_CONFIG', `Invalid email in allowed_emails: "${entry}".`)
+    }
+    if (!seen.has(normalized)) {
+      seen.add(normalized)
+      emails.push(normalized)
+    }
+  }
+
+  return emails
+}
+
+export function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
 export class SpecialistConfigError extends Error {
   constructor(
     public readonly code: SpecialistLoadError['code'],
@@ -115,6 +169,18 @@ export class SpecialistConfigError extends Error {
     super(message)
     this.name = 'SpecialistConfigError'
   }
+}
+
+function readOptionalStatus(value: unknown): SpecialistStatus {
+  if (value === undefined || value === null) {
+    return 'active'
+  }
+
+  if (value !== 'active' && value !== 'suspended') {
+    throw new SpecialistConfigError('INVALID_STATUS', 'Specialist status must be active or suspended.')
+  }
+
+  return value
 }
 
 function isLlmWikiPreset(value: string): value is LlmWikiPreset {

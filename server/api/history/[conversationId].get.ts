@@ -2,6 +2,8 @@ import { createError, defineEventHandler, getRouterParam } from 'h3'
 import { readSessionFromEvent } from '../../utils/auth/session'
 import { initializeDatabase } from '../../utils/db'
 import { getConversation } from '../../utils/history/repository'
+import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../../utils/specialists/access'
+import { getSpecialistById } from '../../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
   const session = readSessionFromEvent(event)
@@ -19,6 +21,11 @@ export default defineEventHandler(async (event) => {
     })
 
     if (!conversation) {
+      throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
+    }
+
+    const specialist = await getSpecialistById(conversation.specialistId)
+    if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
       throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
     }
 
