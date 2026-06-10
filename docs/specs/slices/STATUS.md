@@ -73,11 +73,11 @@ Known non-blocking warnings:
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
-| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `grilled` | — | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
+| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `acceptance-tested` | — | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 
 ## Slice 23 — Development-only allowlisted login
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -93,9 +93,15 @@ Refinement and grill decisions:
 - Dev sessions must not be marked as OTP sessions and must not satisfy recent-OTP checks for passkey registration.
 - The browser may learn whether dev auth is enabled, but never receives the allowlisted contacts.
 
+Acceptance tests:
+
+- Added `tests/dev-auth.acceptance.test.ts` for dev-login success, phone normalization, admin allowlist interaction, non-allowlisted rejection, disabled mode, and production blocking.
+- Added `tests/dev-auth-ui.acceptance.test.ts` for the shared auth modal dev-login surface.
+- Ran `npm test -- tests/dev-auth.acceptance.test.ts tests/dev-auth-ui.acceptance.test.ts --reporter=verbose`; it failed red because the endpoint and UI do not yet exist.
+
 Next verification target:
 
-- Add red acceptance tests for dev-login success, admin allowlist interaction, production blocking, non-allowlisted rejection, and UI exposure.
+- Implement the dev-login service, endpoints, modal UI, and environment documentation.
 
 ## UI redesign planned slices
 
