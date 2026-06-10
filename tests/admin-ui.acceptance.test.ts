@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
+import { createEmptySpecialistForm } from '../utils/admin-ui'
 
 const adminDashboardPath = 'pages/admin/index.vue'
 const adminSpecialistsPath = 'pages/admin/specialists/index.vue'
@@ -90,6 +91,12 @@ describe('admin specialist management UI acceptance', () => {
     expect(ops).toContain('<UBadge')
     expect(ops).not.toContain('UJIMU_SESSION_SECRET')
     expect(ops).not.toContain('UJIMU_BILLING_WEBHOOK_SECRET')
+  })
+
+  it('pre-fills the specialist system prompt when creating a specialist', () => {
+    expect(createEmptySpecialistForm().system_prompt).toBe(
+      'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.'
+    )
   })
 
   it('keeps unauthenticated and non-admin blocking messages on every admin route', async () => {

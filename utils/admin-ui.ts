@@ -103,13 +103,15 @@ export interface ApiErrorPayload {
 
 export type AdminBadgeColor = 'primary' | 'neutral' | 'success' | 'warning' | 'error'
 
+export const DEFAULT_SPECIALIST_SYSTEM_PROMPT = 'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.'
+
 export function createEmptySpecialistForm() {
   return {
     id: '',
     name: '',
     description: '',
     wiki_type: 'legislation-regulatory',
-    system_prompt: '',
+    system_prompt: DEFAULT_SPECIALIST_SYSTEM_PROMPT,
     citations_required: true,
     streaming_enabled: true
   }
