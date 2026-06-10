@@ -73,11 +73,11 @@ Known non-blocking warnings:
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
-| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `acceptance-tested` | — | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
+| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 
 ## Slice 23 — Development-only allowlisted login
 
-Status: `acceptance-tested`
+Status: `implemented`
 
 Originating brainstorm and architecture:
 
@@ -99,9 +99,20 @@ Acceptance tests:
 - Added `tests/dev-auth-ui.acceptance.test.ts` for the shared auth modal dev-login surface.
 - Ran `npm test -- tests/dev-auth.acceptance.test.ts tests/dev-auth-ui.acceptance.test.ts --reporter=verbose`; it failed red because the endpoint and UI do not yet exist.
 
-Next verification target:
+Implementation:
 
-- Implement the dev-login service, endpoints, modal UI, and environment documentation.
+- Added `server/utils/auth/dev-login.ts` plus `GET`/`POST` `/api/auth/dev-login` endpoints.
+- Added the shared `AuthModal.vue` development login panel, visible only when the dev-login status endpoint is enabled.
+- Documented `UJIMU_DEV_AUTH_ENABLED` and `UJIMU_DEV_USER_CONTACTS` in `.env.sample`.
+- Ran `npm audit fix` to resolve critical audit findings in development dependencies, updating `package-lock.json`.
+
+Verification:
+
+- `npm test` — 31 files, 117 tests.
+- `npm run typecheck`.
+- `npm run build`.
+- `npm audit --audit-level=high` — 0 vulnerabilities.
+- Browser DevTools QA with `UJIMU_DEV_AUTH_ENABLED=true` and `UJIMU_DEV_USER_CONTACTS=dev@example.test`: modal displayed the dev-login panel, dev contact authenticated, drawer showed the authenticated contact, admin navigation appeared only because the same contact was in `UJIMU_ADMIN_CONTACTS`, and `/admin` loaded successfully.
 
 ## UI redesign planned slices
 

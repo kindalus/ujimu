@@ -19,6 +19,10 @@ interface PasskeyAuthenticationOptionsResponse {
   options: Record<string, unknown>
 }
 
+interface DevAuthStatusResponse {
+  enabled: boolean
+}
+
 const props = defineProps<{
   open: boolean
   authSession: AuthSessionResponse
@@ -41,9 +45,12 @@ const authPending = ref(false)
 const passkeysSupported = ref(false)
 const passkeyPending = ref(false)
 const passkeyError = ref('')
+const devAuthAvailable = ref(false)
+const devAuthPending = ref(false)
 
 onMounted(() => {
   void detectPasskeySupport()
+  void loadDevAuthStatus()
 })
 
 const modalOpen = computed({
@@ -60,6 +67,17 @@ async function detectPasskeySupport(): Promise<void> {
     passkeysSupported.value = browserSupportsWebAuthn()
   } catch {
     passkeysSupported.value = false
+  }
+}
+
+async function loadDevAuthStatus(): Promise<void> {
+  try {
+    const response = await fetch('/api/auth/dev-login')
+    if (!response.ok) return
+    const payload = (await response.json()) as DevAuthStatusResponse
+    devAuthAvailable.value = payload.enabled
+  } catch {
+    devAuthAvailable.value = false
   }
 }
 
@@ -117,6 +135,39 @@ async function verifyOtpCode(): Promise<void> {
     authError.value = 'Não foi possível verificar o código. Tente novamente.'
   } finally {
     authPending.value = false
+  }
+}
+
+async function signInWithDevContact(): Promise<void> {
+  if (!authContact.value.trim()) {
+    authError.value = 'Indique o contacto autorizado para desenvolvimento.'
+    return
+  }
+
+  devAuthPending.value = true
+  authError.value = ''
+  authMessage.value = ''
+
+  try {
+    const response = await fetch('/api/auth/dev-login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ channel: authChannel.value, contact: authContact.value })
+    })
+
+    if (!response.ok) {
+      authError.value = response.status === 403
+        ? 'Contacto não autorizado para modo de desenvolvimento.'
+        : 'O modo de desenvolvimento não está disponível.'
+      return
+    }
+
+    emit('authenticated', (await response.json()) as AuthSessionResponse)
+    resetAndClose()
+  } catch {
+    authError.value = 'Não foi possível entrar em modo de desenvolvimento.'
+  } finally {
+    devAuthPending.value = false
   }
 }
 
@@ -241,6 +292,22 @@ function resetAndClose(): void {
           <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
           <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
 
+          <div v-if="devAuthAvailable" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
+            <p><strong>Modo de desenvolvimento</strong></p>
+            <p>Activo apenas em desenvolvimento com UJIMU_DEV_AUTH_ENABLED.</p>
+            <UButton
+              type="button"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              :loading="devAuthPending"
+              :disabled="authPending || devAuthPending"
+              @click="signInWithDevContact"
+            >
+              Entrar em modo desenvolvimento
+            </UButton>
+          </div>
+
           <UButton type="submit" color="primary" size="sm" :loading="authPending">
             {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
           </UButton>
@@ -264,6 +331,26 @@ function resetAndClose(): void {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.dev-auth-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(249, 214, 22, 0.24);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(249, 214, 22, 0.08);
+}
+
+.dev-auth-panel p {
+  margin: 0;
+  color: var(--ujimu-muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.dev-auth-panel strong {
+  color: #fff8cc;
 }
 
 .auth-channel {
