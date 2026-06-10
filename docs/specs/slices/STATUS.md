@@ -75,9 +75,30 @@ Known non-blocking warnings:
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
-| 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `planned` | — | Source upload/replacement and source-status refresh without manual conversion UI. |
+| 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `grilled` | — | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `planned` | — | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
+
+## Slice 25 — Source upload, replacement, and refresh
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-admin-source-ingestion-access.html`](../brainstorm-admin-source-ingestion-access.html)
+- [`../admin-source-ingestion-access-architecture.html`](../admin-source-ingestion-access-architecture.html)
+
+Refinement and grill decisions:
+
+- Treat the normalized upload filename as the logical source identity.
+- A second upload with the same logical name replaces the source instead of returning a duplicate conflict.
+- Replacement is marked internally with previous checksum and replacement timestamp; old versions are not listed in the UI.
+- Upload/replacement immediately refreshes the source state so the administrator sees pending status without a separate redetect action.
+- The detail UI uses “Actualizar estado” and no longer exposes “Recarregar fontes” or “Executar conversão”.
+
+Acceptance tests:
+
+- Pending: write before implementation.
 
 ## Slice 24 — Specialist availability and access control
 
