@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ujimu — Login de desenvolvimento</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Source+Sans+3:wght@400;600;700&display=swap");
+
+      :root {
+        --bg: #050505;
+        --panel: rgba(255, 255, 255, 0.075);
+        --line: rgba(255, 255, 255, 0.14);
+        --text: #f7f4e8;
+        --muted: #b9b7ad;
+        --accent: #f9d616;
+        --danger: #d21034;
+        --font-display: "Inter", sans-serif;
+        --font-body: "Source Sans 3", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; width: 100%; height: 100%; }
+      body {
+        overflow: hidden;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 16% 12%, rgba(249, 214, 22, 0.16), transparent 30%),
+          radial-gradient(circle at 82% 74%, rgba(210, 16, 52, 0.12), transparent 34%),
+          linear-gradient(135deg, #050505 0%, #121212 52%, #050505 100%);
+        font-family: var(--font-body);
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 8vh 12vw;
+      }
+      .slide.active { display: flex; animation: enter 220ms ease-out; }
+      @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      .card {
+        width: min(1040px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 32px;
+        padding: clamp(28px, 5vw, 64px);
+        background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.03));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(18px);
+      }
+      h1, h2 { margin: 0; font-family: var(--font-display); letter-spacing: -0.055em; line-height: 0.98; }
+      h1 { max-width: 900px; font-size: clamp(3rem, 8vw, 7rem); }
+      h2 { margin-bottom: 24px; font-size: clamp(2.2rem, 5vw, 4.5rem); }
+      p { margin: 0; color: var(--muted); font-size: clamp(1.05rem, 1.7vw, 1.35rem); line-height: 1.5; }
+      ul { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+      li {
+        border: 1px solid rgba(255,255,255,0.11);
+        border-radius: 18px;
+        padding: 14px 16px;
+        color: #eee9d8;
+        background: rgba(0,0,0,0.2);
+        font-size: clamp(1rem, 1.4vw, 1.18rem);
+        line-height: 1.4;
+      }
+      code {
+        border: 1px solid rgba(249,214,22,0.24);
+        border-radius: 10px;
+        padding: 2px 7px;
+        color: #fff8cc;
+        background: rgba(249,214,22,0.1);
+      }
+      .eyebrow { margin-bottom: 14px; color: var(--accent); font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .callout { border-color: rgba(249,214,22,0.28); background: rgba(249,214,22,0.1); }
+      .danger { border-color: rgba(210,16,52,0.35); background: rgba(210,16,52,0.12); }
+      .counter { position: fixed; right: 30px; bottom: 24px; color: var(--muted); font-size: 0.9rem; }
+      .topbar { position: fixed; top: 24px; left: 30px; right: 30px; display: flex; justify-content: space-between; color: var(--muted); font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .slide { padding: 8vh 6vw; } }
+      @media print { body { overflow: visible; } .slide { position: relative; display: flex; page-break-after: always; } .counter, .topbar { display: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><span>Ujimu</span><span>Brainstorm Zafir — login dev</span></div>
+
+    <section class="slide active">
+      <div class="card">
+        <p class="eyebrow">Objectivo</p>
+        <h1>Login de desenvolvimento sem OTP</h1>
+        <p class="mt-6">Permitir testes locais rápidos de utilizadores e administradores, sem enfraquecer a autenticação em produção.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Valor</p>
+        <h2>Porque existe</h2>
+        <ul>
+          <li>Acelera testes de chat, ingestão, conversão e administração.</li>
+          <li>Evita depender de entrega real de OTP durante desenvolvimento.</li>
+          <li>Mantém a regra: administração continua separada por <code>UJIMU_ADMIN_CONTACTS</code>.</li>
+          <li>Não substitui OTP, passkeys nem políticas de produção.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Contrato proposto</p>
+        <h2>Variáveis de ambiente</h2>
+        <div class="grid">
+          <ul>
+            <li><code>UJIMU_DEV_AUTH_ENABLED=true</code> activa o modo dev.</li>
+            <li><code>UJIMU_DEV_USER_CONTACTS</code> lista contactos permitidos, separados por vírgulas.</li>
+          </ul>
+          <ul>
+            <li><code>UJIMU_ADMIN_CONTACTS</code> continua a definir quem é admin.</li>
+            <li>O modo dev é recusado quando <code>NODE_ENV=production</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Fluxo</p>
+        <h2>Como funciona</h2>
+        <ul>
+          <li>O utilizador escolhe a acção “Entrar em modo desenvolvimento”.</li>
+          <li>Submete um contacto por email ou telemóvel.</li>
+          <li>Se o contacto estiver na allowlist dev, o backend cria/actualiza utilizador e identidade verificada.</li>
+          <li>O backend emite a cookie de sessão normal e devolve a sessão pública.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Segurança</p>
+        <h2>Guardas obrigatórias</h2>
+        <ul>
+          <li class="danger">Nunca funciona em produção, mesmo com variáveis definidas.</li>
+          <li>Não lista contactos permitidos no browser.</li>
+          <li>Não conta como OTP recente, para não autorizar criação de passkeys.</li>
+          <li>Usa normalização igual à administração: email em minúsculas; telefone sem espaços.</li>
+          <li>Regista sessão com método <code>unknown</code> ou equivalente não-OTP.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">API</p>
+        <h2>Endpoint mínimo</h2>
+        <ul>
+          <li><code>POST /api/auth/dev-login</code></li>
+          <li>Body: <code>{ channel: "email" | "phone", contact: string }</code></li>
+          <li>Sucesso: resposta de sessão igual ao login normal.</li>
+          <li>Erros: contacto inválido, modo não activo, contacto não autorizado, produção bloqueada.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">UI</p>
+        <h2>Superfície no modal</h2>
+        <ul>
+          <li>Adicionar bloco discreto no <code>AuthModal.vue</code>.</li>
+          <li>Só mostrar quando endpoint/flag indicar modo dev activo.</li>
+          <li>Texto claro: “Modo de desenvolvimento”.</li>
+          <li>Não mostrar em produção nem quando a flag estiver desligada.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Testes</p>
+        <h2>Aceitação</h2>
+        <ul>
+          <li>Permite login dev para contacto allowlisted em desenvolvimento.</li>
+          <li>Cria identidade verificada e permite admin quando também estiver em <code>UJIMU_ADMIN_CONTACTS</code>.</li>
+          <li>Rejeita contacto fora da allowlist.</li>
+          <li>Rejeita sempre em produção.</li>
+          <li>Não produz sessão OTP recente para passkeys.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Exclusões</p>
+        <h2>Fora de âmbito</h2>
+        <ul>
+          <li>Sem login dev em produção.</li>
+          <li>Sem bypass para billing, quotas ou permissões admin.</li>
+          <li>Sem entrega real de email/SMS.</li>
+          <li>Sem criar passwords ou contas permanentes especiais.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="card">
+        <p class="eyebrow">Próximo passo</p>
+        <h2>Aprovação necessária</h2>
+        <p>Se aprovar esta deck por caminho, a implementação segue com testes primeiro, endpoint dev, modal de login e verificação completa.</p>
+        <p class="mt-6 callout p-4 rounded-lg">Caminho: <code>docs/specs/brainstorm-dev-auth-login.html</code></p>
+      </div>
+    </section>
+
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = [...document.querySelectorAll('.slide')]
+      let index = 0
+      document.getElementById('total').textContent = slides.length
+      function go(next) {
+        slides[index].classList.remove('active')
+        index = Math.max(0, Math.min(slides.length - 1, next))
+        slides[index].classList.add('active')
+        document.getElementById('current').textContent = String(index + 1)
+      }
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1) }
+        if (event.key === 'ArrowLeft') go(index - 1)
+      })
+    </script>
+  </body>
+</html>

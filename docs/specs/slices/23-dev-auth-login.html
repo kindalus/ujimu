@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 23 — Login dev</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap");
+      :root { --bg:#050505; --text:#f7f4e8; --muted:#b9b7ad; --accent:#f9d616; --line:rgba(255,255,255,.14); --panel:rgba(255,255,255,.075); }
+      *{box-sizing:border-box}body{margin:0;overflow:hidden;background:radial-gradient(circle at 20% 10%,rgba(249,214,22,.16),transparent 30%),linear-gradient(135deg,#050505,#141414);color:var(--text);font-family:"Source Sans 3",sans-serif}.slide{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:8vh 12vw}.slide.active{display:flex}.card{width:min(1040px,100%);border:1px solid var(--line);border-radius:32px;padding:clamp(28px,5vw,64px);background:linear-gradient(180deg,var(--panel),rgba(255,255,255,.03));box-shadow:0 28px 90px rgba(0,0,0,.42)}h1,h2{font-family:Inter,sans-serif;letter-spacing:-.055em;line-height:.98;margin:0}h1{font-size:clamp(3rem,8vw,7rem)}h2{font-size:clamp(2.2rem,5vw,4.5rem);margin-bottom:24px}p,li{font-size:clamp(1.05rem,1.55vw,1.25rem);line-height:1.45;color:var(--muted)}ul{display:grid;gap:12px;list-style:none;padding:0;margin:0}li{border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:14px 16px;background:rgba(0,0,0,.2);color:#eee9d8}.eyebrow{color:var(--accent);font-weight:900;letter-spacing:.16em;text-transform:uppercase}code{color:#fff8cc}.counter,.topbar{position:fixed;color:var(--muted);font-size:.85rem}.counter{right:30px;bottom:24px}.topbar{top:24px;left:30px;right:30px;display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.12em}@media print{body{overflow:visible}.slide{position:relative;display:flex;page-break-after:always}.counter,.topbar{display:none}}
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><span>Slice 23</span><span>Login dev — refinado e grelhado</span></div>
+    <section class="slide active"><div class="card"><p class="eyebrow">Ideia</p><h1>Entrar sem OTP em dev</h1><p>Adicionar uma superfície segura para autenticação local por contactos permitidos.</p></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Origem</p><h2>Decks aprovadas</h2><ul><li><code>docs/specs/brainstorm-dev-auth-login.html</code></li><li><code>docs/specs/dev-auth-login-architecture.html</code></li></ul></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Âmbito</p><h2>Incluído</h2><ul><li>Variáveis <code>UJIMU_DEV_AUTH_ENABLED</code> e <code>UJIMU_DEV_USER_CONTACTS</code>.</li><li>Endpoint dev-only para estado e login.</li><li>Criação/reutilização de utilizador e identidade verificada.</li><li>Botão dev no modal de login.</li><li>Testes de segurança para produção e passkeys.</li></ul></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Decisões grelhadas</p><h2>Guardas finais</h2><ul><li>O modo dev nunca funciona em <code>NODE_ENV=production</code>.</li><li>A allowlist não é enviada para o browser.</li><li>Admin continua a depender de <code>UJIMU_ADMIN_CONTACTS</code>.</li><li>Sessão dev não é OTP recente e não desbloqueia passkeys.</li></ul></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Zonas prováveis</p><h2>Implementação</h2><ul><li><code>server/utils/auth/dev-login.ts</code></li><li><code>server/api/auth/dev-login.get.ts</code> e <code>.post.ts</code></li><li><code>components/AuthModal.vue</code></li><li><code>.env.sample</code></li><li>Testes de auth e UI.</li></ul></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Sucesso</p><h2>Condições</h2><ul><li>Contacto allowlisted entra sem OTP em dev.</li><li>Contacto admin allowlisted ganha acesso admin se também estiver em <code>UJIMU_ADMIN_CONTACTS</code>.</li><li>Contacto não allowlisted é recusado.</li><li>Produção bloqueia o endpoint.</li><li>Suite, typecheck, build e audit passam.</li></ul></div></section>
+    <section class="slide"><div class="card"><p class="eyebrow">Exclusões</p><h2>Não fazer</h2><ul><li>Não alterar quotas, billing, chat, ingestion ou permissões admin.</li><li>Não adicionar passwords.</li><li>Não enviar OTPs falsos ao UI.</li><li>Não criar fluxo de produção sem OTP/passkey.</li></ul></div></section>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div><script>const slides=[...document.querySelectorAll('.slide')];let index=0;total.textContent=slides.length;function go(n){slides[index].classList.remove('active');index=Math.max(0,Math.min(slides.length-1,n));slides[index].classList.add('active');current.textContent=index+1}document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(index+1)}if(e.key==='ArrowLeft')go(index-1)})</script>
+  </body>
+</html>

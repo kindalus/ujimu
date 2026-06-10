@@ -73,6 +73,29 @@ Known non-blocking warnings:
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
+| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `grilled` | — | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
+
+## Slice 23 — Development-only allowlisted login
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-dev-auth-login.html`](../brainstorm-dev-auth-login.html)
+- [`../dev-auth-login-architecture.html`](../dev-auth-login-architecture.html)
+
+Refinement and grill decisions:
+
+- Add explicit `UJIMU_DEV_AUTH_ENABLED=true` plus comma-separated `UJIMU_DEV_USER_CONTACTS`; do not infer enablement from a non-empty contacts list alone.
+- Reject the dev-login POST path whenever `NODE_ENV=production`, even when all dev variables are present.
+- Keep admin authorization unchanged: dev-login only authenticates a user; `UJIMU_ADMIN_CONTACTS` still decides admin access.
+- Reuse the existing `users`, `user_identities`, and `ujimu_session` cookie model; do not add passwords, roles, tables, or production credentials.
+- Dev sessions must not be marked as OTP sessions and must not satisfy recent-OTP checks for passkey registration.
+- The browser may learn whether dev auth is enabled, but never receives the allowlisted contacts.
+
+Next verification target:
+
+- Add red acceptance tests for dev-login success, admin allowlist interaction, production blocking, non-allowlisted rejection, and UI exposure.
 
 ## UI redesign planned slices
 
