@@ -2,17 +2,15 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 describe('passkey UI acceptance', () => {
-  it('exposes passkey sign-in and account-security management entry points', async () => {
-    const mainPage = await readFile('pages/index.vue', 'utf8')
+  it('exposes passkey sign-in while keeping the prototype drawer free of non-prototype links', async () => {
     const drawer = await readFile('components/AppDrawer.vue', 'utf8')
     const authModal = await readFile('components/AuthModal.vue', 'utf8')
-    const shellSources = `${mainPage}\n${drawer}\n${authModal}`
 
-    expect(shellSources).toContain('Entrar com passkey')
-    expect(shellSources).toContain('Segurança da conta')
-    expect(shellSources).toContain('/account/security')
-    expect(shellSources).toContain('/api/auth/passkeys/authentication/options')
-    expect(shellSources).toContain('/api/auth/passkeys/authentication/verify')
+    expect(authModal).toContain('Entrar com passkey')
+    expect(authModal).toContain('/api/auth/passkeys/authentication/options')
+    expect(authModal).toContain('/api/auth/passkeys/authentication/verify')
+    expect(drawer).not.toContain('Segurança da conta')
+    expect(drawer).not.toContain('/account/security')
   })
 
   it('provides a dedicated account-security page for adding, listing, and removing passkeys', async () => {

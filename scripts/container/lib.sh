@@ -79,7 +79,7 @@ create_container() {
     --network "$UJIMU_NETWORK" \
     --env-file "$ENV_FILE" \
     -p "${HOST_PORT}:${CONTAINER_PORT}" \
-    -v "${UJIMU_HOST_PI_DIR}:/home/ujimu/.pi:Z" \
+    -v "${UJIMU_HOST_PI_DIR}:/home/ujimu/.config/ujimu:Z" \
     -v "${UJIMU_HOST_DATA_DIR}:/home/ujimu/.local/share/ujimu:Z" \
     "$UJIMU_IMAGE"
 }

@@ -55,7 +55,10 @@ onMounted(() => {
 
 const modalOpen = computed({
   get: () => props.open,
-  set: (value: boolean) => emit('update:open', value)
+  set: (value: boolean) => {
+    emit('update:open', value)
+    if (!value) resetAuthState()
+  }
 })
 const passkeySignInAvailable = computed(
   () => passkeysSupported.value && Boolean(props.authSession.passkeys?.passkeysEnabled && props.authSession.passkeys.passkeysConfigured)
@@ -216,8 +219,29 @@ async function signInWithPasskey(): Promise<void> {
   }
 }
 
-function resetAndClose(): void {
-  modalOpen.value = false
+function handleOtpInput(index: number, event: Event): void {
+  const input = event.target instanceof HTMLInputElement ? event.target : null
+  if (!input) return
+  const digit = input.value.replace(/\D/g, '').slice(-1)
+  const digits = authCode.value.padEnd(6, ' ').split('')
+  digits[index] = digit || ' '
+  authCode.value = digits.join('').replace(/\s/g, '')
+  input.value = digit
+  if (digit && index < 5) {
+    const next = input.parentElement?.querySelectorAll<HTMLInputElement>('.otp-cell')[index + 1]
+    next?.focus()
+  }
+}
+
+function handleOtpKeydown(index: number, event: KeyboardEvent): void {
+  if (event.key !== 'Backspace') return
+  const input = event.target instanceof HTMLInputElement ? event.target : null
+  if (!input || input.value || index === 0) return
+  const previous = input.parentElement?.querySelectorAll<HTMLInputElement>('.otp-cell')[index - 1]
+  previous?.focus()
+}
+
+function resetAuthState(): void {
   authStep.value = 'request'
   authContact.value = ''
   authCode.value = ''
@@ -225,156 +249,87 @@ function resetAndClose(): void {
   authError.value = ''
   passkeyError.value = ''
 }
+
+function resetAndClose(): void {
+  resetAuthState()
+  emit('update:open', false)
+}
 </script>
 
 <template>
-  <UModal
-    v-model:open="modalOpen"
-    title="Entrar"
-    description="Receba um código por email ou telemóvel para continuar."
-    class="auth-modal"
-  >
-    <template #body>
-      <div class="auth-entry">
-        <div class="auth-actions">
-          <UButton
-            v-if="passkeySignInAvailable"
-            type="button"
-            color="neutral"
-            variant="soft"
-            size="sm"
-            :disabled="!passkeysSupported"
-            :loading="passkeyPending"
-            @click="signInWithPasskey"
-          >
-            Entrar com passkey
-          </UButton>
+  <UModal v-model:open="modalOpen" :close="false" class="auth-modal" :ui="{ content: 'modal auth-modal-content' }">
+    <template #content>
+      <div class="modal-head">
+        <button v-if="authStep === 'verify'" class="iconbtn" type="button" aria-label="Voltar" @click="authStep = 'request'"><UjimuIcon name="chevLeft" /></button>
+        <span v-else />
+        <button class="iconbtn" type="button" aria-label="Fechar" @click="resetAndClose"><UjimuIcon name="close" /></button>
+      </div>
+
+      <form v-if="authStep === 'request'" class="auth-form" @submit.prevent="requestOtpCode">
+        <h2 id="auth-title" class="modal-title">Entrar na Ujimu</h2>
+        <p class="modal-sub">Sem palavra-passe — enviamos-lhe um código de utilização única.</p>
+
+        <div v-if="passkeySignInAvailable" class="auth-actions">
+          <button class="btn btn--ghost btn--block" type="button" :disabled="!passkeysSupported || passkeyPending" @click="signInWithPasskey">
+            {{ passkeyPending ? 'A confirmar…' : 'Entrar com passkey' }}
+          </button>
         </div>
         <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
 
-        <form class="auth-form" @submit.prevent="authStep === 'request' ? requestOtpCode() : verifyOtpCode()">
-          <div class="auth-channel" role="group" aria-label="Canal de autenticação">
-            <UButton
-              type="button"
-              size="xs"
-              :color="authChannel === 'email' ? 'primary' : 'neutral'"
-              :variant="authChannel === 'email' ? 'soft' : 'ghost'"
-              @click="authChannel = 'email'"
-            >
-              Email
-            </UButton>
-            <UButton
-              type="button"
-              size="xs"
-              :color="authChannel === 'phone' ? 'primary' : 'neutral'"
-              :variant="authChannel === 'phone' ? 'soft' : 'ghost'"
-              @click="authChannel = 'phone'"
-            >
-              Telemóvel
-            </UButton>
-          </div>
+        <div class="seg" role="group" aria-label="Canal de autenticação">
+          <button class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'email' }" type="button" @click="authChannel = 'email'"><UjimuIcon name="mail" /> Email</button>
+          <button class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'phone' }" type="button" @click="authChannel = 'phone'"><UjimuIcon name="phone" /> Telemóvel</button>
+        </div>
 
-          <label class="auth-field" for="auth-contact">
-            <span>{{ authChannel === 'email' ? 'Email' : 'Telemóvel' }}</span>
-            <UInput
-              id="auth-contact"
-              v-model="authContact"
-              :placeholder="authChannel === 'email' ? 'nome@exemplo.com' : '+244923000000'"
-              :disabled="authPending || authStep === 'verify'"
-            />
-          </label>
+        <input id="auth-contact" v-model="authContact" class="field" :type="authChannel === 'email' ? 'email' : 'tel'" :placeholder="authChannel === 'email' ? 'o.seu@email.com' : '+244 9XX XXX XXX'" :disabled="authPending" />
 
-          <label v-if="authStep === 'verify'" class="auth-field" for="auth-code">
-            <span>Código</span>
-            <UInput id="auth-code" v-model="authCode" placeholder="123456" :disabled="authPending" />
-          </label>
+        <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
+        <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
 
-          <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
-          <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+        <div v-if="devAuthAvailable && authContact.trim()" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
+          <p><strong>Modo de desenvolvimento</strong></p>
+          <p>Activo apenas em desenvolvimento com UJIMU_DEV_AUTH_ENABLED.</p>
+          <button class="btn btn--ghost btn--block" type="button" :disabled="authPending || devAuthPending" @click="signInWithDevContact">
+            {{ devAuthPending ? 'A entrar…' : 'Entrar em modo desenvolvimento' }}
+          </button>
+        </div>
 
-          <div v-if="devAuthAvailable" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
-            <p><strong>Modo de desenvolvimento</strong></p>
-            <p>Activo apenas em desenvolvimento com UJIMU_DEV_AUTH_ENABLED.</p>
-            <UButton
-              type="button"
-              color="neutral"
-              variant="soft"
-              size="sm"
-              :loading="devAuthPending"
-              :disabled="authPending || devAuthPending"
-              @click="signInWithDevContact"
-            >
-              Entrar em modo desenvolvimento
-            </UButton>
-          </div>
+        <button class="btn btn--primary btn--block" type="submit" :disabled="authPending">{{ authPending ? 'A enviar…' : 'Enviar código' }}</button>
+      </form>
 
-          <UButton type="submit" color="primary" size="sm" :loading="authPending">
-            {{ authStep === 'request' ? 'Enviar código' : 'Verificar código' }}
-          </UButton>
-        </form>
-      </div>
+      <form v-else class="auth-form" @submit.prevent="verifyOtpCode">
+        <h2 id="auth-title" class="modal-title">Introduza o código</h2>
+        <p class="modal-sub">Enviámos um código de 6 dígitos para <strong>{{ authContact }}</strong>.</p>
+        <div class="otp-row">
+          <input
+            v-for="index in 6"
+            :key="index"
+            class="otp-cell"
+            inputmode="numeric"
+            maxlength="1"
+            :value="authCode[index - 1] || ''"
+            :disabled="authPending"
+            :autofocus="index === 1"
+            @input="handleOtpInput(index - 1, $event)"
+            @keydown="handleOtpKeydown(index - 1, $event)"
+          />
+        </div>
+        <p class="modal-hint">Introduza o código recebido para continuar.</p>
+        <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
+        <button class="btn btn--primary btn--block" type="submit" :disabled="authPending">{{ authPending ? 'A verificar…' : 'Verificar código' }}</button>
+      </form>
     </template>
   </UModal>
 </template>
 
 <style scoped>
-.auth-entry,
-.auth-channel,
-.auth-form,
-.auth-field {
-  display: grid;
-  gap: 10px;
-}
-
-.auth-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.dev-auth-panel {
-  display: grid;
-  gap: 8px;
-  border: 1px solid rgba(249, 214, 22, 0.24);
-  border-radius: 16px;
-  padding: 10px;
-  background: rgba(249, 214, 22, 0.08);
-}
-
-.dev-auth-panel p {
-  margin: 0;
-  color: var(--ujimu-muted);
-  font-size: 0.85rem;
-  line-height: 1.35;
-}
-
-.dev-auth-panel strong {
-  color: #fff8cc;
-}
-
-.auth-channel {
-  grid-template-columns: repeat(2, max-content);
-}
-
-.auth-field {
-  color: var(--ujimu-muted);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.auth-message,
-.auth-error {
-  margin: 0;
-  line-height: 1.4;
-  font-size: 0.9rem;
-}
-
-.auth-message {
-  color: #fff8cc;
-}
-
-.auth-error {
-  color: #ffd3d3;
-}
+.auth-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 18px 0; align-items: stretch; }
+.auth-actions, .auth-field { display: grid; gap: 8px; }
+.auth-field span { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+.dev-auth-panel { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 10px; background: var(--yellow-soft); }
+.dev-auth-panel p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.dev-auth-panel strong { color: var(--ink); }
+.auth-message, .auth-error { margin: 0; line-height: 1.4; font-size: 13px; }
+.auth-message { color: var(--ink); }
+.auth-error { color: var(--danger); }
 </style>

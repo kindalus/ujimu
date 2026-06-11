@@ -14,7 +14,7 @@ import { readAdminApiError } from '../../utils/admin-ui'
 const session = ref<AdminSessionResponse>({ authenticated: false, admin: false })
 const sessionPending = ref(true)
 const specialists = ref<AdminSpecialist[]>([])
-const selectedSpecialistId = ref('')
+const selectedSpecialistId = ref('all')
 const monthlyVisitors = ref<MonthlyVisitorsResponse | undefined>()
 const analyticsCandidates = ref<ContentGapCandidate[]>([])
 const recentQuestions = ref<RecentQuestionAnalytics[]>([])
@@ -28,6 +28,12 @@ const currentMonth = new Date().toISOString().slice(0, 7)
 const selectedSpecialist = computed(() =>
   specialists.value.find((specialist) => specialist.id === selectedSpecialistId.value)
 )
+const noContextRecentCount = computed(() => recentQuestions.value.filter((question) => question.outcome === 'insufficient_context').length)
+const unreviewedGapCount = computed(() => analyticsCandidates.value.filter((candidate) => !candidate.reviewedAt).length)
+const visitorBars = computed(() => {
+  const value = monthlyVisitors.value?.distinctVisitors ?? 0
+  return [{ label: monthlyVisitors.value?.month ?? currentMonth, value, height: value > 0 ? 120 : 12 }]
+})
 
 onMounted(() => {
   void loadAdminSession()
@@ -42,7 +48,7 @@ async function loadAdminSession(): Promise<void> {
       : { authenticated: false, admin: false }
     if (session.value.admin) {
       await loadSpecialists()
-      await loadMonthlyVisitors()
+      await Promise.all([loadMonthlyVisitors(), loadQuestionAnalytics()])
     }
   } catch {
     session.value = { authenticated: false, admin: false }
@@ -54,12 +60,8 @@ async function loadAdminSession(): Promise<void> {
 async function loadSpecialists(): Promise<void> {
   const response = await fetch('/api/admin/specialists')
   if (!response.ok) throw new Error('Failed to load specialists.')
-
   const payload = (await response.json()) as AdminSpecialistsResponse
   specialists.value = payload.specialists
-  if (!selectedSpecialistId.value && specialists.value.length > 0) {
-    selectSpecialist(specialists.value[0]!.id)
-  }
 }
 
 function selectSpecialist(specialistId: string): void {
@@ -78,7 +80,7 @@ async function loadMonthlyVisitors(): Promise<void> {
 }
 
 async function loadQuestionAnalytics(): Promise<void> {
-  if (!selectedSpecialistId.value) {
+  if (specialists.value.length === 0) {
     analyticsCandidates.value = []
     recentQuestions.value = []
     return
@@ -87,13 +89,25 @@ async function loadQuestionAnalytics(): Promise<void> {
   analyticsPending.value = true
   analyticsError.value = ''
   try {
-    const response = await fetch(`/api/admin/analytics/questions?specialistId=${encodeURIComponent(selectedSpecialistId.value)}`)
-    if (!response.ok) throw new Error('Failed to load analytics.')
-    const payload = (await response.json()) as QuestionAnalyticsResponse
-    analyticsCandidates.value = payload.candidates
-    recentQuestions.value = payload.recentQuestions
+    const ids = selectedSpecialistId.value === 'all'
+      ? specialists.value.map((specialist) => specialist.id)
+      : [selectedSpecialistId.value]
+    const results = await Promise.all(ids.map(async (specialistId) => {
+      const response = await fetch(`/api/admin/analytics/questions?specialistId=${encodeURIComponent(specialistId)}`)
+      if (!response.ok) throw new Error('Failed to load analytics.')
+      return (await response.json()) as QuestionAnalyticsResponse
+    }))
+    analyticsCandidates.value = results
+      .flatMap((result) => result.candidates)
+      .sort((left, right) => right.countLast30Days - left.countLast30Days)
+    recentQuestions.value = results
+      .flatMap((result) => result.recentQuestions)
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+      .slice(0, 12)
   } catch {
     analyticsError.value = 'Não foi possível carregar as lacunas de conteúdo.'
+    analyticsCandidates.value = []
+    recentQuestions.value = []
   } finally {
     analyticsPending.value = false
   }
@@ -124,249 +138,113 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
     pending.value = false
   }
 }
+
+function specialistName(specialistId: string): string {
+  return specialists.value.find((specialist) => specialist.id === specialistId)?.name || specialistId
+}
+
+function questionWhen(value: string): string {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('pt-PT', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+}
 </script>
 
 <template>
-  <main class="admin-shell" aria-labelledby="analytics-title">
-    <header class="admin-hero">
+  <main class="adm-page" aria-labelledby="analytics-title" data-screen-label="Admin — Analytics">
+    <div class="adm-pagehead">
       <div>
-        <p class="section-label">Administração</p>
-        <h1 id="analytics-title">Analytics</h1>
-        <p>Use estes sinais para orientar revisão editorial; nunca como fonte de respostas do chat.</p>
+        <h1 id="analytics-title" class="adm-title">Analytics</h1>
+        <p class="adm-sub">Sinais de produto e conteúdo, para revisão editorial. <strong>Não são usados como fonte de respostas do chat.</strong></p>
       </div>
-      <div class="header-actions">
-        <UButton to="/admin" color="neutral" variant="ghost">Painel</UButton>
-        <UButton to="/admin/specialists" color="neutral" variant="ghost">Especialidades</UButton>
+      <select v-if="session.admin" class="field adm-filter" :value="selectedSpecialistId" :disabled="analyticsPending" @change="selectSpecialist(($event.target as HTMLSelectElement).value)">
+        <option value="all">Todas as especialidades</option>
+        <option v-for="specialist in specialists" :key="specialist.id" :value="specialist.id">{{ specialist.name }}</option>
+      </select>
+    </div>
+
+    <section v-if="sessionPending" class="adm-card">
+      <p class="adm-sub">A verificar permissões...</p>
+    </section>
+
+    <section v-else-if="!session.authenticated" class="adm-card adm-gate" role="alert">
+      <span class="adm-gate-icon"><UjimuIcon name="user" /></span>
+      <h2 class="adm-title">Tem de iniciar sessão para aceder à administração.</h2>
+      <p class="adm-sub">Volte à página principal e entre com o código de acesso.</p>
+    </section>
+
+    <section v-else-if="!session.admin" class="adm-card adm-gate" role="alert">
+      <span class="adm-gate-icon"><UjimuIcon name="user" /></span>
+      <h2 class="adm-title">Não tem permissões de administração.</h2>
+      <p class="adm-sub">Esta área está reservada a contactos autorizados.</p>
+    </section>
+
+    <template v-else>
+      <div class="adm-statrow">
+        <div class="adm-card adm-statcard">
+          <span class="adm-stat-big">{{ monthlyVisitors?.distinctVisitors?.toLocaleString('pt-PT') ?? '—' }}</span>
+          <span class="adm-stat-label">Visitantes distintos este mês</span>
+        </div>
+        <div class="adm-card adm-statcard">
+          <span class="adm-stat-big">{{ noContextRecentCount }}</span>
+          <span class="adm-stat-label">Perguntas recentes sem contexto suficiente</span>
+        </div>
+        <div class="adm-card adm-statcard">
+          <span class="adm-stat-big">{{ unreviewedGapCount }}</span>
+          <span class="adm-stat-label">Lacunas por rever</span>
+        </div>
       </div>
-    </header>
 
-    <section v-if="sessionPending" class="admin-card">
-      <p>A verificar permissões...</p>
-    </section>
-
-    <section v-else-if="!session.authenticated" class="admin-card" role="alert">
-      <h2>Tem de iniciar sessão para aceder à administração.</h2>
-      <p>Volte à página principal e entre com o código de acesso.</p>
-    </section>
-
-    <section v-else-if="!session.admin" class="admin-card" role="alert">
-      <h2>Não tem permissões de administração.</h2>
-      <p>Esta área está reservada a contactos autorizados.</p>
-    </section>
-
-    <section v-else class="analytics-grid">
-      <section class="admin-card visitors-card" aria-labelledby="visitors-title">
-        <div class="card-heading">
-          <div>
-            <p class="section-label">Visitantes</p>
-            <h2 id="visitors-title">Visitantes este mês</h2>
+      <div class="adm-card">
+        <h2 class="adm-card-title">Visitantes distintos por mês</h2>
+        <div class="chart">
+          <div v-for="bar in visitorBars" :key="bar.label" class="chart-col">
+            <span class="chart-val">{{ bar.value.toLocaleString('pt-PT') }}</span>
+            <div class="chart-bar chart-bar--now" :style="{ height: `${bar.height}px` }" />
+            <span class="chart-lbl">{{ bar.label }}</span>
           </div>
-          <UBadge color="primary" variant="soft">
-            {{ monthlyVisitors?.distinctVisitors ?? '—' }}
-          </UBadge>
         </div>
-        <p class="muted">Visitantes distintos em {{ monthlyVisitors?.month ?? currentMonth }}.</p>
-      </section>
+        <p class="adm-foot-note">{{ currentMonth }} em curso.</p>
+      </div>
 
-      <section class="admin-card specialist-card" aria-labelledby="specialist-filter-title">
-        <h2 id="specialist-filter-title">Especialidade analisada</h2>
-        <p v-if="specialists.length === 0" class="muted">Ainda não há especialidades para analisar.</p>
-        <div v-else class="specialist-switcher" aria-label="Especialidades para análise">
-          <UButton
-            v-for="specialist in specialists"
-            :key="specialist.id"
-            type="button"
-            size="sm"
-            :color="specialist.id === selectedSpecialistId ? 'primary' : 'neutral'"
-            :variant="specialist.id === selectedSpecialistId ? 'soft' : 'ghost'"
-            @click="selectSpecialist(specialist.id)"
-          >
-            {{ specialist.name }}
-          </UButton>
-        </div>
-      </section>
+      <p v-if="analyticsPending" class="adm-card adm-sub">A carregar analytics...</p>
+      <p v-else-if="analyticsError" class="adm-src-error" role="alert">{{ analyticsError }}</p>
 
-      <section class="admin-card gaps-card" aria-labelledby="gaps-title">
-        <div class="card-heading">
-          <div>
-            <p class="section-label">Editorial</p>
-            <h2 id="gaps-title">Lacunas de conteúdo</h2>
-          </div>
-          <UButton type="button" color="neutral" variant="soft" size="sm" :loading="analyticsPending" @click="loadQuestionAnalytics">
-            Actualizar
-          </UButton>
-        </div>
-
-        <p v-if="!selectedSpecialist" class="muted">Seleccione uma especialidade para ver lacunas.</p>
-        <p v-else-if="analyticsPending" class="muted">A carregar lacunas de conteúdo...</p>
-        <p v-else-if="analyticsError" class="admin-error" role="alert">{{ analyticsError }}</p>
-        <p v-else-if="analyticsCandidates.length === 0" class="muted">Sem lacunas repetidas por rever.</p>
-        <ol v-else class="analytics-list">
-          <li v-for="candidate in analyticsCandidates" :key="candidate.fingerprint">
-            <div>
-              <strong>{{ candidate.latestQuestion }}</strong>
-              <small>
-                {{ candidate.countLast30Days }} ocorrências em 30 dias ·
-                {{ candidate.insufficientContextCount }} sem contexto suficiente
-              </small>
+      <div class="adm-twocol">
+        <div class="adm-card">
+          <h2 class="adm-card-title">Perguntas recentes</h2>
+          <div class="adm-feed">
+            <div v-for="question in recentQuestions" :key="question.id" class="adm-feed-row">
+              <span class="adm-feed-q">
+                {{ question.questionText }}
+                <span v-if="question.outcome === 'insufficient_context'" class="nocontext-tag nocontext-tag--inline">sem contexto</span>
+              </span>
+              <span class="adm-feed-meta">{{ specialistName(question.specialistId) }} · {{ questionWhen(question.occurredAt) }}</span>
             </div>
-            <UButton type="button" color="primary" variant="soft" size="sm" :loading="pending" @click="reviewCandidate(candidate)">
-              Marcar como revista
-            </UButton>
-          </li>
-        </ol>
-      </section>
+            <p v-if="recentQuestions.length === 0" class="adm-sub">Sem perguntas recentes nesta especialidade.</p>
+          </div>
+        </div>
 
-      <section class="admin-card recent-questions" aria-labelledby="recent-questions-title">
-        <h2 id="recent-questions-title">Perguntas recentes</h2>
-        <p v-if="recentQuestions.length === 0" class="muted">Sem perguntas registadas.</p>
-        <ol v-else>
-          <li v-for="item in recentQuestions" :key="item.id">
-            <span>{{ item.questionText }}</span>
-            <small>{{ item.outcome === 'insufficient_context' ? 'Sem contexto suficiente' : 'Respondida' }}</small>
-          </li>
-        </ol>
-      </section>
-    </section>
+        <div class="adm-card">
+          <h2 class="adm-card-title">Lacunas de conteúdo repetidas</h2>
+          <p class="adm-card-note">Perguntas sem contexto suficiente, agrupadas por tema.</p>
+          <div class="adm-feed">
+            <div v-for="candidate in analyticsCandidates" :key="candidate.fingerprint" class="adm-feed-row adm-gap" :class="{ 'adm-gap--done': candidate.reviewedAt }">
+              <div class="adm-gap-main">
+                <span class="adm-feed-q">{{ candidate.latestQuestion }}</span>
+                <span class="adm-feed-meta">{{ specialistName(candidate.specialistId) }} · {{ candidate.countLast30Days }}× em 30 dias</span>
+              </div>
+              <button class="btn btn--ghost btn--xs" :class="{ 'btn--off': Boolean(candidate.reviewedAt) }" type="button" :disabled="pending || Boolean(candidate.reviewedAt)" @click="reviewCandidate(candidate)">
+                <template v-if="candidate.reviewedAt"><UjimuIcon name="check" /> Revista</template>
+                <template v-else>Marcar como revista</template>
+              </button>
+            </div>
+            <p v-if="analyticsCandidates.length === 0" class="adm-sub">Sem lacunas registadas nesta especialidade.</p>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <p v-if="feedback" class="feedback">{{ feedback }}</p>
     <p v-if="errorMessage" class="admin-error" role="alert">{{ errorMessage }}</p>
   </main>
 </template>
-
-<style scoped>
-.admin-shell {
-  width: min(1180px, calc(100% - 32px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 32px 0;
-}
-
-.admin-hero,
-.admin-card {
-  border: 1px solid var(--ujimu-line);
-  border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-}
-
-.admin-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: clamp(24px, 4vw, 42px);
-}
-
-.header-actions,
-.card-heading,
-.specialist-switcher {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.header-actions,
-.specialist-switcher {
-  flex-wrap: wrap;
-}
-
-.admin-hero h1,
-.admin-card h2 {
-  margin: 0;
-  letter-spacing: -0.045em;
-}
-
-.section-label {
-  margin: 0 0 10px;
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-hero p:not(.section-label),
-.muted,
-.analytics-list small,
-.recent-questions small {
-  color: var(--ujimu-muted);
-}
-
-.analytics-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 0.7fr) minmax(280px, 1fr);
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.admin-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 22px;
-}
-
-.gaps-card,
-.recent-questions {
-  grid-column: 1 / -1;
-}
-
-.analytics-list,
-.recent-questions ol {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.analytics-list li,
-.recent-questions li {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.analytics-list li {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.recent-questions li {
-  display: grid;
-  gap: 4px;
-}
-
-.feedback,
-.admin-error {
-  margin: 18px 0 0;
-  border-radius: 18px;
-  padding: 12px 14px;
-  background: rgba(249, 214, 22, 0.1);
-}
-
-.feedback {
-  color: #fff8cc;
-  font-weight: 800;
-}
-
-.admin-error {
-  color: #ffd3d3;
-  font-weight: 800;
-}
-
-@media (max-width: 900px) {
-  .admin-hero,
-  .analytics-grid,
-  .analytics-list li {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-}
-</style>

@@ -12,14 +12,21 @@ export interface IngestionSource {
   status: 'pending' | 'processing' | 'ingested' | 'failed' | 'blocked'
   title: string
   article_refs: string[]
+  updated_at?: string
+  detected_at?: string
+  ingested_at?: string
   conversion?: {
     status: 'not_required' | 'pending' | 'processing' | 'converted' | 'failed'
     markdown_path: string
+    updated_at?: string
+    ingested_at?: string
     error_message?: string
   }
   ingestion?: {
     status: 'blocked' | 'pending' | 'processing' | 'ingested' | 'failed'
     source_path: string
+    updated_at?: string
+    ingested_at?: string
     skipped_reason?: string
     error_message?: string
   }

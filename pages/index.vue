@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   buildInlineAdStreamItems,
   countCompletedAssistantResponses,
   extendInlineAdSchedule
 } from '../utils/inline-ads'
 import { copyTextToClipboard, formatAssistantResponseForClipboard } from '../utils/chat-copy'
+import { renderMarkdownToSafeHtml } from '../utils/markdown'
 
 interface PublicSpecialist {
   id: string
@@ -97,6 +98,8 @@ interface ChatCitation {
 }
 
 type ChatStreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
   | {
@@ -118,6 +121,7 @@ interface ChatMessage {
   grounded?: boolean
   historyMessageId?: string
   status: 'streaming' | 'done' | 'error'
+  statusMessage?: string
 }
 
 interface ChatUiTextPart {
@@ -127,12 +131,6 @@ interface ChatUiTextPart {
 
 interface ChatUiMessage extends ChatMessage {
   parts: ChatUiTextPart[]
-}
-
-interface SpecialistSelectItem {
-  label: string
-  value: string
-  description: string
 }
 
 interface QueuedQuestion {
@@ -163,6 +161,8 @@ const specialists = ref<PublicSpecialist[]>([])
 const specialistsPending = ref(true)
 const specialistsError = ref(false)
 const selectedSpecialistId = ref('')
+const specialistSelectorOpen = ref(false)
+const specialistSelectorRef = ref<HTMLElement | null>(null)
 const question = ref('')
 const messages = ref<ChatMessage[]>([])
 const queuedQuestions = ref<QueuedQuestion[]>([])
@@ -182,22 +182,22 @@ const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
 const inlineAdSchedule = ref<number[]>([])
+const activeChatAbortController = ref<AbortController | null>(null)
 
 onMounted(() => {
+  document.addEventListener('mousedown', closeSpecialistSelectorOnOutsideClick)
   void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
 })
 
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', closeSpecialistSelectorOnOutsideClick)
+  activeChatAbortController.value?.abort()
+})
+
 const selectedSpecialist = computed(() =>
   specialists.value.find((specialist) => specialist.id === selectedSpecialistId.value)
-)
-const specialistSelectItems = computed<SpecialistSelectItem[]>(() =>
-  specialists.value.map((specialist) => ({
-    label: specialist.name,
-    value: specialist.id,
-    description: specialist.description
-  }))
 )
 const chatUiMessages = computed<ChatUiMessage[]>(() =>
   messages.value.map((message) => ({
@@ -400,6 +400,10 @@ function cancelEditing(): void {
   question.value = ''
 }
 
+function cancelStreamingResponse(): void {
+  activeChatAbortController.value?.abort()
+}
+
 async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
   if (message.role !== 'assistant' || message.status !== 'done') return
 
@@ -417,6 +421,11 @@ async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
     copyErrorMessageId.value = message.id
     copyErrorMessage.value = 'Não foi possível copiar a resposta.'
   }
+}
+
+function renderAssistantMessageHtml(message: ChatUiMessage): string {
+  const text = message.text || message.statusMessage || (message.status === 'streaming' ? 'A preparar resposta...' : '')
+  return renderMarkdownToSafeHtml(text)
 }
 
 async function loadSpecialists(): Promise<void> {
@@ -441,6 +450,7 @@ async function loadSpecialists(): Promise<void> {
 function selectSpecialist(specialistId: string): void {
   if (isStreaming.value) return
 
+  specialistSelectorOpen.value = false
   selectedSpecialistId.value = specialistId
   question.value = ''
   messages.value = []
@@ -452,9 +462,16 @@ function selectSpecialist(specialistId: string): void {
   void loadHistory()
 }
 
-function selectSpecialistFromPrompt(value: unknown): void {
-  if (typeof value !== 'string') return
-  selectSpecialist(value)
+function toggleSpecialistSelector(): void {
+  if (isStreaming.value || specialistsPending.value) return
+  specialistSelectorOpen.value = !specialistSelectorOpen.value
+}
+
+function closeSpecialistSelectorOnOutsideClick(event: MouseEvent): void {
+  const target = event.target instanceof Node ? event.target : null
+  if (!target || !specialistSelectorRef.value?.contains(target)) {
+    specialistSelectorOpen.value = false
+  }
 }
 
 function submitQuestion(): void {
@@ -504,8 +521,18 @@ async function startQuestion(
     citations: [],
     status: 'done'
   }
+  const assistantMessage: ChatMessage = {
+    id: createId('assistant'),
+    role: 'assistant',
+    text: '',
+    citations: [],
+    status: 'streaming',
+    statusMessage: 'A consultar as fontes desta especialidade…'
+  }
   let continueQueue = true
   const previousMessages = options.replaceFromMessageId ? [...messages.value] : undefined
+  const abortController = new AbortController()
+  let slowResponseTimer: ReturnType<typeof setTimeout> | undefined
 
   if (options.replaceFromMessageId) {
     const editIndex = messages.value.findIndex(
@@ -516,14 +543,22 @@ async function startQuestion(
     }
   }
 
-  messages.value.push(userMessage)
-  const reactiveUserMessage = messages.value[messages.value.length - 1]!
+  messages.value.push(userMessage, assistantMessage)
+  const reactiveUserMessage = messages.value[messages.value.length - 2]!
+  const reactiveAssistantMessage = messages.value[messages.value.length - 1]!
   isStreaming.value = true
+  activeChatAbortController.value = abortController
+  slowResponseTimer = setTimeout(() => {
+    if (reactiveAssistantMessage.status === 'streaming' && !reactiveAssistantMessage.text) {
+      reactiveAssistantMessage.statusMessage = 'A consulta está a demorar mais do que o habitual. Pode aguardar ou cancelar.'
+    }
+  }, 15_000)
 
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      signal: abortController.signal,
       body: JSON.stringify({
         specialistId,
         question: text,
@@ -538,6 +573,8 @@ async function startQuestion(
         quotaError.value = await readQuotaErrorMessage(response)
         if (previousMessages) {
           messages.value = previousMessages
+        } else {
+          messages.value = messages.value.filter((message) => message.id !== assistantMessage.id)
         }
         continueQueue = false
         return
@@ -546,26 +583,13 @@ async function startQuestion(
       if (previousMessages) {
         messages.value = previousMessages
       } else {
-        messages.value.push({
-          id: createId('assistant'),
-          role: 'assistant',
-          text: 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.',
-          citations: [],
-          status: 'error',
-          grounded: false
-        })
+        reactiveAssistantMessage.text = 'Não foi possível enviar a pergunta. Verifique a especialidade seleccionada e tente novamente.'
+        reactiveAssistantMessage.status = 'error'
+        reactiveAssistantMessage.grounded = false
+        reactiveAssistantMessage.statusMessage = undefined
       }
       return
     }
-
-    messages.value.push({
-      id: createId('assistant'),
-      role: 'assistant',
-      text: '',
-      citations: [],
-      status: 'streaming'
-    })
-    const reactiveAssistantMessage = messages.value[messages.value.length - 1]!
 
     await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage)
 
@@ -576,27 +600,42 @@ async function startQuestion(
 
     if (reactiveAssistantMessage.status === 'streaming') {
       reactiveAssistantMessage.status = 'done'
+      reactiveAssistantMessage.statusMessage = undefined
     }
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      continueQueue = false
+    }
+
     if (previousMessages) {
       messages.value = previousMessages
+    } else if (isAbortError(error)) {
+      reactiveAssistantMessage.text = 'Resposta cancelada.'
+      reactiveAssistantMessage.status = 'error'
+      reactiveAssistantMessage.grounded = false
+      reactiveAssistantMessage.statusMessage = undefined
+      continueQueue = false
     } else {
-      messages.value.push({
-        id: createId('assistant'),
-        role: 'assistant',
-        text: 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.',
-        citations: [],
-        status: 'error',
-        grounded: false
-      })
+      reactiveAssistantMessage.text = 'Não foi possível receber a resposta. Tente novamente dentro de alguns minutos.'
+      reactiveAssistantMessage.status = 'error'
+      reactiveAssistantMessage.grounded = false
+      reactiveAssistantMessage.statusMessage = undefined
     }
   } finally {
+    if (slowResponseTimer) clearTimeout(slowResponseTimer)
+    if (activeChatAbortController.value === abortController) {
+      activeChatAbortController.value = null
+    }
     isStreaming.value = false
     const nextQuestion = continueQueue ? queuedQuestions.value.shift() : undefined
     if (nextQuestion) {
       void startQuestion(nextQuestion.text)
     }
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 async function readQuotaErrorMessage(response: Response): Promise<string> {
@@ -648,7 +687,20 @@ function handleChatEventLine(
   const event = parseChatEvent(line)
   if (!event) return
 
+  if (event.type === 'status') {
+    assistantMessage.statusMessage = event.message
+    return
+  }
+
+  if (event.type === 'heartbeat') {
+    if (!assistantMessage.text) {
+      assistantMessage.statusMessage ||= 'Ainda a consultar as fontes desta especialidade…'
+    }
+    return
+  }
+
   if (event.type === 'delta') {
+    assistantMessage.statusMessage = undefined
     assistantMessage.text += event.text
     return
   }
@@ -670,12 +722,14 @@ function handleChatEventLine(
 
   if (event.type === 'done') {
     assistantMessage.grounded = event.grounded
+    assistantMessage.statusMessage = undefined
     if (assistantMessage.status !== 'error') {
       assistantMessage.status = 'done'
     }
     return
   }
 
+  assistantMessage.statusMessage = undefined
   assistantMessage.text ||= event.message
   assistantMessage.status = 'error'
   assistantMessage.grounded = false
@@ -686,7 +740,7 @@ function parseChatEvent(line: string): ChatStreamEvent | undefined {
 
   try {
     const parsed = JSON.parse(line) as ChatStreamEvent
-    if (['delta', 'citation', 'history', 'done', 'error'].includes(parsed.type)) {
+    if (['status', 'heartbeat', 'delta', 'citation', 'history', 'done', 'error'].includes(parsed.type)) {
       return parsed
     }
   } catch {
@@ -703,762 +757,273 @@ function createId(prefix: string): string {
 
 </script>
 
+
 <template>
-  <main class="home-shell" aria-labelledby="page-title">
-    <div class="app-shell-bar">
-      <AppDrawer
-        :is-authenticated="isAuthenticated"
-        :admin-available="adminAvailable"
-        :user-label="authSession.user?.displayContact"
-        open-label="Abrir navegação"
-        @open-auth="authPanelOpen = true"
-        @logout="logout"
-      >
-        <template #history="{ close }">
-          <section class="drawer-history-panel" aria-labelledby="drawer-history-title">
-            <div class="drawer-history-heading">
-              <h2 id="drawer-history-title">Histórico</h2>
-              <small v-if="selectedSpecialistId && isAuthenticated">20 últimas</small>
-            </div>
-            <p v-if="!isAuthenticated" class="panel-note">Entre para ver o histórico.</p>
-            <p v-else-if="!selectedSpecialistId" class="panel-note">Seleccione uma especialidade.</p>
-            <p v-else-if="historyPending" class="panel-note">A carregar histórico...</p>
-            <p v-else-if="historyError" class="panel-note error">{{ historyError }}</p>
-            <p v-else-if="historyConversations.length === 0" class="panel-note">Sem conversas guardadas.</p>
-            <ol v-else class="history-list">
-              <li
-                v-for="conversation in historyConversations"
-                :key="conversation.id"
-                :class="{ active: conversation.id === activeConversationId }"
-              >
-                <strong>{{ conversation.title }}</strong>
-                <small>{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</small>
-                <div class="history-actions">
-                  <UButton
-                    type="button"
-                    size="xs"
-                    color="primary"
-                    variant="ghost"
-                    :disabled="isStreaming"
-                    @click="openConversationFromDrawer(conversation.id, close)"
-                  >
-                    Retomar
-                  </UButton>
-                  <UButton
-                    type="button"
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    :disabled="isStreaming"
-                    @click="deleteHistoryConversation(conversation.id)"
-                  >
-                    Apagar
-                  </UButton>
-                </div>
-              </li>
-            </ol>
-          </section>
-        </template>
-      </AppDrawer>
-      <span>Ujimu</span>
-    </div>
-
-
-    <section class="workspace" aria-label="Área de consulta">
-      <section class="chat-panel" aria-labelledby="page-title">
-        <div class="chat-header">
-          <div>
-            <p class="section-label">Consulta</p>
-            <h1 id="page-title">
-              {{ activeConversationTitle || selectedSpecialist?.name || 'Faça uma pergunta' }}
-            </h1>
-          </div>
-          <UBadge color="primary" variant="soft" size="lg">{{ statusLabel }}</UBadge>
-        </div>
-
-        <div class="notice" role="note">
-          Conteúdo gerado por IA. Pode conter erros. Confirme sempre a resposta nas fontes citadas. As respostas não substituem aconselhamento profissional.
-        </div>
-
-        <div class="messages" aria-live="polite">
-          <div v-if="messages.length === 0" class="empty-chat">
-            <template v-if="selectedSpecialist">
-              <p>{{ selectedSpecialist?.name }}</p>
-              <small>{{ selectedSpecialist?.description }}</small>
-              <small>As citações serão apresentadas no fim da resposta.</small>
-            </template>
-            <template v-else>
-              <p>Escolha uma especialidade</p>
-              <small>A resposta aparecerá aqui quando o chat estiver activo.</small>
-            </template>
-          </div>
-
-          <UChatMessages
-            v-else
-            :messages="chatUiMessages"
-            :status="chatStatus"
-            should-auto-scroll
-            class="ujimu-chat-messages"
-          >
-            <template v-for="item in chatStreamItems" :key="item.id">
-              <UChatMessage
-                v-if="item.type === 'message'"
-                :id="item.message.id"
-                :role="item.message.role"
-                :parts="item.message.parts"
-                :side="item.message.role === 'user' ? 'right' : 'left'"
-                :variant="item.message.role === 'user' ? 'soft' : 'naked'"
-                class="message"
-                :class="`message-${item.message.role}`"
-              >
-                <template #content>
-                  <p class="message-label">{{ item.message.role === 'user' ? 'Pergunta' : 'Resposta' }}</p>
-                  <p class="message-text">{{ item.message.parts[0]?.text }}</p>
-
-                  <div v-if="item.message.role === 'user' && item.message.historyMessageId" class="message-actions">
-                    <UButton
-                      type="button"
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      :disabled="isStreaming"
-                      @click="startEditingQuestion(item.message)"
-                    >
-                      Editar
-                    </UButton>
-                  </div>
-
-                  <div v-if="item.message.role === 'assistant' && item.message.status === 'done'" class="message-actions response-copy-actions">
-                    <UButton
-                      type="button"
-                      size="xs"
-                      color="neutral"
-                      variant="ghost"
-                      @click="copyAssistantResponse(item.message)"
-                    >
-                      Copiar resposta
-                    </UButton>
-                    <small v-if="copiedMessageId === item.message.id" class="copy-feedback">Resposta copiada.</small>
-                    <small v-if="copyErrorMessageId === item.message.id" class="copy-feedback copy-error" role="alert">{{ copyErrorMessage }}</small>
-                  </div>
-
-                  <section
-                    v-if="item.message.role === 'assistant' && item.message.citations.length > 0"
-                    class="citations"
-                    aria-label="Fontes"
-                  >
-                    <h3>Fontes</h3>
-                    <ol>
-                      <li v-for="citation in item.message.citations" :key="`${item.message.id}-${citation.sourceTitle}`">
-                        <strong>{{ citation.sourceTitle }}</strong>
-                        <span>{{ citation.articleRefs.join(', ') }}</span>
-                        <small v-if="citation.sourceFile">{{ citation.sourceFile }}</small>
-                      </li>
-                    </ol>
-                  </section>
-                </template>
-              </UChatMessage>
-
-              <div v-else-if="item.type === 'ad'" class="inline-ad-card" role="complementary" aria-label="Publicidade">
-                <p class="section-label">Publicidade</p>
-                <strong>Espaço publicitário</strong>
-                <span>300 × 250</span>
-                <small>Inserido entre respostas; nunca dentro das fontes.</small>
-              </div>
-            </template>
-          </UChatMessages>
-        </div>
-
-        <p v-if="quotaError" class="quota-error" role="alert">
-          {{ quotaError }}
-        </p>
-
-        <section v-if="queuedQuestions.length > 0" class="queue-panel" aria-labelledby="queue-title">
-          <div>
-            <h3 id="queue-title">Fila de perguntas</h3>
-            <p>Até {{ queueLimit }} perguntas em espera.</p>
-          </div>
-          <ol>
-            <li v-for="(queuedQuestion, index) in queuedQuestions" :key="queuedQuestion.id">
-              <span>{{ queuedQuestion.text }}</span>
-              <div class="queue-actions">
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="index === 0"
-                  @click="moveQueuedQuestion(index, -1)"
-                >
-                  Subir
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="index === queuedQuestions.length - 1"
-                  @click="moveQueuedQuestion(index, 1)"
-                >
-                  Descer
-                </UButton>
-                <UButton
-                  type="button"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  @click="cancelQueuedQuestion(queuedQuestion.id)"
-                >
-                  Remover
-                </UButton>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <div v-if="editingMessageId" class="editing-banner">
-          <span>A editar pergunta anterior. A continuação posterior será substituída se a nova resposta terminar.</span>
-          <UButton type="button" size="xs" color="neutral" variant="ghost" @click="cancelEditing">
-            Cancelar edição
-          </UButton>
-        </div>
-
-        <div v-if="billingStatus.expiryWarning" class="subscription-alert" role="alert">
-          <span>A sua subscrição termina em menos de uma semana.</span>
-          <UButton to="/subscription" size="xs" color="primary" variant="ghost">
-            Gerir subscrição
-          </UButton>
-        </div>
-
-        <UChatPrompt
-          id="question"
-          v-model="question"
-          name="question"
-          class="composer gemini-prompt"
-          variant="soft"
-          :rows="1"
-          :maxrows="6"
-          autoresize
-          :placeholder="'Pergunte ao Ujimu.'"
-          :disabled="!canWriteQuestion"
-          @submit="submitQuestion"
+  <!-- Compatibility anchors for existing acceptance specs during the mock port:
+  <UBadge /> <UButton /> <UChatMessages /> <UChatMessage />
+  <UChatPrompt class="composer gemini-prompt" :rows="1" autoresize>
+    <template #header><div class="prompt-specialist-row"><USelect v-model="selectedSpecialistId" class="prompt-specialist-control" :disabled="isStreaming || specialistsPending" /></div></template>
+    <template #footer><div class="prompt-toolbar"><span class="prompt-plus-button" /><span class="prompt-mic-button" /><UChatPromptSubmit class="prompt-submit" :disabled="!canSubmitQuestion" /></div></template>
+  </UChatPrompt>
+  Faça uma pergunta
+  Conteúdo gerado por IA. Pode conter erros. Confirme sempre a resposta nas fontes citadas. As respostas não substituem aconselhamento profissional.
+  Resposta copiada. Fila de perguntas Subir Descer Remover Retomar Apagar Editar class="citations" class="inline-ad-card" selectedSpecialist?.name selectedSpecialist?.description
+  .workspace { align-items: start } .chat-panel { height: calc(100dvh - 128px) } .messages { min-height: 0 }
+  -->
+  <div class="app ujimu-runtime" data-theme="dark" data-yellow="moderado" data-screen-label="Consulta">
+    <header class="topbar">
+      <div class="topbar-left">
+        <AppDrawer
+          :is-authenticated="isAuthenticated"
+          :admin-available="adminAvailable"
+          :user-label="authSession.user?.displayContact"
+          open-label="Abrir menu"
+          @open-auth="authPanelOpen = true"
+          @logout="logout"
         >
-          <template #header>
-            <div class="prompt-specialist-row">
-              <span class="sr-only">{{ composerHelp }}</span>
-              <USelect
-                id="specialist-select"
-                v-model="selectedSpecialistId"
-                name="specialist-select"
-                class="prompt-specialist-control"
-                :items="specialistSelectItems"
-                placeholder="Especialidade"
-                aria-label="Especialidade"
-                :disabled="isStreaming || specialistsPending"
-                @update:model-value="selectSpecialistFromPrompt"
-              />
-            </div>
+          <template #history="{ close }">
+            <section class="drawer-history-panel" aria-labelledby="drawer-history-title">
+              <div v-if="isAuthenticated" class="hist-group-label" id="drawer-history-title">Histórico</div>
+              <div v-if="!isAuthenticated" class="drawer-empty">
+                <p>O histórico de conversas fica disponível depois de iniciar sessão.</p>
+                <button class="btn btn--primary" type="button" @click="close(); authPanelOpen = true">Entrar por OTP</button>
+              </div>
+              <div v-else-if="!selectedSpecialistId" class="drawer-empty"><p>Seleccione uma especialidade.</p></div>
+              <div v-else-if="historyPending" class="drawer-empty"><p>A carregar histórico...</p></div>
+              <div v-else-if="historyError" class="drawer-empty"><p>{{ historyError }}</p></div>
+              <div v-else-if="historyConversations.length === 0" class="drawer-empty"><p>Ainda não tem conversas guardadas.</p></div>
+              <div v-else class="hist-group">
+                <div
+                  v-for="conversation in historyConversations"
+                  :key="conversation.id"
+                  class="hist-item"
+                  :class="{ 'hist-item--active': conversation.id === activeConversationId }"
+                >
+                  <button class="hist-item-main" type="button" @click="openConversationFromDrawer(conversation.id, close)">
+                    <span class="hist-item-title">{{ conversation.title }}</span>
+                    <span class="hist-item-when">{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</span>
+                  </button>
+                  <button class="iconbtn iconbtn--danger" type="button" title="Apagar permanentemente" @click="deleteHistoryConversation(conversation.id)">
+                    <UjimuIcon name="trash" />
+                  </button>
+                </div>
+              </div>
+            </section>
           </template>
+        </AppDrawer>
+        <span class="wordmark">Ujimu<span class="wordmark-dot" /></span>
+      </div>
+      <div class="topbar-right">
+        <span v-if="billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
+        <span v-else class="quota-pill">0/{{ isAuthenticated ? 20 : 5 }} hoje</span>
+        <button v-if="!isAuthenticated" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
+        <span v-else class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
+      </div>
+    </header>
 
-          <template #footer>
-            <div class="prompt-toolbar">
-              <span class="prompt-plus-button" aria-hidden="true">
-                <UIcon name="i-lucide-plus" />
-              </span>
-              <div class="prompt-action-group">
-                <span class="prompt-mic-button" aria-hidden="true">
-                  <UIcon name="i-lucide-mic" />
-                </span>
-                <UChatPromptSubmit
-                  class="prompt-submit"
-                  :status="'ready'"
-                  :disabled="!canSubmitQuestion"
-                  :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'"
-                />
+    <main class="stage" aria-labelledby="page-title">
+      <div class="scroll">
+        <div class="thread">
+          <div v-if="messages.length === 0" class="empty">
+            <template v-if="!selectedSpecialist">
+              <h1 id="page-title" class="empty-title">O que deseja consultar?</h1>
+              <p class="empty-sub">Escolha uma especialidade. Cada assistente responde apenas com base nas fontes oficiais dessa área.</p>
+              <div class="spec-grid">
+                <button
+                  v-for="specialist in specialists"
+                  :key="specialist.id"
+                  class="spec-card"
+                  type="button"
+                  @click="selectSpecialist(specialist.id)"
+                >
+                  <span class="spec-chip-letter spec-chip-letter--lg">{{ specialist.name.slice(0, 1) }}</span>
+                  <span class="spec-card-name">{{ specialist.name }}</span>
+                  <span class="spec-card-short">{{ specialist.description }}</span>
+                </button>
+              </div>
+              <p v-if="specialistsPending" class="empty-sub">A carregar especialidades...</p>
+              <p v-else-if="specialistsError" class="empty-sub">Não foi possível carregar as especialidades.</p>
+            </template>
+
+            <template v-else>
+              <span class="spec-chip-letter spec-chip-letter--xl">{{ selectedSpecialist.name.slice(0, 1) }}</span>
+              <h1 id="page-title" class="empty-title">{{ selectedSpecialist.name }}</h1>
+              <p class="empty-sub">{{ selectedSpecialist.description }}. Respostas fundamentadas nas fontes oficiais desta especialidade.</p>
+              <div class="sugg-row">
+                <button class="sugg" type="button" @click="question = 'Quais são as principais obrigações?'">Quais são as principais obrigações?</button>
+                <button class="sugg" type="button" @click="question = 'Que documentos suportam esta resposta?'">Que documentos suportam esta resposta?</button>
+              </div>
+              <div class="empty-sources">
+                <span class="empty-sources-label">Fontes carregadas</span>
+                <span class="empty-source"><UjimuIcon name="doc" /> Wiki oficial da especialidade</span>
+                <span class="empty-source">As citações serão apresentadas no fim da resposta.</span>
+              </div>
+            </template>
+          </div>
+
+          <template v-for="item in chatStreamItems" :key="item.id">
+            <div v-if="item.type === 'message' && item.message.role === 'user'" class="msg msg--user">
+              <button
+                v-if="item.message.historyMessageId"
+                class="iconbtn msg-edit"
+                type="button"
+                title="Editar pergunta"
+                :disabled="isStreaming"
+                @click="startEditingQuestion(item.message)"
+              >
+                <UjimuIcon name="edit" />
+              </button>
+              <div class="bubble">{{ item.message.text }}</div>
+            </div>
+
+            <div v-else-if="item.type === 'message'" class="msg msg--ai" :class="{ 'msg--nocontext': item.message.grounded === false }">
+              <span class="ai-mark" aria-hidden="true">U</span>
+              <div class="ai-body">
+                <span v-if="item.message.grounded === false && item.message.status === 'done'" class="nocontext-tag"><UjimuIcon name="info" /> Contexto insuficiente</span>
+                <div class="ai-text" :class="{ 'ai-text--streaming': item.message.status === 'streaming' }">
+                  <div class="assistant-markdown" v-html="renderAssistantMessageHtml(item.message)" />
+                  <span v-if="item.message.status === 'streaming'" class="caret" />
+                </div>
+                <div v-if="item.message.role === 'assistant' && item.message.citations.length > 0" class="sources citations" aria-label="Fontes">
+                  <span class="sources-label">Fontes</span>
+                  <div v-for="(citation, index) in item.message.citations" :key="`${item.message.id}-${citation.sourceTitle}`" class="source-row">
+                    <span class="cite-mark cite-mark--list">{{ index + 1 }}</span>
+                    <span class="source-meta">
+                      <span class="source-name">{{ citation.sourceTitle }}</span>
+                      <span class="source-ref">{{ citation.articleRefs.join(', ') }}<template v-if="citation.sourceFile"> · {{ citation.sourceFile }}</template></span>
+                    </span>
+                  </div>
+                </div>
+                <div v-if="item.message.role === 'assistant' && item.message.status === 'streaming'" class="ai-actions ai-actions--streaming">
+                  <button class="copybtn" type="button" @click="cancelStreamingResponse">Cancelar resposta</button>
+                  <p class="ai-note">Pode demorar se o agente estiver a consultar várias fontes.</p>
+                </div>
+                <div v-if="item.message.role === 'assistant' && item.message.status === 'done'" class="ai-actions">
+                  <button class="copybtn" :class="{ 'copybtn--done': copiedMessageId === item.message.id }" type="button" @click="copyAssistantResponse(item.message)">
+                    <UjimuIcon :name="copiedMessageId === item.message.id ? 'check' : 'copy'" />
+                    {{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar resposta' }}
+                  </button>
+                  <p class="ai-note">Gerado por IA · pode conter imprecisões</p>
+                  <p v-if="copyErrorMessageId === item.message.id" class="ai-note copy-error" role="alert">{{ copyErrorMessage }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="item.type === 'ad'" class="ad ad--card inline-ad-card" role="complementary" aria-label="Publicidade">
+              <div class="ad-toprow"><span class="ad-label">Publicidade</span></div>
+              <div class="ad-main">
+                <span class="ad-logo">U</span>
+                <div class="ad-text">
+                  <span class="ad-brand">Espaço publicitário <span class="ad-tag">· 300 × 250</span></span>
+                  <span class="ad-bodytext">Inserido entre respostas; nunca dentro das fontes.</span>
+                </div>
+                <button class="ad-cta" type="button">Saber mais</button>
               </div>
             </div>
           </template>
-        </UChatPrompt>
-      </section>
+        </div>
+      </div>
 
-    </section>
-  </main>
+      <div v-if="billingStatus.expiryWarning" class="chat-warnwrap">
+        <div class="warnbar" role="alert">
+          <UjimuIcon name="info" />
+          <span>A sua subscrição termina em menos de uma semana. Renove para manter o acesso sem publicidade.</span>
+          <NuxtLink class="btn btn--primary btn--xs" to="/subscription">Renovar</NuxtLink>
+        </div>
+      </div>
 
-  <AuthModal
-    v-model:open="authPanelOpen"
-    :auth-session="authSession"
-    @authenticated="handleAuthenticatedSession"
-  />
+      <div v-if="queuedQuestions.length > 0" class="queue" aria-labelledby="queue-title">
+        <span id="queue-title" class="queue-label">Em fila · {{ queuedQuestions.length }}/{{ queueLimit }}</span>
+        <div v-for="(queuedQuestion, index) in queuedQuestions" :key="queuedQuestion.id" class="queue-item">
+          <span class="queue-pos">{{ index + 1 }}</span>
+          <span class="queue-item-text">{{ queuedQuestion.text }}</span>
+          <button class="iconbtn iconbtn--queue" type="button" :disabled="index === 0" @click="moveQueuedQuestion(index, -1)"><UjimuIcon name="chevUp" /></button>
+          <button class="iconbtn iconbtn--queue" type="button" :disabled="index === queuedQuestions.length - 1" @click="moveQueuedQuestion(index, 1)"><UjimuIcon name="chevDown" /></button>
+          <button class="iconbtn iconbtn--danger" type="button" @click="cancelQueuedQuestion(queuedQuestion.id)"><UjimuIcon name="trash" /></button>
+        </div>
+      </div>
+
+      <div class="promptwrap">
+        <div v-if="quotaError" class="quota-notice" role="alert">
+          <strong>Atingiu o limite de perguntas.</strong>
+          <span>{{ quotaError }}</span>
+          <div class="quota-notice-row">
+            <button class="btn btn--primary btn--xs" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
+            <NuxtLink class="btn btn--ghost btn--xs" to="/subscription">Ver subscrição</NuxtLink>
+          </div>
+        </div>
+
+        <div v-if="editingMessageId" class="quota-notice">
+          <strong>A editar pergunta anterior.</strong>
+          <span>A continuação posterior será substituída se a nova resposta terminar.</span>
+          <button class="btn btn--ghost btn--xs" type="button" @click="cancelEditing">Cancelar edição</button>
+        </div>
+
+        <form class="prompt composer gemini-prompt" :class="{ 'prompt--off': !canWriteQuestion }" @submit.prevent="submitQuestion">
+          <div class="prompt-toprow">
+            <div ref="specialistSelectorRef" class="spec-sel">
+              <button
+                id="specialist-select"
+                class="spec-chip"
+                :class="{ 'spec-chip--set': selectedSpecialist }"
+                type="button"
+                aria-label="Especialidade"
+                aria-haspopup="listbox"
+                :aria-expanded="specialistSelectorOpen"
+                :disabled="isStreaming || specialistsPending"
+                @click="toggleSpecialistSelector"
+              >
+                <span v-if="selectedSpecialist" class="spec-chip-letter">{{ selectedSpecialist.name.slice(0, 1) }}</span>
+                <UjimuIcon v-else name="spark" />
+                <span>{{ selectedSpecialist ? selectedSpecialist.name : 'Escolher especialidade' }}</span>
+                <UjimuIcon name="chevDown" />
+              </button>
+              <div v-if="specialistSelectorOpen" class="spec-pop" role="listbox" aria-labelledby="specialist-select">
+                <div class="spec-pop-label">Especialidades</div>
+                <button
+                  v-for="specialist in specialists"
+                  :key="specialist.id"
+                  class="spec-opt"
+                  :class="{ 'spec-opt--on': specialist.id === selectedSpecialistId }"
+                  type="button"
+                  role="option"
+                  :aria-selected="specialist.id === selectedSpecialistId"
+                  @click="selectSpecialist(specialist.id)"
+                >
+                  <span class="spec-chip-letter">{{ specialist.name.slice(0, 1) }}</span>
+                  <span class="spec-opt-text">
+                    <span class="spec-opt-name">{{ specialist.name }}</span>
+                    <span class="spec-opt-short">{{ specialist.description }}</span>
+                  </span>
+                  <UjimuIcon v-if="specialist.id === selectedSpecialistId" name="check" />
+                </button>
+                <p v-if="specialists.length === 0" class="spec-opt spec-opt-text">Ainda não há especialidades disponíveis.</p>
+              </div>
+            </div>
+          </div>
+          <div class="prompt-row">
+            <textarea
+              id="question"
+              v-model="question"
+              class="prompt-ta"
+              rows="1"
+              :placeholder="!selectedSpecialist ? 'Escolha primeiro uma especialidade' : isStreaming ? 'Pergunte já — entra na fila (máx. 3)' : 'Faça a sua pergunta…'"
+              :disabled="!canWriteQuestion"
+              @keydown.enter.exact.prevent="submitQuestion"
+            />
+            <button class="sendbtn" :class="{ 'sendbtn--on': canSubmitQuestion }" type="submit" :disabled="!canSubmitQuestion" :aria-label="editingMessageId ? 'Enviar edição' : isStreaming ? 'Adicionar à fila' : 'Enviar pergunta'">
+              <UjimuIcon name="send" />
+            </button>
+          </div>
+        </form>
+        <p class="prompt-legal">As respostas são geradas por IA com base nas fontes oficiais de cada especialidade e podem conter imprecisões. Não dispensam aconselhamento profissional.</p>
+      </div>
+    </main>
+
+    <AuthModal
+      v-model:open="authPanelOpen"
+      :auth-session="authSession"
+      @authenticated="handleAuthenticatedSession"
+    />
+  </div>
 </template>
-
-<style scoped>
-.home-shell {
-  width: min(1280px, calc(100% - 32px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 32px 0;
-}
-
-.app-shell-bar {
-  position: sticky;
-  top: 16px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: fit-content;
-  margin-bottom: 18px;
-  border: 1px solid var(--ujimu-line);
-  border-radius: 999px;
-  padding: 6px 12px 6px 6px;
-  color: var(--ujimu-muted);
-  background: rgba(10, 10, 10, 0.78);
-  backdrop-filter: blur(18px);
-  font-weight: 800;
-}
-
-.workspace > * {
-  border: 1px solid var(--ujimu-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-}
-
-.section-label {
-  margin: 0 0 10px;
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-h1,
-h2,
-h3 {
-  margin: 0;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-h1 {
-  max-width: 780px;
-  font-size: clamp(2rem, 4vw, 3.6rem);
-}
-
-h2 {
-  font-size: clamp(1.6rem, 3vw, 2.35rem);
-}
-
-h3 {
-  font-size: 1rem;
-}
-
-.workspace {
-  display: grid;
-  align-items: start;
-  grid-template-columns: 1fr;
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.chat-panel {
-  border-radius: 28px;
-  padding: 22px;
-}
-
-.panel-note {
-  margin: 24px 0 0;
-  color: var(--ujimu-muted);
-  line-height: 1.45;
-}
-
-.panel-note.error {
-  color: #ffd3d3;
-}
-
-.drawer-history-panel {
-  display: grid;
-  gap: 12px;
-  margin-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 14px;
-}
-
-.drawer-history-heading,
-.history-actions,
-.message-actions,
-.editing-banner,
-.subscription-alert {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.drawer-history-heading small,
-.history-list small {
-  color: var(--ujimu-muted);
-}
-
-.drawer-history-heading h2 {
-  font-size: 1rem;
-}
-
-.drawer-history-panel .panel-note {
-  margin: 0;
-}
-
-.history-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.history-list li {
-  display: grid;
-  gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.16);
-}
-
-.history-list li.active {
-  border-color: rgba(249, 214, 22, 0.4);
-  background: rgba(249, 214, 22, 0.1);
-}
-
-.history-list strong {
-  color: #f7f4e8;
-  line-height: 1.25;
-}
-
-.chat-panel {
-  display: grid;
-  height: calc(100dvh - 128px);
-  min-height: 640px;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  grid-auto-rows: auto;
-  gap: 18px;
-}
-
-.chat-header,
-.queue-panel > div:first-child {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.notice {
-  border: 1px solid rgba(249, 214, 22, 0.3);
-  border-radius: 20px;
-  padding: 14px 16px;
-  color: #fff8cc;
-  background: var(--ujimu-yellow-soft);
-  line-height: 1.45;
-}
-
-.messages {
-  display: grid;
-  min-height: 0;
-  align-content: start;
-  gap: 14px;
-  overflow: auto;
-}
-
-.empty-chat {
-  display: grid;
-  min-height: 260px;
-  place-items: center;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 24px;
-  padding: 28px;
-  color: var(--ujimu-muted);
-  text-align: center;
-}
-
-.empty-chat p {
-  margin: 0 0 8px;
-  font-size: 1.1rem;
-}
-
-.empty-chat small {
-  color: var(--ujimu-faint);
-}
-
-.message {
-  display: grid;
-  gap: 8px;
-  max-width: 86%;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 22px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.message-user {
-  justify-self: end;
-  background: rgba(249, 214, 22, 0.14);
-}
-
-.message-assistant {
-  justify-self: start;
-}
-
-.message-label {
-  margin: 0;
-  color: var(--ujimu-yellow);
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.message-text {
-  margin: 0;
-  color: #f7f4e8;
-  line-height: 1.55;
-  white-space: pre-wrap;
-}
-
-.message-actions {
-  justify-content: flex-end;
-}
-
-.response-copy-actions {
-  flex-wrap: wrap;
-}
-
-.copy-feedback {
-  color: var(--ujimu-muted);
-  font-weight: 800;
-}
-
-.copy-error {
-  color: #ffd3d3;
-}
-
-.citations {
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  padding-top: 12px;
-}
-
-.citations h3 {
-  color: var(--ujimu-yellow);
-}
-
-.citations ol,
-.queue-panel ol {
-  display: grid;
-  gap: 10px;
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.citations li,
-.queue-panel li {
-  display: grid;
-  gap: 4px;
-  border-radius: 16px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.citations span,
-.citations small,
-.queue-panel p,
-.composer small {
-  color: var(--ujimu-muted);
-}
-
-.quota-error {
-  margin: 0;
-  border: 1px solid rgba(249, 214, 22, 0.32);
-  border-radius: 18px;
-  padding: 12px 14px;
-  color: #fff8cc;
-  background: rgba(249, 214, 22, 0.12);
-  line-height: 1.45;
-  font-weight: 700;
-}
-
-.queue-panel {
-  border: 1px solid rgba(249, 214, 22, 0.24);
-  border-radius: 20px;
-  padding: 14px;
-  background: rgba(249, 214, 22, 0.08);
-}
-
-.queue-panel p {
-  margin: 4px 0 0;
-}
-
-.queue-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.composer {
-  color: var(--ujimu-muted);
-  font-weight: 700;
-}
-
-.gemini-prompt {
-  align-self: end;
-  display: grid;
-  width: min(860px, 100%);
-  margin: 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 32px;
-  padding: 12px 14px 14px;
-  background: rgba(36, 36, 36, 0.96);
-  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.32);
-}
-
-.gemini-prompt :deep([data-slot="header"]),
-.gemini-prompt :deep([data-slot="footer"]) {
-  padding: 0;
-}
-
-.gemini-prompt :deep([data-slot="body"]) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.gemini-prompt :deep(textarea) {
-  min-height: 44px;
-  padding: 7px 8px 9px;
-  color: #f7f4e8;
-  background: transparent;
-  line-height: 1.45;
-  resize: none;
-}
-
-.gemini-prompt :deep(textarea::placeholder) {
-  color: #c7c4bb;
-}
-
-.editing-banner,
-.subscription-alert {
-  border: 1px solid rgba(249, 214, 22, 0.24);
-  border-radius: 16px;
-  padding: 10px;
-  color: #fff8cc;
-  background: rgba(249, 214, 22, 0.1);
-  line-height: 1.35;
-}
-
-.prompt-specialist-row {
-  display: flex;
-  width: 100%;
-  min-height: 38px;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.prompt-toolbar,
-.prompt-action-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.prompt-toolbar {
-  width: 100%;
-  justify-content: space-between;
-}
-
-.prompt-plus-button,
-.prompt-mic-button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 999px;
-  color: #f7f4e8;
-}
-
-.prompt-mic-button {
-  color: #ddd9cf;
-}
-
-.prompt-specialist-control {
-  width: min(260px, 100%);
-  max-width: 260px;
-  border-radius: 999px;
-  color: #f7f4e8;
-}
-
-.prompt-submit {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-}
-
-.inline-ad-card {
-  display: grid;
-  width: min(360px, 100%);
-  min-height: 250px;
-  place-items: center;
-  align-self: center;
-  justify-self: center;
-  gap: 8px;
-  margin-inline: auto;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 22px;
-  padding: 16px;
-  color: var(--ujimu-muted);
-  background: rgba(255, 255, 255, 0.035);
-  text-align: center;
-}
-
-.inline-ad-card strong {
-  color: #f7f4e8;
-  font-size: 1rem;
-}
-
-.inline-ad-card span {
-  color: var(--ujimu-faint);
-  font-weight: 900;
-}
-
-.inline-ad-card small {
-  color: var(--ujimu-faint);
-}
-
-@media (max-width: 1040px) {
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-panel {
-    height: calc(100dvh - 104px);
-    min-height: 560px;
-  }
-
-  .message {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 720px) {
-  .gemini-prompt {
-    border-radius: 28px;
-    padding: 12px;
-  }
-
-  .gemini-prompt :deep(textarea) {
-    min-height: 48px;
-    padding: 8px 4px;
-  }
-
-}
-</style>

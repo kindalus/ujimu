@@ -21,7 +21,13 @@ import {
   validateChatRequestBody,
   type ValidatedChatRequest
 } from './request'
-import type { ChatCitation, ChatConversationContextMessage, ChatEngineRunner, ChatStreamEvent } from './types'
+import type {
+  ChatCitation,
+  ChatConversationContextMessage,
+  ChatEngineRunner,
+  ChatRunnerStreamEvent,
+  ChatStreamEvent
+} from './types'
 
 const INSUFFICIENT_EVIDENCE_MESSAGE =
   'Ainda não tenho fontes suficientes — fontes oficiais suficientes nesta especialidade — para responder com segurança. Para poder responder, será necessário acrescentar uma fonte oficial relevante, por exemplo o diploma, regulamento, instrução administrativa ou artigo aplicável à pergunta.'
@@ -150,29 +156,21 @@ export async function createChatEventStreamForSpecialist(
   }
 
   const runner = options.runner ?? createDefaultChatRunner(isPiChatEnabled(options.piChatEnabled))
-  const result = await runner.run({
+  const runnerInput = {
     specialist,
     question: input.question,
     ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
     citationEvidence,
     ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {})
-  })
-  const citations = filterAllowedCitations(normalizeCitations(result.citations), citationEvidence)
-
-  if (result.grounded && citations.length === 0) {
-    return fallbackStream(
-      MISSING_CITATIONS_MESSAGE,
-      historyPersistence,
-      buildAnalyticsPersistence('insufficient_context')
-    )
   }
 
-  return streamRunnerResult({
-    grounded: result.grounded,
-    citations: result.grounded ? citations : [],
-    deltas: result.deltas,
+  return streamChatWithRunner({
+    runner,
+    runnerInput,
+    citationEvidence,
     history: historyPersistence,
-    analytics: result.grounded ? buildAnalyticsPersistence('answered') : undefined
+    answeredAnalytics: buildAnalyticsPersistence('answered'),
+    insufficientAnalytics: buildAnalyticsPersistence('insufficient_context')
   })
 
   function buildAnalyticsPersistence(outcome: QuestionAnalyticsOutcome): StreamAnalyticsPersistence | undefined {
@@ -249,6 +247,49 @@ function filterAllowedCitations(citations: ChatCitation[], allowedEvidence: Chat
   })
 }
 
+function streamChatWithRunner(input: {
+  runner: ChatEngineRunner
+  runnerInput: Parameters<ChatEngineRunner['run']>[0]
+  citationEvidence: ChatCitation[]
+  history?: StreamHistoryPersistence
+  answeredAnalytics?: StreamAnalyticsPersistence
+  insufficientAnalytics?: StreamAnalyticsPersistence
+}): AsyncIterable<ChatStreamEvent> {
+  return (async function* () {
+    const result = await input.runner.run(input.runnerInput)
+
+    if (result.events) {
+      yield* streamRunnerEventResult({
+        events: result.events,
+        citationEvidence: input.citationEvidence,
+        history: input.history,
+        answeredAnalytics: input.answeredAnalytics,
+        insufficientAnalytics: input.insufficientAnalytics
+      })
+      return
+    }
+
+    const citations = filterAllowedCitations(normalizeCitations(result.citations), input.citationEvidence)
+
+    if (result.grounded && citations.length === 0) {
+      yield* fallbackStream(
+        MISSING_CITATIONS_MESSAGE,
+        input.history,
+        input.insufficientAnalytics
+      )
+      return
+    }
+
+    yield* streamRunnerResult({
+      grounded: result.grounded,
+      citations: result.grounded ? citations : [],
+      deltas: result.deltas,
+      history: input.history,
+      analytics: result.grounded ? input.answeredAnalytics : undefined
+    })
+  })()
+}
+
 function fallbackStream(
   message: string,
   history?: StreamHistoryPersistence,
@@ -287,6 +328,122 @@ interface StreamAnalyticsPersistence {
   now?: Date
 }
 
+async function* streamRunnerEventResult(input: {
+  events: AsyncIterable<ChatRunnerStreamEvent>
+  citationEvidence: ChatCitation[]
+  history?: StreamHistoryPersistence
+  answeredAnalytics?: StreamAnalyticsPersistence
+  insufficientAnalytics?: StreamAnalyticsPersistence
+}): AsyncIterable<ChatStreamEvent> {
+  let answer = ''
+  const bufferedDeltas: string[] = []
+  const receivedCitations: ChatCitation[] = []
+  let allowedCitations: ChatCitation[] = []
+  let citationsValidated = false
+  let sawDone = false
+  let grounded = false
+
+  try {
+    for await (const event of withHeartbeat(input.events)) {
+      if (event.type === 'status' || event.type === 'heartbeat') {
+        yield event
+        continue
+      }
+
+      if (event.type === 'citation') {
+        receivedCitations.push(event.citation)
+        allowedCitations = filterAllowedCitations(normalizeCitations(receivedCitations), input.citationEvidence)
+        citationsValidated = allowedCitations.length > 0
+
+        if (citationsValidated && bufferedDeltas.length > 0) {
+          for (const text of bufferedDeltas.splice(0)) {
+            answer += text
+            yield { type: 'delta', text }
+          }
+        }
+        continue
+      }
+
+      if (event.type === 'delta') {
+        if (citationsValidated) {
+          answer += event.text
+          yield { type: 'delta', text: event.text }
+        } else {
+          bufferedDeltas.push(event.text)
+        }
+        continue
+      }
+
+      sawDone = true
+      grounded = event.grounded
+      break
+    }
+
+    if (!sawDone) {
+      throw new Error('Runner stream ended without a done event.')
+    }
+
+    if (grounded && !citationsValidated) {
+      yield* fallbackStream(MISSING_CITATIONS_MESSAGE, input.history, input.insufficientAnalytics)
+      return
+    }
+
+    if (!grounded) {
+      for (const text of bufferedDeltas) {
+        answer += text
+        yield { type: 'delta', text }
+      }
+      allowedCitations = []
+    }
+
+    yield* completeStreamResult({
+      answer,
+      grounded,
+      citations: grounded ? allowedCitations : [],
+      history: input.history,
+      analytics: grounded ? input.answeredAnalytics : undefined
+    })
+  } catch {
+    yield { type: 'error', code: 'CHAT_STREAM_FAILED', message: STREAM_ERROR_MESSAGE }
+    yield { type: 'done', grounded: false }
+  }
+}
+
+async function* withHeartbeat(
+  events: AsyncIterable<ChatRunnerStreamEvent>,
+  intervalMs = 5_000
+): AsyncIterable<ChatRunnerStreamEvent | { type: 'heartbeat' }> {
+  const iterator = events[Symbol.asyncIterator]()
+  let next = iterator.next()
+
+  try {
+    while (true) {
+      const result = await Promise.race([
+        next.then((value) => ({ type: 'next' as const, value })),
+        delay(intervalMs).then(() => ({ type: 'heartbeat' as const }))
+      ])
+
+      if (result.type === 'heartbeat') {
+        yield { type: 'heartbeat' }
+        continue
+      }
+
+      if (result.value.done) {
+        break
+      }
+
+      yield result.value.value
+      next = iterator.next()
+    }
+  } finally {
+    await iterator.return?.()
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function* streamRunnerResult(input: {
   grounded: boolean
   citations: ChatCitation[]
@@ -304,57 +461,73 @@ async function* streamRunnerResult(input: {
       }
     }
 
-    for (const citation of input.citations) {
-      yield { type: 'citation', citation }
-    }
-
-    let persisted: Awaited<ReturnType<typeof persistCompletedHistoryTurn>> | undefined
-
-    if (input.history) {
-      persisted = await persistCompletedHistoryTurn(input.history.database, {
-        userId: input.history.userId,
-        specialistId: input.history.specialistId,
-        specialistName: input.history.specialistName,
-        ...(input.history.conversationId ? { conversationId: input.history.conversationId } : {}),
-        ...(input.history.replaceFromMessageId ? { replaceFromMessageId: input.history.replaceFromMessageId } : {}),
-        question: input.history.question,
-        answer,
-        grounded: input.grounded,
-        citations: input.citations,
-        ...(input.history.now ? { now: input.history.now } : {}),
-        ...(input.history.titleRunner ? { titleRunner: input.history.titleRunner } : {}),
-        ...(input.history.titleTimeoutMs !== undefined ? { titleTimeoutMs: input.history.titleTimeoutMs } : {})
-      })
-
-      yield {
-        type: 'history',
-        conversationId: persisted.conversationId,
-        userMessageId: persisted.userMessageId,
-        assistantMessageId: persisted.assistantMessageId,
-        title: persisted.title,
-        titleStatus: persisted.titleStatus
-      }
-    }
-
-    if (input.analytics) {
-      recordQuestionAnalyticsEvent(input.analytics.database, {
-        specialistId: input.analytics.specialistId,
-        outcome: input.analytics.outcome,
-        question: input.analytics.question,
-        userTimezone: input.analytics.userTimezone,
-        visitorId: input.analytics.visitorId,
-        userId: input.analytics.userId,
-        conversationId: persisted?.conversationId,
-        userMessageId: persisted?.userMessageId,
-        occurredAt: input.analytics.now
-      })
-    }
-
-    yield { type: 'done', grounded: input.grounded }
+    yield* completeStreamResult({
+      answer,
+      grounded: input.grounded,
+      citations: input.citations,
+      history: input.history,
+      analytics: input.analytics
+    })
   } catch {
     yield { type: 'error', code: 'CHAT_STREAM_FAILED', message: STREAM_ERROR_MESSAGE }
     yield { type: 'done', grounded: false }
   }
+}
+
+async function* completeStreamResult(input: {
+  answer: string
+  grounded: boolean
+  citations: ChatCitation[]
+  history?: StreamHistoryPersistence
+  analytics?: StreamAnalyticsPersistence
+}): AsyncIterable<ChatStreamEvent> {
+  for (const citation of input.citations) {
+    yield { type: 'citation', citation }
+  }
+
+  let persisted: Awaited<ReturnType<typeof persistCompletedHistoryTurn>> | undefined
+
+  if (input.history) {
+    persisted = await persistCompletedHistoryTurn(input.history.database, {
+      userId: input.history.userId,
+      specialistId: input.history.specialistId,
+      specialistName: input.history.specialistName,
+      ...(input.history.conversationId ? { conversationId: input.history.conversationId } : {}),
+      ...(input.history.replaceFromMessageId ? { replaceFromMessageId: input.history.replaceFromMessageId } : {}),
+      question: input.history.question,
+      answer: input.answer,
+      grounded: input.grounded,
+      citations: input.citations,
+      ...(input.history.now ? { now: input.history.now } : {}),
+      ...(input.history.titleRunner ? { titleRunner: input.history.titleRunner } : {}),
+      ...(input.history.titleTimeoutMs !== undefined ? { titleTimeoutMs: input.history.titleTimeoutMs } : {})
+    })
+
+    yield {
+      type: 'history',
+      conversationId: persisted.conversationId,
+      userMessageId: persisted.userMessageId,
+      assistantMessageId: persisted.assistantMessageId,
+      title: persisted.title,
+      titleStatus: persisted.titleStatus
+    }
+  }
+
+  if (input.analytics) {
+    recordQuestionAnalyticsEvent(input.analytics.database, {
+      specialistId: input.analytics.specialistId,
+      outcome: input.analytics.outcome,
+      question: input.analytics.question,
+      userTimezone: input.analytics.userTimezone,
+      visitorId: input.analytics.visitorId,
+      userId: input.analytics.userId,
+      conversationId: persisted?.conversationId,
+      userMessageId: persisted?.userMessageId,
+      occurredAt: input.analytics.now
+    })
+  }
+
+  yield { type: 'done', grounded: input.grounded }
 }
 
 async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {

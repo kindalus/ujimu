@@ -1,9 +1,37 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import type { AdminSessionResponse } from '../../utils/admin-ui'
+import { computed, onMounted, ref } from 'vue'
+import type { AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse, MonthlyVisitorsResponse } from '../../utils/admin-ui'
 
 const session = ref<AdminSessionResponse>({ authenticated: false, admin: false })
 const sessionPending = ref(true)
+const specialists = ref<AdminSpecialist[]>([])
+const monthlyVisitors = ref<MonthlyVisitorsResponse | undefined>()
+const currentMonth = new Date().toISOString().slice(0, 7)
+
+const sourceIssueCount = computed(() =>
+  specialists.value.reduce((count, specialist) => count + specialist.sources.filter((source) => ['failed', 'blocked'].includes(source.status)).length, 0)
+)
+
+const adminCards = computed(() => [
+  {
+    to: '/admin/specialists',
+    path: '/admin/specialists',
+    title: 'Especialidades e fontes',
+    desc: `${specialists.value.length} especialidades · ${sourceIssueCount.value > 0 ? `${sourceIssueCount.value} fontes com problemas` : 'fontes sem problemas'}`
+  },
+  {
+    to: '/admin/analytics',
+    path: '/admin/analytics',
+    title: 'Analytics',
+    desc: `${(monthlyVisitors.value?.distinctVisitors ?? 0).toLocaleString('pt-PT')} visitantes distintos este mês · lacunas por rever`
+  },
+  {
+    to: '/admin/ops',
+    path: '/admin/ops',
+    title: 'Operações / readiness',
+    desc: 'Checks seguros de base de dados, dados, logs, migrações e segredos'
+  }
+])
 
 onMounted(() => {
   void loadAdminSession()
@@ -16,143 +44,61 @@ async function loadAdminSession(): Promise<void> {
     session.value = response.ok
       ? ((await response.json()) as AdminSessionResponse)
       : { authenticated: false, admin: false }
+    if (session.value.admin) await Promise.all([loadSpecialists(), loadMonthlyVisitors()])
   } catch {
     session.value = { authenticated: false, admin: false }
   } finally {
     sessionPending.value = false
   }
 }
+
+async function loadSpecialists(): Promise<void> {
+  const response = await fetch('/api/admin/specialists')
+  if (!response.ok) return
+  const payload = (await response.json()) as AdminSpecialistsResponse
+  specialists.value = payload.specialists
+}
+
+async function loadMonthlyVisitors(): Promise<void> {
+  const response = await fetch(`/api/admin/analytics/visitors?month=${encodeURIComponent(currentMonth)}`)
+  if (!response.ok) return
+  monthlyVisitors.value = (await response.json()) as MonthlyVisitorsResponse
+}
 </script>
 
 <template>
-  <main class="admin-shell" aria-labelledby="admin-title">
-    <header class="admin-hero">
+  <main v-if="sessionPending" class="adm-page" aria-labelledby="admin-title">
+    <section class="adm-card"><p class="adm-sub">A verificar permissões...</p></section>
+  </main>
+
+  <main v-else-if="!session.authenticated || !session.admin" class="adm-page adm-gate" aria-labelledby="admin-gate-title">
+    <span class="adm-gate-icon"><UjimuIcon name="user" /></span>
+    <h1 id="admin-gate-title" class="adm-title">Área reservada</h1>
+    <p class="adm-sub">{{ !session.authenticated ? 'Inicie sessão com uma conta de administrador para aceder a /admin.' : 'A sua conta não tem permissões de administrador.' }}</p>
+    <div class="adm-row-actions" style="justify-content: center">
+      <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
+    </div>
+    <p class="adm-foot-note">Esta área está reservada a contactos autorizados.</p>
+  </main>
+
+  <main v-else class="adm-page" aria-labelledby="admin-title" data-screen-label="Admin — Painel">
+    <div class="adm-pagehead">
       <div>
-        <p class="section-label">Administração</p>
-        <h1 id="admin-title">Painel administrativo</h1>
-        <p>Escolha a área operacional que quer gerir.</p>
+        <h1 id="admin-title" class="adm-title">Administração</h1>
+        <p class="adm-sub">Sessão de <strong>{{ session.user?.displayContact }}</strong> verificada com permissões de administrador.</p>
       </div>
-      <UButton to="/" color="neutral" variant="ghost">Voltar ao chat</UButton>
-    </header>
+    </div>
 
-    <section v-if="sessionPending" class="admin-card">
-      <p>A verificar permissões...</p>
-    </section>
-
-    <section v-else-if="!session.authenticated" class="admin-card" role="alert">
-      <h2>Tem de iniciar sessão para aceder à administração.</h2>
-      <p>Volte à página principal e entre com o código de acesso.</p>
-    </section>
-
-    <section v-else-if="!session.admin" class="admin-card" role="alert">
-      <h2>Não tem permissões de administração.</h2>
-      <p>Esta área está reservada a contactos autorizados.</p>
-    </section>
-
-    <section v-else class="dashboard-grid" aria-label="Áreas administrativas">
-      <section class="admin-card route-card">
-        <p class="section-label">Operação</p>
-        <h2>Especialidades e fontes</h2>
-        <p class="muted">Crie especialistas, edite prompts, carregue fontes e acompanhe o pipeline de conversão e ingestão.</p>
-        <UButton to="/admin/specialists" color="primary" variant="soft">Abrir especialidades</UButton>
-      </section>
-
-      <section class="admin-card route-card">
-        <p class="section-label">Empresas</p>
-        <h2>Empresas corporativas</h2>
-        <p class="muted">Veja subscrições, membros, quota agregada e especialidades privadas associadas.</p>
-        <UButton to="/admin/companies" color="primary" variant="soft">Abrir empresas</UButton>
-      </section>
-
-      <section class="admin-card route-card">
-        <p class="section-label">Analytics</p>
-        <h2>Visitantes e lacunas</h2>
-        <p class="muted">Veja visitantes mensais, perguntas recentes e candidatos editoriais a lacunas de conteúdo.</p>
-        <UButton to="/admin/analytics" color="primary" variant="soft">Abrir analytics</UButton>
-      </section>
-
-      <section class="admin-card route-card">
-        <p class="section-label">Operações</p>
-        <h2>Readiness seguro</h2>
-        <p class="muted">Confirme checks operacionais seguros sem expor caminhos, segredos ou valores de ambiente.</p>
-        <UButton to="/admin/ops" color="primary" variant="soft">Abrir operações</UButton>
-      </section>
-    </section>
+    <div class="adm-homegrid" aria-label="Áreas administrativas">
+      <NuxtLink v-for="card in adminCards" :key="card.to" class="adm-card adm-homecard" :to="card.to">
+        <span class="adm-homecard-path">{{ card.path }}</span>
+        <span class="adm-homecard-title">{{ card.title }}</span>
+        <span class="adm-homecard-desc">{{ card.desc }}</span>
+      </NuxtLink>
+    </div>
   </main>
 </template>
 
 <style scoped>
-.admin-shell {
-  width: min(1180px, calc(100% - 32px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 32px 0;
-}
-
-.admin-hero,
-.admin-card {
-  border: 1px solid var(--ujimu-line);
-  border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-}
-
-.admin-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: clamp(24px, 4vw, 42px);
-}
-
-.admin-hero h1,
-.admin-card h2 {
-  margin: 0;
-  letter-spacing: -0.045em;
-}
-
-.section-label {
-  margin: 0 0 10px;
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-hero p:not(.section-label),
-.muted {
-  color: var(--ujimu-muted);
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.admin-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 22px;
-}
-
-.route-card p {
-  margin: 0;
-}
-
-@media (max-width: 1040px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .admin-hero {
-    display: grid;
-  }
-}
+a.adm-homecard { color: inherit; text-decoration: none; }
 </style>

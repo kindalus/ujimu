@@ -33,8 +33,8 @@ describe('Podman container deployment acceptance', () => {
     expect(dockerignore).toContain('.output')
     expect(dockerignore).toContain('.env')
     expect(dockerignore).toContain('config/container/*.env')
-    expect(dockerignore).toContain('config/ujimu-pi-agent/auth.json')
-    expect(dockerignore).not.toContain('config/ujimu-pi-agent/settings.json')
+    expect(dockerignore).toContain('config/pi/auth.json')
+    expect(dockerignore).not.toContain('config/pi/settings.json')
   })
 
   it('documents production and test env profiles with persistence, timezone, Pi flags, and test no-op auth', async () => {
@@ -44,7 +44,8 @@ describe('Podman container deployment acceptance', () => {
     for (const envFile of [prod, test]) {
       expect(envFile).toContain('TZ=Africa/Luanda')
       expect(envFile).toContain('UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu')
-      expect(envFile).toContain('UJIMU_PI_AGENT_DIR=/app/config/ujimu-pi-agent')
+      expect(envFile).toContain('UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu')
+      expect(envFile).toContain('UJIMU_PI_BUNDLE_DIR=/app/config/pi')
       expect(envFile).toContain('UJIMU_PI_CONVERSION_ENABLED=true')
       expect(envFile).toContain('UJIMU_PI_INGESTION_ENABLED=true')
       expect(envFile).toContain('UJIMU_PI_CHAT_ENABLED=true')
@@ -80,7 +81,7 @@ describe('Podman container deployment acceptance', () => {
     expect(log).toContain('network create ujimu')
     expect(log).toContain('container exists ujimu-test')
     expect(log).toContain(`create --name ujimu-test --network ujimu --env-file ${envFile} -p 3001:3000`)
-    expect(log).toContain(`${workspace.root}/test/pi:/home/ujimu/.pi`)
+    expect(log).toContain(`${workspace.root}/test/pi:/home/ujimu/.config/ujimu`)
     expect(log).toContain(`${workspace.root}/test/data:/home/ujimu/.local/share/ujimu`)
     expect(log).toContain('localhost/ujimu:test')
   })

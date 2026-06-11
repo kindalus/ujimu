@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
-import { resolveUjimuPiAgentDir } from './paths'
+import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
+import { createSandboxedFileTools, type UjimuPiFileSystemPolicy } from './sandboxed-tools'
 
 export type PiTaskName = 'conversion' | 'ingestion' | 'chat'
 
@@ -9,6 +10,7 @@ export interface CreateUjimuPiSessionOptions {
   cwd: string
   task: PiTaskName
   tools: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
+  fileSystemPolicy: UjimuPiFileSystemPolicy
   appendSystemPromptOverride?: () => string[]
   modelEnvPrefix?: string
 }
@@ -23,20 +25,28 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     SettingsManager
   } = await import('@earendil-works/pi-coding-agent')
 
-  const agentDir = resolveUjimuPiAgentDir()
-  const authStorage = AuthStorage.create(join(agentDir, 'auth.json'))
-  const modelRegistry = ModelRegistry.create(authStorage, join(agentDir, 'models.json'))
-  const settingsManager = SettingsManager.create(options.cwd, agentDir)
+  const configDir = await ensureUjimuPiConfigDir()
+  const bundledPiDir = resolveUjimuPiBundleDir()
+  const authStorage = AuthStorage.create(join(configDir, 'auth.json'))
+  const modelRegistry = ModelRegistry.create(authStorage, join(configDir, 'models.json'))
+  const settingsManager = SettingsManager.create(options.cwd, configDir)
   const loader = new DefaultResourceLoader({
     cwd: options.cwd,
-    agentDir,
+    agentDir: bundledPiDir,
     settingsManager,
+    additionalSkillPaths: [join(bundledPiDir, 'skills')],
+    noContextFiles: true,
+    noExtensions: true,
+    noPromptTemplates: true,
+    noSkills: true,
+    noThemes: true,
     appendSystemPromptOverride: options.appendSystemPromptOverride
   })
   await loader.reload()
 
   const selectedModel = await resolveTaskModel(modelRegistry, settingsManager, options.modelEnvPrefix)
-  const customTools = createUjimuCustomToolsForTask(options.task, options.cwd)
+  const sandboxedFileTools = await createSandboxedFileTools(options.fileSystemPolicy, options.tools)
+  const customTools = [...sandboxedFileTools, ...createUjimuCustomToolsForTask(options.task, options.cwd)]
 
   const result = await createAgentSession({
     cwd: options.cwd,
@@ -53,7 +63,8 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   attachPiDebugLogger(result.session, {
     task: options.task,
     cwd: options.cwd,
-    agentDir,
+    configDir,
+    bundledPiDir,
     tools: [...options.tools, ...customTools.map((tool: any) => tool.name)],
     model: selectedModel
   })
@@ -64,7 +75,8 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
 interface PiDebugContext {
   task: PiTaskName
   cwd: string
-  agentDir: string
+  configDir: string
+  bundledPiDir: string
   tools: string[]
   model: unknown
 }

@@ -60,10 +60,7 @@ async function loadCompanies(): Promise<void> {
         <h1 id="admin-companies-title">Empresas</h1>
         <p>Consulte empresas corporativas, subscrições, membros e especialistas associados.</p>
       </div>
-      <div class="header-actions">
-        <UButton to="/admin" color="neutral" variant="ghost">Painel</UButton>
-        <UButton to="/" color="neutral" variant="ghost">Voltar ao chat</UButton>
-      </div>
+
     </header>
 
     <section v-if="sessionPending" class="admin-card">
@@ -108,19 +105,4 @@ async function loadCompanies(): Promise<void> {
   </main>
 </template>
 
-<style scoped>
-.admin-shell { width: min(1180px, calc(100% - 32px)); min-height: 100vh; margin: 0 auto; padding: 32px 0; }
-.admin-hero, .admin-card { border: 1px solid var(--ujimu-line); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.028)); box-shadow: 0 24px 80px rgba(0,0,0,.34); backdrop-filter: blur(18px); }
-.admin-hero { display: flex; justify-content: space-between; gap: 18px; padding: clamp(24px, 4vw, 42px); }
-.header-actions, .card-heading, .status-badges { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.header-actions, .status-badges { flex-wrap: wrap; }
-.section-label { margin: 0 0 10px; color: var(--ujimu-yellow); font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.admin-hero p:not(.section-label), .muted, .company-list small { color: var(--ujimu-muted); }
-.admin-card { display: grid; gap: 14px; margin-top: 18px; padding: 22px; }
-.company-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.company-list li { display: flex; justify-content: space-between; gap: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 12px; background: rgba(0,0,0,.18); }
-.company-list strong, .company-list small { display: block; }
-.status-badges { justify-content: flex-start; margin-top: 8px; }
-.admin-error { color: #ffd3d3; font-weight: 800; }
-@media (max-width: 760px) { .admin-hero, .company-list li { display: grid; } }
-</style>
+

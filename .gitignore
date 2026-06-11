@@ -9,5 +9,5 @@ node_modules/
 .DS_Store
 .local/
 .pi/
-config/ujimu-pi-agent/auth.json
+config/pi/auth.json
 config/container/*.env

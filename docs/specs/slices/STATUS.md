@@ -1071,7 +1071,7 @@ Refinement and grill decisions:
 - Add `.dockerignore` that excludes build output, local dependencies, logs, env files, and real secrets while keeping versioned Pi config resources available.
 - Runtime image installs only `ca-certificates` and `coreutils`; healthcheck uses Node instead of curl/wget.
 - `test.env.example` uses `NODE_ENV=development` and `UJIMU_AUTH_FAKE_DELIVERY_ENABLED=true` to activate existing fake OTP delivery.
-- Set `UJIMU_PI_AGENT_DIR=/app/config/ujimu-pi-agent` in env examples.
+- Use `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu` for mutable configuration and `UJIMU_PI_BUNDLE_DIR=/app/config/pi` for bundled Pi resources in env examples.
 - Both prod and test env examples enable `UJIMU_PI_CONVERSION_ENABLED=true`, `UJIMU_PI_INGESTION_ENABLED=true`, and `UJIMU_PI_CHAT_ENABLED=true`.
 - `prod.env.example` highlights required secrets; lifecycle scripts do not validate secret completeness.
 
@@ -1212,7 +1212,7 @@ Manual smoke status:
 
 Status: `verified`
 
-As-built correction (2026-05-18): Ujimu Pi resources were moved from the originally planned project `.pi/` directory to `config/ujimu-pi-agent/` because `.pi/` is a reserved Pi CLI project directory and caused development-time resource discovery collisions. The runtime still honours `UJIMU_PI_AGENT_DIR` for explicit overrides.
+As-built correction (2026-06-11): Ujimu separates mutable Pi configuration under `<UJIMU_CONFIG_DIR>` from versioned Pi bundle resources under `<UJIMU_PI_BUNDLE_DIR>`.
 
 Idea-refined direction:
 
@@ -1231,7 +1231,6 @@ Idea-refined direction:
 - Version `config/ujimu-pi-agent/settings.json`, `config/ujimu-pi-agent/models.json`, `config/ujimu-pi-agent/auth.json.sample`, and agent skills/prompts, but never commit `config/ujimu-pi-agent/auth.json`.
 - Use the `config/ujimu-pi-agent` default model for consultation.
 - Allow conversion and ingestion to override provider/model through environment variables; when absent, they fall back to the project-local default.
-- As-built correction: the earlier Slice 13 planning keys `UJIMU_PI_CONVERSION_THINKING_LEVEL` and `UJIMU_PI_INGESTION_THINKING_LEVEL` are not read by the current runtime. Treat them as obsolete/no-op environment keys unless a future slice explicitly implements per-role thinking-level overrides.
 - Do not add new Pi tools in this slice. Agent skills are instructions, not capabilities.
 - Keep `bash` disabled by default. Conversion and ingestion may use only the already-approved file tools: `read`, `write`, `edit`, `grep`, `find`, and `ls`. Consultation should use read/search tools only.
 - If PDF, DOCX, or HTML content cannot be extracted safely with the existing tools, conversion fails safely and ingestion does not advance for that source.
@@ -1254,8 +1253,8 @@ Locked grill decisions:
 - Ujimu ingestion uses the `llm-wiki` skill through the Ujimu Pi agent copy under `config/ujimu-pi-agent/skills/llm-wiki`.
 - The project-local `llm-wiki` copy adds a minimal Ujimu override: only Markdown files under `raw/` may be ingested; non-Markdown raw files are original uploads for the conversion pipeline and must not be ingested directly.
 - If a global `llm-wiki` skill is also available, the Ujimu Pi agent `config/ujimu-pi-agent/skills/llm-wiki` copy must prevail. This is verified through Pi resource loading using the Ujimu agent directory.
-- Pi SDK sessions resolve their agent directory from `UJIMU_PI_AGENT_DIR` when set, otherwise they fall back to the project-root `config/ujimu-pi-agent` directory.
-- Conversion, ingestion, and consultation sessions must pass this resolved `agentDir` explicitly to Pi SDK session/resource-loader/model-registry setup so they use the project-local settings, models, auth sample convention, and skills.
+- Pi SDK sessions resolve mutable configuration from `UJIMU_CONFIG_DIR` and bundled resources from `UJIMU_PI_BUNDLE_DIR`.
+- Conversion, ingestion, and consultation sessions must pass the resolved config and bundle paths explicitly to Pi SDK session/resource-loader/model-registry setup so they use the Ujimu settings, models, auth sample convention, skills, tools, and extensions.
 - Conversion and ingestion model overrides are valid only when both provider and model environment variables are set for that role.
 - If neither provider nor model override is set for a role, that role uses the default model from `config/ujimu-pi-agent/settings.json`.
 - If only one of provider/model is set, or if the configured model does not exist or lacks configured authentication, fail with a clear configuration error before starting the Pi session.

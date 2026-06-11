@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import { serializeChatEvent } from '../server/utils/chat/ndjson'
-import type { ChatEngineRunner, ChatStreamEvent } from '../server/utils/chat/types'
+import type { ChatEngineRunner, ChatRunnerStreamEvent, ChatStreamEvent } from '../server/utils/chat/types'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { writeIngestionState } from '../server/utils/ingestion/state'
 import { storeRawSource } from '../server/utils/ingestion/storage'
@@ -119,6 +119,55 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
+  it('streams live runner events only after initial citations are validated', async () => {
+    const { specialtiesRoot } = await createTempSpecialist('iva')
+    await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
+
+    const stream = await createChatEventStreamFromBody(
+      { specialistId: 'iva', question: 'O que diz o Artigo 1.º?' },
+      {
+        specialtiesRoot,
+        piChatEnabled: true,
+        runner: {
+          async run(input) {
+            return {
+              grounded: false,
+              citations: [],
+              deltas: toAsyncDeltas([]),
+              events: toAsyncEvents([
+                { type: 'status', message: 'A consultar as fontes desta especialidade…' },
+                { type: 'citation', citation: input.citationEvidence[0] },
+                { type: 'delta', text: 'O Artigo 1.º ' },
+                { type: 'delta', text: 'define o âmbito.' },
+                { type: 'done', grounded: true }
+              ])
+            }
+          }
+        }
+      }
+    )
+    const iterator = stream[Symbol.asyncIterator]()
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'status', message: 'A consultar as fontes desta especialidade…' },
+      done: false
+    })
+    await expect(iterator.next()).resolves.toEqual({ value: { type: 'delta', text: 'O Artigo 1.º ' }, done: false })
+    await expect(iterator.next()).resolves.toEqual({ value: { type: 'delta', text: 'define o âmbito.' }, done: false })
+    await expect(iterator.next()).resolves.toEqual({
+      value: {
+        type: 'citation',
+        citation: {
+          sourceTitle: 'Código do IVA',
+          sourceFile: 'raw/codigo-iva.original.md',
+          articleRefs: ['Artigo 1.º']
+        }
+      },
+      done: false
+    })
+    await expect(iterator.next()).resolves.toEqual({ value: { type: 'done', grounded: true }, done: false })
+  })
+
   it('converts a grounded engine result without citations into a safe fallback', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
@@ -229,6 +278,12 @@ function fakeRunner(
 async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {
   for (const delta of deltas) {
     yield delta
+  }
+}
+
+async function* toAsyncEvents(events: ChatRunnerStreamEvent[]): AsyncIterable<ChatRunnerStreamEvent> {
+  for (const event of events) {
+    yield event
   }
 }
 

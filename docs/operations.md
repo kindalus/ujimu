@@ -40,13 +40,14 @@ Configure these outside source control:
 - `UJIMU_PASSKEY_ORIGIN` — exact origin used for WebAuthn verification; required in production when passkeys are enabled.
 - `UJIMU_DATA_DIR` — storage root for SQLite, specialties, trash, and logs.
 - `UJIMU_DB_PATH` — optional SQLite override; defaults under `UJIMU_DATA_DIR`.
-- `UJIMU_PI_AGENT_DIR` — optional Pi agent directory override; defaults to `config/ujimu-pi-agent`. The repository-level `.pi/` directory is reserved for the developer's Pi CLI/runtime state and is ignored by Git.
+- `UJIMU_CONFIG_DIR` — mutable application configuration directory; defaults to `~/.config/ujimu` and stores Pi `auth.json`, `models.json`, and `settings.json`.
+- `UJIMU_PI_BUNDLE_DIR` — optional override for bundled Pi resources; defaults to `config/pi` and stores product skills, tools, extensions, and seed config files.
 - `UJIMU_PI_CONVERSION_ENABLED` — set to `true` only where admins may run raw-to-Markdown conversion.
 - `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may ingest converted Markdown into specialist wikis.
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — maximum validated converted Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
-- `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `config/ujimu-pi-agent/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
+- `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `<UJIMU_CONFIG_DIR>/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
 
 ## Passkey configuration
 
@@ -56,11 +57,36 @@ Passkeys require the correct browser origin and HTTPS in production. OTP continu
 
 The admin readiness endpoint reports only passkey booleans such as enabled/configured status. It must not expose RP IDs, origins, challenges, public keys, credential IDs, or WebAuthn payloads.
 
-## Ujimu Pi agent directory
+## Ujimu configuration and bundled Pi resources
 
-Versioned Ujimu Pi resources live under `config/ujimu-pi-agent/`. Do not move product skills, extensions, tools, settings, or model configuration back under the repository `.pi/` directory: Pi CLI reserves `.pi/` for project-local developer runtime configuration and will auto-discover resources there during development.
+Mutable Ujimu Pi configuration lives under `<UJIMU_CONFIG_DIR>`, defaulting to `~/.config/ujimu/`. On startup, Ujimu creates this directory when it is missing and seeds only missing files from the bundled Pi directory:
 
-If a local environment previously used `.pi/auth.json`, copy the credentials to `config/ujimu-pi-agent/auth.json` or set `UJIMU_PI_AGENT_DIR` to a secret-managed agent directory. Keep real auth files out of Git.
+```text
+<UJIMU_CONFIG_DIR>/
+  auth.json      # seeded from config/pi/auth.json.sample
+  models.json    # seeded from config/pi/models.json
+  settings.json  # seeded from config/pi/settings.json
+```
+
+Versioned Ujimu Pi resources live under `config/pi/`: product skills, extensions, tools, and the seed copies of the three mutable config files. Do not move product skills, extensions, or tools back under the repository `.pi/` directory: Pi CLI reserves `.pi/` for project-local developer runtime configuration and will auto-discover resources there during development.
+
+Keep real `auth.json` files out of Git. If a local environment previously used `.pi/auth.json`, copy the credentials to `<UJIMU_CONFIG_DIR>/auth.json`.
+
+### Pi file-tool sandboxing
+
+Ujimu wraps Pi file tools with a realpath-based allowlist before exposing them to conversion, ingestion, or chat sessions. The wrappers reject absolute paths, home-relative paths, resource-prefixed paths, null bytes, `..` escapes, and symlink escapes.
+
+- Chat sessions may read/search/list only `wiki/` and cannot write files.
+- Ingestion sessions may read the selected Markdown source plus `wiki/`, and may write/edit only `wiki/`.
+- Conversion sessions may read only the selected raw source and write only its derived Markdown output.
+- `bash` remains unavailable to Ujimu Pi sessions.
+- Ujimu Pi sessions load only bundled Ujimu skills from `config/pi/skills`; user-global skills such as `~/.agents/skills` are intentionally not exposed.
+
+This is an application-level guard. For a stronger production isolation boundary, run the process or tool execution inside a container, VM, or equivalent sandbox with only the required specialist directory mounted.
+
+### DOCX conversion
+
+DOCX conversion is handled by a Ujimu-controlled OpenXML extractor for files under `raw/`. It writes the deterministic output `raw/<source>.docx.md` without asking the model to read external DOCX skills or execute shell commands. Complex DOCX constructs may still require manual source preparation if the generated Markdown is too small or unusable.
 
 ## Gemini PDF-to-Markdown conversion dependency
 
@@ -69,7 +95,7 @@ PDF conversion through the `pdf_to_markdown` tool depends on the Gemini CLI in t
 - `gemini` must be installed and available on `PATH`.
 - `timeout` must be available on `PATH` in the container runtime; the script uses `timeout 600s` per PDF.
 - `GEMINI_API_KEY` must be set in the environment or secret manager.
-- `GEMINI_API_KEY` is sensitive and must not be written to `config/ujimu-pi-agent/settings.json`, prompts, operational logs, or versioned files.
+- `GEMINI_API_KEY` is sensitive and must not be written to `<UJIMU_CONFIG_DIR>/settings.json`, prompts, operational logs, or versioned files.
 
 Manual smoke test in a configured non-production environment:
 
@@ -78,18 +104,18 @@ command -v gemini
 command -v timeout
 test -n "$GEMINI_API_KEY"
 cd /path/to/specialist-root
-/path/to/ujimu/config/ujimu-pi-agent/tools/pdf_to_markdown.sh raw/small-sample.pdf
+/path/to/ujimu/config/pi/tools/pdf_to_markdown.sh raw/small-sample.pdf
 ```
 
 Expected result: the command prints JSON metadata only and creates `raw/small-sample.pdf.md`. Do not run this smoke test in CI because it requires real Gemini credentials and an external service call.
 
 ## Pi conversion, ingestion, and consultation smoke test
 
-Run this smoke path only in a configured non-production environment with `config/ujimu-pi-agent/auth.json` present outside source control or credentials provided through environment variables, and with the Pi enable flags set deliberately. Before production, run it with the exact provider/model configuration intended for production; a successful smoke with a temporary model proves the pipeline shape, not the final production model choice.
+Run this smoke path only in a configured non-production environment with `<UJIMU_CONFIG_DIR>/auth.json` present outside source control or credentials provided through environment variables, and with the Pi enable flags set deliberately. Before production, run it with the exact provider/model configuration intended for production; a successful smoke with a temporary model proves the pipeline shape, not the final production model choice.
 
 1. Upload a small official source through the admin console.
-2. Click `Executar conversão` and confirm that `raw/<original filename>.md` is created and the source state becomes conversion `converted` / ingestion `pending`.
-3. Click `Executar ingestão` and confirm that the wiki is updated while citations still reference the original uploaded file.
+2. Click `Executar ingestão` and confirm that raw files that still need conversion first produce `raw/<original filename>.md`, then continue into ingestion.
+3. Confirm that the wiki is updated while citations still reference the original uploaded file.
 4. Ask a scoped chat question and confirm that the response streams only after validated citations are available.
 5. Review admin audit events for safe conversion counts; do not log source contents, prompts, answers, or secrets.
 
@@ -135,7 +161,7 @@ Default image tag: `localhost/ujimu:latest`. Override with `UJIMU_IMAGE` when ne
 
 Profile defaults:
 
-| Profile | Container | Host port | Pi host dir | Ujimu data host dir |
+| Profile | Container | Host port | Ujimu config host dir | Ujimu data host dir |
 | --- | --- | --- | --- | --- |
 | `prod` | `ujimu-prod` | `3000` | `/srv/ujimu/prod/pi` | `/srv/ujimu/prod/data` |
 | `test` | `ujimu-test` | `3001` | `/srv/ujimu/test/pi` | `/srv/ujimu/test/data` |
@@ -143,11 +169,11 @@ Profile defaults:
 Inside the container both profiles use:
 
 ```text
-/home/ujimu/.pi
+/home/ujimu/.config/ujimu
 /home/ujimu/.local/share/ujimu
 ```
 
-The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, and sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`. It includes Gemini CLI through `npm install -g @google/gemini-cli` and exposes a `/healthz` Dockerfile healthcheck.
+The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`, sets `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu`, and keeps bundled Pi resources under `/app/config/pi`. It includes Gemini CLI through `npm install -g @google/gemini-cli` and exposes a `/healthz` Dockerfile healthcheck.
 
 Create real env files from the examples, keeping secrets out of Git:
 
@@ -171,7 +197,7 @@ scripts/container/redeploy.sh prod|test  # build, replace container, start; pres
 scripts/container/remove.sh prod|test    # remove only the target container
 ```
 
-The scripts create missing profile host directories with `mkdir -p`, but never delete Pi or Ujimu data directories, images, networks, env files, or secrets. Reverse proxy, TLS, DNS, certificates, and CI/CD automation are intentionally outside this deployment slice.
+The scripts create missing profile host directories with `mkdir -p`, but never delete Ujimu config or data directories, images, networks, env files, or secrets. Reverse proxy, TLS, DNS, certificates, and CI/CD automation are intentionally outside this deployment slice.
 
 The test profile enables existing fake/no-op auth delivery and mock billing paths while keeping Pi conversion, ingestion, and chat enabled for validation. Do not put real external auth, payment, or communication provider secrets in `test.env`.
 

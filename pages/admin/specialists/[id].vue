@@ -1,7 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { AdminCompaniesResponse, AdminCompanySummary, AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse, IngestionRunResponse, IngestionSource } from '../../../utils/admin-ui'
-import { pipelineStatusColor, readAdminApiError } from '../../../utils/admin-ui'
+import { readAdminApiError } from '../../../utils/admin-ui'
+
+const wikiPresets = [
+  { value: 'research-project', label: 'Projecto de investigação' },
+  { value: 'book-companion', label: 'Companheiro de livro' },
+  { value: 'personal-journal-backed', label: 'Diário pessoal' },
+  { value: 'business-team-knowledge', label: 'Conhecimento de equipa' },
+  { value: 'help-desk-faq-customer-support', label: 'Apoio ao cliente / FAQ' },
+  { value: 'engineering-internal-technical-documentation', label: 'Documentação técnica interna' },
+  { value: 'legislation-regulatory', label: 'Legislação e regulação' },
+  { value: 'custom-domain', label: 'Domínio personalizado' }
+]
+
+type SourceDisplayStatus = 'pending' | 'processing' | 'ingested' | 'failed' | 'blocked' | 'converted' | 'not_required'
 
 const specialistId = ref('')
 const session = ref<AdminSessionResponse>({ authenticated: false, admin: false })
@@ -17,14 +30,19 @@ const editForm = ref({
   status: 'active' as 'active' | 'suspended',
   company_id: ''
 })
-const uploadFile = ref<File | undefined>()
-const confirmationId = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
+const confirmDeleteOpen = ref(false)
 const pending = ref(false)
 const feedback = ref('')
+const ingestionNote = ref('')
 const errorMessage = ref('')
 
 const specialist = computed(() =>
   specialists.value.find((item) => item.id === specialistId.value)
+)
+
+const canRunIngestion = computed(() =>
+  specialist.value?.sources.some((source) => canIngestSource(source)) ?? false
 )
 
 onMounted(() => {
@@ -80,7 +98,7 @@ function syncEditForm(): void {
 }
 
 async function updateSpecialist(): Promise<void> {
-  if (!specialist.value) return
+  if (!specialist.value || pending.value) return
 
   await runAdminAction(async () => {
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}`, {
@@ -96,20 +114,38 @@ async function updateSpecialist(): Promise<void> {
   })
 }
 
-function rememberUploadFile(event: Event): void {
-  const input = event.target as HTMLInputElement
-  uploadFile.value = input.files?.[0]
+function setCitationsRequired(value: boolean): void {
+  editForm.value.citations_required = value
+  void updateSpecialist()
 }
 
-async function uploadRawSource(): Promise<void> {
-  if (!specialist.value || !uploadFile.value) {
-    errorMessage.value = 'Seleccione um ficheiro para carregar.'
-    return
-  }
+function setStreamingEnabled(value: boolean): void {
+  editForm.value.streaming_enabled = value
+  void updateSpecialist()
+}
+
+function toggleSuspended(): void {
+  editForm.value.status = specialist.value?.status === 'suspended' ? 'active' : 'suspended'
+  void updateSpecialist()
+}
+
+function openFilePicker(): void {
+  fileInput.value?.click()
+}
+
+function rememberUploadFile(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (file) void uploadRawSource(file)
+}
+
+async function uploadRawSource(file: File): Promise<void> {
+  if (!specialist.value) return
 
   await runAdminAction(async () => {
     const form = new FormData()
-    form.set('file', uploadFile.value as File)
+    form.set('file', file)
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}/raw`, {
       method: 'POST',
       body: form
@@ -134,12 +170,13 @@ async function refreshSources(): Promise<void> {
 
     const payload = (await response.json()) as { sources: IngestionSource[] }
     replaceSelectedSources(payload.sources)
+    if (!payload.sources.some((source) => canIngestSource(source) || source.status === 'processing')) ingestionNote.value = ''
     feedback.value = 'Estado actualizado.'
   })
 }
 
 async function runIngestion(): Promise<void> {
-  if (!specialist.value) return
+  if (!specialist.value || !canRunIngestion.value) return
 
   await runAdminAction(async () => {
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}/ingestion/run`, {
@@ -149,21 +186,24 @@ async function runIngestion(): Promise<void> {
 
     const payload = (await response.json()) as IngestionRunResponse
     replaceSelectedSources(payload.sources)
+    ingestionNote.value = 'Comando enviado. A conversão e a ingestão decorrem em background — use Actualizar para acompanhar o estado.'
     feedback.value = formatIngestionFeedback(payload)
   })
 }
 
 async function deleteSpecialist(): Promise<void> {
-  if (!specialist.value) return
+  const selected = specialist.value
+  if (!selected) return
 
   await runAdminAction(async () => {
-    const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}`, {
+    const response = await fetch(`/api/admin/specialists/${encodeURIComponent(selected.id)}`, {
       method: 'DELETE',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirmationId: confirmationId.value })
+      body: JSON.stringify({ confirmationId: selected.id })
     })
     if (!response.ok) throw new Error(await readAdminApiError(response))
 
+    confirmDeleteOpen.value = false
     feedback.value = 'Especialidade apagada.'
     window.location.href = '/admin/specialists'
   })
@@ -217,304 +257,232 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
     pending.value = false
   }
 }
+
+function specialistLetter(item: AdminSpecialist): string {
+  return item.name.trim().slice(0, 1).toUpperCase() || 'E'
+}
+
+function companyName(companyId: string | null): string {
+  if (!companyId) return ''
+  return companies.value.find((company) => company.id === companyId)?.name || companyId
+}
+
+function sourceName(source: IngestionSource): string {
+  return source.raw_path.split('/').filter(Boolean).at(-1) || source.raw_path
+}
+
+function sourceSub(source: IngestionSource): string {
+  const pieces: string[] = []
+  if (source.article_refs.length > 0) pieces.push(`${source.article_refs.length} fragmentos na wiki`)
+  pieces.push(`actualizada ${sourceUpdatedLabel(source)}`)
+  return pieces.join(' · ')
+}
+
+function sourceUpdatedLabel(source: IngestionSource): string {
+  const timestamp = source.updated_at ?? source.ingestion?.updated_at ?? source.conversion?.updated_at ?? source.replaced_at ?? source.ingested_at ?? source.detected_at
+  if (!timestamp) return 'recentemente'
+
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'recentemente'
+
+  return new Intl.DateTimeFormat('pt-PT', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date)
+}
+
+function effectiveSourceStatus(source: IngestionSource): SourceDisplayStatus {
+  if (source.status !== 'ingested' && source.conversion?.status === 'converted') return 'converted'
+  return source.status
+}
+
+function statusLabel(status: SourceDisplayStatus): string {
+  const labels: Record<SourceDisplayStatus, string> = {
+    pending: 'Pendente',
+    processing: 'Em processamento',
+    ingested: 'Ingerido',
+    failed: 'Falhado',
+    blocked: 'Bloqueado',
+    converted: 'Convertido',
+    not_required: 'Não requerido'
+  }
+  return labels[status]
+}
+
+function badgeClass(status: SourceDisplayStatus): string {
+  if (['ingested', 'not_required'].includes(status)) return 'badge--ok'
+  if (['pending', 'processing'].includes(status)) return 'badge--warn'
+  if (['failed', 'blocked'].includes(status)) return 'badge--err'
+  if (status === 'converted') return 'badge--mid'
+  return 'badge--mute'
+}
+
+function canIngestSource(source: IngestionSource): boolean {
+  return ['pending', 'failed', 'blocked'].includes(source.status)
+}
 </script>
 
 <template>
-  <main class="admin-shell" aria-labelledby="admin-specialist-title">
-    <header class="admin-hero">
-      <div>
-        <p class="section-label">Administração</p>
-        <h1 id="admin-specialist-title">Ficha da especialidade</h1>
-        <p>Edite metadados, acesso, fontes e acompanhe o pipeline desta especialidade.</p>
+  <main v-if="sessionPending" class="adm-page" aria-labelledby="admin-specialist-title">
+    <section class="adm-card"><p class="adm-sub">A verificar permissões...</p></section>
+  </main>
+
+  <main v-else-if="!session.authenticated || !session.admin" class="adm-page adm-gate" aria-labelledby="admin-specialist-gate-title" data-screen-label="Admin — Acesso negado">
+    <span class="adm-gate-icon"><UjimuIcon name="user" :size="26" /></span>
+    <h1 id="admin-specialist-gate-title" class="adm-title">Área reservada</h1>
+    <p class="adm-sub">{{ !session.authenticated ? 'Inicie sessão com uma conta de administrador para aceder a /admin.' : 'A sua conta não tem permissões de administrador.' }}</p>
+    <div class="adm-row-actions" style="justify-content: center">
+      <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
+    </div>
+    <p class="adm-foot-note">Esta área está reservada a contactos autorizados.</p>
+  </main>
+
+  <main v-else-if="!specialist" class="adm-page adm-gate" aria-labelledby="admin-specialist-missing-title" data-screen-label="Admin — Especialidade não encontrada">
+    <span class="adm-gate-icon"><UjimuIcon name="doc" :size="26" /></span>
+    <h1 id="admin-specialist-missing-title" class="adm-title">Especialidade não encontrada.</h1>
+    <p class="adm-sub">A ficha pedida não existe ou já foi apagada.</p>
+    <div class="adm-row-actions" style="justify-content: center">
+      <NuxtLink class="btn btn--ghost" to="/admin/specialists"><UjimuIcon name="chevLeft" :size="16" /> Especialidades</NuxtLink>
+    </div>
+  </main>
+
+  <main v-else class="adm-page" aria-labelledby="admin-specialist-title" data-screen-label="Admin — Ficha de especialidade">
+    <NuxtLink class="btn btn--ghost btn--back" to="/admin/specialists"><UjimuIcon name="chevLeft" :size="16" /> Especialidades</NuxtLink>
+    <div class="adm-pagehead">
+      <div class="adm-detail-head">
+        <span class="spec-chip-letter spec-chip-letter--lg">{{ specialistLetter(specialist) }}</span>
+        <div>
+          <h1 id="admin-specialist-title" class="adm-title">
+            {{ specialist.name }}
+            <span v-if="specialist.status === 'suspended'" class="badge badge--mute"><span class="badge-dot" />Suspensa</span>
+          </h1>
+          <p class="adm-sub mono-field">/admin/specialists/{{ specialist.id }}</p>
+        </div>
       </div>
-      <div class="header-actions">
-        <UButton to="/admin/specialists" color="neutral" variant="ghost">Especialidades</UButton>
-        <UButton to="/admin" color="neutral" variant="ghost">Painel</UButton>
+    </div>
+
+    <div class="adm-card">
+      <h2 class="adm-card-title">Metadados</h2>
+      <label class="adm-field">
+        <span class="adm-field-label">Nome</span>
+        <input v-model="editForm.name" class="field" :disabled="pending" @change="updateSpecialist" />
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Descrição</span>
+        <input v-model="editForm.description" class="field" :disabled="pending" @change="updateSpecialist" />
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Preset da wiki</span>
+        <select :value="specialist.wiki_type" class="field readonly-field" disabled>
+          <option v-for="preset in wikiPresets" :key="preset.value" :value="preset.value">{{ preset.label }}</option>
+        </select>
+        <span class="adm-preset-id">{{ specialist.wiki_type }}</span>
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Prompt do especialista</span>
+        <textarea v-model="editForm.system_prompt" class="field adm-prompt" rows="4" :disabled="pending" @change="updateSpecialist"></textarea>
+      </label>
+      <div class="adm-togglerow">
+        <button class="adm-toggle" type="button" role="switch" :aria-checked="editForm.citations_required" :disabled="pending" @click="setCitationsRequired(!editForm.citations_required)">
+          <span class="adm-toggle-meta">
+            <span class="adm-toggle-label">Exige citações</span>
+            <span class="adm-toggle-hint">Respostas devem citar as fontes da wiki</span>
+          </span>
+          <span class="switch" :class="{ 'switch--on': editForm.citations_required }"><span class="switch-knob" /></span>
+        </button>
+        <button class="adm-toggle" type="button" role="switch" :aria-checked="editForm.streaming_enabled" :disabled="pending" @click="setStreamingEnabled(!editForm.streaming_enabled)">
+          <span class="adm-toggle-meta">
+            <span class="adm-toggle-label">Responde em fluxo</span>
+            <span class="adm-toggle-hint">Streaming de tokens no chat</span>
+          </span>
+          <span class="switch" :class="{ 'switch--on': editForm.streaming_enabled }"><span class="switch-knob" /></span>
+        </button>
       </div>
-    </header>
+    </div>
 
-    <section v-if="sessionPending" class="admin-card">
-      <p>A verificar permissões...</p>
-    </section>
-
-    <section v-else-if="!session.authenticated" class="admin-card" role="alert">
-      <h2>Tem de iniciar sessão para aceder à administração.</h2>
-      <p>Volte à página principal e entre com o código de acesso.</p>
-    </section>
-
-    <section v-else-if="!session.admin" class="admin-card" role="alert">
-      <h2>Não tem permissões de administração.</h2>
-      <p>Esta área está reservada a contactos autorizados.</p>
-    </section>
-
-    <section v-else-if="!specialist" class="admin-card" role="alert">
-      <h2>Especialidade não encontrada.</h2>
-      <p>A ficha pedida não existe ou já foi apagada.</p>
-      <UButton to="/admin/specialists" color="primary" variant="soft">Voltar às especialidades</UButton>
-    </section>
-
-    <section v-else class="detail-grid">
-      <section class="admin-card edit-card">
-        <div class="card-heading">
-          <div>
-            <p class="section-label">{{ specialist.id }}</p>
-            <h2>Editar especialidade</h2>
-          </div>
-          <div class="status-badges">
-            <UBadge color="neutral" variant="soft">{{ specialist.wiki_type }}</UBadge>
-            <UBadge :color="specialist.status === 'active' ? 'success' : 'warning'" variant="soft">
-              {{ specialist.status === 'active' ? 'Activo' : 'Suspenso' }}
-            </UBadge>
-            <UBadge :color="specialist.company_id ? 'primary' : 'neutral'" variant="soft">
-              {{ specialist.company_id ? 'Empresa privada' : 'Público' }}
-            </UBadge>
-          </div>
+    <div class="adm-card">
+      <div class="adm-card-toprow">
+        <h2 class="adm-card-title">Fontes oficiais</h2>
+        <div class="adm-row-actions">
+          <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="openFilePicker"><UjimuIcon name="upload" :size="13" /> Carregar fonte</button>
+          <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="refreshSources"><UjimuIcon name="refresh" :size="13" /> Actualizar</button>
+          <button class="btn btn--primary btn--xs" :class="{ 'btn--off': !canRunIngestion || pending }" type="button" :disabled="!canRunIngestion || pending" @click="runIngestion">Executar ingestão</button>
         </div>
-
-        <form class="admin-form" @submit.prevent="updateSpecialist">
-          <label>Nome<UInput v-model="editForm.name" :disabled="pending" /></label>
-          <label>Descrição<UTextarea v-model="editForm.description" :rows="2" :disabled="pending" /></label>
-          <label>Prompt do especialista<UTextarea v-model="editForm.system_prompt" :rows="5" :disabled="pending" /></label>
-          <label>Estado
-            <select v-model="editForm.status" :disabled="pending">
-              <option value="active">Activo</option>
-              <option value="suspended">Suspenso</option>
-            </select>
-          </label>
-          <label>Empresa
-            <select v-model="editForm.company_id" :disabled="pending">
-              <option value="">Público</option>
-              <option v-for="company in companies" :key="company.id" :value="company.id">
-                {{ company.name }} · {{ company.nif }}
-              </option>
-            </select>
-          </label>
-          <label class="checkbox-line"><input v-model="editForm.citations_required" type="checkbox" /> Exigir citações</label>
-          <label class="checkbox-line"><input v-model="editForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
-          <UButton type="submit" color="primary" :loading="pending">Guardar alterações</UButton>
-        </form>
-      </section>
-
-      <section class="admin-card source-card" aria-labelledby="upload-title">
-        <div class="card-heading">
-          <div>
-            <p class="section-label">Fontes</p>
-            <h2 id="upload-title">Carregar fonte</h2>
-          </div>
-          <UBadge color="primary" variant="soft">{{ specialist.sources.length }}</UBadge>
-        </div>
-        <input type="file" accept=".pdf,.txt,.docx,.html,.htm,.csv,.xlsx,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
-        <div class="tool-actions">
-          <UButton type="button" color="primary" variant="soft" :loading="pending" @click="uploadRawSource">
-            Carregar fonte
-          </UButton>
-          <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="refreshSources">
-            Actualizar estado
-          </UButton>
-          <UButton type="button" color="neutral" variant="soft" :loading="pending" @click="runIngestion">
-            Executar ingestão
-          </UButton>
-        </div>
-      </section>
-
-      <section class="admin-card sources-card" aria-labelledby="sources-title">
-        <h2 id="sources-title">Estado das fontes</h2>
-        <p v-if="specialist.sources.length === 0" class="muted">Sem fontes detectadas.</p>
-        <ol v-else class="sources-list">
-          <li v-for="source in specialist.sources" :key="source.raw_path">
-            <div class="source-main-line">
-              <strong>{{ source.raw_path }}</strong>
-              <UBadge :color="pipelineStatusColor(source.status)" variant="soft">{{ source.status }}</UBadge>
+      </div>
+      <input ref="fileInput" type="file" style="display: none" accept=".pdf,.docx,.xlsx,.html,.txt,.htm,.csv,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
+      <p v-if="ingestionNote" class="adm-ingest-note"><UjimuIcon name="info" :size="14" /> {{ ingestionNote }}</p>
+      <div class="adm-srcs">
+        <div v-for="source in specialist.sources" :key="source.raw_path" class="adm-src" :class="{ 'adm-src--err': source.error_message || source.conversion?.error_message || source.ingestion?.error_message }">
+          <div class="adm-src-row">
+            <UjimuIcon name="doc" :size="16" />
+            <div class="adm-src-meta">
+              <span class="adm-src-name">{{ sourceName(source) }}</span>
+              <span class="adm-src-sub">{{ sourceSub(source) }}</span>
             </div>
-            <small v-if="source.title">{{ source.title }}</small>
-            <small v-if="source.conversion">
-              Conversão:
-              <UBadge :color="pipelineStatusColor(source.conversion.status)" variant="soft">{{ source.conversion.status }}</UBadge>
-              {{ source.conversion.markdown_path }}
-            </small>
-            <small v-if="source.ingestion">
-              Ingestão:
-              <UBadge :color="pipelineStatusColor(source.ingestion.status)" variant="soft">{{ source.ingestion.status }}</UBadge>
-              {{ source.ingestion.source_path }}
-            </small>
-            <small v-if="source.replaced_at">Fonte substituída; aguarda nova ingestão.</small>
-            <small v-if="source.error_message" class="source-error">{{ source.error_message }}</small>
-            <small v-if="source.conversion?.error_message" class="source-error">{{ source.conversion.error_message }}</small>
-            <small v-if="source.ingestion?.error_message" class="source-error">{{ source.ingestion.error_message }}</small>
-          </li>
-        </ol>
-      </section>
+            <span class="badge" :class="badgeClass(effectiveSourceStatus(source))"><span class="badge-dot" />{{ statusLabel(effectiveSourceStatus(source)) }}</span>
+            <button class="btn btn--ghost btn--xs" type="button" title="Substituir esta fonte por um novo ficheiro" :disabled="pending" @click="openFilePicker">Recarregar</button>
+          </div>
+          <p v-if="source.error_message" class="adm-src-error">{{ source.error_message }}</p>
+          <p v-if="source.conversion?.error_message" class="adm-src-error">{{ source.conversion.error_message }}</p>
+          <p v-if="source.ingestion?.error_message" class="adm-src-error">{{ source.ingestion.error_message }}</p>
+        </div>
+        <p v-if="specialist.sources.length === 0" class="adm-sub">Ainda não há fontes carregadas para esta especialidade.</p>
+      </div>
+      <p class="adm-foot-note">A conversão dos ficheiros é automática e acontece durante a ingestão. «Recarregar» substitui o ficheiro de uma fonte; a fonte fica marcada como substituída até à próxima ingestão.</p>
+    </div>
 
-      <section class="admin-card danger-zone" aria-labelledby="delete-title">
-        <h2 id="delete-title">Apagar especialidade</h2>
-        <p>Escreva o ID <strong>{{ specialist.id }}</strong> para confirmar. A pasta será movida para trash e o histórico dos clientes desta especialidade será apagado.</p>
-        <UInput v-model="confirmationId" placeholder="confirmationId" :disabled="pending" />
-        <UButton type="button" color="error" variant="soft" :loading="pending" @click="deleteSpecialist">
-          Apagar especialidade
-        </UButton>
-      </section>
-    </section>
+    <div class="adm-card">
+      <h2 class="adm-card-title">Acesso restrito por empresa</h2>
+      <p class="adm-card-note">Reserve este especialista a uma única empresa com conta corporativa. Com «Todos», fica disponível ao público.</p>
+      <label class="adm-field">
+        <span class="adm-field-label">Empresa com acesso</span>
+        <select v-model="editForm.company_id" class="field" :disabled="pending" @change="updateSpecialist">
+          <option value="">Todos — disponível ao público</option>
+          <option v-for="company in companies" :key="company.id" :value="company.id">{{ company.name }} · {{ company.seats }} utilizadores</option>
+        </select>
+      </label>
+      <p class="adm-foot-note">{{ editForm.company_id ? 'Apenas as contas especificadas pela ' + companyName(editForm.company_id) + ' vêem e consultam este especialista.' : 'Disponível para todos os utilizadores.' }}</p>
+    </div>
 
-    <p v-if="feedback" class="feedback">{{ feedback }}</p>
-    <p v-if="errorMessage" class="admin-error" role="alert">{{ errorMessage }}</p>
+    <div class="adm-card adm-dangerzone">
+      <div class="adm-card-toprow">
+        <div>
+          <h2 class="adm-card-title">{{ specialist.status === 'suspended' ? 'Especialidade suspensa' : 'Suspender especialidade' }}</h2>
+          <p class="adm-card-note">{{ specialist.status === 'suspended' ? 'Não aparece aos utilizadores. A wiki e o histórico mantêm-se intactos.' : 'Retira a especialidade do selector dos utilizadores, sem apagar dados.' }}</p>
+        </div>
+        <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="toggleSuspended">
+          <UjimuIcon :name="specialist.status === 'suspended' ? 'check' : 'pause'" :size="13" /> {{ specialist.status === 'suspended' ? 'Reactivar' : 'Suspender' }}
+        </button>
+      </div>
+      <div class="adm-card-toprow" style="border-top: 1px solid var(--line); padding-top: 12px">
+        <div>
+          <h2 class="adm-card-title">Apagar especialidade</h2>
+          <p class="adm-card-note">Apaga a wiki e todo o histórico de clientes associado, permanentemente.</p>
+        </div>
+        <button class="btn btn--danger btn--xs" type="button" :disabled="pending" @click="confirmDeleteOpen = true">Apagar</button>
+      </div>
+    </div>
+
+    <p v-if="feedback" class="plan-current--on"><UjimuIcon name="check" :size="11" /> {{ feedback }}</p>
+    <p v-if="errorMessage" class="adm-src-error" role="alert">{{ errorMessage }}</p>
+
+    <div v-if="confirmDeleteOpen" class="modal-scrim" @click="confirmDeleteOpen = false">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-specialist-title" @click.stop>
+        <div class="modal-body" style="padding-top: 18px; padding-bottom: 6px">
+          <h2 id="delete-specialist-title" class="modal-title">Apagar «{{ specialist.name }}»?</h2>
+          <p class="modal-sub">Esta acção apaga a especialidade, a respectiva wiki e <strong>todo o histórico de conversas dos clientes</strong> associado, de forma permanente.</p>
+          <div class="adm-row-actions">
+            <button class="btn btn--ghost" type="button" :disabled="pending" @click="confirmDeleteOpen = false">Cancelar</button>
+            <button class="btn btn--danger" type="button" :disabled="pending" @click="deleteSpecialist">Apagar permanentemente</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
 <style scoped>
-.admin-shell {
-  width: min(1180px, calc(100% - 32px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 32px 0;
-}
-
-.admin-hero,
-.admin-card {
-  border: 1px solid var(--ujimu-line);
-  border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-}
-
-.admin-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: clamp(24px, 4vw, 42px);
-}
-
-.header-actions,
-.card-heading,
-.tool-actions,
-.source-main-line,
-.status-badges {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.header-actions,
-.tool-actions,
-.status-badges {
-  flex-wrap: wrap;
-}
-
-.status-badges {
-  justify-content: flex-end;
-}
-
-.admin-hero h1,
-.admin-card h2 {
-  margin: 0;
-  letter-spacing: -0.045em;
-}
-
-.section-label {
-  margin: 0 0 10px;
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-hero p:not(.section-label),
-.muted,
-.sources-list small,
-.danger-zone p {
-  color: var(--ujimu-muted);
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.admin-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 22px;
-}
-
-.sources-card,
-.danger-zone {
-  grid-column: 1 / -1;
-}
-
-.admin-form {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--ujimu-muted);
-  font-weight: 800;
-}
-
-.checkbox-line {
-  display: flex !important;
-  grid-template-columns: none !important;
-  align-items: center;
-  gap: 8px !important;
-}
-
-.sources-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sources-list li,
-.danger-zone {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.sources-list li {
-  display: grid;
-  gap: 6px;
-}
-
-.source-error {
-  color: #ffd3d3 !important;
-  font-weight: 800;
-}
-
-.feedback,
-.admin-error {
-  margin: 18px 0 0;
-  border-radius: 18px;
-  padding: 12px 14px;
-  background: rgba(249, 214, 22, 0.1);
-}
-
-.feedback {
-  color: #fff8cc;
-  font-weight: 800;
-}
-
-.admin-error {
-  color: #ffd3d3;
-  font-weight: 800;
-}
-
-@media (max-width: 900px) {
-  .admin-hero,
-  .detail-grid {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-}
+a.btn { text-decoration: none; }
+.readonly-field:disabled { opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink); cursor: default; }
+.adm-toggle:disabled { opacity: 0.6; cursor: default; }
 </style>

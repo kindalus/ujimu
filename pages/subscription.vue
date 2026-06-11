@@ -45,23 +45,13 @@ interface BillingStatusResponse {
 interface BillingCheckoutResponse {
   checkout: {
     id: string
-    provider: BillingProvider
-    method: BillingPaymentMethod
     status: 'pending'
     instructions: string
   }
 }
 
-type BillingProvider = 'appy_pay' | 'stripe'
-type BillingPaymentMethod = 'multicaixa_express' | 'multicaixa_reference' | 'qr_code' | 'visa'
-
-interface BillingMethodOption {
-  label: string
-  provider: BillingProvider
-  method: BillingPaymentMethod
-}
-
-const billingCheckoutSuccessMessage = 'Pagamento criado. A subscrição será activada depois da confirmação do pagamento.'
+const billingCheckoutSuccessMessage = 'Pedido de subscrição criado. A subscrição será activada depois da confirmação operacional.'
+const fallbackBillingPriceLabel = '50 000,00 AOA'
 const defaultBillingStatus: BillingStatusResponse = {
   authenticated: false,
   subscribed: false,
@@ -70,13 +60,6 @@ const defaultBillingStatus: BillingStatusResponse = {
   expiryWarning: null,
   ads: { visible: true }
 }
-const billingMethodOptions: BillingMethodOption[] = [
-  { label: 'Multicaixa Express', provider: 'appy_pay', method: 'multicaixa_express' },
-  { label: 'Referência Multicaixa', provider: 'appy_pay', method: 'multicaixa_reference' },
-  { label: 'QR Code', provider: 'appy_pay', method: 'qr_code' },
-  { label: 'VISA', provider: 'stripe', method: 'visa' }
-]
-
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
@@ -84,16 +67,18 @@ const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
 const billingPending = ref(false)
 const billingError = ref('')
 const billingMessage = ref('')
-const billingCheckoutPendingMethod = ref<BillingPaymentMethod | ''>('')
+const billingCheckoutPending = ref(false)
 
 onMounted(() => {
   void loadAuthSession()
 })
 
 const isAuthenticated = computed(() => authSession.value.authenticated)
-const billingPriceLabel = computed(() => `${formatBillingAmount(billingStatus.value.plan.amount.value)} AOA`)
+const billingPriceLabel = computed(() => {
+  const formatted = formatBillingAmount(billingStatus.value.plan.amount.value)
+  return formatted ? `${formatted} AOA` : fallbackBillingPriceLabel
+})
 const billingExpiryLabel = computed(() => formatDisplayDate(billingStatus.value.subscription?.expiresAt))
-const subscriptionStateLabel = computed(() => billingStatus.value.subscribed ? 'Activa' : 'Por activar')
 
 async function loadAuthSession(): Promise<void> {
   try {
@@ -137,14 +122,14 @@ async function loadBillingStatus(): Promise<void> {
   }
 }
 
-async function startBillingCheckout(provider: BillingProvider, method: BillingPaymentMethod): Promise<void> {
+async function startBillingCheckout(): Promise<void> {
   if (!isAuthenticated.value) {
     billingError.value = 'Entre para subscrever.'
     authPanelOpen.value = true
     return
   }
 
-  billingCheckoutPendingMethod.value = method
+  billingCheckoutPending.value = true
   billingError.value = ''
   billingMessage.value = ''
 
@@ -152,7 +137,7 @@ async function startBillingCheckout(provider: BillingProvider, method: BillingPa
     const response = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider, method })
+      body: JSON.stringify({ provider: 'appy_pay', method: 'multicaixa_express' })
     })
 
     if (response.status === 401) {
@@ -162,17 +147,17 @@ async function startBillingCheckout(provider: BillingProvider, method: BillingPa
     }
 
     if (!response.ok) {
-      billingError.value = 'Não foi possível iniciar o pagamento.'
+      billingError.value = 'Não foi possível registar o pedido de subscrição.'
       return
     }
 
-    const payload = (await response.json()) as BillingCheckoutResponse
-    billingMessage.value = payload.checkout.instructions || billingCheckoutSuccessMessage
+    await response.json() as BillingCheckoutResponse
+    billingMessage.value = billingCheckoutSuccessMessage
     void loadBillingStatus()
   } catch {
-    billingError.value = 'Não foi possível iniciar o pagamento.'
+    billingError.value = 'Não foi possível registar o pedido de subscrição.'
   } finally {
-    billingCheckoutPendingMethod.value = ''
+    billingCheckoutPending.value = false
   }
 }
 
@@ -209,78 +194,75 @@ function formatDisplayDate(value: string | undefined): string {
 </script>
 
 <template>
-  <main class="subscription-shell" aria-labelledby="subscription-title">
-    <div class="app-shell-bar">
-      <AppDrawer
-        :is-authenticated="isAuthenticated"
-        :admin-available="adminAvailable"
-        :user-label="authSession.user?.displayContact"
-        open-label="Abrir navegação"
-        @open-auth="authPanelOpen = true"
-        @logout="logout"
-      />
-      <span>Ujimu</span>
+  <main class="subpage" aria-labelledby="subscription-title" data-screen-label="Subscrição — Planos">
+    <NuxtLink class="btn btn--ghost btn--back" to="/"><UjimuIcon name="chevLeft" /> Voltar à consulta</NuxtLink>
+    <h1 id="subscription-title" class="subpage-title">Subscrição</h1>
+    <p class="subpage-sub">Consulte sem limite diário e sem publicidade.</p>
+
+    <div v-if="billingStatus.expiryWarning" class="warnbar" role="alert">
+      <UjimuIcon name="info" />
+      <span>A sua subscrição termina em menos de uma semana. Renove para manter o acesso sem publicidade.</span>
+      <button class="btn btn--primary btn--xs" type="button" :disabled="billingCheckoutPending" @click="startBillingCheckout">Renovar agora</button>
     </div>
 
-    <header class="subscription-hero">
-      <div>
-        <p class="section-label">Subscrição</p>
-        <h1 id="subscription-title">Plano trimestral — 50 000,00 AOA</h1>
-        <p>Remova publicidade e use os limites de subscritor durante três meses.</p>
-      </div>
-      <div class="hero-actions">
-        <UBadge color="primary" variant="soft" size="lg">{{ subscriptionStateLabel }}</UBadge>
-        <UButton to="/" color="neutral" variant="ghost">Voltar ao chat</UButton>
-      </div>
-    </header>
+    <p v-if="billingPending" class="adm-foot-note">A carregar subscrição...</p>
+    <p v-if="billingMessage" class="plan-current--on"><UjimuIcon name="check" /> {{ billingMessage }}</p>
+    <p v-if="billingError" class="errbar" role="alert"><UjimuIcon name="info" /><span>{{ billingError }}</span></p>
 
-    <section class="subscription-grid" aria-label="Gestão da subscrição">
-      <section class="subscription-card" aria-labelledby="plan-title">
-        <p class="section-label">Plano</p>
-        <h2 id="plan-title">{{ billingPriceLabel }} <span>por trimestre</span></h2>
-
-        <p v-if="billingPending" class="muted">A carregar subscrição...</p>
-        <template v-else>
-          <p v-if="billingStatus.subscribed" class="state-text">
-            Subscrição activa até {{ billingExpiryLabel }}. Não verá publicidade enquanto a subscrição estiver activa.
-          </p>
-          <p v-else class="state-text">
-            Entre para subscrever, remover publicidade e usar os limites de subscritor.
-          </p>
-          <p v-if="billingStatus.expiryWarning" class="state-warning" role="alert">
-            A sua subscrição termina em menos de uma semana.
-          </p>
-        </template>
-
-        <p v-if="billingMessage" class="state-message">{{ billingMessage }}</p>
-        <p v-if="billingError" class="state-error" role="alert">{{ billingError }}</p>
-
-        <div class="billing-actions" aria-label="Métodos de pagamento">
-          <UButton
-            v-for="option in billingMethodOptions"
-            :key="option.method"
-            type="button"
-            color="primary"
-            variant="soft"
-            :loading="billingCheckoutPendingMethod === option.method"
-            @click="startBillingCheckout(option.provider, option.method)"
-          >
-            {{ option.label }}
-          </UButton>
-        </div>
-      </section>
-
-      <aside class="subscription-card support-card" aria-labelledby="support-title">
-        <p class="section-label">Lançamento</p>
-        <h2 id="support-title">Pagamento em modo de preparação</h2>
-        <p class="muted">Os métodos listados validam o fluxo de checkout. A activação automática por pagamento real será ligada depois do lançamento.</p>
-        <ul>
-          <li>Appy Pay: Multicaixa Express, Referência Multicaixa e QR Code.</li>
-          <li>VISA: integração prevista por Stripe.</li>
-          <li>Sem período de graça depois do fim da subscrição.</li>
+    <div class="plans plans--three">
+      <div class="plan">
+        <span class="plan-name">Gratuito</span>
+        <span class="plan-price">0 AOA</span>
+        <ul class="plan-list">
+          <li>5 pedidos/dia · 20/semana (anónimo)</li>
+          <li>20 pedidos/dia · 100/semana (com sessão)</li>
+          <li>Publicidade no fluxo da conversa</li>
+          <li>Histórico por especialidade (com sessão)</li>
         </ul>
-      </aside>
-    </section>
+        <span v-if="!billingStatus.subscribed" class="plan-current">Plano actual</span>
+      </div>
+
+      <div class="plan plan--featured" :class="{ 'plan--active': billingStatus.subscribed }">
+        <span class="plan-name">Subscritor</span>
+        <span class="plan-price">{{ billingPriceLabel }}<span class="plan-per">/trimestre</span></span>
+        <ul class="plan-list">
+          <li>Sem limite diário</li>
+          <li>Limite semanal configurável para subscritores</li>
+          <li>Sem publicidade</li>
+          <li>Tudo o que tem o plano gratuito</li>
+        </ul>
+        <span v-if="billingStatus.subscribed" class="plan-current plan-current--on"><UjimuIcon name="check" /> Subscrição activa</span>
+        <button v-else class="btn btn--primary btn--block" type="button" :disabled="billingCheckoutPending" @click="startBillingCheckout">
+          {{ isAuthenticated ? (billingCheckoutPending ? 'A preparar subscrição…' : 'Subscrever') : 'Entrar para subscrever' }}
+        </button>
+      </div>
+
+      <div class="plan">
+        <span class="plan-name">Empresa</span>
+        <span class="plan-price">Sob consulta<span class="plan-per">/trimestre</span></span>
+        <ul class="plan-list">
+          <li>Tudo o que tem o plano Subscritor</li>
+          <li>Lugares para toda a equipa</li>
+          <li>Gestão centralizada de contas e administradores</li>
+          <li>Acesso a especialistas reservados à empresa</li>
+        </ul>
+        <button v-if="!isAuthenticated" class="btn btn--primary btn--block" type="button" @click="authPanelOpen = true">Entrar para configurar</button>
+        <NuxtLink v-else class="btn btn--primary btn--block" to="/companies">Configurar empresa</NuxtLink>
+      </div>
+    </div>
+
+    <div v-if="billingStatus.subscribed" class="sub-manage">
+      <h2 class="sub-manage-title">Gerir subscrição</h2>
+      <div class="sub-manage-row">
+        <span>Subscrição activa até <strong>{{ billingExpiryLabel }}</strong></span>
+      </div>
+      <div class="sub-manage-row">
+        <span>Limite semanal: <strong>configurado para subscritores</strong></span>
+      </div>
+      <div class="sub-manage-row">
+        <span>Publicidade: <strong>removida enquanto a subscrição estiver activa</strong></span>
+      </div>
+    </div>
   </main>
 
   <AuthModal
@@ -291,154 +273,5 @@ function formatDisplayDate(value: string | undefined): string {
 </template>
 
 <style scoped>
-.subscription-shell {
-  width: min(1100px, calc(100% - 32px));
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: 32px 0;
-}
-
-.app-shell-bar {
-  position: sticky;
-  top: 16px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: fit-content;
-  margin-bottom: 18px;
-  border: 1px solid var(--ujimu-line);
-  border-radius: 999px;
-  padding: 6px 12px 6px 6px;
-  color: var(--ujimu-muted);
-  background: rgba(10, 10, 10, 0.78);
-  backdrop-filter: blur(18px);
-  font-weight: 800;
-}
-
-.subscription-hero,
-.subscription-card {
-  border: 1px solid var(--ujimu-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.028));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-}
-
-.subscription-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  border-radius: 28px;
-  padding: clamp(24px, 4vw, 42px);
-}
-
-.subscription-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.subscription-card {
-  display: grid;
-  align-content: start;
-  gap: 16px;
-  border-radius: 24px;
-  padding: 22px;
-}
-
-.hero-actions,
-.billing-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.section-label {
-  margin: 0 0 10px;
-  color: var(--ujimu-yellow);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-h1,
-h2 {
-  margin: 0;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-h1 {
-  max-width: 780px;
-  font-size: clamp(2.2rem, 5vw, 4.8rem);
-}
-
-h2 {
-  font-size: clamp(1.6rem, 3vw, 2.35rem);
-}
-
-h2 span,
-.subscription-hero p:not(.section-label),
-.muted,
-.state-text,
-.support-card li {
-  color: var(--ujimu-muted);
-  line-height: 1.45;
-}
-
-.subscription-hero p:not(.section-label),
-.state-text,
-.muted,
-.state-warning,
-.state-message,
-.state-error {
-  margin: 0;
-}
-
-.state-warning,
-.state-message,
-.state-error {
-  border-radius: 16px;
-  padding: 10px;
-  line-height: 1.35;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.state-warning,
-.state-message {
-  color: #fff8cc;
-  background: rgba(249, 214, 22, 0.11);
-}
-
-.state-error {
-  color: #ffd3d3;
-  background: rgba(210, 16, 52, 0.16);
-}
-
-.support-card ul {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding-left: 20px;
-}
-
-@media (max-width: 860px) {
-  .subscription-hero,
-  .subscription-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .subscription-hero {
-    display: grid;
-  }
-
-  .hero-actions {
-    justify-content: flex-start;
-  }
-}
+a.btn { text-decoration: none; }
 </style>

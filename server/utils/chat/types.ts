@@ -16,11 +16,20 @@ export interface ChatHistoryEvent {
 }
 
 export type ChatStreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
   | ChatHistoryEvent
   | { type: 'done'; grounded: boolean }
   | { type: 'error'; code: string; message: string }
+
+export type ChatRunnerStreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'heartbeat' }
+  | { type: 'delta'; text: string }
+  | { type: 'citation'; citation: ChatCitation }
+  | { type: 'done'; grounded: boolean }
 
 export interface ChatConversationContextMessage {
   role: 'user' | 'assistant'
@@ -39,6 +48,7 @@ export interface ChatEngineRun {
   grounded: boolean
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
+  events?: AsyncIterable<ChatRunnerStreamEvent>
 }
 
 export interface ChatEngineRunner {

@@ -258,19 +258,30 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: false })
   })
 
-  it('uses a Ujimu Pi agent directory outside Pi CLI .pi discovery', async () => {
+  it('uses mutable Ujimu config outside bundled Pi resources and Pi CLI .pi discovery', async () => {
     const { DefaultResourceLoader, SettingsManager } = await import('@earendil-works/pi-coding-agent')
-    const { resolveUjimuPiAgentDir } = await import('../server/utils/pi/paths')
-    const previousAgentDir = process.env.UJIMU_PI_AGENT_DIR
-    delete process.env.UJIMU_PI_AGENT_DIR
+    const { ensureUjimuPiConfigDir, resolveUjimuConfigDir, resolveUjimuPiBundleDir } = await import('../server/utils/pi/paths')
+    const previousConfigDir = process.env.UJIMU_CONFIG_DIR
+    const previousBundleDir = process.env.UJIMU_PI_BUNDLE_DIR
+    delete process.env.UJIMU_CONFIG_DIR
+    delete process.env.UJIMU_PI_BUNDLE_DIR
 
     try {
       const loaderCwd = await mkdtemp(join(tmpdir(), 'ujimu-pi-loader-'))
-      const agentDir = resolveUjimuPiAgentDir()
+      const configDir = await mkdtemp(join(tmpdir(), 'ujimu-config-'))
+      const defaultConfigDir = resolveUjimuConfigDir()
+      const bundleDir = resolveUjimuPiBundleDir()
+      const seededConfigDir = await ensureUjimuPiConfigDir({ env: { UJIMU_CONFIG_DIR: configDir }, bundledPiDir: bundleDir })
       const loader = new DefaultResourceLoader({
         cwd: loaderCwd,
-        agentDir,
-        settingsManager: SettingsManager.create(loaderCwd, agentDir)
+        agentDir: bundleDir,
+        settingsManager: SettingsManager.create(loaderCwd, seededConfigDir),
+        additionalSkillPaths: [join(bundleDir, 'skills')],
+        noContextFiles: true,
+        noExtensions: true,
+        noPromptTemplates: true,
+        noSkills: true,
+        noThemes: true
       })
       await loader.reload()
       const skills = loader.getSkills()
@@ -278,21 +289,22 @@ describe('three Pi agent pipeline acceptance', () => {
       const llmWiki = skills.skills.find((skill) => skill.name === 'llm-wiki')
       const trackedPi = await execFileAsync('git', ['ls-files', '.pi'])
 
-      expect(agentDir).toBe(join(process.cwd(), 'config', 'ujimu-pi-agent'))
-      expect(agentDir).not.toBe(join(process.cwd(), '.pi'))
-      expect(llmWiki?.filePath).toBe(join(agentDir, 'skills', 'llm-wiki', 'SKILL.md'))
+      expect(defaultConfigDir).toMatch(/\.config\/ujimu$/)
+      expect(bundleDir).toBe(join(process.cwd(), 'config', 'pi'))
+      expect(bundleDir).not.toBe(join(process.cwd(), '.pi'))
+      expect(seededConfigDir).toBe(configDir)
+      expect(llmWiki?.filePath).toBe(join(bundleDir, 'skills', 'llm-wiki', 'SKILL.md'))
+      expect(skills.skills.map((skill) => skill.name)).toEqual(['llm-wiki'])
       expect(extensions.errors).toEqual([])
       expect(trackedPi.stdout.trim()).toBe('')
-      await expect(readFile(join(agentDir, 'auth.json.sample'), 'utf8')).resolves.toContain('OPENROUTER_API_KEY')
-      await expect(readFile('.gitignore', 'utf8')).resolves.toContain('config/ujimu-pi-agent/auth.json')
+      await expect(readFile(join(configDir, 'auth.json'), 'utf8')).resolves.toContain('OPENROUTER_API_KEY')
+      await expect(readFile(join(configDir, 'models.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
+      await expect(readFile(join(configDir, 'settings.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
+      await expect(readFile('.gitignore', 'utf8')).resolves.toContain('config/pi/auth.json')
       await expect(readFile('.gitignore', 'utf8')).resolves.toContain('.pi/')
-      await expect(readFile(join(agentDir, 'settings.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
     } finally {
-      if (previousAgentDir === undefined) {
-        delete process.env.UJIMU_PI_AGENT_DIR
-      } else {
-        process.env.UJIMU_PI_AGENT_DIR = previousAgentDir
-      }
+      restoreEnv('UJIMU_CONFIG_DIR', previousConfigDir)
+      restoreEnv('UJIMU_PI_BUNDLE_DIR', previousBundleDir)
     }
   })
 })
@@ -471,14 +483,14 @@ function createAdminFetch(dataDir: string, conversionHandler: unknown): (request
     const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
     const previousAdminContacts = process.env.UJIMU_ADMIN_CONTACTS
     const previousConversionEnabled = process.env.UJIMU_PI_CONVERSION_ENABLED
-    const previousAgentDir = process.env.UJIMU_PI_AGENT_DIR
+    const previousConfigDir = process.env.UJIMU_CONFIG_DIR
     const previousConversionProvider = process.env.UJIMU_PI_CONVERSION_PROVIDER
     const previousConversionModel = process.env.UJIMU_PI_CONVERSION_MODEL
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'admin-test-secret'
     process.env.UJIMU_ADMIN_CONTACTS = 'admin@example.com'
     process.env.UJIMU_PI_CONVERSION_ENABLED = 'true'
-    process.env.UJIMU_PI_AGENT_DIR = piAgentDir
+    process.env.UJIMU_CONFIG_DIR = piAgentDir
     delete process.env.UJIMU_PI_CONVERSION_PROVIDER
     delete process.env.UJIMU_PI_CONVERSION_MODEL
 
@@ -489,7 +501,7 @@ function createAdminFetch(dataDir: string, conversionHandler: unknown): (request
       restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
       restoreEnv('UJIMU_ADMIN_CONTACTS', previousAdminContacts)
       restoreEnv('UJIMU_PI_CONVERSION_ENABLED', previousConversionEnabled)
-      restoreEnv('UJIMU_PI_AGENT_DIR', previousAgentDir)
+      restoreEnv('UJIMU_CONFIG_DIR', previousConfigDir)
       restoreEnv('UJIMU_PI_CONVERSION_PROVIDER', previousConversionProvider)
       restoreEnv('UJIMU_PI_CONVERSION_MODEL', previousConversionModel)
     }

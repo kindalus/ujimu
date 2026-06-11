@@ -24,7 +24,7 @@ describe('resolveAppConfig', () => {
   })
 
   it('limits the default OpenRouter chat model output tokens in the Pi agent config', async () => {
-    const config = JSON.parse(await readFile('config/ujimu-pi-agent/models.json', 'utf8')) as {
+    const config = JSON.parse(await readFile('config/pi/models.json', 'utf8')) as {
       providers?: {
         openrouter?: {
           modelOverrides?: Record<string, { maxTokens?: number }>

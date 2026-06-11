@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import type { IngestionSource } from '../../../utils/admin-ui'
-import { pipelineStatusColor } from '../../../utils/admin-ui'
+
+interface CompanyMembership {
+  email: string
+  role: 'admin' | 'member'
+}
+
+interface CompanyDetail {
+  company: { id: string; nif: string; name: string; phone: string; address: string }
+  role: 'admin' | 'member'
+  memberships: CompanyMembership[]
+}
 
 interface CompanySpecialist {
   id: string
@@ -13,11 +24,16 @@ interface CompanySpecialist {
   sources: IngestionSource[]
 }
 
+const route = useRoute()
 const companyId = ref('')
+const companyName = ref('')
+const companyRole = ref<'admin' | 'member' | ''>('')
 const specialists = ref<CompanySpecialist[]>([])
 const selectedSpecialistId = ref('')
 const promptForm = ref('')
+const lastSavedPrompt = ref('')
 const uploadFile = ref<File | undefined>()
+const fileInput = ref<HTMLInputElement | null>(null)
 const loading = ref(true)
 const pending = ref(false)
 const feedback = ref('')
@@ -26,37 +42,56 @@ const errorMessage = ref('')
 const selectedSpecialist = computed(() =>
   specialists.value.find((specialist) => specialist.id === selectedSpecialistId.value) ?? null
 )
+const selectedPendingCount = computed(() => selectedSpecialist.value ? pendingSourceCount(selectedSpecialist.value) : 0)
 
 onMounted(() => {
-  companyId.value = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-2) ?? '')
-  void loadSpecialists()
+  companyId.value = readRouteCompanyId()
+  void loadCompanyArea()
 })
 
-async function loadSpecialists(): Promise<void> {
+async function loadCompanyArea(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
+  feedback.value = ''
   try {
-    const response = await fetch(`/api/companies/${encodeURIComponent(companyId.value)}/specialists`)
-    if (!response.ok) {
-      errorMessage.value = resolveLoadError(response.status)
+    const detailResponse = await fetch(`/api/companies/${encodeURIComponent(companyId.value)}`)
+    if (!detailResponse.ok) {
+      errorMessage.value = resolveCompanyError(detailResponse.status)
       return
     }
 
-    const payload = (await response.json()) as { specialists: CompanySpecialist[] }
-    specialists.value = payload.specialists
-    if (!selectedSpecialistId.value && payload.specialists[0]) {
-      selectedSpecialistId.value = payload.specialists[0].id
+    const detail = (await detailResponse.json()) as CompanyDetail
+    companyName.value = detail.company.name
+    companyRole.value = detail.role
+    if (detail.role !== 'admin') {
+      errorMessage.value = 'A sua conta não tem permissões de administrador na empresa activa. Mude de empresa no menu lateral ou contacte o administrador da sua empresa.'
+      return
     }
-    syncPromptForm()
+
+    await loadSpecialists()
   } catch {
-    errorMessage.value = 'Não foi possível carregar os especialistas.'
+    errorMessage.value = 'Não foi possível carregar os especialistas da empresa.'
   } finally {
     loading.value = false
   }
 }
 
+async function loadSpecialists(): Promise<void> {
+  const response = await fetch(`/api/companies/${encodeURIComponent(companyId.value)}/specialists`)
+  if (!response.ok) {
+    errorMessage.value = resolveSpecialistsError(response.status)
+    return
+  }
+
+  const payload = (await response.json()) as { specialists: CompanySpecialist[] }
+  specialists.value = payload.specialists
+  const requestedId = readRequestedSpecialistId()
+  selectedSpecialistId.value = payload.specialists.some((specialist) => specialist.id === requestedId) ? requestedId : ''
+  syncPromptForm()
+}
+
 async function savePrompt(): Promise<void> {
-  if (!selectedSpecialist.value) return
+  if (!selectedSpecialist.value || promptForm.value === lastSavedPrompt.value) return
 
   await runAction(async () => {
     const response = await fetch(`/api/companies/${encodeURIComponent(companyId.value)}/specialists/${encodeURIComponent(selectedSpecialist.value!.id)}`, {
@@ -68,7 +103,7 @@ async function savePrompt(): Promise<void> {
 
     const payload = (await response.json()) as { specialist: CompanySpecialist }
     replaceSpecialist(payload.specialist)
-    feedback.value = 'Prompt guardado.'
+    feedback.value = 'Alterações guardadas automaticamente.'
   })
 }
 
@@ -90,14 +125,20 @@ async function uploadRawSource(): Promise<void> {
     const payload = (await response.json()) as { replaced: boolean; source?: IngestionSource }
     if (payload.source) replaceOneSource(payload.source)
     feedback.value = payload.replaced
-      ? 'Fonte substituída. Aguarda processamento pelo admin Ujimu.'
-      : 'Fonte carregada. Aguarda processamento pelo admin Ujimu.'
+      ? 'Fonte substituída; aguarda ingestão pela equipa Ujimu.'
+      : 'Fonte carregada; aguarda ingestão pela equipa Ujimu.'
   })
 }
 
 function rememberUploadFile(event: Event): void {
   const input = event.target as HTMLInputElement
   uploadFile.value = input.files?.[0]
+  input.value = ''
+  if (uploadFile.value) void uploadRawSource()
+}
+
+function openFilePicker(): void {
+  fileInput.value?.click()
 }
 
 function selectSpecialist(specialistId: string): void {
@@ -107,8 +148,16 @@ function selectSpecialist(specialistId: string): void {
   syncPromptForm()
 }
 
+function backToList(): void {
+  selectedSpecialistId.value = ''
+  feedback.value = ''
+  errorMessage.value = ''
+  syncPromptForm()
+}
+
 function syncPromptForm(): void {
   promptForm.value = selectedSpecialist.value?.system_prompt ?? ''
+  lastSavedPrompt.value = promptForm.value
 }
 
 function replaceSpecialist(updated: CompanySpecialist): void {
@@ -141,134 +190,185 @@ async function runAction(action: () => Promise<void>): Promise<void> {
   }
 }
 
-function resolveLoadError(status: number): string {
-  if (status === 401) return 'Tem de iniciar sessão.'
-  if (status === 403) return 'Só administradores da empresa podem gerir especialistas.'
+function readRouteCompanyId(): string {
+  const raw = route.params.id
+  return decodeURIComponent(Array.isArray(raw) ? raw[0] ?? '' : raw ?? '')
+}
+
+function readRequestedSpecialistId(): string {
+  const raw = route.query.specialist
+  return typeof raw === 'string' ? raw : ''
+}
+
+function specialistLetter(specialist: CompanySpecialist): string {
+  return (specialist.name || specialist.id).trim().slice(0, 1).toUpperCase() || 'E'
+}
+
+function pendingSourceCount(specialist: CompanySpecialist): number {
+  return specialist.sources.filter((source) => source.status !== 'ingested').length
+}
+
+function sourceName(source: IngestionSource): string {
+  return source.raw_path.split('/').filter(Boolean).at(-1) || source.raw_path
+}
+
+function sourceSub(source: IngestionSource): string {
+  const pieces: string[] = []
+  if (source.article_refs.length > 0) pieces.push(`${source.article_refs.length} fragmentos na wiki`)
+  pieces.push('adicionada pela empresa')
+  pieces.push(`actualizada ${sourceUpdatedLabel(source)}`)
+  return pieces.join(' · ')
+}
+
+function sourceUpdatedLabel(source: IngestionSource): string {
+  const timestamp = source.updated_at ?? source.ingestion?.updated_at ?? source.conversion?.updated_at ?? source.replaced_at ?? source.ingested_at ?? source.detected_at
+  if (!timestamp) return 'recentemente'
+
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'recentemente'
+
+  return new Intl.DateTimeFormat('pt-PT', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date)
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: 'Pendente',
+    processing: 'Em processamento',
+    ingested: 'Ingerido',
+    failed: 'Falhado',
+    blocked: 'Bloqueado',
+    converted: 'Convertido',
+    not_required: 'Não requerido'
+  }
+  return labels[status] || status
+}
+
+function badgeClass(status: string): string {
+  if (['ingested', 'not_required'].includes(status)) return 'badge--ok'
+  if (['processing'].includes(status)) return 'badge--warn'
+  if (['failed', 'blocked'].includes(status)) return 'badge--err'
+  if (['converted'].includes(status)) return 'badge--mid'
+  return 'badge--mute'
+}
+
+function resolveCompanyError(status: number): string {
+  if (status === 401) return 'Inicie sessão com uma conta de administrador corporativo para gerir os especialistas da sua empresa.'
+  if (status === 404) return 'Empresa não encontrada.'
+  return 'Não foi possível carregar a empresa.'
+}
+
+function resolveSpecialistsError(status: number): string {
+  if (status === 401) return 'Inicie sessão com uma conta de administrador corporativo para gerir os especialistas da sua empresa.'
+  if (status === 403) return 'A sua conta não tem permissões de administrador na empresa activa. Mude de empresa no menu lateral ou contacte o administrador da sua empresa.'
   if (status === 404) return 'Empresa não encontrada.'
   return 'Não foi possível carregar os especialistas.'
 }
 </script>
 
 <template>
-  <main class="company-shell" aria-labelledby="company-specialists-title">
-    <header class="company-hero">
+  <main v-if="loading" class="adm-page" aria-labelledby="company-specialists-title">
+    <section class="adm-card"><p class="adm-sub">A carregar especialistas...</p></section>
+  </main>
+
+  <main v-else-if="errorMessage && companyRole !== 'admin'" class="adm-page adm-gate" aria-labelledby="company-specialists-title" data-screen-label="Empresa — Acesso negado">
+    <span class="adm-gate-icon"><UjimuIcon name="user" /></span>
+    <h1 id="company-specialists-title" class="adm-title">Gestão de especialistas da empresa</h1>
+    <p class="adm-sub">{{ errorMessage }}</p>
+    <div class="adm-row-actions" style="justify-content: center">
+      <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
+    </div>
+  </main>
+
+  <main v-else-if="!selectedSpecialist" class="adm-page" aria-labelledby="company-specialists-title" data-screen-label="Empresa — Especialistas">
+    <NuxtLink class="btn btn--ghost btn--back" to="/"><UjimuIcon name="chevLeft" /> Voltar à consulta</NuxtLink>
+    <div class="adm-pagehead">
       <div>
-        <p class="section-label">Empresa</p>
-        <h1 id="company-specialists-title">Especialistas da empresa</h1>
-        <p>Actualize o prompt, carregue fontes e acompanhe o estado. A ingestão continua a cargo do admin Ujimu.</p>
+        <h1 id="company-specialists-title" class="adm-title">Especialistas da empresa</h1>
+        <p class="adm-sub">Reservados a <strong>{{ companyName }}</strong>. Pode ajustar o prompt e adicionar fontes; a ingestão é executada pela equipa Ujimu.</p>
       </div>
-      <div class="company-actions">
-        <UButton :to="`/companies/${companyId}`" color="neutral" variant="ghost">Empresa</UButton>
-        <UButton to="/companies" color="neutral" variant="ghost">Empresas</UButton>
+    </div>
+
+    <div class="adm-list">
+      <div v-if="specialists.length === 0" class="adm-card">
+        <p class="adm-sub">Ainda não há especialistas reservados à sua empresa. Contacte a equipa Ujimu para criar um.</p>
       </div>
-    </header>
-
-    <section v-if="loading" class="company-card">
-      <p>A carregar especialistas...</p>
-    </section>
-
-    <section v-else-if="errorMessage" class="company-card" role="alert">
-      <p class="company-error">{{ errorMessage }}</p>
-    </section>
-
-    <section v-else-if="specialists.length === 0" class="company-card">
-      <h2>Sem especialistas privados</h2>
-      <p class="muted">Ainda não existem especialistas associados a esta empresa.</p>
-    </section>
-
-    <section v-else class="specialists-grid">
-      <section class="company-card list-card" aria-labelledby="specialist-list-title">
-        <div class="card-heading">
-          <h2 id="specialist-list-title">Especialistas</h2>
-          <UBadge color="primary" variant="soft">{{ specialists.length }}</UBadge>
+      <template v-else>
+        <div v-for="specialist in specialists" :key="specialist.id" class="adm-card adm-spec">
+          <button class="adm-spec-main" type="button" @click="selectSpecialist(specialist.id)">
+            <span class="spec-chip-letter">{{ specialistLetter(specialist) }}</span>
+            <span class="adm-spec-meta">
+              <span class="adm-spec-name">{{ specialist.name }}</span>
+              <span class="adm-spec-desc">{{ specialist.description }}</span>
+            </span>
+            <span class="adm-spec-stats">
+              <span class="adm-stat">{{ specialist.sources.length }} fontes</span>
+              <span v-if="pendingSourceCount(specialist) > 0" class="badge badge--warn"><span class="badge-dot" />{{ pendingSourceCount(specialist) }} por ingerir</span>
+              <span v-else class="badge badge--ok"><span class="badge-dot" />Tudo ingerido</span>
+            </span>
+          </button>
         </div>
-        <ol class="specialist-list">
-          <li v-for="specialist in specialists" :key="specialist.id" :class="{ selected: specialist.id === selectedSpecialistId }">
-            <button type="button" :disabled="pending" @click="selectSpecialist(specialist.id)">
-              <strong>{{ specialist.name }}</strong>
-              <small>{{ specialist.id }} · {{ specialist.wiki_type }}</small>
-              <span>{{ specialist.sources.length }} fonte(s)</span>
-            </button>
-          </li>
-        </ol>
-      </section>
+      </template>
+    </div>
+    <p class="adm-foot-note">Para criar ou remover especialistas, alterar metadados ou comportamento, contacte a equipa Ujimu.</p>
+    <p v-if="errorMessage" class="adm-src-error" role="alert">{{ errorMessage }}</p>
+  </main>
 
-      <section v-if="selectedSpecialist" class="company-card management-card">
-        <div class="card-heading">
-          <div>
-            <p class="section-label">{{ selectedSpecialist.id }}</p>
-            <h2>{{ selectedSpecialist.name }}</h2>
+  <main v-else class="adm-page" aria-labelledby="company-specialist-detail-title" data-screen-label="Empresa — Ficha de especialista">
+    <button class="btn btn--ghost btn--back" type="button" @click="backToList"><UjimuIcon name="chevLeft" /> Especialistas da empresa</button>
+    <div class="adm-pagehead">
+      <div class="adm-detail-head">
+        <span class="spec-chip-letter spec-chip-letter--lg">{{ specialistLetter(selectedSpecialist) }}</span>
+        <div>
+          <h1 id="company-specialist-detail-title" class="adm-title">{{ selectedSpecialist.name }}</h1>
+          <p class="adm-sub">Reservado a {{ companyName }} · gestão limitada</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="adm-card">
+      <h2 class="adm-card-title">Prompt do especialista</h2>
+      <p class="adm-card-note">Define o comportamento das respostas. As alterações aplicam-se de imediato às novas consultas.</p>
+      <label class="adm-field">
+        <textarea v-model="promptForm" class="field adm-prompt" rows="5" :disabled="pending" @change="savePrompt" />
+      </label>
+      <p v-if="feedback === 'Alterações guardadas automaticamente.'" class="adm-foot-note"><UjimuIcon name="check" /> {{ feedback }}</p>
+    </div>
+
+    <div class="adm-card">
+      <div class="adm-card-toprow">
+        <h2 class="adm-card-title">Fontes</h2>
+        <button class="btn btn--primary btn--xs" type="button" :disabled="pending" @click="openFilePicker"><UjimuIcon name="upload" /> Adicionar fonte</button>
+      </div>
+      <input ref="fileInput" type="file" style="display: none" accept=".pdf,.txt,.docx,.html,.htm,.csv,.xlsx,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
+      <p v-if="selectedPendingCount > 0" class="adm-ingest-note"><UjimuIcon name="info" /> {{ selectedPendingCount === 1 ? '1 fonte aguarda' : selectedPendingCount + ' fontes aguardam' }} ingestão pela equipa Ujimu.</p>
+      <div class="adm-srcs">
+        <div v-for="source in selectedSpecialist.sources" :key="source.raw_path" class="adm-src" :class="{ 'adm-src--err': source.error_message || source.conversion?.error_message || source.ingestion?.error_message }">
+          <div class="adm-src-row">
+            <UjimuIcon name="doc" />
+            <div class="adm-src-meta">
+              <span class="adm-src-name">{{ sourceName(source) }}</span>
+              <span class="adm-src-sub">{{ sourceSub(source) }}</span>
+            </div>
+            <span class="badge" :class="badgeClass(source.status)"><span class="badge-dot" />{{ statusLabel(source.status) }}</span>
           </div>
-          <UBadge :color="selectedSpecialist.status === 'active' ? 'success' : 'warning'" variant="soft">
-            {{ selectedSpecialist.status === 'active' ? 'Activo' : 'Suspenso' }}
-          </UBadge>
+          <p v-if="source.error_message" class="adm-src-error">{{ source.error_message }}</p>
+          <p v-if="source.conversion?.error_message" class="adm-src-error">{{ source.conversion.error_message }}</p>
+          <p v-if="source.ingestion?.error_message" class="adm-src-error">{{ source.ingestion.error_message }}</p>
         </div>
-        <p class="muted">{{ selectedSpecialist.description }}</p>
+        <p v-if="selectedSpecialist.sources.length === 0" class="adm-sub">Ainda não há fontes carregadas para este especialista.</p>
+      </div>
+      <p class="adm-foot-note">As fontes adicionadas ficam «Pendentes» até a equipa Ujimu executar a conversão e a ingestão. Não é possível remover nem substituir fontes a partir desta área.</p>
+    </div>
 
-        <form class="company-form" @submit.prevent="savePrompt">
-          <label>System prompt<UTextarea v-model="promptForm" :rows="6" :disabled="pending" /></label>
-          <UButton type="submit" color="primary" :loading="pending">Guardar prompt</UButton>
-        </form>
-
-        <section class="upload-section" aria-labelledby="upload-title">
-          <h3 id="upload-title">Carregar fonte</h3>
-          <p class="muted">Aguarda processamento pelo admin Ujimu.</p>
-          <input type="file" accept=".pdf,.txt,.docx,.html,.htm,.csv,.xlsx,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
-          <UButton type="button" color="primary" variant="soft" :loading="pending" @click="uploadRawSource">Carregar fonte</UButton>
-        </section>
-
-        <section aria-labelledby="sources-title">
-          <h3 id="sources-title">Estado das fontes</h3>
-          <p v-if="selectedSpecialist.sources.length === 0" class="muted">Sem fontes detectadas.</p>
-          <ol v-else class="sources-list">
-            <li v-for="source in selectedSpecialist.sources" :key="source.raw_path">
-              <div class="source-main-line">
-                <strong>{{ source.raw_path }}</strong>
-                <UBadge :color="pipelineStatusColor(source.status)" variant="soft">{{ source.status }}</UBadge>
-              </div>
-              <small v-if="source.title">{{ source.title }}</small>
-              <small v-if="source.conversion">
-                Conversão:
-                <UBadge :color="pipelineStatusColor(source.conversion.status)" variant="soft">{{ source.conversion.status }}</UBadge>
-                {{ source.conversion.markdown_path }}
-              </small>
-              <small v-if="source.ingestion">
-                Ingestão:
-                <UBadge :color="pipelineStatusColor(source.ingestion.status)" variant="soft">{{ source.ingestion.status }}</UBadge>
-                {{ source.ingestion.source_path }}
-              </small>
-              <small v-if="source.replaced_at">Fonte substituída; aguarda processamento.</small>
-              <small v-if="source.error_message" class="source-error">{{ source.error_message }}</small>
-              <small v-if="source.conversion?.error_message" class="source-error">{{ source.conversion.error_message }}</small>
-              <small v-if="source.ingestion?.error_message" class="source-error">{{ source.ingestion.error_message }}</small>
-            </li>
-          </ol>
-        </section>
-      </section>
-    </section>
-
-    <p v-if="feedback" class="feedback">{{ feedback }}</p>
-    <p v-if="!loading && !errorMessage" class="muted footnote">As fontes carregadas só entram na base de conhecimento depois de processamento pelo admin Ujimu.</p>
+    <p v-if="feedback && feedback !== 'Alterações guardadas automaticamente.'" class="plan-current--on"><UjimuIcon name="check" /> {{ feedback }}</p>
+    <p v-if="errorMessage" class="adm-src-error" role="alert">{{ errorMessage }}</p>
   </main>
 </template>
 
 <style scoped>
-.company-shell { width: min(1180px, calc(100% - 32px)); min-height: 100vh; margin: 0 auto; padding: 32px 0; }
-.company-hero, .company-card { border: 1px solid var(--ujimu-line); border-radius: 28px; background: rgba(255,255,255,.06); padding: 24px; }
-.company-hero { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-.company-actions, .card-heading, .source-main-line { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.company-actions { flex-wrap: wrap; }
-.specialists-grid { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 18px; }
-.company-form, .management-card, .upload-section { display: grid; gap: 12px; }
-.section-label { color: var(--ujimu-yellow); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.muted, .specialist-list small, .sources-list small { color: var(--ujimu-muted); }
-.specialist-list, .sources-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.specialist-list button { width: 100%; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 12px; background: rgba(0,0,0,.18); color: inherit; text-align: left; cursor: pointer; }
-.specialist-list li.selected button { border-color: rgba(249,214,22,.55); background: rgba(249,214,22,.12); }
-.specialist-list strong, .specialist-list small, .specialist-list span, .sources-list small { display: block; }
-.sources-list li { display: grid; gap: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 12px; background: rgba(0,0,0,.18); }
-.company-error, .source-error { color: #ffd3d3; font-weight: 800; }
-.feedback { margin-top: 12px; font-weight: 800; color: #fff8cc; }
-.footnote { margin-top: 12px; }
-@media (max-width: 900px) { .company-hero, .specialists-grid { display: grid; grid-template-columns: 1fr; } }
+a.btn { text-decoration: none; }
+.adm-spec-main { color: inherit; }
 </style>

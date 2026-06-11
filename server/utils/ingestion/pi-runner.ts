@@ -2,6 +2,8 @@ import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { IngestionSourceRecord } from './types'
 
+export const DEFAULT_PI_INGESTION_TIMEOUT_MS = 30 * 60 * 1000
+
 export interface PiIngestionResult {
   summary?: string
 }
@@ -42,11 +44,18 @@ async function runPiSdkIngestion(
   options: PiSdkIngestionOptions
 ): Promise<PiIngestionResult> {
   const cwd = specialist.paths.root
+  const markdownPath = source.ingestion?.source_path ?? source.raw_path
   const { session } = await createUjimuPiSession({
     cwd,
     task: 'ingestion',
     modelEnvPrefix: 'UJIMU_PI_INGESTION',
     tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
+    fileSystemPolicy: {
+      root: cwd,
+      read: { directories: ['wiki'], files: [`raw/${markdownPath}`] },
+      write: { directories: ['wiki'] },
+      list: { directories: ['wiki'] }
+    },
     appendSystemPromptOverride: () => [
       'You are maintaining a Ujimu specialist LLM Wiki.',
       'Operate only inside the current specialist directory.',
@@ -60,7 +69,7 @@ async function runPiSdkIngestion(
   try {
     await runWithTimeout(
       () => session.prompt(prompt),
-      options.timeoutMs ?? 5 * 60 * 1000,
+      options.timeoutMs ?? DEFAULT_PI_INGESTION_TIMEOUT_MS,
       async () => session.abort()
     )
     return { summary: `Pi ingested ${source.ingestion?.source_path ?? source.raw_path}` }

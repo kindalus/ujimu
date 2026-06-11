@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createDocxToMarkdownTool } from '../pi/docx-to-markdown-tool'
 import { createPdfToMarkdownTool } from '../pi/pdf-to-markdown-tool'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
@@ -121,12 +122,25 @@ async function runPiSdkConversion(
     return
   }
 
+  if (/\.docx$/i.test(source.raw_path)) {
+    const tool = createDocxToMarkdownTool({ cwd: specialist.paths.root })
+    await tool.execute('docx-conversion', { docxPath: `raw/${source.raw_path}` })
+    return
+  }
+
   const cwd = specialist.paths.root
+  const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
   const { session } = await createUjimuPiSession({
     cwd,
     task: 'conversion',
     modelEnvPrefix: 'UJIMU_PI_CONVERSION',
     tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
+    fileSystemPolicy: {
+      root: cwd,
+      read: { files: [`raw/${source.raw_path}`] },
+      write: { files: [`raw/${markdownPath}`] },
+      list: { directories: [] }
+    },
     appendSystemPromptOverride: () => [
       'You are a Ujimu raw-source conversion agent.',
       'Operate only inside the current specialist directory.',

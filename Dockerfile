@@ -15,7 +15,8 @@ ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV TZ=Africa/Luanda
 ENV UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu
-ENV UJIMU_PI_AGENT_DIR=/app/config/ujimu-pi-agent
+ENV UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu
+ENV UJIMU_PI_BUNDLE_DIR=/app/config/pi
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates coreutils \
@@ -23,7 +24,7 @@ RUN apt-get update \
   && npm install -g @google/gemini-cli \
   && groupadd --system ujimu \
   && useradd --system --gid ujimu --home-dir /home/ujimu --create-home --shell /usr/sbin/nologin ujimu \
-  && mkdir -p /home/ujimu/.pi /home/ujimu/.local/share/ujimu /app/config \
+  && mkdir -p /home/ujimu/.config/ujimu /home/ujimu/.local/share/ujimu /app/config \
   && chown -R ujimu:ujimu /home/ujimu /app
 
 WORKDIR /app

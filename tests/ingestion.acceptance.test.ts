@@ -10,9 +10,13 @@ import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { readIngestionState } from '../server/utils/ingestion/state'
 import { runPendingIngestion } from '../server/utils/ingestion/run'
 import { storeRawSource } from '../server/utils/ingestion/storage'
-import type { PiIngestionRunner } from '../server/utils/ingestion/pi-runner'
+import { DEFAULT_PI_INGESTION_TIMEOUT_MS, type PiIngestionRunner } from '../server/utils/ingestion/pi-runner'
 
 describe('legislation wiki raw ingestion acceptance', () => {
+  it('allows Pi ingestion to run for up to 30 minutes by default', () => {
+    expect(DEFAULT_PI_INGESTION_TIMEOUT_MS).toBe(30 * 60 * 1000)
+  })
+
   it('stores an uploaded source in the specialist raw directory', async () => {
     const specialist = await createTempSpecialist('iva')
 

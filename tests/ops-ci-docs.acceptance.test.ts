@@ -28,7 +28,8 @@ describe('operations CI and runbook acceptance', () => {
     expect(runbook).toContain('UJIMU_PASSKEY_RP_ID')
     expect(runbook).toContain('UJIMU_PASSKEY_RP_NAME')
     expect(runbook).toContain('UJIMU_PASSKEY_ORIGIN')
-    expect(runbook).toContain('UJIMU_PI_AGENT_DIR')
+    expect(runbook).toContain('UJIMU_CONFIG_DIR')
+    expect(runbook).toContain('UJIMU_PI_BUNDLE_DIR')
     expect(runbook).toContain('UJIMU_PI_CONVERSION_ENABLED')
     expect(runbook).toContain('UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES')
     expect(runbook).toContain('Pi conversion, ingestion, and consultation smoke test')
@@ -36,5 +37,29 @@ describe('operations CI and runbook acceptance', () => {
     expect(runbook).toContain('sqlite3')
     expect(runbook).toContain('.backup')
     expect(runbook).toContain('.restore')
+  })
+
+  it('does not expose removed legacy Pi environment keys as configuration', async () => {
+    const files = [
+      '.env.sample',
+      'config/container/prod.env.example',
+      'config/container/test.env.example',
+      'docs/operations.md',
+      'docs/specs/slices/13-pi-agent-pipeline.html',
+      'docs/specs/slices/15-podman-container-deployment.html',
+      'docs/specs/slices/STATUS.md'
+    ]
+    const removedKeys = [
+      `UJIMU_PI_${'AGENT_DIR'}`,
+      `UJIMU_PI_CONVERSION_${'THINKING_LEVEL'}`,
+      `UJIMU_PI_INGESTION_${'THINKING_LEVEL'}`
+    ]
+
+    for (const file of files) {
+      const content = await readFile(file, 'utf8')
+      for (const key of removedKeys) {
+        expect(content, `${file} must not contain ${key}`).not.toContain(key)
+      }
+    }
   })
 })

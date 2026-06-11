@@ -57,10 +57,7 @@ async function loadCompany(): Promise<void> {
         <h1 id="admin-company-title">Empresa</h1>
         <p>Veja subscrição, quota, membros e especialidades privadas desta empresa.</p>
       </div>
-      <div class="header-actions">
-        <UButton to="/admin/companies" color="neutral" variant="ghost">Empresas</UButton>
-        <UButton to="/admin" color="neutral" variant="ghost">Painel</UButton>
-      </div>
+
     </header>
 
     <section v-if="sessionPending" class="admin-card">
@@ -130,19 +127,4 @@ async function loadCompany(): Promise<void> {
   </main>
 </template>
 
-<style scoped>
-.admin-shell { width: min(1180px, calc(100% - 32px)); min-height: 100vh; margin: 0 auto; padding: 32px 0; }
-.admin-hero, .admin-card { border: 1px solid var(--ujimu-line); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.028)); box-shadow: 0 24px 80px rgba(0,0,0,.34); backdrop-filter: blur(18px); }
-.admin-hero { display: flex; justify-content: space-between; gap: 18px; padding: clamp(24px, 4vw, 42px); }
-.header-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.section-label { margin: 0 0 10px; color: var(--ujimu-yellow); font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.admin-hero p:not(.section-label), .muted { color: var(--ujimu-muted); }
-.detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
-.admin-card { display: grid; align-content: start; gap: 10px; padding: 22px; }
-.admin-card h2, .admin-card p { margin: 0; }
-.wide-card { grid-column: 1 / -1; }
-.plain-list, .specialist-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.specialist-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 10px; background: rgba(0,0,0,.16); }
-@media (max-width: 980px) { .detail-grid { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .admin-hero { display: grid; } }
-</style>
+

@@ -1,0 +1,122 @@
+import { readFile } from 'node:fs/promises'
+import { describe, expect, it } from 'vitest'
+
+describe('prototype port fidelity acceptance', () => {
+  it('uses the prototype specialist selector inside the chat prompt', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+
+    expect(page).toContain('class="spec-sel"')
+    expect(page).toContain('class="spec-chip"')
+    expect(page).toContain('class="spec-pop"')
+    expect(page).toContain('class="spec-opt"')
+    expect(page).toContain('role="listbox"')
+    expect(page).not.toContain('class="spec-chip-select"')
+  })
+
+  it('ports the admin specialist list/create page to the prototype admin layout', async () => {
+    const page = await readFile('pages/admin/specialists/index.vue', 'utf8')
+
+    expect(page).toContain('class="adm-page"')
+    expect(page).toContain('class="adm-pagehead"')
+    expect(page).toContain('class="adm-card adm-create"')
+    expect(page).toContain('class="adm-list"')
+    expect(page).toContain('class="adm-spec-main"')
+    expect(page).toContain('class="spec-chip-letter"')
+    expect(page).toContain('Criar especialidade')
+    expect(page).toContain('presetLabel')
+    expect(page).not.toContain('class="admin-shell"')
+    expect(page).not.toContain('class="specialists-grid"')
+  })
+
+  it('keeps the prototype admin side panel around admin pages instead of page-local navigation buttons', async () => {
+    const chrome = await readFile('components/MockRouteChrome.vue', 'utf8')
+    const specialists = await readFile('pages/admin/specialists/index.vue', 'utf8')
+
+    expect(chrome).toContain('isAdminRoute')
+    expect(chrome).toContain('class="adm"')
+    expect(chrome).toContain('class="adm-nav"')
+    expect(chrome).toContain('class="adm-nav-label"')
+    expect(chrome).toContain('class="adm-nav-item"')
+    expect(chrome).toContain('class="adm-content"')
+    expect(chrome).toContain('Sair da administração')
+    expect(specialists).not.toContain('class="header-actions"')
+    expect(specialists).not.toContain('to="/admin">Painel')
+    expect(specialists).not.toContain('Voltar ao chat')
+  })
+
+  it('ports admin dashboard, ops, analytics, subscription, profile, and company pages to prototype page zones', async () => {
+    const admin = await readFile('pages/admin/index.vue', 'utf8')
+    const adminSpecialistDetail = await readFile('pages/admin/specialists/[id].vue', 'utf8')
+    const ops = await readFile('pages/admin/ops.vue', 'utf8')
+    const analytics = await readFile('pages/admin/analytics.vue', 'utf8')
+    const subscription = await readFile('pages/subscription.vue', 'utf8')
+    const profile = await readFile('pages/account/profile.vue', 'utf8')
+    const companies = await readFile('pages/companies/index.vue', 'utf8')
+    const companyDetail = await readFile('pages/companies/[id].vue', 'utf8')
+    const companySpecialists = await readFile('pages/companies/[id]/specialists.vue', 'utf8')
+
+    expect(admin).toContain('class="adm-page"')
+    expect(admin).toContain('class="adm-homegrid"')
+    expect(admin).toContain('class="adm-card adm-homecard"')
+    expect(admin).toContain('Especialidades e fontes')
+    expect(admin).toContain('Operações / readiness')
+    expect(admin).not.toContain('class="admin-shell"')
+    expect(admin).not.toContain('class="dashboard-grid"')
+
+    expect(adminSpecialistDetail).toContain('data-screen-label="Admin — Ficha de especialidade"')
+    expect(adminSpecialistDetail).toContain('class="adm-detail-head"')
+    expect(adminSpecialistDetail).toContain('Metadados')
+    expect(adminSpecialistDetail).toContain('Fontes oficiais')
+    expect(adminSpecialistDetail).toContain('Acesso restrito por empresa')
+    expect(adminSpecialistDetail).toContain('adm-dangerzone')
+    expect(adminSpecialistDetail).toContain('class="modal-scrim"')
+    expect(adminSpecialistDetail).not.toContain('class="admin-shell"')
+    expect(adminSpecialistDetail).not.toContain('class="detail-grid"')
+
+    expect(ops).toContain('class="adm-page"')
+    expect(ops).toContain('class="adm-srcs"')
+    expect(ops).toContain('class="ops-dot"')
+    expect(ops).toContain('class="adm-ops-val"')
+    expect(ops).toContain('Readiness operacional')
+    expect(ops).not.toContain('class="ops-grid"')
+
+    expect(analytics).toContain('class="adm-page"')
+    expect(analytics).toContain('class="field adm-filter"')
+    expect(analytics).toContain('class="adm-statrow"')
+    expect(analytics).toContain('class="chart"')
+    expect(analytics).toContain('class="adm-twocol"')
+    expect(analytics).toContain('class="adm-feed"')
+    expect(analytics).not.toContain('class="analytics-grid"')
+
+    expect(subscription).toContain('class="subpage"')
+    expect(subscription).toContain('class="plans plans--three"')
+    expect(subscription).toContain('class="plan plan--featured"')
+    expect(subscription).toContain('class="plan-list"')
+    expect(subscription).toContain('class="sub-manage"')
+    expect(subscription).not.toContain('class="subscription-shell"')
+
+    expect(profile).toContain('class="subpage adm-gate"')
+    expect(profile).toContain('class="prof-head"')
+    expect(profile).toContain('class="adm-card"')
+    expect(profile).toContain('class="adm-srcs"')
+    expect(profile).toContain('adm-dangerzone')
+    expect(profile).not.toContain('class="profile-shell"')
+
+    expect(companies).toContain('data-screen-label="Empresa — Especialistas"')
+    expect(companies).toContain('class="adm-page"')
+    expect(companies).toContain('class="adm-list"')
+    expect(companies).toContain('class="adm-card adm-spec"')
+    expect(companies).not.toContain('class="companies-shell"')
+
+    expect(companyDetail).toContain('data-screen-label="Subscrição — Gestão da Empresa"')
+    expect(companyDetail).toContain('class="subpage"')
+    expect(companyDetail).toContain('class="adm-statrow"')
+    expect(companyDetail).toContain('class="member-add"')
+    expect(companyDetail).not.toContain('class="company-shell"')
+
+    expect(companySpecialists).toContain('data-screen-label="Empresa — Ficha de especialista"')
+    expect(companySpecialists).toContain('class="adm-detail-head"')
+    expect(companySpecialists).toContain('class="adm-ingest-note"')
+    expect(companySpecialists).not.toContain('class="specialists-grid"')
+  })
+})
