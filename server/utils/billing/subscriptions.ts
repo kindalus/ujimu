@@ -1,6 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import type { QuotaSubject } from '../quota/policy'
+import {
+  CompanyValidationError,
+  createCompany,
+  getActiveCompanyForUser,
+  getCompanyByNif,
+  getCorporateSubscription,
+  listCompanyMemberships,
+  listUserCompanies,
+  replaceCompanyMemberships,
+  updateCompany,
+  upsertCorporateSubscription,
+  type CompanyMembershipRecord,
+  type UserCompanyRecord
+} from '../companies/repository'
 import { createMockCheckoutDetails } from './providers/mock'
 
 export type BillingProvider = 'appy_pay' | 'stripe'
@@ -42,11 +56,28 @@ export interface BillingSubscriptionPayload {
   expiresAt: string
 }
 
+export interface CorporateBillingCompanyPayload {
+  id: string
+  nif: string
+  name: string
+  role: 'admin' | 'member'
+  seats: number
+  active: boolean
+  expiresAt: string
+}
+
+export interface CorporateBillingStatusPayload {
+  subscribed: boolean
+  companies: CorporateBillingCompanyPayload[]
+  activeCompany: CorporateBillingCompanyPayload | null
+}
+
 export interface BillingStatusPayload {
   authenticated: boolean
   subscribed: boolean
   plan: BillingPlan
   subscription: BillingSubscriptionPayload | null
+  corporate: CorporateBillingStatusPayload
   expiryWarning: {
     message: string
     expiresAt: string
@@ -55,6 +86,19 @@ export interface BillingStatusPayload {
   ads: {
     visible: boolean
   }
+}
+
+export interface CorporateCheckoutPayload {
+  checkout: BillingCheckoutPayload
+  company: {
+    id: string
+    nif: string
+    name: string
+    phone: string
+    address: string
+  }
+  subscription: BillingSubscriptionPayload & { seats: number }
+  memberships: Array<Pick<CompanyMembershipRecord, 'email' | 'role' | 'userId'>>
 }
 
 export interface BillingWebhookProcessingResult {
@@ -79,6 +123,17 @@ export const QUARTERLY_PLAN: BillingPlan = {
   amount: {
     value: '50000.00',
     cents: 5_000_000,
+    currency: 'AOA'
+  },
+  intervalMonths: 3
+}
+
+export const CORPORATE_QUARTERLY_PLAN: BillingPlan = {
+  id: 'corporate-quarterly-user',
+  name: 'Subscrição corporativa trimestral por utilizador',
+  amount: {
+    value: '35000.00',
+    cents: 3_500_000,
     currency: 'AOA'
   },
   intervalMonths: 3
@@ -150,6 +205,131 @@ export function createBillingCheckout(
     providerReference: checkout.providerReference,
     instructions: checkout.instructions,
     createdAt: now.toISOString()
+  }
+}
+
+export function createCorporateBillingCheckout(
+  database: DatabaseSync,
+  input: {
+    userId: string
+    company: { nif: string; name: string; phone: string; address: string }
+    seats: number
+    adminEmails?: string[]
+    memberEmails?: string[]
+    now?: Date
+  }
+): CorporateCheckoutPayload {
+  const now = input.now ?? new Date()
+  const buyerEmail = getPrimaryVerifiedEmail(database, input.userId)
+  if (!buyerEmail) {
+    throw new BillingValidationError('VERIFIED_EMAIL_REQUIRED', 'A verified email is required for corporate checkout.')
+  }
+
+  const seats = readPositiveSeats(input.seats)
+  const paymentId = randomUUID()
+  const amountCents = CORPORATE_QUARTERLY_PLAN.amount.cents * seats
+  const providerReference = `mock-corporate-${paymentId}`
+
+  database.exec('BEGIN')
+  try {
+    const existingCompany = getCompanyByNif(database, input.company.nif)
+    const company = existingCompany
+      ? updateCompany(database, existingCompany.id, { ...input.company, now })
+      : createCompany(database, { ...input.company, now })
+    const existingSubscription = getCorporateSubscription(database, company.id)
+    const baseDate = existingSubscription && new Date(existingSubscription.currentPeriodEnd).getTime() > now.getTime()
+      ? new Date(existingSubscription.currentPeriodEnd)
+      : now
+    const periodStart = existingSubscription && new Date(existingSubscription.currentPeriodEnd).getTime() > now.getTime()
+      ? existingSubscription.currentPeriodStart
+      : now.toISOString()
+    const nextExpiry = addUtcMonths(baseDate, CORPORATE_QUARTERLY_PLAN.intervalMonths)
+
+    database
+      .prepare(`
+        INSERT INTO billing_payments (
+          id,
+          user_id,
+          provider,
+          method,
+          plan_id,
+          amount_cents,
+          currency,
+          status,
+          provider_reference,
+          checkout_url,
+          created_at,
+          confirmed_at
+        ) VALUES (?, ?, 'appy_pay', 'multicaixa_reference', ?, ?, ?, 'confirmed', ?, ?, ?, ?)
+      `)
+      .run(
+        paymentId,
+        input.userId,
+        CORPORATE_QUARTERLY_PLAN.id,
+        amountCents,
+        CORPORATE_QUARTERLY_PLAN.amount.currency,
+        providerReference,
+        `mock://billing/corporate/${paymentId}`,
+        now.toISOString(),
+        now.toISOString()
+      )
+
+    const subscription = upsertCorporateSubscription(database, {
+      companyId: company.id,
+      seats,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: nextExpiry.toISOString(),
+      lastPaymentId: paymentId,
+      now
+    })
+    const memberships = replaceCompanyMemberships(database, {
+      companyId: company.id,
+      admins: [buyerEmail, ...(input.adminEmails ?? [])],
+      members: input.memberEmails ?? [],
+      now,
+      transaction: false
+    })
+    database.exec('COMMIT')
+
+    return {
+      checkout: {
+        id: paymentId,
+        provider: 'appy_pay',
+        method: 'multicaixa_reference',
+        status: 'confirmed',
+        amount: { value: formatCents(amountCents), currency: CORPORATE_QUARTERLY_PLAN.amount.currency },
+        checkoutUrl: `mock://billing/corporate/${paymentId}`,
+        providerReference,
+        instructions: 'Pagamento simulado confirmado. A subscrição corporativa está activa.',
+        createdAt: now.toISOString()
+      },
+      company: {
+        id: company.id,
+        nif: company.nif,
+        name: company.name,
+        phone: company.phone,
+        address: company.address
+      },
+      subscription: {
+        active: true,
+        seats: subscription.seats,
+        planId: subscription.planId,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        expiresAt: subscription.currentPeriodEnd
+      },
+      memberships: memberships.map((membership) => ({
+        email: membership.email,
+        role: membership.role,
+        userId: membership.userId
+      }))
+    }
+  } catch (error) {
+    database.exec('ROLLBACK')
+    if (error instanceof CompanyValidationError) {
+      throw new BillingValidationError(error.code, error.message)
+    }
+    throw error
   }
 }
 
@@ -270,14 +450,16 @@ export function getBillingStatus(
   const row = getSubscriptionRow(database, input.userId)
   const subscription = row ? toSubscriptionPayload(row, now) : null
   const subscribed = Boolean(subscription?.active)
+  const corporate = buildCorporateBillingStatus(database, input.userId, now)
 
   return {
     authenticated: true,
     subscribed,
     plan: QUARTERLY_PLAN,
     subscription,
+    corporate,
     expiryWarning: subscribed && subscription ? buildExpiryWarning(subscription, now) : null,
-    ads: { visible: !subscribed }
+    ads: { visible: !(subscribed || corporate.subscribed) }
   }
 }
 
@@ -317,6 +499,54 @@ export function assertSupportedProviderMethod(provider: BillingProvider, method:
   if (!PROVIDER_METHODS[provider].includes(method)) {
     throw new BillingValidationError('UNSUPPORTED_PAYMENT_METHOD', 'Payment method is not supported by provider.')
   }
+}
+
+function buildCorporateBillingStatus(
+  database: DatabaseSync,
+  userId: string,
+  now: Date
+): CorporateBillingStatusPayload {
+  const companies = listUserCompanies(database, userId, { now }).map(toCorporateBillingCompanyPayload)
+  const activeCompany = getActiveCompanyForUser(database, userId)
+  const activePayload = activeCompany ? toCorporateBillingCompanyPayload(activeCompany) : null
+
+  return {
+    subscribed: companies.some((company) => company.active),
+    companies,
+    activeCompany: activePayload?.active ? activePayload : null
+  }
+}
+
+function toCorporateBillingCompanyPayload(company: UserCompanyRecord): CorporateBillingCompanyPayload {
+  return {
+    id: company.id,
+    nif: company.nif,
+    name: company.name,
+    role: company.role,
+    seats: company.seats,
+    active: company.active,
+    expiresAt: company.currentPeriodEnd
+  }
+}
+
+function getPrimaryVerifiedEmail(database: DatabaseSync, userId: string): string | undefined {
+  const row = database
+    .prepare("SELECT contact FROM user_identities WHERE user_id = ? AND channel = 'email' ORDER BY verified_at ASC LIMIT 1")
+    .get(userId) as { contact: string } | undefined
+
+  return row?.contact.trim().toLowerCase()
+}
+
+function readPositiveSeats(value: number): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new BillingValidationError('INVALID_CORPORATE_SEATS', 'Corporate seats must be a positive integer.')
+  }
+
+  return value
+}
+
+function formatCents(cents: number): string {
+  return (cents / 100).toFixed(2)
 }
 
 function activateQuarterlySubscription(
@@ -384,6 +614,7 @@ function buildUnauthenticatedBillingStatus(): BillingStatusPayload {
     subscribed: false,
     plan: QUARTERLY_PLAN,
     subscription: null,
+    corporate: { subscribed: false, companies: [], activeCompany: null },
     expiryWarning: null,
     ads: { visible: true }
   }

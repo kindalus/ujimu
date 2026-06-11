@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 28 corporate data model/context work:
+Latest full verification after Slice 29 corporate checkout/billing status work:
 
-- `npm test` — passed, 129 tests
+- `npm test` — passed, 130 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -79,11 +79,49 @@ Known non-blocking warnings:
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `verified` | 2026-06-10 | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `verified` | 2026-06-10 | Automatic conversion inside the asynchronous ingestion worker. |
 | 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `verified` | 2026-06-10 | Corporate SQLite model, memberships, subscriptions, and active-company context. |
-| 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `planned` | — | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
+| 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `verified` | 2026-06-10 | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `planned` | — | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 29 — Corporate checkout and billing status
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Refinement and grill decisions:
+
+- Corporate checkout is simulated and does not ask for provider/method in this launch scope.
+- The system still records a confirmed mock payment in `billing_payments` for traceability.
+- The buyer must have a verified email and is always included as a company admin.
+- Reusing the same NIF renews the same company subscription.
+- Top-level individual subscription fields remain intact; corporate state is exposed under a new `corporate` block.
+- Active corporate subscription hides ads but does not yet change quota resolution; quota is handled in Slice 32.
+
+Acceptance tests:
+
+- Updated `tests/billing.acceptance.test.ts` to cover anonymous rejection, simulated confirmed corporate checkout, buyer/admin/member memberships, billing status corporate enrichment, NIF-based renewal, and member-limit rejection.
+- Confirmed RED before implementation with `npm test -- tests/billing.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added `POST /api/billing/corporate/checkout`.
+- Added `createCorporateBillingCheckout()` with confirmed mock payment recording, company create/update by NIF, corporate subscription renewal, and membership replacement.
+- Enriched `getBillingStatus()` with corporate companies and active-company billing metadata.
+- Added company repository support for lookup/update by NIF and nested transaction control when replacing memberships.
+
+Verification:
+
+- `npm test -- tests/billing.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 130 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 28 — Corporate data model and active-company context
 

@@ -6,6 +6,7 @@ import { createApp, createRouter, toWebHandler } from 'h3'
 import { describe, expect, it } from 'vitest'
 import billingStatusHandler from '../server/api/billing/status.get'
 import billingCheckoutHandler from '../server/api/billing/checkout.post'
+import corporateCheckoutHandler from '../server/api/billing/corporate/checkout.post'
 import billingWebhookHandler from '../server/api/billing/webhooks/[provider].post'
 import { createSessionToken } from '../server/utils/auth/session'
 import {
@@ -164,6 +165,87 @@ describe('subscriptions, payments, and advertising acceptance', () => {
     expect(await readTrustedProviderEventCount(dataDir)).toBe(2)
   })
 
+  it('creates simulated corporate checkouts, activates companies immediately, and enriches billing status', async () => {
+    const { dataDir } = await createTempBillingData()
+    await seedUser(dataDir, 'buyer-user')
+    await seedUserEmail(dataDir, 'buyer-user', 'buyer@example.com')
+    await seedUser(dataDir, 'member-user')
+    await seedUserEmail(dataDir, 'member-user', 'member@example.com')
+    const fetchBilling = createBillingFetch(dataDir, { webhookSecret: 'billing-secret' })
+
+    const anonymous = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        body: corporateCheckoutPayload()
+      })
+    )
+    expect(anonymous.status).toBe(401)
+
+    const created = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        headers: sessionHeaders('buyer-user'),
+        body: corporateCheckoutPayload()
+      })
+    )
+    expect(created.status).toBe(201)
+    const createdBody = await created.json() as {
+      checkout: { status: string; amount: { value: string; currency: string } }
+      company: { id: string; nif: string }
+      subscription: { active: boolean; seats: number; expiresAt: string }
+      memberships: Array<{ email: string; role: string; userId: string | null }>
+    }
+    expect(createdBody).toMatchObject({
+      checkout: { status: 'confirmed', amount: { value: '350000.00', currency: 'AOA' } },
+      company: { nif: '5001234567' },
+      subscription: { active: true, seats: 10 },
+      memberships: expect.arrayContaining([
+        expect.objectContaining({ email: 'buyer@example.com', role: 'admin', userId: 'buyer-user' }),
+        expect.objectContaining({ email: 'ops@example.com', role: 'admin', userId: null }),
+        expect.objectContaining({ email: 'member@example.com', role: 'member', userId: 'member-user' })
+      ])
+    })
+
+    const status = await fetchBilling(
+      new Request('http://local/api/billing/status', { headers: sessionHeaders('buyer-user') })
+    )
+    await expect(status.json()).resolves.toMatchObject({
+      authenticated: true,
+      subscribed: false,
+      corporate: {
+        subscribed: true,
+        companies: [expect.objectContaining({ id: createdBody.company.id, role: 'admin', seats: 10, active: true })]
+      },
+      ads: { visible: false }
+    })
+
+    const renewed = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        headers: sessionHeaders('buyer-user'),
+        body: { ...corporateCheckoutPayload(), seats: 12 }
+      })
+    )
+    expect(renewed.status).toBe(201)
+    const renewedBody = await renewed.json() as { company: { id: string }; subscription: { seats: number; expiresAt: string } }
+    expect(renewedBody.company.id).toBe(createdBody.company.id)
+    expect(renewedBody.subscription.seats).toBe(12)
+    expect(new Date(renewedBody.subscription.expiresAt).getTime()).toBeGreaterThan(new Date(createdBody.subscription.expiresAt).getTime())
+
+    const tooManyMembers = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        headers: sessionHeaders('buyer-user'),
+        body: {
+          ...corporateCheckoutPayload(),
+          seats: 10,
+          memberEmails: Array.from({ length: 11 }, (_, index) => `extra${index}@example.com`)
+        }
+      })
+    )
+    expect(tooManyMembers.status).toBe(400)
+  })
+
   it('stacks renewals, expires without grace, warns near expiry, and resolves subscribed quota subjects', async () => {
     const database = await createTempDatabase()
     seedUserInDatabase(database, 'billing-user')
@@ -266,6 +348,14 @@ async function seedUser(dataDir: string, userId: string): Promise<void> {
   database.close()
 }
 
+async function seedUserEmail(dataDir: string, userId: string, email: string): Promise<void> {
+  const database = await openBillingDatabase(dataDir)
+  database
+    .prepare('INSERT INTO user_identities (id, user_id, channel, contact, verified_at) VALUES (?, ?, ?, ?, ?)')
+    .run(`${userId}-${email}`, userId, 'email', email, '2026-05-16T12:00:00.000Z')
+  database.close()
+}
+
 function seedUserInDatabase(database: DatabaseSync, userId: string): void {
   database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run(userId, '2026-05-16T12:00:00.000Z')
 }
@@ -278,6 +368,7 @@ function createBillingFetch(
   const router = createRouter()
   router.get('/api/billing/status', billingStatusHandler)
   router.post('/api/billing/checkout', billingCheckoutHandler)
+  router.post('/api/billing/corporate/checkout', corporateCheckoutHandler)
   router.post('/api/billing/webhooks/:provider', billingWebhookHandler)
   app.use(router)
   const fetch = toWebHandler(app)
@@ -322,6 +413,20 @@ function jsonRequest(
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body)
   })
+}
+
+function corporateCheckoutPayload() {
+  return {
+    company: {
+      nif: '5001234567',
+      name: 'Empresa Exemplo',
+      phone: '+244923000000',
+      address: 'Rua Principal, Luanda'
+    },
+    seats: 10,
+    adminEmails: ['ops@example.com'],
+    memberEmails: ['member@example.com']
+  }
 }
 
 function webhookRequest(

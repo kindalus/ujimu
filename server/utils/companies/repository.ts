@@ -191,7 +191,7 @@ export function upsertCorporateSubscription(
 
 export function replaceCompanyMemberships(
   database: DatabaseSync,
-  input: { companyId: string; admins: string[]; members: string[]; now?: Date }
+  input: { companyId: string; admins: string[]; members: string[]; now?: Date; transaction?: boolean }
 ): CompanyMembershipRecord[] {
   assertCompanyExists(database, input.companyId)
   const subscription = getCorporateSubscription(database, input.companyId)
@@ -213,7 +213,8 @@ export function replaceCompanyMemberships(
   }
 
   const now = (input.now ?? new Date()).toISOString()
-  database.exec('BEGIN')
+  const useTransaction = input.transaction !== false
+  if (useTransaction) database.exec('BEGIN')
   try {
     database.prepare('DELETE FROM company_memberships WHERE company_id = ?').run(input.companyId)
     for (const entry of desired) {
@@ -232,9 +233,9 @@ export function replaceCompanyMemberships(
           now
         )
     }
-    database.exec('COMMIT')
+    if (useTransaction) database.exec('COMMIT')
   } catch (error) {
-    database.exec('ROLLBACK')
+    if (useTransaction) database.exec('ROLLBACK')
     throw error
   }
 
@@ -334,10 +335,42 @@ export function getActiveCompanyForUser(database: DatabaseSync, userId: string):
   return listUserCompanies(database, userId).find((company) => company.id === row.active_company_id) ?? null
 }
 
+export function updateCompany(
+  database: DatabaseSync,
+  companyId: string,
+  input: { nif: string; name: string; phone: string; address: string; now?: Date }
+): CompanyRecord {
+  assertCompanyExists(database, companyId)
+  const now = (input.now ?? new Date()).toISOString()
+  database
+    .prepare(`
+      UPDATE companies
+      SET nif = ?, name = ?, phone = ?, address = ?, updated_at = ?
+      WHERE id = ?
+    `)
+    .run(
+      readRequiredString(input.nif, 'nif'),
+      readRequiredString(input.name, 'name'),
+      readRequiredString(input.phone, 'phone'),
+      readRequiredString(input.address, 'address'),
+      now,
+      companyId
+    )
+
+  return getCompany(database, companyId)!
+}
+
 export function getCompany(database: DatabaseSync, companyId: string): CompanyRecord | undefined {
   const row = database
     .prepare('SELECT id, nif, name, phone, address, status, created_at, updated_at FROM companies WHERE id = ?')
     .get(companyId) as CompanyRow | undefined
+  return row ? toCompanyRecord(row) : undefined
+}
+
+export function getCompanyByNif(database: DatabaseSync, nif: string): CompanyRecord | undefined {
+  const row = database
+    .prepare('SELECT id, nif, name, phone, address, status, created_at, updated_at FROM companies WHERE nif = ?')
+    .get(readRequiredString(nif, 'nif')) as CompanyRow | undefined
   return row ? toCompanyRecord(row) : undefined
 }
 
