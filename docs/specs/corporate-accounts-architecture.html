@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arquitectura — Contas corporativas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
+
+      :root {
+        --bg: #070707;
+        --panel: rgba(255, 255, 255, 0.075);
+        --panel-strong: rgba(255, 255, 255, 0.12);
+        --line: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f0;
+        --muted: #b9b9ad;
+        --accent: #f9d616;
+        --accent-soft: rgba(249, 214, 22, 0.14);
+        --danger: #ff8a8a;
+        --font-display: 'Space Grotesk', sans-serif;
+        --font-body: 'Inter', sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 18% 16%, rgba(249, 214, 22, 0.18), transparent 26%),
+          radial-gradient(circle at 84% 25%, rgba(255, 255, 255, 0.08), transparent 24%),
+          linear-gradient(145deg, #020202 0%, var(--bg) 56%, #101010 100%);
+        color: var(--text);
+        font-family: var(--font-body);
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 7vh 11vw;
+        position: relative;
+      }
+
+      .slide.active { display: flex; }
+
+      .frame {
+        width: min(1120px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 34px;
+        padding: clamp(28px, 5vw, 56px);
+        background: linear-gradient(180deg, var(--panel), rgba(255, 255, 255, 0.033));
+        box-shadow: 0 30px 100px rgba(0, 0, 0, 0.44);
+        backdrop-filter: blur(20px);
+      }
+
+      .kicker {
+        margin-bottom: 14px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1, h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        letter-spacing: -0.055em;
+        line-height: 0.95;
+      }
+
+      h1 { max-width: 900px; font-size: clamp(3rem, 8vw, 6.4rem); }
+      h2 { max-width: 900px; font-size: clamp(2.15rem, 5vw, 4.2rem); }
+
+      p.lead {
+        max-width: 820px;
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 2vw, 1.36rem);
+        line-height: 1.5;
+      }
+
+      ul, ol {
+        display: grid;
+        gap: 13px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      li {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 13px 16px;
+        background: rgba(0, 0, 0, 0.22);
+        color: #eeeeea;
+        line-height: 1.45;
+      }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+      .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .card { border: 1px solid var(--line); border-radius: 22px; padding: 18px; background: var(--panel); }
+      .card strong { display: block; margin-bottom: 8px; color: var(--accent); }
+      .muted { color: var(--muted); }
+      .danger { color: var(--danger); }
+      code { color: var(--accent); }
+
+      .table {
+        display: grid;
+        gap: 8px;
+        margin-top: 26px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 12px 14px;
+        background: rgba(0, 0, 0, 0.22);
+      }
+
+      .row span:first-child { color: var(--accent); font-weight: 800; }
+
+      .metric {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-top: 26px;
+        border: 1px solid rgba(249, 214, 22, 0.35);
+        border-radius: 24px;
+        padding: 16px 20px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      .metric span { color: var(--text); font-size: 1.34rem; }
+
+      .slide-counter {
+        position: fixed;
+        right: 28px;
+        bottom: 24px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        letter-spacing: 0.08em;
+      }
+
+      .hint {
+        position: fixed;
+        left: 28px;
+        bottom: 24px;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      @media (max-width: 920px) {
+        .slide { padding: 5vh 5vw; }
+        .grid, .grid.three { grid-template-columns: 1fr; }
+        .row { grid-template-columns: 1fr; }
+      }
+
+      @media print {
+        body { overflow: visible; background: #fff; color: #111; }
+        .slide { display: flex; break-after: page; }
+        .slide-counter, .hint { display: none; }
+        .frame { box-shadow: none; color: #111; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="slide active">
+      <div class="frame">
+        <div class="kicker">Arquitectura Zafir</div>
+        <h1>Contas corporativas</h1>
+        <p class="lead">Extensão sobre a arquitectura actual: Nuxt, SQLite sem ORM, auth existente, billing mock e especialistas em YAML.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Fonte de verdade</div>
+        <h2>Deck aprovado</h2>
+        <p class="lead">Esta arquitectura deriva do brainstorm aprovado em <code>docs/specs/brainstorm-corporate-accounts.html</code>.</p>
+        <ul>
+          <li>Individual permanece.</li>
+          <li>Corporate é <code>35 000,00 AOA / trimestre / utilizador</code>.</li>
+          <li>Pagamento corporate é simulado e activa imediatamente.</li>
+          <li>Quota corporate é agregada por empresa.</li>
+          <li>O utilizador escolhe uma empresa activa de cada vez.</li>
+          <li>Com empresa activa, só ficam disponíveis especialistas públicos e especialistas dessa empresa.</li>
+          <li>A quota usada é corporate-first; quando esgota, usa quota individual.</li>
+          <li>Especialista privado aponta para uma empresa, não para emails.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Baseline</div>
+        <h2>Não redesenhar a plataforma</h2>
+        <div class="grid">
+          <div class="card"><strong>Nuxt + server utils</strong><span class="muted">Manter endpoints Nitro e lógica server-side em <code>server/utils</code>.</span></div>
+          <div class="card"><strong>SQLite sem ORM</strong><span class="muted">Nova migração, queries explícitas e testes de idempotência.</span></div>
+          <div class="card"><strong>Auth existente</strong><span class="muted">Reutilizar sessões e contactos verificados em <code>user_identities</code>.</span></div>
+          <div class="card"><strong>Billing mock</strong><span class="muted">Não introduzir Appy Pay, Stripe real ou webhooks novos nesta fase.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Modelo de domínio</div>
+        <h2>Empresa como entidade central</h2>
+        <div class="table">
+          <div class="row"><span><code>companies</code></span><span>NIF, nome, telefone, morada, timestamps e estado.</span></div>
+          <div class="row"><span><code>company_memberships</code></span><span>Email normalizado, papel <code>admin</code>/<code>member</code>, utilizador ligado opcionalmente.</span></div>
+          <div class="row"><span><code>user_company_contexts</code></span><span>Empresa activa persistida por utilizador; nula significa contexto individual.</span></div>
+          <div class="row"><span><code>corporate_subscriptions</code></span><span>Uma linha por empresa, lugares contratados, período actual e último pagamento.</span></div>
+          <div class="row"><span><code>billing_payments</code></span><span>Extensão mínima para distinguir pagamento individual e corporate simulado.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Membros por email</div>
+        <h2>Convite sem envio de email</h2>
+        <ul>
+          <li>A filiação é criada por email normalizado, mesmo sem conta registada.</li>
+          <li>Quando um utilizador verifica esse email, ganha acesso automaticamente.</li>
+          <li>O comprador corporate tem de ter pelo menos um email verificado e entra como <code>admin</code>.</li>
+          <li>Um utilizador pode pertencer a várias empresas através de emails verificados.</li>
+          <li>Apesar disso, só pode ter uma empresa activa de cada vez no produto.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Limite corporate</div>
+        <h2>Capacidade efectiva</h2>
+        <p class="lead">Para <code>seats</code> lugares contratados, a capacidade de pessoas é <code>seats + floor(seats × 0.10)</code>. Comprador, membros e administradores contam todos.</p>
+        <div class="metric"><span>37 lugares</span> permitem 40 pessoas</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Subscrição</div>
+        <h2>Uma subscrição por empresa</h2>
+        <ul>
+          <li>Corporate checkout cria ou actualiza a empresa.</li>
+          <li>Renova sempre a mesma subscrição corporate da empresa.</li>
+          <li>Confirmação simulada é imediata e activa o período trimestral.</li>
+          <li>Montante = <code>35 000,00 AOA × lugares</code>.</li>
+          <li>Se a subscrição expira, perde-se acesso corporate sem período de graça.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Especialistas</div>
+        <h2><code>company_id</code> substitui <code>allowed_emails</code></h2>
+        <ul>
+          <li><code>company_id</code> ausente: especialista público.</li>
+          <li><code>company_id</code> presente: só membros da empresa seleccionada com subscrição activa.</li>
+          <li>Quando há empresa activa, a lista mostra apenas públicos e privados dessa empresa.</li>
+          <li><code>allowed_emails</code> sai do schema, APIs e UI.</li>
+          <li>Admin Ujimu escolhe a empresa no ecrã do especialista.</li>
+          <li>Especialista suspenso continua invisível e inacessível.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Autorização</div>
+        <h2>Resolver acesso no servidor</h2>
+        <div class="grid">
+          <div class="card"><strong>Subject</strong><span class="muted">Sessão → emails verificados → empresas disponíveis → empresa activa.</span></div>
+          <div class="card"><strong>Especialista público</strong><span class="muted">Disponível salvo suspensão; aparece com ou sem empresa activa.</span></div>
+          <div class="card"><strong>Especialista privado</strong><span class="muted">Exige empresa activa igual à do especialista e subscrição corporate activa.</span></div>
+          <div class="card"><strong>Histórico</strong><span class="muted">Retoma e listagem respeitam o mesmo acesso do especialista e contexto activo.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Contexto activo</div>
+        <h2>Uma empresa seleccionada de cada vez</h2>
+        <ul>
+          <li>O utilizador pode pertencer a várias empresas, mas selecciona só uma empresa activa.</li>
+          <li>O contexto activo é persistido server-side, não apenas em estado de cliente.</li>
+          <li>Sem empresa activa, só vê especialistas públicos e usa quota individual.</li>
+          <li>Com empresa activa, vê especialistas públicos e especialistas privados dessa empresa.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Quota agregada</div>
+        <h2>Corporate-first, individual fallback</h2>
+        <ul>
+          <li>Adicionar subject de quota <code>company</code> com <code>subject_id = active_company_id</code>.</li>
+          <li>Limite semanal corporate = lugares × limite semanal subscrito configurado.</li>
+          <li>Com empresa activa, a tentativa usa primeiro quota corporate.</li>
+          <li>Se a quota corporate esgotou, tentar quota individual do utilizador.</li>
+          <li>Quota individual não substitui subscrição corporate expirada para aceder a especialistas privados.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">APIs — subscrição</div>
+        <h2>Contratos novos</h2>
+        <div class="table">
+          <div class="row"><span><code>POST /api/billing/corporate/checkout</code></span><span>Cria/actualiza empresa, membros iniciais, pagamento simulado e subscrição activa.</span></div>
+          <div class="row"><span><code>GET /api/billing/status</code></span><span>Inclui estado individual, empresas do utilizador e empresa activa.</span></div>
+          <div class="row"><span><code>GET /api/account/profile</code></span><span>Perfil, contactos verificados, subscrição individual, empresas e empresa activa.</span></div>
+          <div class="row"><span><code>PUT /api/account/active-company</code></span><span>Define a empresa activa do utilizador ou limpa o contexto corporate.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">APIs — empresa</div>
+        <h2>Gestão corporativa</h2>
+        <div class="table">
+          <div class="row"><span><code>GET /api/companies</code></span><span>Empresas em que o utilizador é membro/admin.</span></div>
+          <div class="row"><span><code>PATCH /api/companies/:id</code></span><span>Admin da empresa edita NIF, nome, telefone e morada.</span></div>
+          <div class="row"><span><code>PUT /api/companies/:id/members</code></span><span>Admin substitui lista de membros/admins, validada contra capacidade.</span></div>
+          <div class="row"><span><code>GET /api/companies/:id/quota</code></span><span>Admin vê uso semanal, limite e reset.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">APIs — admin Ujimu</div>
+        <h2>Controlo interno</h2>
+        <div class="table">
+          <div class="row"><span><code>GET /api/admin/companies</code></span><span>Listar empresas, subscrições, lugares e estado.</span></div>
+          <div class="row"><span><code>GET /api/admin/companies/:id</code></span><span>Detalhe operacional de empresa e membros.</span></div>
+          <div class="row"><span><code>PATCH /api/admin/specialists/:id</code></span><span>Passa a aceitar <code>company_id</code> e deixa de aceitar <code>allowed_emails</code>.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Interfaces</div>
+        <h2>Páginas Nuxt</h2>
+        <ul>
+          <li><code>/subscription</code>: escolha individual ou corporate; corporate recolhe empresa, lugares e emails.</li>
+          <li><code>/account/profile</code>: perfil, contactos, empresas e selector de empresa activa.</li>
+          <li>Chat/prompt: selector rápido da empresa activa quando o utilizador pertence a empresas.</li>
+          <li><code>/companies</code> e <code>/companies/[id]</code>: gestão por admin da empresa.</li>
+          <li><code>/admin/companies</code>: visão Ujimu das empresas.</li>
+          <li><code>/admin/specialists/[id]</code>: selector de empresa privada ou público.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Segurança</div>
+        <h2>Regras obrigatórias</h2>
+        <ul>
+          <li>Todos os limites, papéis e contexto de empresa activa são validados no servidor.</li>
+          <li>Emails são normalizados e nunca usados como prova sem verificação em <code>user_identities</code>.</li>
+          <li>Erros de acesso a especialista privado devem parecer indisponibilidade, sem revelar empresas.</li>
+          <li>Auditar criação/actualização corporate, alterações de membros, mudança de empresa activa e associação de especialista a empresa.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Migração</div>
+        <h2>Remover <code>allowed_emails</code> com cuidado</h2>
+        <ul>
+          <li>Actualizar schema YAML para <code>company_id?: string</code>.</li>
+          <li>Especialistas existentes com <code>allowed_emails</code> devem falhar validação ou exigir migração explícita?</li>
+          <li>UI e payload admin removem campo de allowlist.</li>
+          <li>Testes cobrem que allowlist antiga já não concede acesso.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Fatiamento proposto</div>
+        <h2>Slices prováveis</h2>
+        <ol>
+          <li>Modelo SQLite corporate, repositório de empresas e contexto activo.</li>
+          <li>Checkout corporate simulado e estado de billing enriquecido.</li>
+          <li>Gestão de empresa e perfil de utilizador com selector de empresa activa.</li>
+          <li>Acesso a especialistas por empresa e remoção de <code>allowed_emails</code>.</li>
+          <li>Quota corporate agregada com fallback individual.</li>
+          <li>Admin Ujimu para empresas e associação de especialistas.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Próximos passos</div>
+        <h2>Pronto para aprovação</h2>
+        <p class="lead">A arquitectura agora fixa: uma empresa activa por utilizador, especialistas públicos + especialistas da empresa seleccionada, quota corporate-first e fallback individual.</p>
+        <p class="lead"><code>docs/specs/corporate-accounts-architecture.html</code></p>
+      </div>
+    </section>
+
+    <div class="hint">← / → ou espaço</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      let current = 0;
+      const currentEl = document.getElementById('current');
+      const totalEl = document.getElementById('total');
+      totalEl.textContent = String(slides.length);
+
+      function go(next) {
+        slides[current].classList.remove('active');
+        current = Math.max(0, Math.min(next, slides.length - 1));
+        slides[current].classList.add('active');
+        currentEl.textContent = String(current + 1);
+      }
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(current + 1); }
+        if (event.key === 'ArrowLeft') { event.preventDefault(); go(current - 1); }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        event.clientX > window.innerWidth / 2 ? go(current + 1) : go(current - 1);
+      });
+    </script>
+  </body>
+</html>
