@@ -413,6 +413,26 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_request_events_subject_time
         ON request_events (subject_type, subject_id, occurred_at_utc);
     `
+  },
+  {
+    version: '0012_company_admin_audit_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS company_admin_audit_events (
+        id TEXT PRIMARY KEY,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        actor_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        specialist_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('specialist_prompt_updated', 'raw_source_uploaded', 'raw_source_replaced')),
+        occurred_at TEXT NOT NULL,
+        metadata_json TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_company_admin_audit_company_time
+        ON company_admin_audit_events (company_id, occurred_at);
+
+      CREATE INDEX IF NOT EXISTS idx_company_admin_audit_specialist_time
+        ON company_admin_audit_events (specialist_id, occurred_at);
+    `
   }
 ]
 

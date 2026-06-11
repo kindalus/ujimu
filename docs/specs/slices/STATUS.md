@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 33 admin company operations work:
+Latest full verification after Slice 34 corporate specialist management API work:
 
-- `npm test` — passed, 136 tests
+- `npm test` — passed, 137 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -84,7 +84,7 @@ Known non-blocking warnings:
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
-| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `acceptance-tested` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
+| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `planned` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
@@ -112,7 +112,7 @@ Planned order:
 
 ## Slice 34 — Corporate specialist management API
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -134,6 +134,21 @@ Acceptance-test plan:
 - Add `tests/company-specialists.acceptance.test.ts` for list/detail authorization, prompt edit validation, upload/replacement, state refresh, and no job creation.
 - Update `tests/db.test.ts` for the new audit migration.
 - Confirmed RED with `npm test -- tests/company-specialists.acceptance.test.ts tests/db.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added migration `0012_company_admin_audit_events`.
+- Added company specialist helper functions for company-scoped payloads, authorization, prompt update, and sanitized audit writes.
+- Added corporate specialist list, detail, prompt patch, and raw upload endpoints.
+- Reused existing upload validation, raw-source replacement, and source-state scan without triggering conversion or ingestion jobs.
+
+Verification:
+
+- `npm test -- tests/company-specialists.acceptance.test.ts tests/db.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 137 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 33 — Admin company operations and specialist assignment
 
