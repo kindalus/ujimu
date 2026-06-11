@@ -1,9 +1,8 @@
-export type QuotaSubjectType = 'anonymous' | 'registered' | 'subscribed'
+export type QuotaSubjectType = 'anonymous' | 'registered' | 'subscribed' | 'company'
 
-export interface QuotaSubject {
-  type: QuotaSubjectType
-  id: string
-}
+export type QuotaSubject =
+  | { type: Exclude<QuotaSubjectType, 'company'>; id: string }
+  | { type: 'company'; id: string; seats: number }
 
 export interface QuotaPolicy {
   dailyLimit: number | null
@@ -16,6 +15,7 @@ export interface ResolveQuotaPolicyInput {
 
 export interface ResolveQuotaPolicyOptions {
   subscribedWeeklyLimit?: number
+  companySeats?: number
   env?: Record<string, string | undefined>
 }
 
@@ -33,10 +33,22 @@ export function resolveQuotaPolicy(
     return { dailyLimit: 20, weeklyLimit: 100 }
   }
 
+  if (input.subjectType === 'company') {
+    return {
+      dailyLimit: null,
+      weeklyLimit: resolveCompanyWeeklyLimit(options)
+    }
+  }
+
   return {
     dailyLimit: null,
     weeklyLimit: resolveSubscribedWeeklyLimit(options)
   }
+}
+
+function resolveCompanyWeeklyLimit(options: ResolveQuotaPolicyOptions): number {
+  const seats = Number.isFinite(options.companySeats) ? Math.max(0, Math.floor(options.companySeats ?? 0)) : 0
+  return seats * resolveSubscribedWeeklyLimit(options)
 }
 
 function resolveSubscribedWeeklyLimit(options: ResolveQuotaPolicyOptions): number {

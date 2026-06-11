@@ -13,8 +13,13 @@ interface CompanyDetail {
   memberships: CompanyMembership[]
 }
 
+interface CompanyQuota {
+  weekly: { limit: number; used: number; resetAt: string }
+}
+
 const companyId = ref('')
 const detail = ref<CompanyDetail | null>(null)
+const quota = ref<CompanyQuota | null>(null)
 const form = ref({ nif: '', name: '', phone: '', address: '' })
 const membersForm = ref({ admins: '', members: '' })
 const loading = ref(true)
@@ -47,11 +52,17 @@ async function loadCompany(): Promise<void> {
       admins: detail.value.memberships.filter((item) => item.role === 'admin').map((item) => item.email).join('\n'),
       members: detail.value.memberships.filter((item) => item.role === 'member').map((item) => item.email).join('\n')
     }
+    quota.value = detail.value.role === 'admin' ? await loadCompanyQuota() : null
   } catch {
     errorMessage.value = 'Não foi possível carregar a empresa.'
   } finally {
     loading.value = false
   }
+}
+
+async function loadCompanyQuota(): Promise<CompanyQuota | null> {
+  const response = await fetch(`/api/companies/${encodeURIComponent(companyId.value)}/quota`)
+  return response.ok ? ((await response.json()) as CompanyQuota) : null
 }
 
 async function saveCompany(): Promise<void> {
@@ -125,6 +136,12 @@ function splitEmails(value: string): string[] {
             <label>Morada<UTextarea v-model="form.address" :disabled="pending || detail.role !== 'admin'" /></label>
             <UButton v-if="detail.role === 'admin'" type="submit" color="primary" :loading="pending">Guardar empresa</UButton>
           </form>
+        </section>
+
+        <section>
+          <h2>Quota corporativa</h2>
+          <p v-if="quota" class="quota-summary">Uso semanal: {{ quota.weekly.used }} / {{ quota.weekly.limit }}</p>
+          <p v-else class="muted">Só administradores da empresa podem consultar a quota agregada.</p>
         </section>
 
         <section>

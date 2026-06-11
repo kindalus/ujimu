@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import type { ChatEngineRunner } from '../server/utils/chat/types'
+import { createCompany, replaceCompanyMemberships, setActiveCompanyForUser, upsertCorporateSubscription } from '../server/utils/companies/repository'
 import { initializeDatabase } from '../server/utils/db'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { writeIngestionState } from '../server/utils/ingestion/state'
@@ -17,6 +18,8 @@ import {
 } from '../server/utils/quota/identity'
 import {
   evaluateAndRecordQuota,
+  evaluateAndRecordQuotaWithFallback,
+  getCompanyQuotaUsage,
   getRequestEventCount
 } from '../server/utils/quota/usage'
 import { QuotaExceededError } from '../server/utils/quota/errors'
@@ -37,6 +40,10 @@ describe('quota and request limit acceptance', () => {
     expect(resolveQuotaPolicy({ subjectType: 'subscribed' }, { subscribedWeeklyLimit: 7500 })).toEqual({
       dailyLimit: null,
       weeklyLimit: 7500
+    })
+    expect(resolveQuotaPolicy({ subjectType: 'company' }, { subscribedWeeklyLimit: 7500, companySeats: 3 })).toEqual({
+      dailyLimit: null,
+      weeklyLimit: 22500
     })
   })
 
@@ -146,6 +153,88 @@ describe('quota and request limit acceptance', () => {
     database.close()
   })
 
+  it('uses company quota first and falls back to the individual user when corporate quota is exhausted', async () => {
+    const database = await createTempDatabase()
+    const now = new Date('2026-05-16T12:00:00.000Z')
+
+    const first = evaluateAndRecordQuotaWithFallback(database, {
+      primary: {
+        subject: { type: 'company', id: 'company-1', seats: 1 },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now,
+        subscribedWeeklyLimit: 2
+      },
+      fallback: {
+        subject: { type: 'registered', id: 'user-1' },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now
+      }
+    })
+    expect(first).toMatchObject({ allowed: true, consumedSubject: { type: 'company', id: 'company-1' } })
+
+    const second = evaluateAndRecordQuotaWithFallback(database, {
+      primary: {
+        subject: { type: 'company', id: 'company-1', seats: 1 },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now,
+        subscribedWeeklyLimit: 2
+      },
+      fallback: {
+        subject: { type: 'registered', id: 'user-1' },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now
+      }
+    })
+    expect(second).toMatchObject({ allowed: true, consumedSubject: { type: 'company', id: 'company-1' } })
+
+    const fallback = evaluateAndRecordQuotaWithFallback(database, {
+      primary: {
+        subject: { type: 'company', id: 'company-1', seats: 1 },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now,
+        subscribedWeeklyLimit: 2
+      },
+      fallback: {
+        subject: { type: 'registered', id: 'user-1' },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now
+      }
+    })
+    expect(fallback).toMatchObject({ allowed: true, consumedSubject: { type: 'registered', id: 'user-1' } })
+    expect(getSubjectCount(database, 'company', 'company-1')).toBe(2)
+    expect(getSubjectCount(database, 'registered', 'user-1')).toBe(1)
+    expect(getDeniedSubjectCount(database, 'company', 'company-1')).toBe(1)
+    database.close()
+  })
+
+  it('reports weekly company quota usage for company admins only', async () => {
+    const database = await createTempDatabase()
+    const { companyId } = seedCorporateQuotaScenario(database)
+    const now = new Date('2026-05-16T12:00:00.000Z')
+
+    for (let index = 0; index < 3; index += 1) {
+      expect(evaluateAndRecordQuota(database, {
+        subject: { type: 'company', id: companyId, seats: 2 },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: now,
+        subscribedWeeklyLimit: 10
+      }).allowed).toBe(true)
+    }
+
+    expect(getCompanyQuotaUsage(database, { companyId, occurredAt: now, subscribedWeeklyLimit: 10 })).toEqual({
+      subject: { type: 'company', id: companyId },
+      weekly: { limit: 20, used: 3, resetAt: '2026-05-17T23:00:00.000Z' }
+    })
+    database.close()
+  })
+
   it('checks quota before creating a chat stream and does not call the runner when denied', async () => {
     const database = await createTempDatabase()
     const { specialtiesRoot } = await createTempSpecialist('iva')
@@ -245,6 +334,50 @@ async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {
   for (const delta of deltas) {
     yield delta
   }
+}
+
+function seedCorporateQuotaScenario(database: DatabaseSync): { companyId: string } {
+  seedQuotaUser(database, 'admin-user', 'admin@example.com')
+  const company = createCompany(database, {
+    nif: '5009990001',
+    name: 'Empresa Quota',
+    phone: '+244923000000',
+    address: 'Rua Principal'
+  })
+  upsertCorporateSubscription(database, {
+    companyId: company.id,
+    seats: 2,
+    currentPeriodStart: '2026-05-01T00:00:00.000Z',
+    currentPeriodEnd: '2026-08-01T00:00:00.000Z'
+  })
+  replaceCompanyMemberships(database, {
+    companyId: company.id,
+    admins: ['admin@example.com'],
+    members: []
+  })
+  setActiveCompanyForUser(database, { userId: 'admin-user', companyId: company.id })
+  return { companyId: company.id }
+}
+
+function seedQuotaUser(database: DatabaseSync, userId: string, email: string): void {
+  database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run(userId, '2026-05-16T12:00:00.000Z')
+  database
+    .prepare('INSERT INTO user_identities (id, user_id, channel, contact, verified_at) VALUES (?, ?, ?, ?, ?)')
+    .run(`${userId}-email`, userId, 'email', email, '2026-05-16T12:00:00.000Z')
+}
+
+function getSubjectCount(database: DatabaseSync, subjectType: string, subjectId: string): number {
+  const row = database
+    .prepare('SELECT COUNT(*) AS count FROM request_events WHERE subject_type = ? AND subject_id = ? AND counted = 1')
+    .get(subjectType, subjectId) as { count: number }
+  return row.count
+}
+
+function getDeniedSubjectCount(database: DatabaseSync, subjectType: string, subjectId: string): number {
+  const row = database
+    .prepare("SELECT COUNT(*) AS count FROM request_events WHERE subject_type = ? AND subject_id = ? AND decision = 'denied'")
+    .get(subjectType, subjectId) as { count: number }
+  return row.count
 }
 
 function getDeniedEventCount(database: DatabaseSync): number {

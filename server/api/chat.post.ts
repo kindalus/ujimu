@@ -14,6 +14,7 @@ import { serializeChatEvent } from '../utils/chat/ndjson'
 import type { ChatStreamEvent } from '../utils/chat/types'
 import { ChatRequestError, validateChatRequestBody } from '../utils/chat/request'
 import { resolveQuotaSubjectWithSubscription } from '../utils/billing/subscriptions'
+import { getActiveCompanyForUser } from '../utils/companies/repository'
 import { initializeDatabase } from '../utils/db'
 import { QuotaExceededError } from '../utils/quota/errors'
 import { resolveQuotaSubject } from '../utils/quota/identity'
@@ -42,12 +43,16 @@ export default defineEventHandler(async (event) => {
     const input = validateChatRequestBody(body)
     const baseSubject = resolveQuotaSubject(event)
     const subject = resolveQuotaSubjectWithSubscription(database, baseSubject)
+    const corporateSubject = subject.type === 'anonymous'
+      ? null
+      : resolveActiveCompanyQuotaSubject(database, subject.id)
     const visitor = resolveVisitorIdentity(event)
 
     const stream = await createChatEventStream(input, {
       quota: {
         database,
-        subject
+        subject: corporateSubject ?? subject,
+        fallbackSubject: corporateSubject ? subject : undefined
       },
       history: {
         database,
@@ -86,6 +91,12 @@ export default defineEventHandler(async (event) => {
     throw error
   }
 })
+
+function resolveActiveCompanyQuotaSubject(database: DatabaseSync, userId: string): { type: 'company'; id: string; seats: number } | null {
+  const activeCompany = getActiveCompanyForUser(database, userId)
+  if (!activeCompany?.active) return null
+  return { type: 'company', id: activeCompany.id, seats: activeCompany.seats }
+}
 
 async function* closeDatabaseAfterStream(
   stream: AsyncIterable<ChatStreamEvent>,

@@ -9,7 +9,17 @@ export interface EvaluateQuotaInput {
   specialistId: string
   userTimezone?: string
   occurredAt?: Date
+  subscribedWeeklyLimit?: number
 }
+
+export interface EvaluateQuotaWithFallbackInput {
+  primary: EvaluateQuotaInput
+  fallback?: EvaluateQuotaInput
+}
+
+export type QuotaFallbackDecision =
+  | { allowed: true; consumedSubject: Pick<QuotaSubject, 'type' | 'id'> }
+  | { allowed: false; error: QuotaExceededPayload }
 
 export type QuotaDecision =
   | { allowed: true }
@@ -24,7 +34,13 @@ export function evaluateAndRecordQuota(
   const occurredAt = input.occurredAt ?? new Date()
   const timezone = normalizeTimezone(input.userTimezone)
   const windows = resolveQuotaWindows(occurredAt, timezone)
-  const policy = resolveQuotaPolicy({ subjectType: input.subject.type })
+  const policy = resolveQuotaPolicy(
+    { subjectType: input.subject.type },
+    {
+      subscribedWeeklyLimit: input.subscribedWeeklyLimit,
+      companySeats: input.subject.type === 'company' ? input.subject.seats : undefined
+    }
+  )
 
   const dailyUsed = policy.dailyLimit === null
     ? 0
@@ -79,11 +95,68 @@ export function evaluateAndRecordQuota(
   return { allowed: true }
 }
 
+export function evaluateAndRecordQuotaWithFallback(
+  database: DatabaseSync,
+  input: EvaluateQuotaWithFallbackInput
+): QuotaFallbackDecision {
+  const primary = evaluateAndRecordQuota(database, input.primary)
+  if (primary.allowed) {
+    return { allowed: true, consumedSubject: toConsumedSubject(input.primary.subject) }
+  }
+
+  if (input.fallback) {
+    const fallback = evaluateAndRecordQuota(database, input.fallback)
+    if (fallback.allowed) {
+      return { allowed: true, consumedSubject: toConsumedSubject(input.fallback.subject) }
+    }
+    return { allowed: false, error: fallback.error }
+  }
+
+  return { allowed: false, error: primary.error }
+}
+
 export function assertQuotaAllowed(database: DatabaseSync, input: EvaluateQuotaInput): void {
   const decision = evaluateAndRecordQuota(database, input)
 
   if (!decision.allowed) {
     throw new QuotaExceededError(decision.error)
+  }
+}
+
+export function assertQuotaAllowedWithFallback(database: DatabaseSync, input: EvaluateQuotaWithFallbackInput): void {
+  const decision = evaluateAndRecordQuotaWithFallback(database, input)
+
+  if (!decision.allowed) {
+    throw new QuotaExceededError(decision.error)
+  }
+}
+
+export function getCompanyQuotaUsage(
+  database: DatabaseSync,
+  input: { companyId: string; occurredAt?: Date; userTimezone?: string; subscribedWeeklyLimit?: number }
+): {
+  subject: { type: 'company'; id: string }
+  weekly: { limit: number; used: number; resetAt: string }
+} {
+  const subscription = database
+    .prepare('SELECT seats FROM corporate_subscriptions WHERE company_id = ?')
+    .get(input.companyId) as { seats: number } | undefined
+  const subject: QuotaSubject = { type: 'company', id: input.companyId, seats: subscription?.seats ?? 0 }
+  const occurredAt = input.occurredAt ?? new Date()
+  const timezone = normalizeTimezone(input.userTimezone)
+  const windows = resolveQuotaWindows(occurredAt, timezone)
+  const policy = resolveQuotaPolicy(
+    { subjectType: 'company' },
+    { subscribedWeeklyLimit: input.subscribedWeeklyLimit, companySeats: subject.seats }
+  )
+
+  return {
+    subject: { type: 'company', id: input.companyId },
+    weekly: {
+      limit: policy.weeklyLimit,
+      used: countEvents(database, subject, windows.weekly.startAtUtc, windows.weekly.resetAtUtc),
+      resetAt: windows.weekly.resetAtUtc.toISOString()
+    }
   }
 }
 
@@ -94,7 +167,7 @@ export function getRequestEventCount(database: DatabaseSync): number {
 
 function countEvents(
   database: DatabaseSync,
-  subject: QuotaSubject,
+  subject: Pick<QuotaSubject, 'type' | 'id'>,
   startAtUtc: Date,
   resetAtUtc: Date
 ): number {
@@ -111,6 +184,10 @@ function countEvents(
     .get(subject.type, subject.id, startAtUtc.toISOString(), resetAtUtc.toISOString()) as { count: number }
 
   return row.count
+}
+
+function toConsumedSubject(subject: QuotaSubject): Pick<QuotaSubject, 'type' | 'id'> {
+  return { type: subject.type, id: subject.id }
 }
 
 function recordRequestEvent(

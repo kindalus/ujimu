@@ -8,6 +8,7 @@ import activeCompanyHandler from '../server/api/account/active-company.put'
 import companiesListHandler from '../server/api/companies/index.get'
 import companyDetailHandler from '../server/api/companies/[id].get'
 import companyPatchHandler from '../server/api/companies/[id].patch'
+import companyQuotaHandler from '../server/api/companies/[id]/quota.get'
 import companyMembersHandler from '../server/api/companies/[id]/members.put'
 import { createSessionToken } from '../server/utils/auth/session'
 import { createCompany, replaceCompanyMemberships, upsertCorporateSubscription } from '../server/utils/companies/repository'
@@ -52,6 +53,20 @@ describe('company profile and management acceptance', () => {
       body: { name: 'Nome proibido' }
     }))
     expect(memberPatch.status).toBe(403)
+
+    const memberQuota = await fetchCompany(new Request(`http://local/api/companies/${companyId}/quota`, {
+      headers: sessionHeaders('member-user')
+    }))
+    expect(memberQuota.status).toBe(403)
+
+    const adminQuota = await fetchCompany(new Request(`http://local/api/companies/${companyId}/quota`, {
+      headers: sessionHeaders('buyer-user')
+    }))
+    expect(adminQuota.status).toBe(200)
+    await expect(adminQuota.json()).resolves.toMatchObject({
+      subject: { type: 'company', id: companyId },
+      weekly: { used: 0, limit: 50000 }
+    })
 
     const updated = await fetchCompany(jsonRequest(`http://local/api/companies/${companyId}`, {
       method: 'PATCH',
@@ -126,6 +141,7 @@ function createCompanyFetch(dataDir: string): (request: Request) => Promise<Resp
   router.put('/api/account/active-company', activeCompanyHandler)
   router.get('/api/companies', companiesListHandler)
   router.get('/api/companies/:id', companyDetailHandler)
+  router.get('/api/companies/:id/quota', companyQuotaHandler)
   router.patch('/api/companies/:id', companyPatchHandler)
   router.put('/api/companies/:id/members', companyMembersHandler)
   app.use(router)

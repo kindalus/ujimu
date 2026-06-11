@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 31 specialist company access work:
+Latest full verification after Slice 32 corporate quota fallback work:
 
-- `npm test` — passed, 132 tests
+- `npm test` — passed, 134 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -82,8 +82,39 @@ Known non-blocking warnings:
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `verified` | 2026-06-10 | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `verified` | 2026-06-10 | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
-| 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
+| 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 32 — Corporate quota fallback
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Acceptance tests:
+
+- Updated `tests/quotas.acceptance.test.ts` to cover `company` policies, corporate-first consumption, individual fallback, denied corporate attempts, and company quota usage reporting.
+- Updated `tests/company-management.acceptance.test.ts` to cover `/api/companies/:id/quota` access for company admins only.
+- Updated `tests/company-ui.acceptance.test.ts` to cover company-detail quota display.
+- Confirmed RED before implementation with `npm test -- tests/quotas.acceptance.test.ts tests/company-management.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added quota subject type `company`, with weekly limit equal to active seats times the subscribed weekly limit.
+- Added SQLite migration `0011_company_quota_subject` to permit corporate request-event subjects.
+- Added corporate-first quota evaluation with individual fallback and wired it into chat when a registered user has an active company context.
+- Added `GET /api/companies/:id/quota` for company admins and displayed weekly use on the company detail page.
+
+Verification:
+
+- `npm test -- tests/quotas.acceptance.test.ts tests/company-management.acceptance.test.ts tests/company-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 134 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 31 — Specialist company access
 

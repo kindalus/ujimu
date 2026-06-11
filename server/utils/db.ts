@@ -368,6 +368,51 @@ const MIGRATIONS: Migration[] = [
         updated_at TEXT NOT NULL
       );
     `
+  },
+  {
+    version: '0011_company_quota_subject',
+    sql: `
+      CREATE TABLE request_events_new (
+        id TEXT PRIMARY KEY,
+        subject_type TEXT NOT NULL CHECK (subject_type IN ('anonymous', 'registered', 'subscribed', 'company')),
+        subject_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL,
+        occurred_at_utc TEXT NOT NULL,
+        user_timezone TEXT NOT NULL,
+        counted INTEGER NOT NULL CHECK (counted IN (0, 1)),
+        decision TEXT NOT NULL CHECK (decision IN ('allowed', 'denied')),
+        denial_reason TEXT
+      );
+
+      INSERT INTO request_events_new (
+        id,
+        subject_type,
+        subject_id,
+        specialist_id,
+        occurred_at_utc,
+        user_timezone,
+        counted,
+        decision,
+        denial_reason
+      )
+      SELECT
+        id,
+        subject_type,
+        subject_id,
+        specialist_id,
+        occurred_at_utc,
+        user_timezone,
+        counted,
+        decision,
+        denial_reason
+      FROM request_events;
+
+      DROP TABLE request_events;
+      ALTER TABLE request_events_new RENAME TO request_events;
+
+      CREATE INDEX IF NOT EXISTS idx_request_events_subject_time
+        ON request_events (subject_type, subject_id, occurred_at_utc);
+    `
   }
 ]
 

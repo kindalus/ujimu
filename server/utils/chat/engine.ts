@@ -4,7 +4,7 @@ import type { SpecialistRuntime } from '../specialists/schema'
 import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../specialists/access'
 import { getSpecialistById } from '../specialists/registry'
 import type { QuotaSubject } from '../quota/policy'
-import { assertQuotaAllowed } from '../quota/usage'
+import { assertQuotaAllowedWithFallback } from '../quota/usage'
 import { recordQuestionAnalyticsEvent, type QuestionAnalyticsOutcome } from '../analytics/questions'
 import {
   buildConversationContext,
@@ -35,6 +35,7 @@ const STREAM_ERROR_MESSAGE =
 export interface ChatQuotaOptions {
   database: DatabaseSync
   subject: QuotaSubject
+  fallbackSubject?: QuotaSubject
   occurredAt?: Date
 }
 
@@ -97,11 +98,21 @@ export async function createChatEventStreamForSpecialist(
   options: CreateChatEventStreamOptions = {}
 ): Promise<AsyncIterable<ChatStreamEvent>> {
   if (options.quota) {
-    assertQuotaAllowed(options.quota.database, {
-      subject: options.quota.subject,
-      specialistId: specialist.id,
-      userTimezone: input.clientTimezone,
-      occurredAt: options.quota.occurredAt
+    assertQuotaAllowedWithFallback(options.quota.database, {
+      primary: {
+        subject: options.quota.subject,
+        specialistId: specialist.id,
+        userTimezone: input.clientTimezone,
+        occurredAt: options.quota.occurredAt
+      },
+      fallback: options.quota.fallbackSubject
+        ? {
+            subject: options.quota.fallbackSubject,
+            specialistId: specialist.id,
+            userTimezone: input.clientTimezone,
+            occurredAt: options.quota.occurredAt
+          }
+        : undefined
     })
   }
 
