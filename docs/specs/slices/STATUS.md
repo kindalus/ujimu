@@ -84,7 +84,7 @@ Known non-blocking warnings:
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
-| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `planned` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
+| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `grilled` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `planned` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
@@ -109,6 +109,30 @@ Planned order:
 
 1. Slice 34 adds the corporate specialist-management API and auditing.
 2. Slice 35 adds the corporate specialist-management UI.
+
+## Slice 34 — Corporate specialist management API
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-specialist-source-management.html`](../brainstorm-corporate-specialist-source-management.html)
+- [`../corporate-specialist-source-management-architecture.html`](../corporate-specialist-source-management-architecture.html)
+
+Refinement and grill decisions:
+
+- Keep the API separate from `/api/admin`; company endpoints authorize through `requireCompanyAdmin()`.
+- A manageable specialist is one whose `company_id` equals the requested company id.
+- Wrong-company, public, or missing specialists return `404` to avoid revealing resources.
+- `PATCH` accepts exactly `system_prompt`; immutable or unrelated fields return `400`.
+- Upload reuses existing raw-source validation and logical replacement, then refreshes source state only.
+- Upload must not trigger conversion, ingestion, or background jobs.
+- Add a small `company_admin_audit_events` table for corporate prompt/upload actions with sanitized metadata.
+
+Acceptance-test plan:
+
+- Add `tests/company-specialists.acceptance.test.ts` for list/detail authorization, prompt edit validation, upload/replacement, state refresh, and no job creation.
+- Update `tests/db.test.ts` for the new audit migration.
 
 ## Slice 33 — Admin company operations and specialist assignment
 
