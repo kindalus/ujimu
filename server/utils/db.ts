@@ -287,6 +287,33 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_passkey_auth_attempts_subject_time
         ON passkey_auth_attempts (subject_type, subject_id, purpose, occurred_at);
     `
+  },
+  {
+    version: '0009_background_jobs',
+    sql: `
+      CREATE TABLE IF NOT EXISTS background_jobs (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('specialist_ingestion')),
+        specialist_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        locked_at TEXT,
+        locked_by TEXT,
+        last_error_code TEXT,
+        last_error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_background_jobs_status_time
+        ON background_jobs (status, updated_at);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_background_jobs_specialist_active
+        ON background_jobs (type, specialist_id)
+        WHERE status IN ('queued', 'running');
+    `
   }
 ]
 

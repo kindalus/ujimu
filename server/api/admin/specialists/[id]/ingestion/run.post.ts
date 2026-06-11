@@ -3,7 +3,9 @@ import { recordAdminAuditEvent } from '../../../../../utils/admin/audit'
 import { requireAdmin } from '../../../../../utils/admin/guards'
 import { countSources } from '../../../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../../../utils/db'
+import { scanSpecialistRawSources } from '../../../../../utils/ingestion/detect'
 import { PiIngestionDisabledError, runPendingIngestion } from '../../../../../utils/ingestion/run'
+import { enqueueSpecialistIngestionJob, scheduleDueBackgroundJobs } from '../../../../../utils/jobs/background'
 import { getSpecialistById } from '../../../../../utils/specialists/registry'
 
 const disabledMessage = 'A ingestão automática não está activa neste ambiente.'
@@ -20,13 +22,21 @@ export default defineEventHandler(async (event) => {
 
     try {
       if (process.env.UJIMU_PI_INGESTION_ENABLED === 'true') {
+        const state = await scanSpecialistRawSources(specialist)
+        const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
+        const counts = countSources(sources)
+        const job = enqueueSpecialistIngestionJob(database, { specialistId })
         recordAdminAuditEvent(database, {
           admin,
           action: 'ingestion_started',
           specialistId,
-          metadata: {}
+          metadata: { job_id: job.id, status: job.status }
         })
+        scheduleDueBackgroundJobs()
+        setResponseStatus(event, 202)
+        return { job, sources, counts }
       }
+
       const state = await runPendingIngestion(specialist)
       const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
       const counts = countSources(sources)

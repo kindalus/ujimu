@@ -162,6 +162,10 @@ async function deleteSpecialist(): Promise<void> {
 }
 
 function formatIngestionFeedback(payload: IngestionRunResponse): string {
+  if (payload.job?.status === 'queued' || payload.job?.status === 'running') {
+    return 'Ingestão agendada. Actualize o estado para acompanhar o processamento.'
+  }
+
   const counts = payload.counts
   if (!counts) return 'Ingestão concluída.'
 

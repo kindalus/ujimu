@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 25 source replacement/refresh work:
+Latest full verification after Slice 26 recoverable ingestion jobs work:
 
-- `npm test` — passed, 125 tests
+- `npm test` — passed, 126 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -76,7 +76,7 @@ Known non-blocking warnings:
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
-| 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `grilled` | — | Recoverable SQLite-backed ingestion jobs. |
+| 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `verified` | 2026-06-10 | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
 | 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `planned` | — | Corporate SQLite model, memberships, subscriptions, and active-company context. |
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `planned` | — | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
@@ -117,11 +117,11 @@ Planned slices:
 
 Sequencing note:
 
-- Slice 26 has paused uncommitted implementation work in `server/utils/db.ts`; before implementing Slice 28, resolve that paused work by completing it, reverting it, or explicitly shelving it in a separate commit/branch.
+- Slice 26 is now verified; Slice 28 may safely add the next SQLite migration after `0009_background_jobs`.
 
 ## Slice 26 — Recoverable ingestion jobs
 
-Status: `grilled`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -138,7 +138,31 @@ Refinement and grill decisions:
 
 Acceptance tests:
 
-- Pending: write before implementation.
+- Updated `tests/db.test.ts` to require migration `0009_background_jobs`.
+- Updated `tests/admin.acceptance.test.ts` to require `202` job enqueueing, persisted queued state, and worker completion with a fake ingestion runner.
+- Updated `tests/admin-ui.acceptance.test.ts` to require “Ingestão agendada” feedback.
+- Confirmed RED before implementation with `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts tests/db.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added SQLite-backed `background_jobs` migration with a unique active ingestion job per specialist.
+- Added `server/utils/jobs/background.ts` with enqueueing, locking, stale-running recovery, worker execution, sanitized failures, startup recovery scheduling, and test-safe in-process scheduling.
+- Changed the admin ingestion endpoint to return `202` and a queued `specialist_ingestion` job when Pi ingestion is enabled while preserving the disabled `409` behaviour.
+- Updated admin UI types and feedback to show “Ingestão agendada”.
+
+Impact assessment for corporate slices:
+
+- Slice 28 will touch `server/utils/db.ts` next, but only to add a later migration after `0009_background_jobs`.
+- Corporate slices do not depend on ingestion jobs and should not alter job states, ingestion endpoint semantics, or source processing.
+- Shared future surfaces are limited to admin navigation/audit and must be handled in their own slices.
+
+Verification:
+
+- `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts tests/db.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 126 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 25 — Source upload, replacement, and refresh
 

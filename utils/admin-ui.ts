@@ -54,7 +54,15 @@ export interface SourceStatusCounts {
   blocked: number
 }
 
+export interface BackgroundJobSummary {
+  id: string
+  type: 'specialist_ingestion'
+  specialist_id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+}
+
 export interface IngestionRunResponse {
+  job?: BackgroundJobSummary
   sources: IngestionSource[]
   counts?: SourceStatusCounts
 }

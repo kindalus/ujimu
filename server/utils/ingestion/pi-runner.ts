@@ -11,7 +11,7 @@ export interface PiIngestionRunner {
     specialist: SpecialistRuntime,
     source: IngestionSourceRecord,
     options?: PiSdkIngestionOptions
-  ): Promise<PiIngestionResult>
+  ): Promise<PiIngestionResult | void>
 }
 
 export interface PiSdkIngestionOptions {
