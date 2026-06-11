@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-05-21
+Last updated: 2026-06-10
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -78,6 +78,46 @@ Known non-blocking warnings:
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `grilled` | — | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
+| 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `planned` | — | Corporate SQLite model, memberships, subscriptions, and active-company context. |
+| 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `planned` | — | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
+| 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `planned` | — | Registered user profile, active company selector, and company admin management UI/API. |
+| 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
+| 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
+| 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Corporate accounts implementation plan
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Approved product and architecture decisions:
+
+- Individual subscriptions remain available.
+- Corporate subscriptions cost `35,000.00 AOA` per quarter per subscribed user.
+- Corporate payment is simulated and activates immediately in this launch scope.
+- A company has NIF, name, phone, and address.
+- The purchaser becomes a company administrator.
+- A company has one renewable corporate subscription.
+- Users may belong to multiple companies, but can select only one active company at a time.
+- With an active company, users see public specialists and specialists assigned to that company.
+- Corporate quota is aggregated by active company and is consumed before individual quota; individual fallback does not unlock expired corporate specialist access.
+- Specialist privacy moves from `allowed_emails` to `company_id`; `allowed_emails` is removed.
+- Only Ujimu admins assign a specialist to a company.
+
+Planned slices:
+
+- Slice 28: data model and active-company context foundation.
+- Slice 29: simulated corporate checkout and billing status.
+- Slice 30: profile and company management surfaces.
+- Slice 31: specialist company access and `allowed_emails` removal.
+- Slice 32: corporate quota with individual fallback.
+- Slice 33: Ujimu admin company operations and specialist assignment.
+
+Sequencing note:
+
+- Slice 26 has paused uncommitted implementation work in `server/utils/db.ts`; before implementing Slice 28, resolve that paused work by completing it, reverting it, or explicitly shelving it in a separate commit/branch.
 
 ## Slice 26 — Recoverable ingestion jobs
 
