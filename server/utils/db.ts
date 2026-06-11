@@ -314,6 +314,60 @@ const MIGRATIONS: Migration[] = [
         ON background_jobs (type, specialist_id)
         WHERE status IN ('queued', 'running');
     `
+  },
+  {
+    version: '0010_corporate_accounts',
+    sql: `
+      CREATE TABLE IF NOT EXISTS companies (
+        id TEXT PRIMARY KEY,
+        nif TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS corporate_subscriptions (
+        id TEXT PRIMARY KEY,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        plan_id TEXT NOT NULL,
+        seats INTEGER NOT NULL CHECK (seats > 0),
+        current_period_start TEXT NOT NULL,
+        current_period_end TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_payment_id TEXT,
+        UNIQUE (company_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_corporate_subscriptions_company_end
+        ON corporate_subscriptions (company_id, current_period_end);
+
+      CREATE TABLE IF NOT EXISTS company_memberships (
+        id TEXT PRIMARY KEY,
+        company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'member')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (company_id, email)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_company_memberships_email
+        ON company_memberships (email);
+
+      CREATE INDEX IF NOT EXISTS idx_company_memberships_user
+        ON company_memberships (user_id);
+
+      CREATE TABLE IF NOT EXISTS user_company_contexts (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        active_company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+      );
+    `
   }
 ]
 

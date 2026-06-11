@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 27 automatic conversion/ingestion worker work:
+Latest full verification after Slice 28 corporate data model/context work:
 
-- `npm test` — passed, 127 tests
+- `npm test` — passed, 129 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -78,12 +78,49 @@ Known non-blocking warnings:
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `verified` | 2026-06-10 | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `verified` | 2026-06-10 | Automatic conversion inside the asynchronous ingestion worker. |
-| 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `planned` | — | Corporate SQLite model, memberships, subscriptions, and active-company context. |
+| 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `verified` | 2026-06-10 | Corporate SQLite model, memberships, subscriptions, and active-company context. |
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `planned` | — | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `planned` | — | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 28 — Corporate data model and active-company context
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Refinement and grill decisions:
+
+- Use UUID as the technical company id; NIF remains business data.
+- Store memberships by normalized email and link `user_id` when a verified identity already exists.
+- Admin role wins when an email appears as both admin and member.
+- Require at least one company admin.
+- Validate membership capacity from the company's corporate subscription seats: `seats + floor(seats * 0.10)`.
+- Persist the user's active company server-side and allow clearing it back to individual context.
+
+Acceptance tests:
+
+- Added `tests/companies.acceptance.test.ts` for company creation, corporate subscription seats, normalized memberships, existing user links, user-company listing, active company set/clear, capacity rejection, and invalid active-company rejection.
+- Updated `tests/db.test.ts` to require `0010_corporate_accounts` migration.
+- Confirmed RED before implementation with `npm test -- tests/db.test.ts tests/companies.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added `0010_corporate_accounts` migration for `companies`, `corporate_subscriptions`, `company_memberships`, and `user_company_contexts`.
+- Added `server/utils/companies/repository.ts` with company/subscription/membership/context operations and validation errors.
+
+Verification:
+
+- `npm test -- tests/db.test.ts tests/companies.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 129 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 27 — Automatic conversion inside ingestion worker
 
