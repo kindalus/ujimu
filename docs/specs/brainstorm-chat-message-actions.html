@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brainstorm — Acções in-chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap');
+    :root { --bg:#080806; --panel:#15130d; --text:#fffaf0; --muted:#c9c0a8; --accent:#f9d616; --line:rgba(255,255,255,.14); }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 20% 0%, rgba(249,214,22,.18), transparent 32%), var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 12vw; }
+    .slide.active { display:flex; }
+    .panel { width:min(1060px, 100%); border:1px solid var(--line); border-radius:28px; padding:46px; background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow:0 24px 90px rgba(0,0,0,.45); }
+    h1 { margin:0 0 18px; font-size:clamp(2.4rem, 5vw, 5.4rem); line-height:.92; letter-spacing:-.06em; font-weight:900; }
+    h2 { margin:0 0 22px; font-size:clamp(2rem, 4vw, 3.8rem); line-height:.95; letter-spacing:-.055em; font-weight:900; }
+    p, li { color:var(--muted); font-size:1.2rem; line-height:1.45; }
+    ul { display:grid; gap:12px; margin:0; padding-left:1.25rem; }
+    .kicker { color:var(--accent); text-transform:uppercase; letter-spacing:.18em; font-weight:900; font-size:.78rem; margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { border:1px solid var(--line); border-radius:20px; padding:20px; background:rgba(0,0,0,.2); }
+    .badge { display:inline-flex; border:1px solid rgba(249,214,22,.45); border-radius:999px; padding:6px 10px; color:#fff6b8; background:rgba(249,214,22,.12); font-weight:800; }
+    .counter { position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:800; }
+    @media print { body { overflow:visible; } .slide { display:flex; page-break-after:always; } .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="panel"><div class="kicker">Brainstorm vivo</div><h1>Acções in-chat</h1><p>Preparar uma extensão mínima da conversa: copiar uma resposta para a área de transferência, incluindo as fontes citadas.</p></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Objectivo actual</div><h2>Copiar resposta com fontes</h2><ul><li>Permitir copiar uma resposta do assistente directamente na conversa.</li><li>A cópia deve incluir o texto da resposta e as fontes citadas.</li><li>Preservar o comportamento existente de histórico, quotas e streaming.</li><li>Evitar novas superfícies administrativas ou mudanças de produto não pedidas.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Contexto governante</div><h2>Base existente</h2><div class="grid"><div class="card"><span class="badge">Sem docs/wiki</span><p>Não existe `docs/wiki/`; o contexto vem de `AGENTS.md`, specs existentes e código actual.</p></div><div class="card"><span class="badge">Chat actual</span><p>Há edição de perguntas guardadas, fila, histórico, citações e streaming. Não há botão de copiar.</p></div></div></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Decisões já assumidas</div><h2>Limites iniciais</h2><ul><li>A única acção nova neste escopo é copiar respostas do assistente.</li><li>A cópia de resposta deve incluir corpo da resposta e fontes citadas.</li><li>A acção deve aparecer apenas para respostas, não para perguntas.</li><li>A UI deve manter português europeu pré-Acordo nas cópias visíveis.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Perguntas abertas</div><h2>Bloqueador principal</h2><ul><li>Formato proposto para a área de transferência: texto simples com estrutura Markdown leve.</li><li>Disponibilidade proposta: só depois de a resposta deixar de estar em streaming.</li><li>Feedback proposto: mostrar “Resposta copiada.” ou erro acessível junto da mensagem.</li><li>Sem alterações a edição de perguntas, regeneração, eliminação de mensagens ou partilha.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Critérios prováveis</div><h2>Sucesso verificável</h2><ul><li>Testes UI confirmam botões permitidos e ausência de acções perigosas.</li><li>Cópia de resposta monta texto com resposta, fontes, artigos e ficheiros quando existirem.</li><li>Estados de erro da área de transferência são tratados sem bloquear o chat.</li><li>Build, typecheck, testes e audit continuam verdes.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Iteração 1</div><h2>Estado desta ronda</h2><ul><li>Pedido inicial recebeu ambiguidade sobre “pontos 1-4”.</li><li>O utilizador reduziu o escopo: implementar apenas copiar resposta com fontes.</li><li>Contexto inspeccionado: `docs/wiki/` ausente; chat actual tem edição mas não cópia.</li><li>Aprovação explícita recebida para o brainstorm.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Próximos passos</div><h2>Confirmação necessária</h2><p>Brainstorm aprovado. O trabalho segue para arquitectura aprovada e um slice pequeno de implementação.</p></div></section>
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')]; let idx = 0;
+    document.getElementById('total').textContent = slides.length;
+    function go(next){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+    document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>

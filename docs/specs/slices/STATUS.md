@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -86,6 +86,28 @@ Known non-blocking warnings:
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
+| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `planned` | — | In-chat copy action for assistant responses including citations. |
+
+## Chat message actions extension
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-chat-message-actions.html`](../brainstorm-chat-message-actions.html)
+- [`../chat-message-actions-architecture.html`](../chat-message-actions-architecture.html)
+
+Planning decisions:
+
+- Implement only copying assistant responses to the clipboard with sources.
+- Do not implement copying questions, regenerating answers, deleting messages, or sharing conversations in this slice.
+- Keep the change client-side in the existing chat page.
+- Do not alter chat API contracts, history, analytics, quotas, or database schema.
+- Use user-facing UI copy in European Portuguese using pre-1990 orthography.
+
+Planned order:
+
+1. Slice 36 adds the assistant-response copy action with sources.
 
 ## Corporate specialist source management extension
 

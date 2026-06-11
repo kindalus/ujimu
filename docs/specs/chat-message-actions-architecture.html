@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arquitectura — Copiar resposta com fontes</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap');
+    :root { --bg:#080806; --panel:#15130d; --text:#fffaf0; --muted:#c9c0a8; --accent:#f9d616; --line:rgba(255,255,255,.14); --ok:#b7f7c2; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 20% 0%, rgba(249,214,22,.18), transparent 32%), var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 12vw; }
+    .slide.active { display:flex; }
+    .panel { width:min(1060px, 100%); border:1px solid var(--line); border-radius:28px; padding:46px; background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow:0 24px 90px rgba(0,0,0,.45); }
+    h1 { margin:0 0 18px; font-size:clamp(2.4rem, 5vw, 5.4rem); line-height:.92; letter-spacing:-.06em; font-weight:900; }
+    h2 { margin:0 0 22px; font-size:clamp(2rem, 4vw, 3.8rem); line-height:.95; letter-spacing:-.055em; font-weight:900; }
+    p, li { color:var(--muted); font-size:1.2rem; line-height:1.45; }
+    ul { display:grid; gap:12px; margin:0; padding-left:1.25rem; }
+    code { font-family:'JetBrains Mono', monospace; color:#fff6b8; }
+    .kicker { color:var(--accent); text-transform:uppercase; letter-spacing:.18em; font-weight:900; font-size:.78rem; margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { border:1px solid var(--line); border-radius:20px; padding:20px; background:rgba(0,0,0,.2); }
+    .badge { display:inline-flex; border:1px solid rgba(249,214,22,.45); border-radius:999px; padding:6px 10px; color:#fff6b8; background:rgba(249,214,22,.12); font-weight:800; }
+    .ok { color:var(--ok); }
+    .counter { position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:800; }
+    @media print { body { overflow:visible; } .slide { display:flex; page-break-after:always; } .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="panel"><div class="kicker">Arquitectura</div><h1>Copiar resposta com fontes</h1><p>Desenho mínimo para acrescentar uma acção local no chat sem alterar APIs, quotas, histórico ou ingestão.</p></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Origem</div><h2>Deck aprovado</h2><ul><li>Origem: <code>docs/specs/brainstorm-chat-message-actions.html</code>.</li><li>Escopo aprovado: apenas copiar resposta para a área de transferência.</li><li>Arquitectura aprovada explicitamente pelo utilizador.</li><li>Sem <code>docs/wiki/</code>; contexto governante vem de <code>AGENTS.md</code>, specs e código actual.</li><li>UI visível em português europeu pré-Acordo.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Princípio técnico</div><h2>Cliente apenas</h2><div class="grid"><div class="card"><span class="badge">Sem API</span><p>Não há alteração de servidor, base de dados, quotas, histórico ou contratos de chat.</p></div><div class="card"><span class="badge">Página actual</span><p>A implementação vive em <code>pages/index.vue</code>, junto da renderização das mensagens.</p></div></div></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Modelo de interacção</div><h2>Acção por resposta</h2><ul><li>Mostrar botão <strong>Copiar resposta</strong> apenas em mensagens do assistente.</li><li>Desactivar/ocultar enquanto a mensagem ainda está em <code>streaming</code>.</li><li>Ao clicar, montar texto com resposta e secção <strong>Fontes</strong>.</li><li>Usar <code>navigator.clipboard.writeText</code> quando disponível.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Formato copiado</div><h2>Texto simples estruturado</h2><ul><li>Primeira parte: texto integral da resposta.</li><li>Se existirem citações: adicionar linha vazia e cabeçalho <code>Fontes:</code>.</li><li>Cada fonte inclui título, artigos/referências e ficheiro quando existir.</li><li>Sem HTML, sem metadados sensíveis, sem identificadores internos de mensagem.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Estados e acessibilidade</div><h2>Feedback simples</h2><ul><li>Guardar estado local <code>copiedMessageId</code> e <code>copyErrorMessage</code>.</li><li>Mostrar <strong>Resposta copiada.</strong> junto da mensagem copiada.</li><li>Mostrar erro curto se o browser bloquear a área de transferência.</li><li>Botão normal, focável por teclado, com texto visível.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Exclusões</div><h2>Não fazer agora</h2><ul><li>Não copiar perguntas.</li><li>Não regenerar respostas.</li><li>Não apagar mensagens individuais.</li><li>Não partilhar conversas ou criar URLs públicos.</li><li>Não alterar histórico, analytics, quotas ou API de chat.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Verificação</div><h2>Critérios de sucesso</h2><ul><li>Teste UI confirma botão em respostas e ausência em perguntas.</li><li>Teste confirma inclusão de resposta, fontes, artigos e ficheiro.</li><li>Teste confirma uso de <code>navigator.clipboard.writeText</code> e feedback.</li><li><code>typecheck</code>, testes, build e audit continuam verdes.</li></ul></div></section>
+  <section class="slide"><div class="panel"><div class="kicker">Decisão</div><h2>Arquitectura proposta</h2><p><span class="ok">Aprovado:</span> usar a arquitectura existente do chat, acrescentando apenas uma acção client-side de cópia por mensagem de assistente concluída.</p></div></section>
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')]; let idx = 0;
+    document.getElementById('total').textContent = slides.length;
+    function go(next){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+    document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>
