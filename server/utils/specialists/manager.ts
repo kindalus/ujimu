@@ -18,7 +18,7 @@ export interface SpecialistManagerOptions extends SpecialistPathOptions {
 
 export type EditSpecialistInput = Partial<Pick<
   NormalizedSpecialistConfig,
-  'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled' | 'status' | 'allowed_emails'
+  'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled' | 'status' | 'company_id'
 >>
 
 export interface DeleteSpecialistResult {
@@ -119,7 +119,7 @@ function stringifySpecialistConfig(config: NormalizedSpecialistConfig): string {
       citations_required: config.citations_required,
       streaming_enabled: config.streaming_enabled,
       status: config.status,
-      allowed_emails: config.allowed_emails
+      ...(config.company_id ? { company_id: config.company_id } : {})
     },
     { lineWidth: 0 }
   )

@@ -38,7 +38,7 @@ export interface AdminSpecialist {
   citations_required: boolean
   streaming_enabled: boolean
   status: 'active' | 'suspended'
-  allowed_emails: string[]
+  company_id: string | null
   sources: IngestionSource[]
 }
 
@@ -140,7 +140,7 @@ export function createEmptySpecialistForm() {
     citations_required: true,
     streaming_enabled: true,
     status: 'active' as const,
-    allowed_emails: ''
+    company_id: ''
   }
 }
 

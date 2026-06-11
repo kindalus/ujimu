@@ -20,7 +20,7 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 30 company profile/management work:
+Latest full verification after Slice 31 specialist company access work:
 
 - `npm test` — passed, 132 tests
 - `npm run typecheck` — passed
@@ -81,9 +81,38 @@ Known non-blocking warnings:
 | 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `verified` | 2026-06-10 | Corporate SQLite model, memberships, subscriptions, and active-company context. |
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `verified` | 2026-06-10 | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `verified` | 2026-06-10 | Registered user profile, active company selector, and company admin management UI/API. |
-| 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
+| 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 31 — Specialist company access
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Acceptance tests:
+
+- Updated `tests/specialist-access.acceptance.test.ts` to cover company-scoped specialist creation/editing, public payload privacy, active-company access, and missing-company rejection.
+- Updated `tests/admin-ui.acceptance.test.ts` to expect the admin create defaults to use `company_id` rather than `allowed_emails`.
+- Confirmed RED before implementation with `npm test -- tests/specialist-access.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Replaced specialist `allowed_emails` with optional `company_id` in schema, manager serialization, admin payloads, and admin UI forms.
+- Enforced private specialist access through the user's active company only; inactive/expired company context does not unlock access.
+- Validated admin-assigned `company_id` values against the corporate company repository.
+
+Verification:
+
+- `npm test -- tests/specialist-access.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 132 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 30 — Company profile and management
 

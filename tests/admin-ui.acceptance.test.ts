@@ -101,7 +101,7 @@ describe('admin specialist management UI acceptance', () => {
     expect(createEmptySpecialistForm()).toMatchObject({
       system_prompt: 'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.',
       status: 'active',
-      allowed_emails: ''
+      company_id: ''
     })
   })
 

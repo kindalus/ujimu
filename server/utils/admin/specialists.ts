@@ -38,7 +38,7 @@ export interface AdminSpecialistPayload {
   citations_required: boolean
   streaming_enabled: boolean
   status: 'active' | 'suspended'
-  allowed_emails: string[]
+  company_id: string | null
   sources: IngestionSourceRecord[]
 }
 
@@ -62,7 +62,7 @@ export async function toAdminSpecialistPayload(
     citations_required: specialist.citations_required,
     streaming_enabled: specialist.streaming_enabled,
     status: specialist.status,
-    allowed_emails: specialist.allowed_emails,
+    company_id: specialist.company_id,
     sources: await readSpecialistSources(specialist)
   }
 }

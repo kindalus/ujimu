@@ -23,12 +23,12 @@ export interface SpecialistConfig {
   citations_required: boolean
   streaming_enabled: boolean
   status?: SpecialistStatus
-  allowed_emails?: string[]
+  company_id?: string | null
 }
 
 export interface NormalizedSpecialistConfig extends SpecialistConfig {
   status: SpecialistStatus
-  allowed_emails: string[]
+  company_id: string | null
 }
 
 export interface SpecialistRuntime extends NormalizedSpecialistConfig {
@@ -63,7 +63,6 @@ export interface SpecialistLoadError {
 }
 
 export const SPECIALIST_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function assertValidSpecialistId(id: string): void {
   if (!SPECIALIST_ID_PATTERN.test(id)) {
@@ -106,7 +105,7 @@ export function validateSpecialistConfig(input: unknown, directoryId: string): N
     citations_required: readBoolean(input, 'citations_required'),
     streaming_enabled: readBoolean(input, 'streaming_enabled'),
     status: readOptionalStatus(input.status),
-    allowed_emails: normalizeAllowedEmails(input.allowed_emails)
+    company_id: readOptionalCompanyId(input.company_id)
   }
 }
 
@@ -119,42 +118,6 @@ export function toPublicSpecialist(specialist: SpecialistRuntime | NormalizedSpe
     citations_required: specialist.citations_required,
     streaming_enabled: specialist.streaming_enabled
   }
-}
-
-export function normalizeAllowedEmails(value: unknown): string[] {
-  if (value === undefined || value === null) {
-    return []
-  }
-
-  const entries = typeof value === 'string'
-    ? value.split('\n')
-    : Array.isArray(value)
-      ? value
-      : undefined
-
-  if (!entries) {
-    throw new SpecialistConfigError('INVALID_CONFIG', 'allowed_emails must be a list of emails.')
-  }
-
-  const seen = new Set<string>()
-  const emails: string[] = []
-  for (const entry of entries) {
-    if (typeof entry !== 'string') {
-      throw new SpecialistConfigError('INVALID_CONFIG', 'allowed_emails must contain only strings.')
-    }
-
-    const normalized = normalizeEmail(entry)
-    if (!normalized) continue
-    if (!EMAIL_PATTERN.test(normalized)) {
-      throw new SpecialistConfigError('INVALID_CONFIG', `Invalid email in allowed_emails: "${entry}".`)
-    }
-    if (!seen.has(normalized)) {
-      seen.add(normalized)
-      emails.push(normalized)
-    }
-  }
-
-  return emails
 }
 
 export function normalizeEmail(value: string): string {
@@ -181,6 +144,16 @@ function readOptionalStatus(value: unknown): SpecialistStatus {
   }
 
   return value
+}
+
+function readOptionalCompanyId(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new SpecialistConfigError('INVALID_CONFIG', 'company_id must be a string when provided.')
+  }
+  return value.trim()
 }
 
 function isLlmWikiPreset(value: string): value is LlmWikiPreset {

@@ -12,6 +12,7 @@ import historyListHandler from '../server/api/history/index.get'
 import historyGetHandler from '../server/api/history/[conversationId].get'
 import { createSessionToken } from '../server/utils/auth/session'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
+import { createCompany, replaceCompanyMemberships, setActiveCompanyForUser, upsertCorporateSubscription } from '../server/utils/companies/repository'
 import { initializeDatabase } from '../server/utils/db'
 import { persistCompletedHistoryTurn } from '../server/utils/history/repository'
 import { createSpecialist } from '../server/utils/specialists/manager'
@@ -27,9 +28,11 @@ describe('specialist availability and access acceptance', () => {
     ])
   })
 
-  it('lets admins create and edit status plus email allowlists without exposing allowlists publicly', async () => {
+  it('lets admins create and edit status plus company access without exposing company ids publicly', async () => {
     const { dataDir, specialtiesRoot } = await createTempData()
     await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
+    await seedUser(dataDir, { userId: 'company-user', contacts: ['member@example.com'] })
+    const companyId = await seedCompany(dataDir, { memberUserEmail: 'member@example.com' })
     const fetchApp = createAccessFetch(dataDir, { adminContacts: 'admin@example.com' })
 
     const created = await fetchApp(jsonRequest('http://local/api/admin/specialists', {
@@ -38,53 +41,45 @@ describe('specialist availability and access acceptance', () => {
       body: {
         ...validSpecialist('laboral'),
         status: 'suspended',
-        allowed_emails: [' Pessoa@Exemplo.AO ', 'outra@example.com']
+        company_id: companyId
       }
     }))
     expect(created.status).toBe(201)
-    const createdBody = await created.json() as { specialist: { status: string; allowed_emails: string[] } }
-    expect(createdBody.specialist).toMatchObject({
-      status: 'suspended',
-      allowed_emails: ['pessoa@exemplo.ao', 'outra@example.com']
-    })
+    const createdBody = await created.json() as { specialist: { status: string; company_id: string } }
+    expect(createdBody.specialist).toMatchObject({ status: 'suspended', company_id: companyId })
 
     const edited = await fetchApp(jsonRequest('http://local/api/admin/specialists/laboral', {
       method: 'PATCH',
       headers: sessionHeaders('admin-user'),
-      body: {
-        status: 'active',
-        allowed_emails: 'restrito@example.com\nPessoa@Exemplo.AO\n'
-      }
+      body: { status: 'active', company_id: companyId }
     }))
     expect(edited.status).toBe(200)
-    await expect(edited.json()).resolves.toMatchObject({
-      specialist: { status: 'active', allowed_emails: ['restrito@example.com', 'pessoa@exemplo.ao'] }
-    })
+    await expect(edited.json()).resolves.toMatchObject({ specialist: { status: 'active', company_id: companyId } })
 
-    const invalidEmail = await fetchApp(jsonRequest('http://local/api/admin/specialists/laboral', {
+    const invalidCompany = await fetchApp(jsonRequest('http://local/api/admin/specialists/laboral', {
       method: 'PATCH',
       headers: sessionHeaders('admin-user'),
-      body: { allowed_emails: ['sem-arroba'] }
+      body: { company_id: 'missing-company' }
     }))
-    expect(invalidEmail.status).toBe(400)
+    expect(invalidCompany.status).toBe(400)
 
     const adminList = await fetchApp(new Request('http://local/api/admin/specialists', {
       headers: sessionHeaders('admin-user')
     }))
     await expect(adminList.json()).resolves.toMatchObject({
-      specialists: [expect.objectContaining({ id: 'laboral', status: 'active', allowed_emails: ['restrito@example.com', 'pessoa@exemplo.ao'] })]
+      specialists: [expect.objectContaining({ id: 'laboral', status: 'active', company_id: companyId })]
     })
 
     const anonymousPublic = await fetchApp(new Request('http://local/api/specialists'))
     expect(await anonymousPublic.json()).toEqual({ specialists: [] })
 
-    await seedUser(dataDir, { userId: 'allowed-user', contacts: ['Pessoa@Exemplo.AO'] })
+    await setActiveCompany(dataDir, 'company-user', companyId)
     const allowedPublic = await fetchApp(new Request('http://local/api/specialists', {
-      headers: sessionHeaders('allowed-user')
+      headers: sessionHeaders('company-user')
     }))
     const allowedBody = await allowedPublic.json() as { specialists: Array<Record<string, unknown>> }
     expect(allowedBody.specialists).toEqual([expect.objectContaining({ id: 'laboral' })])
-    expect(allowedBody.specialists[0]).not.toHaveProperty('allowed_emails')
+    expect(allowedBody.specialists[0]).not.toHaveProperty('company_id')
 
     expect(await getPublicSpecialists({ specialtiesRoot })).toEqual([])
   })
@@ -134,20 +129,21 @@ describe('specialist availability and access acceptance', () => {
     database.close()
   })
 
-  it('requires a verified allowlisted email for restricted specialists and does not accept phone-only identity', async () => {
+  it('requires the matching active company for private specialists', async () => {
     const { dataDir } = await createTempData()
-    await createSpecialist({ ...validSpecialist('laboral'), allowed_emails: ['allowed@example.com'] } as never, { dataDir })
-    await seedUser(dataDir, { userId: 'phone-user', contacts: ['+244923000000'] })
-    await seedUser(dataDir, { userId: 'allowed-user', contacts: ['ALLOWED@EXAMPLE.COM'] })
+    await seedUser(dataDir, { userId: 'member-user', contacts: ['member@example.com'] })
+    await seedUser(dataDir, { userId: 'other-user', contacts: ['other@example.com'] })
+    const companyId = await seedCompany(dataDir, { memberUserEmail: 'member@example.com' })
+    await createSpecialist({ ...validSpecialist('laboral'), company_id: companyId } as never, { dataDir })
     const fetchApp = createAccessFetch(dataDir)
 
     const anonymousList = await fetchApp(new Request('http://local/api/specialists'))
     expect(await anonymousList.json()).toEqual({ specialists: [] })
 
-    const phoneList = await fetchApp(new Request('http://local/api/specialists', {
-      headers: sessionHeaders('phone-user')
+    const memberWithoutActiveCompany = await fetchApp(new Request('http://local/api/specialists', {
+      headers: sessionHeaders('member-user')
     }))
-    expect(await phoneList.json()).toEqual({ specialists: [] })
+    expect(await memberWithoutActiveCompany.json()).toEqual({ specialists: [] })
 
     const database = await openDatabase(dataDir)
     await expect(
@@ -155,19 +151,25 @@ describe('specialist availability and access acceptance', () => {
         { specialistId: 'laboral', question: 'Posso consultar?' },
         {
           dataDir,
-          history: { database, subject: { type: 'registered', id: 'phone-user' } },
-          quota: { database, subject: { type: 'registered', id: 'phone-user' } }
+          history: { database, subject: { type: 'registered', id: 'member-user' } },
+          quota: { database, subject: { type: 'registered', id: 'member-user' } }
         }
       )
     ).rejects.toMatchObject({ statusCode: 404, code: 'SPECIALIST_NOT_FOUND' })
+    database.close()
 
+    await setActiveCompany(dataDir, 'member-user', companyId)
     const allowedList = await fetchApp(new Request('http://local/api/specialists', {
-      headers: sessionHeaders('allowed-user')
+      headers: sessionHeaders('member-user')
     }))
     await expect(allowedList.json()).resolves.toMatchObject({
       specialists: [expect.objectContaining({ id: 'laboral' })]
     })
-    database.close()
+
+    const otherList = await fetchApp(new Request('http://local/api/specialists', {
+      headers: sessionHeaders('other-user')
+    }))
+    expect(await otherList.json()).toEqual({ specialists: [] })
   })
 })
 
@@ -195,6 +197,35 @@ async function seedUser(dataDir: string, input: { userId: string; contacts: stri
         new Date(Date.UTC(2026, 4, 16, 12, index)).toISOString()
       )
   })
+  database.close()
+}
+
+async function seedCompany(dataDir: string, input: { memberUserEmail: string }): Promise<string> {
+  const database = await openDatabase(dataDir)
+  const company = createCompany(database, {
+    nif: `5${Math.floor(Math.random() * 1_000_000_000).toString().padStart(9, '0')}`,
+    name: 'Empresa Especialista',
+    phone: '+244923000000',
+    address: 'Rua Principal'
+  })
+  upsertCorporateSubscription(database, {
+    companyId: company.id,
+    seats: 10,
+    currentPeriodStart: '2026-05-16T12:00:00.000Z',
+    currentPeriodEnd: '2026-08-16T12:00:00.000Z'
+  })
+  replaceCompanyMemberships(database, {
+    companyId: company.id,
+    admins: [input.memberUserEmail],
+    members: []
+  })
+  database.close()
+  return company.id
+}
+
+async function setActiveCompany(dataDir: string, userId: string, companyId: string): Promise<void> {
+  const database = await openDatabase(dataDir)
+  setActiveCompanyForUser(database, { userId, companyId })
   database.close()
 }
 

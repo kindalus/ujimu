@@ -1,27 +1,23 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { H3Event } from 'h3'
 import { readSessionFromEvent } from '../auth/session'
-import { normalizeEmail, type SpecialistRuntime } from './schema'
+import { getActiveCompanyForUser } from '../companies/repository'
+import type { SpecialistRuntime } from './schema'
 
 export type SpecialistAccessSubject =
   | { type: 'anonymous' }
-  | { type: 'user'; userId: string; verifiedEmails: string[] }
+  | { type: 'user'; userId: string; activeCompanyId: string | null }
 
 export function canUseSpecialist(specialist: SpecialistRuntime, subject: SpecialistAccessSubject): boolean {
   if (specialist.status === 'suspended') {
     return false
   }
 
-  if (specialist.allowed_emails.length === 0) {
+  if (!specialist.company_id) {
     return true
   }
 
-  if (subject.type !== 'user') {
-    return false
-  }
-
-  const allowed = new Set(specialist.allowed_emails.map(normalizeEmail))
-  return subject.verifiedEmails.some((email) => allowed.has(normalizeEmail(email)))
+  return subject.type === 'user' && subject.activeCompanyId === specialist.company_id
 }
 
 export function filterAccessibleSpecialists(
@@ -33,47 +29,27 @@ export function filterAccessibleSpecialists(
 
 export function resolveSpecialistAccessSubject(database: DatabaseSync, event: H3Event): SpecialistAccessSubject {
   const session = readSessionFromEvent(event)
-  if (!session) {
+  if (!session || !userExists(database, session.userId)) {
     return { type: 'anonymous' }
   }
 
-  const verifiedEmails = getVerifiedEmailContactsForUser(database, session.userId)
-  if (verifiedEmails.length === 0 && !userExists(database, session.userId)) {
-    return { type: 'anonymous' }
-  }
-
-  return {
-    type: 'user',
-    userId: session.userId,
-    verifiedEmails
-  }
+  return resolveSpecialistAccessSubjectFromUser(database, session.userId)
 }
 
 export function resolveSpecialistAccessSubjectFromUser(
   database: DatabaseSync | undefined,
   userId: string | undefined
 ): SpecialistAccessSubject {
-  if (!database || !userId) {
+  if (!database || !userId || !userExists(database, userId)) {
     return { type: 'anonymous' }
   }
 
+  const activeCompany = getActiveCompanyForUser(database, userId)
   return {
     type: 'user',
     userId,
-    verifiedEmails: getVerifiedEmailContactsForUser(database, userId)
+    activeCompanyId: activeCompany?.active ? activeCompany.id : null
   }
-}
-
-export function getVerifiedEmailContactsForUser(database: DatabaseSync, userId: string): string[] {
-  return database
-    .prepare(`
-      SELECT contact
-      FROM user_identities
-      WHERE user_id = ? AND channel = 'email'
-      ORDER BY verified_at ASC
-    `)
-    .all(userId)
-    .map((row) => normalizeEmail((row as { contact: string }).contact))
 }
 
 function userExists(database: DatabaseSync, userId: string): boolean {

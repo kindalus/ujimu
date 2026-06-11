@@ -114,8 +114,8 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
                 <UBadge :color="specialist.status === 'active' ? 'success' : 'warning'" variant="soft">
                   {{ specialist.status === 'active' ? 'Activo' : 'Suspenso' }}
                 </UBadge>
-                <UBadge :color="specialist.allowed_emails.length === 0 ? 'neutral' : 'primary'" variant="soft">
-                  {{ specialist.allowed_emails.length === 0 ? 'Público' : 'Restricto' }}
+                <UBadge :color="specialist.company_id ? 'primary' : 'neutral'" variant="soft">
+                  {{ specialist.company_id ? 'Empresa privada' : 'Público' }}
                 </UBadge>
               </div>
               <p>{{ specialist.description }}</p>
@@ -147,7 +147,7 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
               <option value="suspended">Suspenso</option>
             </select>
           </label>
-          <label>Emails com acesso<UTextarea v-model="createForm.allowed_emails" :rows="4" placeholder="um email por linha; vazio significa público" :disabled="pending" /></label>
+          <label>ID da empresa<UInput v-model="createForm.company_id" placeholder="vazio significa público" :disabled="pending" /></label>
           <label class="checkbox-line"><input v-model="createForm.citations_required" type="checkbox" /> Exigir citações</label>
           <label class="checkbox-line"><input v-model="createForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
           <UButton type="submit" color="primary" :loading="pending">Criar especialidade</UButton>

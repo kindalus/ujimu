@@ -14,7 +14,7 @@ const editForm = ref({
   citations_required: true,
   streaming_enabled: true,
   status: 'active' as 'active' | 'suspended',
-  allowed_emails: ''
+  company_id: ''
 })
 const uploadFile = ref<File | undefined>()
 const confirmationId = ref('')
@@ -67,7 +67,7 @@ function syncEditForm(): void {
     citations_required: specialist.value.citations_required,
     streaming_enabled: specialist.value.streaming_enabled,
     status: specialist.value.status,
-    allowed_emails: specialist.value.allowed_emails.join('\n')
+    company_id: specialist.value.company_id ?? ''
   }
 }
 
@@ -257,8 +257,8 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
             <UBadge :color="specialist.status === 'active' ? 'success' : 'warning'" variant="soft">
               {{ specialist.status === 'active' ? 'Activo' : 'Suspenso' }}
             </UBadge>
-            <UBadge :color="specialist.allowed_emails.length === 0 ? 'neutral' : 'primary'" variant="soft">
-              {{ specialist.allowed_emails.length === 0 ? 'Público' : 'Restricto' }}
+            <UBadge :color="specialist.company_id ? 'primary' : 'neutral'" variant="soft">
+              {{ specialist.company_id ? 'Empresa privada' : 'Público' }}
             </UBadge>
           </div>
         </div>
@@ -273,7 +273,7 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
               <option value="suspended">Suspenso</option>
             </select>
           </label>
-          <label>Emails com acesso<UTextarea v-model="editForm.allowed_emails" :rows="4" placeholder="um email por linha; vazio significa público" :disabled="pending" /></label>
+          <label>ID da empresa<UInput v-model="editForm.company_id" placeholder="vazio significa público" :disabled="pending" /></label>
           <label class="checkbox-line"><input v-model="editForm.citations_required" type="checkbox" /> Exigir citações</label>
           <label class="checkbox-line"><input v-model="editForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
           <UButton type="submit" color="primary" :loading="pending">Guardar alterações</UButton>
