@@ -85,7 +85,7 @@ Known non-blocking warnings:
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
-| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `grilled` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
+| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `acceptance-tested` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
 
@@ -112,7 +112,7 @@ Planned order:
 
 ## Slice 35 — Corporate specialist management UI
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -131,6 +131,7 @@ Refinement and grill decisions:
 Acceptance-test plan:
 
 - Add `tests/company-specialists-ui.acceptance.test.ts` to verify page route, company detail link, allowed API hooks, and absent forbidden operations.
+- Confirmed RED with `npm test -- tests/company-specialists-ui.acceptance.test.ts --reporter=verbose`.
 
 ## Slice 34 — Corporate specialist management API
 
