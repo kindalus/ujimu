@@ -86,11 +86,11 @@ Known non-blocking warnings:
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
-| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `idea-refined` | — | In-chat copy action for assistant responses including citations. |
+| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `grilled` | — | In-chat copy action for assistant responses including citations. |
 
 ## Chat message actions extension
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
@@ -111,7 +111,7 @@ Planned order:
 
 ## Slice 36 — Copy assistant response with sources
 
-Status: `idea-refined`
+Status: `grilled`
 
 Originating brainstorm and architecture:
 
@@ -124,6 +124,13 @@ Refinement decisions:
 - Keep the action as a small per-response button in the existing chat message rendering.
 - Copy plain text with lightweight structure rather than HTML or a custom export format.
 - Avoid a new component or server contract for this single-page behaviour.
+
+Grill decisions:
+
+- Add a small pure formatter/helper for direct test coverage.
+- Render the button only for assistant messages whose status is `done`.
+- Do not render copy controls for user questions, streaming assistant messages, or error assistant messages.
+- Use `navigator.clipboard.writeText`; if unavailable or rejected, show a short per-message error rather than adding a hidden fallback.
 
 ## Corporate specialist source management extension
 
