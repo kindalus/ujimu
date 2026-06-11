@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, stat } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -15,6 +15,8 @@ import adminIngestionRunHandler from '../server/api/admin/specialists/[id]/inges
 import { createSessionToken } from '../server/utils/auth/session'
 import { initializeDatabase } from '../server/utils/db'
 import { getConversation, persistCompletedHistoryTurn } from '../server/utils/history/repository'
+import { readIngestionState } from '../server/utils/ingestion/state'
+import { runDueBackgroundJobs } from '../server/utils/jobs/background'
 import { createSpecialist } from '../server/utils/specialists/manager'
 import {
   getPublicSpecialists,
@@ -236,6 +238,55 @@ describe('admin specialist management acceptance', () => {
     expect(audit[1].metadata_json).not.toContain('Artigo 2.º')
   })
 
+  it('queues ingestion asynchronously and lets a recoverable worker complete the job', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const fetchAdmin = createAdminFetch(dataDir, 'admin@example.com', {
+      UJIMU_PI_INGESTION_ENABLED: 'true'
+    })
+
+    const upload = await fetchAdmin(
+      uploadRequest('http://local/api/admin/specialists/iva/raw', 'codigo-iva.md', '# Código do IVA\n\nArtigo 1.º')
+    )
+    expect(upload.status).toBe(201)
+
+    const queued = await fetchAdmin(
+      jsonRequest('http://local/api/admin/specialists/iva/ingestion/run', {
+        method: 'POST',
+        headers: sessionHeaders('admin-user')
+      })
+    )
+    expect(queued.status).toBe(202)
+    const queuedBody = await queued.json() as { job: { id: string; type: string; status: string; specialist_id: string }; sources: Array<{ raw_path: string; status: string }> }
+    expect(queuedBody).toMatchObject({
+      job: { type: 'specialist_ingestion', status: 'queued', specialist_id: 'iva' },
+      sources: [expect.objectContaining({ raw_path: 'codigo-iva.original.md', status: 'pending' })]
+    })
+
+    const database = await openAdminDatabase(dataDir)
+    expect(readJobStatuses(database)).toEqual([{ id: queuedBody.job.id, status: 'queued', attempts: 0 }])
+
+    const result = await runDueBackgroundJobs({
+      database,
+      dataDir,
+      piIngestionEnabled: true,
+      runner: {
+        async ingestSource(specialist, source) {
+          await writeFile(join(specialist.paths.wiki, 'index.md'), `# Wiki\n\nFonte: ${source.raw_path}\n`)
+        }
+      }
+    })
+
+    expect(result).toMatchObject({ processed: 1, succeeded: 1, failed: 0 })
+    expect(readJobStatuses(database)).toEqual([{ id: queuedBody.job.id, status: 'succeeded', attempts: 1 }])
+    const specialist = await getSpecialistById('iva', { dataDir })
+    expect(specialist).toBeTruthy()
+    const state = await readIngestionState(specialist!.paths.ingestState)
+    expect(state.sources['codigo-iva.original.md'].status).toBe('ingested')
+    database.close()
+  })
+
   it('deletes specialists as product deletion while moving the directory to trash and deleting history', async () => {
     const { dataDir, specialtiesRoot } = await createTempAdminData()
     await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
@@ -323,7 +374,11 @@ async function seedUser(
   database.close()
 }
 
-function createAdminFetch(dataDir: string, adminContacts: string): (request: Request) => Promise<Response> {
+function createAdminFetch(
+  dataDir: string,
+  adminContacts: string,
+  env: Record<string, string | undefined> = {}
+): (request: Request) => Promise<Response> {
   const app = createApp()
   const router = createRouter()
   router.get('/api/admin/session', adminSessionHandler)
@@ -345,7 +400,11 @@ function createAdminFetch(dataDir: string, adminContacts: string): (request: Req
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'admin-test-secret'
     process.env.UJIMU_ADMIN_CONTACTS = adminContacts
-    delete process.env.UJIMU_PI_INGESTION_ENABLED
+    if (env.UJIMU_PI_INGESTION_ENABLED === undefined) {
+      delete process.env.UJIMU_PI_INGESTION_ENABLED
+    } else {
+      process.env.UJIMU_PI_INGESTION_ENABLED = env.UJIMU_PI_INGESTION_ENABLED
+    }
 
     try {
       return await fetch(request)
@@ -411,6 +470,12 @@ async function readAuditEvents(dataDir: string): Promise<Array<{ action: string;
     .all() as Array<{ action: string; metadata_json: string }>
   database.close()
   return rows
+}
+
+function readJobStatuses(database: DatabaseSync): Array<{ id: string; status: string; attempts: number }> {
+  return database
+    .prepare('SELECT id, status, attempts FROM background_jobs ORDER BY created_at, id')
+    .all() as Array<{ id: string; status: string; attempts: number }>
 }
 
 function restoreEnv(key: string, value: string | undefined): void {

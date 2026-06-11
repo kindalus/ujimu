@@ -56,6 +56,7 @@ describe('admin specialist management UI acceptance', () => {
     expect(detail).not.toContain('Recarregar fontes')
     expect(detail).not.toContain('Executar conversão')
     expect(detail).toContain('Executar ingestão')
+    expect(detail).toContain('Ingestão agendada')
     expect(detail).toContain('Apagar especialidade')
     expect(detail).toContain('confirmationId')
     expect(detail).toContain('<UBadge')
