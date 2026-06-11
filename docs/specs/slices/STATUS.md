@@ -84,7 +84,7 @@ Known non-blocking warnings:
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
-| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `grilled` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
+| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `acceptance-tested` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `planned` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
@@ -112,7 +112,7 @@ Planned order:
 
 ## Slice 34 — Corporate specialist management API
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -133,6 +133,7 @@ Acceptance-test plan:
 
 - Add `tests/company-specialists.acceptance.test.ts` for list/detail authorization, prompt edit validation, upload/replacement, state refresh, and no job creation.
 - Update `tests/db.test.ts` for the new audit migration.
+- Confirmed RED with `npm test -- tests/company-specialists.acceptance.test.ts tests/db.test.ts --reporter=verbose`.
 
 ## Slice 33 — Admin company operations and specialist assignment
 

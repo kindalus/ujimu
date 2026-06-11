@@ -37,7 +37,8 @@ describe('initializeDatabase', () => {
       { version: '0008_passkeys' },
       { version: '0009_background_jobs' },
       { version: '0010_corporate_accounts' },
-      { version: '0011_company_quota_subject' }
+      { version: '0011_company_quota_subject' },
+      { version: '0012_company_admin_audit_events' }
     ])
   })
 
@@ -54,6 +55,6 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(11)
+    expect(count.count).toBe(12)
   })
 })
