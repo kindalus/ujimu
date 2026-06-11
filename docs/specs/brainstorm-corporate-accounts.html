@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brainstorm — Contas corporativas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
+
+      :root {
+        --bg: #070707;
+        --panel: rgba(255, 255, 255, 0.075);
+        --panel-strong: rgba(255, 255, 255, 0.12);
+        --line: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f0;
+        --muted: #b8b8ad;
+        --accent: #f9d616;
+        --accent-soft: rgba(249, 214, 22, 0.13);
+        --font-display: 'Space Grotesk', sans-serif;
+        --font-body: 'Inter', sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 14% 16%, rgba(249, 214, 22, 0.18), transparent 27%),
+          radial-gradient(circle at 85% 22%, rgba(255, 255, 255, 0.08), transparent 24%),
+          linear-gradient(145deg, #020202 0%, var(--bg) 55%, #111 100%);
+        color: var(--text);
+        font-family: var(--font-body);
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 7vh 12vw;
+        position: relative;
+      }
+
+      .slide.active { display: flex; }
+
+      .frame {
+        width: min(1100px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 34px;
+        padding: clamp(28px, 5vw, 58px);
+        background: linear-gradient(180deg, var(--panel), rgba(255, 255, 255, 0.032));
+        box-shadow: 0 30px 100px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(20px);
+      }
+
+      .kicker {
+        margin-bottom: 14px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1, h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        letter-spacing: -0.055em;
+        line-height: 0.95;
+      }
+
+      h1 { max-width: 880px; font-size: clamp(3rem, 8vw, 6.7rem); }
+      h2 { max-width: 860px; font-size: clamp(2.2rem, 5vw, 4.4rem); }
+
+      p.lead {
+        max-width: 790px;
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.08rem, 2vw, 1.45rem);
+        line-height: 1.5;
+      }
+
+      ul, ol {
+        display: grid;
+        gap: 14px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      li {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px 16px;
+        background: rgba(0, 0, 0, 0.22);
+        color: #eeeeea;
+        line-height: 1.45;
+      }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+      .card { border: 1px solid var(--line); border-radius: 22px; padding: 18px; background: var(--panel); }
+      .card strong { display: block; margin-bottom: 8px; color: var(--accent); }
+      .muted { color: var(--muted); }
+      code { color: var(--accent); }
+
+      .metric {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-top: 26px;
+        border: 1px solid rgba(249, 214, 22, 0.35);
+        border-radius: 24px;
+        padding: 16px 20px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      .metric span { color: var(--text); font-size: 1.4rem; }
+
+      .slide-counter {
+        position: fixed;
+        right: 28px;
+        bottom: 24px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        letter-spacing: 0.08em;
+      }
+
+      .hint {
+        position: fixed;
+        left: 28px;
+        bottom: 24px;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      @media (max-width: 900px) {
+        .slide { padding: 5vh 5vw; }
+        .grid { grid-template-columns: 1fr; }
+      }
+
+      @media print {
+        body { overflow: visible; background: #fff; color: #111; }
+        .slide { display: flex; break-after: page; }
+        .slide-counter, .hint { display: none; }
+        .frame { box-shadow: none; color: #111; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="slide active">
+      <div class="frame">
+        <div class="kicker">Brainstorm Zafir</div>
+        <h1>Contas corporativas</h1>
+        <p class="lead">Introduzir empresas, subscrições por número de utilizadores, gestão corporativa e acesso privado de especialistas por empresa.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Problema</div>
+        <h2>Como permitir que uma empresa compre e governe o acesso?</h2>
+        <p class="lead">A Ujimu já suporta utilizadores autenticados e subscrição individual. Falta uma camada empresarial: dados da empresa, lugares contratados, administradores, membros convidados por email e especialistas exclusivos de uma empresa.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Valor para o utilizador</div>
+        <h2>Comprar uma equipa, não uma conta isolada</h2>
+        <ul>
+          <li>O comprador escolhe subscrição corporativa e informa o número de utilizadores.</li>
+          <li>Pode pré-definir emails de utilizadores e administradores da empresa.</li>
+          <li>Emails pré-definidos ganham acesso quando se registam e verificam esse email.</li>
+          <li>Administradores da empresa gerem membros dentro do limite contratado.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Contexto governante</div>
+        <h2>Alinhamento com decisões existentes</h2>
+        <ul>
+          <li>Não existe <code>docs/wiki/</code>; a fonte governante actual é <code>AGENTS.md</code> e os specs já aprovados.</li>
+          <li>Pagamentos live continuam fora do lançamento; usar o fluxo mock/pendente existente.</li>
+          <li>Subscrições individuais continuam disponíveis.</li>
+          <li>Autorização deve continuar server-side; cookies e cliente não são autoridade.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Baseline técnico</div>
+        <h2>O que já existe no produto</h2>
+        <div class="grid">
+          <div class="card"><strong>Billing individual</strong><span class="muted"><code>server/utils/billing/subscriptions.ts</code> activa subscrições trimestrais por utilizador.</span></div>
+          <div class="card"><strong>Perfil de login</strong><span class="muted"><code>user_identities</code> guarda emails/telefones verificados.</span></div>
+          <div class="card"><strong>Acesso por email</strong><span class="muted">Slice 24 adicionou <code>allowed_emails</code> por especialista.</span></div>
+          <div class="card"><strong>Admin Ujimu</strong><span class="muted"><code>/admin</code> gere especialistas, fontes, analytics e operações.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Decisões confirmadas</div>
+        <h2>Produto</h2>
+        <ul>
+          <li>Subscrições individuais permanecem.</li>
+          <li>Subscrição corporativa: <code>35 000,00 AOA / trimestre / utilizador</code>.</li>
+          <li>Campos da empresa: NIF, nome, telefone e morada.</li>
+          <li>Sem pagamentos live nesta fase.</li>
+          <li>Só o admin Ujimu escolhe a empresa que acede a um especialista privado.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Limites</div>
+        <h2>Capacidade contratada + tolerância</h2>
+        <p class="lead">A empresa pode especificar até <strong>+10%</strong> do número de utilizadores subscritos, arredondado para baixo. Comprador e administradores contam para o total.</p>
+        <div class="metric"><span>10 lugares</span> permitem 11 pessoas totais</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Especialistas</div>
+        <h2>De emails para empresa</h2>
+        <ul>
+          <li>Sem empresa associada: especialista público.</li>
+          <li>Com empresa associada: especialista privado dessa empresa.</li>
+          <li>Modelo anterior <code>allowed_emails</code> deve ser substituído ou migrado.</li>
+          <li>Suspensão de especialista continua a esconder e bloquear acesso.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Interfaces</div>
+        <h2>Novos espaços de gestão</h2>
+        <ul>
+          <li>Perfil de utilizador registado: dados próprios, contactos verificados e estado de subscrição/empresa.</li>
+          <li>Admin de empresa: dados da empresa, lugares contratados, membros e administradores.</li>
+          <li>Admin Ujimu: empresas, subscrições corporativas e associação de especialista a uma empresa.</li>
+          <li>Página de subscrição: escolha individual ou corporativa.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Direcções possíveis</div>
+        <h2>Três formas de cortar o MVP</h2>
+        <div class="grid">
+          <div class="card"><strong>A. Mínimo vendável</strong><span class="muted">Empresa + checkout mock + membros por email + acesso especialista por empresa.</span></div>
+          <div class="card"><strong>B. Admin-first</strong><span class="muted">Admin Ujimu cria empresas e atribui especialistas antes de polir compra self-service.</span></div>
+          <div class="card"><strong>C. Self-service completo</strong><span class="muted">Compra corporativa, gestão da empresa e perfil no primeiro ciclo.</span></div>
+          <div class="card"><strong>Recomendação inicial</strong><span class="muted">Começar por A, mantendo pagamentos mock e evitando contabilidade complexa.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Não-objectivos iniciais</div>
+        <h2>Evitar expansão prematura</h2>
+        <ul>
+          <li>Sem pagamentos live, facturação real ou integrações fiscais.</li>
+          <li>Sem múltiplas empresas por especialista no MVP.</li>
+          <li>Sem equipas/departamentos dentro da empresa, salvo decisão contrária.</li>
+          <li>Sem convites por email enviados automaticamente, enquanto o provider de notificações continuar adiado.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Decisões confirmadas</div>
+        <h2>Governação da empresa</h2>
+        <ul>
+          <li>O comprador corporativo torna-se automaticamente administrador da empresa.</li>
+          <li>Cada empresa renova sempre a mesma subscrição corporativa; não há subscrições paralelas.</li>
+          <li>O limite <code>lugares + 10%</code> aplica-se tanto a emails autorizados como a utilizadores já registados.</li>
+          <li>Administradores da empresa podem editar dados, gerir membros, gerir admins e ver quota.</li>
+          <li>Sem pagamentos live: o fluxo corporativo simula confirmação e activa a subscrição.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Convergência</div>
+        <h2>Direcção MVP recomendada</h2>
+        <p class="lead">Implementar corporate como uma segunda via de subscrição, mantendo o individual intacto: empresa única por subscrição, membros por email verificado, admins corporativos, limite server-side e especialistas privados por empresa.</p>
+        <div class="metric"><span>Menor superfície nova</span> sem pagamentos live reais</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Decisões confirmadas</div>
+        <h2>Pagamento, quota e migração</h2>
+        <ul>
+          <li>A confirmação simulada activa a subscrição imediatamente após o clique de subscrever.</li>
+          <li>A quota corporativa é agregada por empresa, não isolada por utilizador.</li>
+          <li>Acesso privado de especialista passa de <code>allowed_emails</code> para <code>company_id</code>.</li>
+          <li>O campo <code>allowed_emails</code> será removido, não apenas escondido da UI.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Questões abertas</div>
+        <h2>Pronto para arquitectura</h2>
+        <p class="lead">As principais decisões de produto estão fechadas para uma primeira arquitectura. Próxima etapa: desenhar dados, APIs, autorização, quota agregada e migração de especialistas.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Registo de iterações</div>
+        <h2>Iterações 1–3</h2>
+        <ul>
+          <li>Iteração 1: corporate é opcional; individual permanece; preço corporate é <code>35 000,00 AOA / trimestre / utilizador</code>.</li>
+          <li>Iteração 1: +10% arredondado para baixo; comprador e administradores contam.</li>
+          <li>Iteração 2: comprador vira admin; subscrição é única por empresa; admins gerem dados, membros, admins e quota.</li>
+          <li>Iteração 2: pagamento corporate é simulado e a subscrição fica activa depois da confirmação simulada.</li>
+          <li>Iteração 3: activação simulada é imediata; quota corporate é agregada; <code>allowed_emails</code> será removido.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="frame">
+        <div class="kicker">Próximos passos</div>
+        <h2>Convergir antes de desenhar</h2>
+        <p class="lead">Responder às questões abertas, actualizar este deck vivo e só depois avançar para arquitectura. A implementação fica bloqueada até aprovação explícita deste ficheiro.</p>
+        <p class="lead"><code>docs/specs/brainstorm-corporate-accounts.html</code></p>
+      </div>
+    </section>
+
+    <div class="hint">← / → ou espaço</div>
+    <div class="slide-counter"><span id="current">1</span> / <span id="total"></span></div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      let current = 0;
+      const currentEl = document.getElementById('current');
+      const totalEl = document.getElementById('total');
+      totalEl.textContent = String(slides.length);
+
+      function go(next) {
+        slides[current].classList.remove('active');
+        current = Math.max(0, Math.min(next, slides.length - 1));
+        slides[current].classList.add('active');
+        currentEl.textContent = String(current + 1);
+      }
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(current + 1); }
+        if (event.key === 'ArrowLeft') { event.preventDefault(); go(current - 1); }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('a')) return;
+        event.clientX > window.innerWidth / 2 ? go(current + 1) : go(current - 1);
+      });
+    </script>
+  </body>
+</html>
