@@ -5,6 +5,7 @@ import {
   countCompletedAssistantResponses,
   extendInlineAdSchedule
 } from '../utils/inline-ads'
+import { copyTextToClipboard, formatAssistantResponseForClipboard } from '../utils/chat-copy'
 
 interface PublicSpecialist {
   id: string
@@ -171,6 +172,9 @@ const historyConversations = ref<HistoryConversationSummary[]>([])
 const historyPending = ref(false)
 const historyError = ref('')
 const editingMessageId = ref('')
+const copiedMessageId = ref('')
+const copyErrorMessageId = ref('')
+const copyErrorMessage = ref('')
 const isStreaming = ref(false)
 const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
@@ -394,6 +398,25 @@ function startEditingQuestion(message: ChatMessage): void {
 function cancelEditing(): void {
   editingMessageId.value = ''
   question.value = ''
+}
+
+async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
+  if (message.role !== 'assistant' || message.status !== 'done') return
+
+  copiedMessageId.value = ''
+  copyErrorMessageId.value = ''
+  copyErrorMessage.value = ''
+
+  try {
+    await copyTextToClipboard(formatAssistantResponseForClipboard({
+      text: message.text,
+      citations: message.citations
+    }))
+    copiedMessageId.value = message.id
+  } catch {
+    copyErrorMessageId.value = message.id
+    copyErrorMessage.value = 'Não foi possível copiar a resposta.'
+  }
 }
 
 async function loadSpecialists(): Promise<void> {
@@ -805,6 +828,20 @@ function createId(prefix: string): string {
                     </UButton>
                   </div>
 
+                  <div v-if="item.message.role === 'assistant' && item.message.status === 'done'" class="message-actions response-copy-actions">
+                    <UButton
+                      type="button"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      @click="copyAssistantResponse(item.message)"
+                    >
+                      Copiar resposta
+                    </UButton>
+                    <small v-if="copiedMessageId === item.message.id" class="copy-feedback">Resposta copiada.</small>
+                    <small v-if="copyErrorMessageId === item.message.id" class="copy-feedback copy-error" role="alert">{{ copyErrorMessage }}</small>
+                  </div>
+
                   <section
                     v-if="item.message.role === 'assistant' && item.message.citations.length > 0"
                     class="citations"
@@ -1190,6 +1227,19 @@ h3 {
 
 .message-actions {
   justify-content: flex-end;
+}
+
+.response-copy-actions {
+  flex-wrap: wrap;
+}
+
+.copy-feedback {
+  color: var(--ujimu-muted);
+  font-weight: 800;
+}
+
+.copy-error {
+  color: #ffd3d3;
 }
 
 .citations {

@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 35 corporate specialist management UI work:
+Latest full verification after Slice 36 assistant response copy work:
 
-- `npm test` — passed, 138 tests
+- `npm test` — passed, 141 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -86,11 +86,11 @@ Known non-blocking warnings:
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
-| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `acceptance-tested` | — | In-chat copy action for assistant responses including citations. |
+| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `verified` | 2026-06-11 | In-chat copy action for assistant responses including citations. |
 
 ## Chat message actions extension
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Approved originating decks:
 
@@ -111,7 +111,7 @@ Planned order:
 
 ## Slice 36 — Copy assistant response with sources
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -136,6 +136,21 @@ Acceptance-test plan:
 
 - Add `tests/chat-response-copy.acceptance.test.ts` to verify copied text formatting, Clipboard API boundary, and response-only UI controls.
 - Confirmed RED with `npm test -- tests/chat-response-copy.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added `utils/chat-copy.ts` with clipboard response formatting and a Clipboard API boundary helper.
+- Added per-message `Copiar resposta` controls for completed assistant messages in `pages/index.vue`.
+- Added success and error feedback next to the copied assistant message.
+- Kept the change client-side and did not alter chat APIs, history, analytics, quotas, or database schema.
+
+Verification:
+
+- `npm test -- tests/chat-response-copy.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 141 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Corporate specialist source management extension
 
