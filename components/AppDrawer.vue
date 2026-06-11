@@ -147,6 +147,30 @@ function logout(): void {
 
           <UButton
             v-if="isAuthenticated"
+            to="/account/profile"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-user"
+            block
+            @click="closeTemporaryDrawer"
+          >
+            Perfil
+          </UButton>
+
+          <UButton
+            v-if="isAuthenticated"
+            to="/companies"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-building-2"
+            block
+            @click="closeTemporaryDrawer"
+          >
+            Empresas
+          </UButton>
+
+          <UButton
+            v-if="isAuthenticated"
             to="/account/security"
             color="neutral"
             variant="ghost"
@@ -214,6 +238,26 @@ function logout(): void {
         </UButton>
         <UButton v-if="adminAvailable" to="/admin" color="neutral" variant="ghost" icon="i-lucide-shield" block>
           Administração
+        </UButton>
+        <UButton
+          v-if="isAuthenticated"
+          to="/account/profile"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-user"
+          block
+        >
+          Perfil
+        </UButton>
+        <UButton
+          v-if="isAuthenticated"
+          to="/companies"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-building-2"
+          block
+        >
+          Empresas
         </UButton>
         <UButton
           v-if="isAuthenticated"

@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 29 corporate checkout/billing status work:
+Latest full verification after Slice 30 company profile/management work:
 
-- `npm test` — passed, 130 tests
+- `npm test` — passed, 132 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -80,10 +80,50 @@ Known non-blocking warnings:
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `verified` | 2026-06-10 | Automatic conversion inside the asynchronous ingestion worker. |
 | 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `verified` | 2026-06-10 | Corporate SQLite model, memberships, subscriptions, and active-company context. |
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `verified` | 2026-06-10 | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
-| 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `planned` | — | Registered user profile, active company selector, and company admin management UI/API. |
+| 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `verified` | 2026-06-10 | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 30 — Company profile and management
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Refinement and grill decisions:
+
+- Build authenticated APIs first and keep UI simple but functional.
+- The profile endpoint follows the session pattern and can return `authenticated:false`.
+- Company endpoints require authentication; company edits and member replacement require company admin role.
+- Member list updates are full replacements validated server-side.
+- Detailed quota display remains deferred to Slice 32.
+- Drawer exposes authenticated navigation to profile and companies.
+
+Acceptance tests:
+
+- Added `tests/company-management.acceptance.test.ts` for profile, active company set/clear, company list/detail, admin-only company edit, and admin-only member management.
+- Added `tests/company-ui.acceptance.test.ts` for profile/company pages and drawer navigation.
+- Confirmed RED before implementation with `npm test -- tests/company-management.acceptance.test.ts tests/company-ui.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added `GET /api/account/profile` and `PUT /api/account/active-company`.
+- Added `GET /api/companies`, `GET/PATCH /api/companies/:id`, and `PUT /api/companies/:id/members`.
+- Added company HTTP authorization helpers.
+- Added `/account/profile`, `/companies`, and `/companies/[id]` pages.
+- Added authenticated drawer links for profile and companies.
+
+Verification:
+
+- `npm test -- tests/company-management.acceptance.test.ts tests/company-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 132 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 29 — Corporate checkout and billing status
 
