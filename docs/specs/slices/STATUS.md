@@ -84,6 +84,31 @@ Known non-blocking warnings:
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
+| 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `planned` | — | Corporate admin specialist-management API for prompt and source upload without ingestion. |
+| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `planned` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
+
+## Corporate specialist source management extension
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-corporate-specialist-source-management.html`](../brainstorm-corporate-specialist-source-management.html)
+- [`../corporate-specialist-source-management-architecture.html`](../corporate-specialist-source-management-architecture.html)
+
+Planning decisions:
+
+- Admins corporativos may manage only specialists already associated with their company through `company_id`.
+- Admins corporativos cannot create, delete, suspend, reassign, convert, ingest, or trigger background jobs for specialists.
+- The only specialist field editable by a company admin is `system_prompt` for the specialist itself.
+- Corporate source uploads use the same logical replacement rule as Ujimu admin uploads.
+- The corporate page route is `/companies/:id/specialists`.
+- No additional external governing context applies beyond repository instructions and approved specs.
+
+Planned order:
+
+1. Slice 34 adds the corporate specialist-management API and auditing.
+2. Slice 35 adds the corporate specialist-management UI.
 
 ## Slice 33 — Admin company operations and specialist assignment
 
