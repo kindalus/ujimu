@@ -85,7 +85,7 @@ Known non-blocking warnings:
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
-| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `planned` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
+| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `grilled` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
 
@@ -109,6 +109,28 @@ Planned order:
 
 1. Slice 34 adds the corporate specialist-management API and auditing.
 2. Slice 35 adds the corporate specialist-management UI.
+
+## Slice 35 — Corporate specialist management UI
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-specialist-source-management.html`](../brainstorm-corporate-specialist-source-management.html)
+- [`../corporate-specialist-source-management-architecture.html`](../corporate-specialist-source-management-architecture.html)
+
+Refinement and grill decisions:
+
+- Add a single route at `/companies/:id/specialists` instead of nested per-specialist routes.
+- Use local page state to select a specialist from the list and show its management panel.
+- Add the page link from `/companies/:id` only for company admins.
+- The page calls only `/api/companies/:id/specialists/**`, never `/api/admin/**`.
+- Include prompt editor, file upload, and source-state list.
+- Exclude conversion/ingestion buttons, specialist creation, specialist deletion, company reassignment, and status editing.
+
+Acceptance-test plan:
+
+- Add `tests/company-specialists-ui.acceptance.test.ts` to verify page route, company detail link, allowed API hooks, and absent forbidden operations.
 
 ## Slice 34 — Corporate specialist management API
 
