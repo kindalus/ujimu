@@ -76,8 +76,29 @@ Known non-blocking warnings:
 | 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
-| 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `planned` | — | Recoverable SQLite-backed ingestion jobs. |
+| 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `grilled` | — | Recoverable SQLite-backed ingestion jobs. |
 | 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
+
+## Slice 26 — Recoverable ingestion jobs
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-admin-source-ingestion-access.html`](../brainstorm-admin-source-ingestion-access.html)
+- [`../admin-source-ingestion-access-architecture.html`](../admin-source-ingestion-access-architecture.html)
+
+Refinement and grill decisions:
+
+- When Pi ingestion is enabled, the admin ingestion endpoint enqueues a recoverable SQLite job and returns `202` immediately.
+- When Pi ingestion is disabled, keep the existing operational gate: return the disabled response and leave sources pending rather than enqueueing a doomed job.
+- Use one active job per specialist to prevent duplicate work from repeated clicks.
+- In tests, do not auto-run real Pi from the endpoint; call the worker explicitly with a fake runner.
+- Store sanitized job errors and attempts in SQLite.
+
+Acceptance tests:
+
+- Pending: write before implementation.
 
 ## Slice 25 — Source upload, replacement, and refresh
 
