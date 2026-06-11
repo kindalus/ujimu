@@ -73,7 +73,7 @@ Known non-blocking warnings:
 | 20 | [`20-inline-ads-chat-polish.html`](./20-inline-ads-chat-polish.html) | `verified` | 2026-05-21 | Inline ad placements after every randomized 5–10 completed assistant responses for eligible users; citations remain inside assistant messages. |
 | 21 | [`21-admin-routing-specialists-sources.html`](./21-admin-routing-specialists-sources.html) | `verified` | 2026-05-21 | Admin subpages for specialist list/create plus detail/source upload/reload/conversion/ingestion/delete; existing API and auth semantics preserved. |
 | 22 | [`22-admin-analytics-ops-polish.html`](./22-admin-analytics-ops-polish.html) | `verified` | 2026-05-21 | Admin analytics/content-gap and safe readiness subpages; admin index simplified to navigation cards. |
-| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `implemented` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
+| 23 | [`23-dev-auth-login.html`](./23-dev-auth-login.html) | `verified` | 2026-06-10 | Development-only login for allowlisted contacts, without OTP/passkey, guarded from production. |
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `verified` | 2026-06-10 | Recoverable SQLite-backed ingestion jobs. |
@@ -485,7 +485,7 @@ Verification:
 
 ## Slice 23 — Development-only allowlisted login
 
-Status: `implemented`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
