@@ -24,12 +24,19 @@ export default defineEventHandler(async (event) => {
 
     assertCompanyExistsWhenProvided(database, input.company_id)
     const changedFields = mutableFields.filter((field) => input[field] !== undefined && input[field] !== existing[field])
+    const companyAssignmentChanged = input.company_id !== undefined && input.company_id !== existing.company_id
     const specialist = await editSpecialist(specialistId, input)
     recordAdminAuditEvent(database, {
       admin,
-      action: 'specialist_updated',
+      action: companyAssignmentChanged ? 'specialist_company_assignment_updated' : 'specialist_updated',
       specialistId,
-      metadata: { changed_fields: changedFields }
+      metadata: companyAssignmentChanged
+        ? {
+            changed_fields: changedFields,
+            previous_company_id: existing.company_id,
+            company_id: specialist.company_id
+          }
+        : { changed_fields: changedFields }
     })
 
     return { specialist: await toAdminSpecialistPayload(specialist) }

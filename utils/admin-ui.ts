@@ -46,6 +46,18 @@ export interface AdminSpecialistsResponse {
   specialists: AdminSpecialist[]
 }
 
+export interface AdminCompanySummary {
+  id: string
+  name: string
+  nif: string
+  active: boolean
+  seats: number
+}
+
+export interface AdminCompaniesResponse {
+  companies: AdminCompanySummary[]
+}
+
 export interface SourceStatusCounts {
   pending: number
   processing: number

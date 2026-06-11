@@ -8,6 +8,8 @@ const adminSpecialistsPath = 'pages/admin/specialists/index.vue'
 const adminSpecialistDetailPath = 'pages/admin/specialists/[id].vue'
 const adminAnalyticsPath = 'pages/admin/analytics.vue'
 const adminOpsPath = 'pages/admin/ops.vue'
+const adminCompaniesPath = 'pages/admin/companies.vue'
+const adminCompanyDetailPath = 'pages/admin/companies/[id].vue'
 
 async function readAdminPages() {
   return {
@@ -15,7 +17,9 @@ async function readAdminPages() {
     specialists: await readFile(adminSpecialistsPath, 'utf8'),
     detail: await readFile(adminSpecialistDetailPath, 'utf8'),
     analytics: await readFile(adminAnalyticsPath, 'utf8'),
-    ops: await readFile(adminOpsPath, 'utf8')
+    ops: await readFile(adminOpsPath, 'utf8'),
+    companies: await readFile(adminCompaniesPath, 'utf8'),
+    companyDetail: await readFile(adminCompanyDetailPath, 'utf8')
   }
 }
 
@@ -71,6 +75,7 @@ describe('admin specialist management UI acceptance', () => {
     const { dashboard, analytics, ops } = await readAdminPages()
 
     expect(dashboard).toContain('to="/admin/analytics"')
+    expect(dashboard).toContain('to="/admin/companies"')
     expect(dashboard).toContain('to="/admin/ops"')
     expect(dashboard).not.toContain('/api/admin/analytics/questions')
     expect(dashboard).not.toContain('/api/admin/ops/readyz')
@@ -97,6 +102,26 @@ describe('admin specialist management UI acceptance', () => {
     expect(ops).not.toContain('UJIMU_BILLING_WEBHOOK_SECRET')
   })
 
+  it('adds Ujimu admin company pages and specialist company selectors', async () => {
+    expect(existsSync(adminCompaniesPath), 'admin companies route must exist').toBe(true)
+    expect(existsSync(adminCompanyDetailPath), 'admin company detail route must exist').toBe(true)
+    if (!existsSync(adminCompaniesPath) || !existsSync(adminCompanyDetailPath)) return
+
+    const { specialists, detail, companies, companyDetail } = await readAdminPages()
+
+    expect(companies).toContain('/api/admin/session')
+    expect(companies).toContain('/api/admin/companies')
+    expect(companies).toContain('Empresas')
+    expect(companies).toContain('`/admin/companies/${company.id}`')
+    expect(companyDetail).toContain('/api/admin/companies')
+    expect(companyDetail).toContain('Quota')
+    expect(companyDetail).toContain('Especialidades associadas')
+    expect(specialists).toContain('/api/admin/companies')
+    expect(detail).toContain('/api/admin/companies')
+    expect(detail).toContain('Empresa')
+    expect(detail).toContain('<select v-model="editForm.company_id"')
+  })
+
   it('pre-fills safe specialist defaults when creating a specialist', () => {
     expect(createEmptySpecialistForm()).toMatchObject({
       system_prompt: 'Responda apenas com base na wiki desta especialidade e cite sempre as fontes relevantes.',
@@ -110,7 +135,9 @@ describe('admin specialist management UI acceptance', () => {
       !existsSync(adminSpecialistsPath) ||
       !existsSync(adminSpecialistDetailPath) ||
       !existsSync(adminAnalyticsPath) ||
-      !existsSync(adminOpsPath)
+      !existsSync(adminOpsPath) ||
+      !existsSync(adminCompaniesPath) ||
+      !existsSync(adminCompanyDetailPath)
     ) return
 
     const pages = Object.values(await readAdminPages())

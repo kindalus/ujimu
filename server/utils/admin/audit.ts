@@ -5,6 +5,7 @@ import type { RequiredAdminSession } from './guards'
 export type AdminAuditAction =
   | 'specialist_created'
   | 'specialist_updated'
+  | 'specialist_company_assignment_updated'
   | 'raw_source_uploaded'
   | 'raw_source_replaced'
   | 'sources_reloaded'

@@ -58,6 +58,13 @@ async function loadAdminSession(): Promise<void> {
       </section>
 
       <section class="admin-card route-card">
+        <p class="section-label">Empresas</p>
+        <h2>Empresas corporativas</h2>
+        <p class="muted">Veja subscrições, membros, quota agregada e especialidades privadas associadas.</p>
+        <UButton to="/admin/companies" color="primary" variant="soft">Abrir empresas</UButton>
+      </section>
+
+      <section class="admin-card route-card">
         <p class="section-label">Analytics</p>
         <h2>Visitantes e lacunas</h2>
         <p class="muted">Veja visitantes mensais, perguntas recentes e candidatos editoriais a lacunas de conteúdo.</p>
@@ -121,7 +128,7 @@ async function loadAdminSession(): Promise<void> {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
   margin-top: 18px;
 }

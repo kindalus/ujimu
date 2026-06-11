@@ -5,6 +5,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { createApp, createRouter, toWebHandler } from 'h3'
 import { describe, expect, it } from 'vitest'
 import adminSessionHandler from '../server/api/admin/session.get'
+import adminCompaniesListHandler from '../server/api/admin/companies/index.get'
+import adminCompanyDetailHandler from '../server/api/admin/companies/[id].get'
 import adminSpecialistsListHandler from '../server/api/admin/specialists/index.get'
 import adminSpecialistsCreateHandler from '../server/api/admin/specialists/index.post'
 import adminSpecialistPatchHandler from '../server/api/admin/specialists/[id].patch'
@@ -13,6 +15,7 @@ import adminRawUploadHandler from '../server/api/admin/specialists/[id]/raw.post
 import adminSourcesReloadHandler from '../server/api/admin/specialists/[id]/sources/reload.post'
 import adminIngestionRunHandler from '../server/api/admin/specialists/[id]/ingestion/run.post'
 import { createSessionToken } from '../server/utils/auth/session'
+import { createCompany, replaceCompanyMemberships, setActiveCompanyForUser, upsertCorporateSubscription } from '../server/utils/companies/repository'
 import { initializeDatabase } from '../server/utils/db'
 import { getConversation, persistCompletedHistoryTurn } from '../server/utils/history/repository'
 import { readIngestionState } from '../server/utils/ingestion/state'
@@ -154,6 +157,61 @@ describe('admin specialist management acceptance', () => {
     expect(audit.map((event) => event.action)).toEqual(['specialist_created', 'specialist_updated'])
     expect(audit[1].metadata_json).toContain('changed_fields')
     expect(audit[1].metadata_json).not.toContain('Answer only from this specialist wiki.')
+  })
+
+  it('lets Ujimu admins inspect companies and audit specialist-company assignment', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
+    await seedUser(dataDir, { userId: 'company-admin', contacts: ['company-admin@example.com'] })
+    const companyId = await seedAdminCompany(dataDir)
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const fetchAdmin = createAdminFetch(dataDir, 'admin@example.com')
+
+    const list = await fetchAdmin(new Request('http://local/api/admin/companies', {
+      headers: sessionHeaders('admin-user')
+    }))
+    expect(list.status).toBe(200)
+    await expect(list.json()).resolves.toMatchObject({
+      companies: [expect.objectContaining({
+        id: companyId,
+        name: 'Empresa Admin',
+        seats: 10,
+        active: true,
+        admin_count: 1,
+        member_count: 1,
+        assigned_specialist_count: 0
+      })]
+    })
+
+    const nonAdmin = await fetchAdmin(new Request(`http://local/api/admin/companies/${companyId}`, {
+      headers: sessionHeaders('company-admin')
+    }))
+    expect(nonAdmin.status).toBe(403)
+
+    const assigned = await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva', {
+      method: 'PATCH',
+      headers: sessionHeaders('admin-user'),
+      body: { company_id: companyId }
+    }))
+    expect(assigned.status).toBe(200)
+
+    const detail = await fetchAdmin(new Request(`http://local/api/admin/companies/${companyId}`, {
+      headers: sessionHeaders('admin-user')
+    }))
+    expect(detail.status).toBe(200)
+    await expect(detail.json()).resolves.toMatchObject({
+      company: { id: companyId, nif: '5003332221', name: 'Empresa Admin' },
+      subscription: { seats: 10 },
+      admins: [expect.objectContaining({ email: 'company-admin@example.com' })],
+      members: [expect.objectContaining({ email: 'member@example.com' })],
+      quota: { subject: { type: 'company', id: companyId }, weekly: { limit: 50000 } },
+      specialists: [expect.objectContaining({ id: 'iva', company_id: companyId })]
+    })
+
+    const audit = await readAuditEvents(dataDir)
+    expect(audit.map((event) => event.action)).toContain('specialist_company_assignment_updated')
+    expect(audit.at(-1)?.metadata_json).toContain(companyId)
+    expect(audit.at(-1)?.metadata_json).not.toContain('company-admin@example.com')
   })
 
   it('uploads raw sources, reloads pending state, rejects unsafe uploads, and skips disabled ingestion safely', async () => {
@@ -408,24 +466,53 @@ async function openAdminDatabase(dataDir: string): Promise<DatabaseSync> {
   return initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
 }
 
+async function seedAdminCompany(dataDir: string): Promise<string> {
+  const database = await openAdminDatabase(dataDir)
+  seedUserInDatabase(database, 'member-user', ['member@example.com'])
+  const company = createCompany(database, {
+    nif: '5003332221',
+    name: 'Empresa Admin',
+    phone: '+244923000000',
+    address: 'Rua Principal'
+  })
+  upsertCorporateSubscription(database, {
+    companyId: company.id,
+    seats: 10,
+    currentPeriodStart: '2026-05-16T12:00:00.000Z',
+    currentPeriodEnd: '2026-08-16T12:00:00.000Z'
+  })
+  replaceCompanyMemberships(database, {
+    companyId: company.id,
+    admins: ['company-admin@example.com'],
+    members: ['member@example.com']
+  })
+  setActiveCompanyForUser(database, { userId: 'company-admin', companyId: company.id })
+  database.close()
+  return company.id
+}
+
 async function seedUser(
   dataDir: string,
   input: { userId: string; contacts: string[] }
 ): Promise<void> {
   const database = await openAdminDatabase(dataDir)
-  database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run(input.userId, '2026-05-16T12:00:00.000Z')
-  input.contacts.forEach((contact, index) => {
+  seedUserInDatabase(database, input.userId, input.contacts)
+  database.close()
+}
+
+function seedUserInDatabase(database: DatabaseSync, userId: string, contacts: string[]): void {
+  database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run(userId, '2026-05-16T12:00:00.000Z')
+  contacts.forEach((contact, index) => {
     database
       .prepare('INSERT INTO user_identities (id, user_id, channel, contact, verified_at) VALUES (?, ?, ?, ?, ?)')
       .run(
-        `${input.userId}-identity-${index}`,
-        input.userId,
+        `${userId}-identity-${index}`,
+        userId,
         contact.startsWith('+') ? 'phone' : 'email',
         contact,
         new Date(Date.UTC(2026, 4, 16, 12, index)).toISOString()
       )
   })
-  database.close()
 }
 
 function createAdminFetch(
@@ -436,6 +523,8 @@ function createAdminFetch(
   const app = createApp()
   const router = createRouter()
   router.get('/api/admin/session', adminSessionHandler)
+  router.get('/api/admin/companies', adminCompaniesListHandler)
+  router.get('/api/admin/companies/:id', adminCompanyDetailHandler)
   router.get('/api/admin/specialists', adminSpecialistsListHandler)
   router.post('/api/admin/specialists', adminSpecialistsCreateHandler)
   router.patch('/api/admin/specialists/:id', adminSpecialistPatchHandler)

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse } from '../../../utils/admin-ui'
+import type { AdminCompaniesResponse, AdminCompanySummary, AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse } from '../../../utils/admin-ui'
 import { createEmptySpecialistForm, readAdminApiError } from '../../../utils/admin-ui'
 
 const session = ref<AdminSessionResponse>({ authenticated: false, admin: false })
 const sessionPending = ref(true)
 const specialists = ref<AdminSpecialist[]>([])
+const companies = ref<AdminCompanySummary[]>([])
 const pending = ref(false)
 const feedback = ref('')
 const errorMessage = ref('')
@@ -23,7 +24,7 @@ async function loadAdminSession(): Promise<void> {
       ? ((await response.json()) as AdminSessionResponse)
       : { authenticated: false, admin: false }
     if (session.value.admin) {
-      await loadSpecialists()
+      await Promise.all([loadSpecialists(), loadCompanies()])
     }
   } catch {
     session.value = { authenticated: false, admin: false }
@@ -38,6 +39,13 @@ async function loadSpecialists(): Promise<void> {
 
   const payload = (await response.json()) as AdminSpecialistsResponse
   specialists.value = payload.specialists
+}
+
+async function loadCompanies(): Promise<void> {
+  const response = await fetch('/api/admin/companies')
+  if (!response.ok) throw new Error('Failed to load companies.')
+  const payload = (await response.json()) as AdminCompaniesResponse
+  companies.value = payload.companies
 }
 
 async function createSpecialist(): Promise<void> {
@@ -147,7 +155,14 @@ async function runAdminAction(action: () => Promise<void>): Promise<void> {
               <option value="suspended">Suspenso</option>
             </select>
           </label>
-          <label>ID da empresa<UInput v-model="createForm.company_id" placeholder="vazio significa público" :disabled="pending" /></label>
+          <label>Empresa
+            <select v-model="createForm.company_id" :disabled="pending">
+              <option value="">Público</option>
+              <option v-for="company in companies" :key="company.id" :value="company.id">
+                {{ company.name }} · {{ company.nif }}
+              </option>
+            </select>
+          </label>
           <label class="checkbox-line"><input v-model="createForm.citations_required" type="checkbox" /> Exigir citações</label>
           <label class="checkbox-line"><input v-model="createForm.streaming_enabled" type="checkbox" /> Respostas em fluxo</label>
           <UButton type="submit" color="primary" :loading="pending">Criar especialidade</UButton>

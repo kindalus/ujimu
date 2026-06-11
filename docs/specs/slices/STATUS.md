@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 32 corporate quota fallback work:
+Latest full verification after Slice 33 admin company operations work:
 
-- `npm test` — passed, 134 tests
+- `npm test` — passed, 136 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -83,7 +83,37 @@ Known non-blocking warnings:
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `verified` | 2026-06-10 | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `verified` | 2026-06-10 | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
-| 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+| 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 33 — Admin company operations and specialist assignment
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-corporate-accounts.html`](../brainstorm-corporate-accounts.html)
+- [`../corporate-accounts-architecture.html`](../corporate-accounts-architecture.html)
+
+Acceptance tests:
+
+- Updated `tests/admin.acceptance.test.ts` to cover admin company list/detail, non-admin denial, specialist-company assignment, and audit metadata hygiene.
+- Updated `tests/admin-ui.acceptance.test.ts` to cover `/admin/companies`, `/admin/companies/:id`, admin dashboard navigation, and specialist company selectors.
+- Confirmed RED before implementation with `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added admin company payload helpers and `GET /api/admin/companies` plus `GET /api/admin/companies/:id`.
+- Added `/admin/companies` and `/admin/companies/[id]` pages with subscription, members/admins, quota, and assigned-specialist visibility.
+- Replaced raw company-id inputs in admin specialist create/detail forms with company selectors populated from the admin company API.
+- Added `specialist_company_assignment_updated` audit action when `company_id` changes.
+
+Verification:
+
+- `npm test -- tests/admin.acceptance.test.ts tests/admin-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 136 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 32 — Corporate quota fallback
 
