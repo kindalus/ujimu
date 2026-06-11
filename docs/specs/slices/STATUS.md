@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 34 corporate specialist management API work:
+Latest full verification after Slice 35 corporate specialist management UI work:
 
-- `npm test` — passed, 137 tests
+- `npm test` — passed, 138 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -85,7 +85,7 @@ Known non-blocking warnings:
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `verified` | 2026-06-10 | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
-| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `acceptance-tested` | — | Corporate admin specialist-management UI for prompt, source upload, and source states. |
+| 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 
 ## Corporate specialist source management extension
 
@@ -112,7 +112,7 @@ Planned order:
 
 ## Slice 35 — Corporate specialist management UI
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -132,6 +132,20 @@ Acceptance-test plan:
 
 - Add `tests/company-specialists-ui.acceptance.test.ts` to verify page route, company detail link, allowed API hooks, and absent forbidden operations.
 - Confirmed RED with `npm test -- tests/company-specialists-ui.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Added `/companies/:id/specialists` page with company specialist list, selected-specialist management, prompt editor, source upload, and source-state display.
+- Added admin-only link from `/companies/:id` to the specialist management page.
+- Kept the page on corporate endpoints only and omitted conversion, ingestion, creation, deletion, and reassignment controls.
+
+Verification:
+
+- `npm test -- tests/company-specialists-ui.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 138 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Slice 34 — Corporate specialist management API
 

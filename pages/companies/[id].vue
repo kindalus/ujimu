@@ -120,7 +120,10 @@ function splitEmails(value: string): string[] {
         <h1 id="company-title">{{ detail?.company.name || 'Empresa' }}</h1>
         <p>Edite dados e membros da empresa quando tiver permissões de administrador.</p>
       </div>
-      <UButton to="/companies" color="neutral" variant="ghost">Empresas</UButton>
+      <div class="company-actions">
+        <UButton v-if="detail?.role === 'admin'" :to="`/companies/${companyId}/specialists`" color="primary" variant="soft">Especialistas</UButton>
+        <UButton to="/companies" color="neutral" variant="ghost">Empresas</UButton>
+      </div>
     </header>
 
     <section class="company-card">
@@ -165,6 +168,7 @@ function splitEmails(value: string): string[] {
 .company-shell { width: min(1080px, calc(100% - 32px)); min-height: 100vh; margin: 0 auto; padding: 32px 0; }
 .company-hero, .company-card { border: 1px solid var(--ujimu-line); border-radius: 28px; background: rgba(255,255,255,.06); padding: 24px; }
 .company-hero { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.company-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
 .company-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .company-form { display: grid; gap: 12px; }
 .section-label { color: var(--ujimu-yellow); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
