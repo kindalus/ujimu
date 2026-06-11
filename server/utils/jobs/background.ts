@@ -3,6 +3,7 @@ import { hostname } from 'node:os'
 import type { DatabaseSync } from 'node:sqlite'
 import { resolveAppConfig } from '../config'
 import { initializeDatabase } from '../db'
+import { runPendingConversions, type PiConversionRunner } from '../ingestion/conversion'
 import type { PiIngestionRunner } from '../ingestion/pi-runner'
 import { runPendingIngestion } from '../ingestion/run'
 import { loadSpecialistsFromDisk } from '../specialists/loader'
@@ -29,7 +30,9 @@ export interface BackgroundJobRecord {
 export interface RunDueBackgroundJobsOptions {
   database: DatabaseSync
   dataDir?: string
+  piConversionEnabled?: boolean
   piIngestionEnabled?: boolean
+  conversionRunner?: PiConversionRunner
   runner?: PiIngestionRunner
   now?: Date
   limit?: number
@@ -224,6 +227,11 @@ async function runSpecialistIngestionJob(
     throw createJobError('SPECIALIST_NOT_FOUND', `Specialist "${job.specialist_id}" was not found.`)
   }
 
+  await runPendingConversions(specialist, {
+    piConversionEnabled: options.piConversionEnabled,
+    ...(options.conversionRunner ? { runner: options.conversionRunner } : {})
+  })
+
   await runPendingIngestion(specialist, {
     piIngestionEnabled: options.piIngestionEnabled,
     ...(options.runner ? { runner: options.runner } : {})
@@ -270,6 +278,7 @@ async function runScheduledBackgroundJobs(dataDir: string | undefined): Promise<
     await runDueBackgroundJobs({
       database,
       ...(dataDir ? { dataDir } : {}),
+      piConversionEnabled: process.env.UJIMU_PI_CONVERSION_ENABLED === 'true',
       piIngestionEnabled: process.env.UJIMU_PI_INGESTION_ENABLED === 'true'
     })
   } finally {

@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 26 recoverable ingestion jobs work:
+Latest full verification after Slice 27 automatic conversion/ingestion worker work:
 
-- `npm test` — passed, 126 tests
+- `npm test` — passed, 127 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
@@ -77,13 +77,49 @@ Known non-blocking warnings:
 | 24 | [`24-specialist-availability-access.html`](./24-specialist-availability-access.html) | `verified` | 2026-06-10 | Specialist suspension and email allowlist, enforced in public listing, chat, and history. |
 | 25 | [`25-source-upload-replacement-refresh.html`](./25-source-upload-replacement-refresh.html) | `verified` | 2026-06-10 | Source upload/replacement and source-status refresh without manual conversion UI. |
 | 26 | [`26-recoverable-ingestion-jobs.html`](./26-recoverable-ingestion-jobs.html) | `verified` | 2026-06-10 | Recoverable SQLite-backed ingestion jobs. |
-| 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `planned` | — | Automatic conversion inside the asynchronous ingestion worker. |
+| 27 | [`27-automatic-conversion-ingestion-worker.html`](./27-automatic-conversion-ingestion-worker.html) | `verified` | 2026-06-10 | Automatic conversion inside the asynchronous ingestion worker. |
 | 28 | [`28-corporate-data-model-context.html`](./28-corporate-data-model-context.html) | `planned` | — | Corporate SQLite model, memberships, subscriptions, and active-company context. |
 | 29 | [`29-corporate-checkout-billing-status.html`](./29-corporate-checkout-billing-status.html) | `planned` | — | Simulated corporate checkout and enriched billing status while preserving individual subscriptions. |
 | 30 | [`30-company-profile-management.html`](./30-company-profile-management.html) | `planned` | — | Registered user profile, active company selector, and company admin management UI/API. |
 | 31 | [`31-specialist-company-access.html`](./31-specialist-company-access.html) | `planned` | — | Specialist access via company_id and removal of allowed_emails. |
 | 32 | [`32-corporate-quota-fallback.html`](./32-corporate-quota-fallback.html) | `planned` | — | Aggregated corporate quota with individual fallback. |
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `planned` | — | Ujimu admin company pages and specialist-company assignment. |
+
+## Slice 27 — Automatic conversion inside ingestion worker
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-admin-source-ingestion-access.html`](../brainstorm-admin-source-ingestion-access.html)
+- [`../admin-source-ingestion-access-architecture.html`](../admin-source-ingestion-access-architecture.html)
+
+Refinement and grill decisions:
+
+- Keep a single `specialist_ingestion` job type and let the worker orchestrate conversion followed by ingestion.
+- Reuse the existing conversion runner and existing ingestion runner instead of creating a second pipeline implementation.
+- Preserve `conversion` and `ingestion` substate in `ingest/state.json` for admin/debug visibility.
+- Keep the manual conversion endpoint for compatibility, but the UI remains free of manual conversion action.
+- Never mark a source ingested unless actual `wiki/*.md` output exists.
+
+Acceptance tests:
+
+- Added `tests/admin.acceptance.test.ts` coverage proving that a recoverable ingestion job converts a non-Markdown source with a fake conversion runner and then ingests the generated Markdown with a fake ingestion runner.
+- Confirmed RED before implementation with `npm test -- tests/admin.acceptance.test.ts --reporter=verbose`.
+
+Implementation:
+
+- Extended `runDueBackgroundJobs` with `piConversionEnabled` and `conversionRunner` options.
+- The `specialist_ingestion` worker now runs `runPendingConversions()` before `runPendingIngestion()`.
+- Scheduled runtime jobs pass both conversion and ingestion feature flags.
+
+Verification:
+
+- `npm test -- tests/admin.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 127 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Corporate accounts implementation plan
 

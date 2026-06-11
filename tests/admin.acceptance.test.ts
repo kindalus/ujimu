@@ -287,6 +287,60 @@ describe('admin specialist management acceptance', () => {
     database.close()
   })
 
+  it('runs pending conversion before ingestion inside the recoverable ingestion job', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const fetchAdmin = createAdminFetch(dataDir, 'admin@example.com', {
+      UJIMU_PI_INGESTION_ENABLED: 'true'
+    })
+
+    const upload = await fetchAdmin(
+      uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.txt', 'Artigo 1.º\nTexto original.')
+    )
+    expect(upload.status).toBe(201)
+
+    const queued = await fetchAdmin(
+      jsonRequest('http://local/api/admin/specialists/iva/ingestion/run', {
+        method: 'POST',
+        headers: sessionHeaders('admin-user')
+      })
+    )
+    expect(queued.status).toBe(202)
+
+    const database = await openAdminDatabase(dataDir)
+    const result = await runDueBackgroundJobs({
+      database,
+      dataDir,
+      piConversionEnabled: true,
+      piIngestionEnabled: true,
+      conversionRunner: {
+        async convertSource(specialist, source) {
+          await writeFile(
+            join(specialist.paths.raw, source.conversion!.markdown_path),
+            `# Convertido\n\nArtigo 1.º\nMarkdown de ${source.raw_path} com conteúdo suficiente.`
+          )
+        }
+      },
+      runner: {
+        async ingestSource(specialist, source) {
+          await writeFile(join(specialist.paths.wiki, 'index.md'), `# Wiki\n\nFonte: ${source.ingestion!.source_path}\n`)
+        }
+      }
+    })
+
+    expect(result).toMatchObject({ processed: 1, succeeded: 1, failed: 0 })
+    const specialist = await getSpecialistById('iva', { dataDir })
+    expect(specialist).toBeTruthy()
+    const state = await readIngestionState(specialist!.paths.ingestState)
+    expect(state.sources['lei.txt']).toMatchObject({
+      conversion: { status: 'converted', markdown_path: 'lei.txt.md', markdown_checksum: expect.stringMatching(/^sha256:/) },
+      ingestion: { status: 'ingested', source_path: 'lei.txt.md' },
+      status: 'ingested'
+    })
+    database.close()
+  })
+
   it('deletes specialists as product deletion while moving the directory to trash and deleting history', async () => {
     const { dataDir, specialtiesRoot } = await createTempAdminData()
     await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
