@@ -86,11 +86,11 @@ Known non-blocking warnings:
 | 33 | [`33-admin-companies-specialist-assignment.html`](./33-admin-companies-specialist-assignment.html) | `verified` | 2026-06-10 | Ujimu admin company pages and specialist-company assignment. |
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
-| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `planned` | — | In-chat copy action for assistant responses including citations. |
+| 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `idea-refined` | — | In-chat copy action for assistant responses including citations. |
 
 ## Chat message actions extension
 
-Status: `planned`
+Status: `idea-refined`
 
 Approved originating decks:
 
@@ -108,6 +108,22 @@ Planning decisions:
 Planned order:
 
 1. Slice 36 adds the assistant-response copy action with sources.
+
+## Slice 36 — Copy assistant response with sources
+
+Status: `idea-refined`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-chat-message-actions.html`](../brainstorm-chat-message-actions.html)
+- [`../chat-message-actions-architecture.html`](../chat-message-actions-architecture.html)
+
+Refinement decisions:
+
+- Solve only the user need to reuse an assistant response together with its citations.
+- Keep the action as a small per-response button in the existing chat message rendering.
+- Copy plain text with lightweight structure rather than HTML or a custom export format.
+- Avoid a new component or server contract for this single-page behaviour.
 
 ## Corporate specialist source management extension
 
