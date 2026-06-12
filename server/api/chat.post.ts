@@ -14,6 +14,7 @@ import { serializeChatEvent } from '../utils/chat/ndjson'
 import type { ChatStreamEvent } from '../utils/chat/types'
 import { ChatRequestError, validateChatRequestBody } from '../utils/chat/request'
 import { resolveQuotaSubjectWithSubscription } from '../utils/billing/subscriptions'
+import { getAdminSession } from '../utils/admin/guards'
 import { getActiveCompanyForUser } from '../utils/companies/repository'
 import { initializeDatabase } from '../utils/db'
 import { QuotaExceededError } from '../utils/quota/errors'
@@ -43,17 +44,20 @@ export default defineEventHandler(async (event) => {
     const input = validateChatRequestBody(body)
     const baseSubject = resolveQuotaSubject(event)
     const subject = resolveQuotaSubjectWithSubscription(database, baseSubject)
-    const corporateSubject = subject.type === 'anonymous'
+    const adminSession = getAdminSession(database, event)
+    const corporateSubject = subject.type === 'anonymous' || adminSession.admin
       ? null
       : resolveActiveCompanyQuotaSubject(database, subject.id)
     const visitor = resolveVisitorIdentity(event)
 
     const stream = await createChatEventStream(input, {
-      quota: {
-        database,
-        subject: corporateSubject ?? subject,
-        fallbackSubject: corporateSubject ? subject : undefined
-      },
+      ...(adminSession.admin ? {} : {
+        quota: {
+          database,
+          subject: corporateSubject ?? subject,
+          fallbackSubject: corporateSubject ? subject : undefined
+        }
+      }),
       history: {
         database,
         subject

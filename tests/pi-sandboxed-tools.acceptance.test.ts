@@ -2,12 +2,17 @@ import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createSandboxedFileTools, UjimuPiPathPolicyError, type UjimuPiFileToolName } from '../server/utils/pi/sandboxed-tools'
+import {
+  createSandboxedFileTools,
+  UjimuPiPathNotFoundError,
+  UjimuPiPathPolicyError,
+  type UjimuPiFileToolName
+} from '../server/utils/pi/sandboxed-tools'
 
 const TOOL_NAMES: UjimuPiFileToolName[] = ['read', 'write', 'edit', 'grep', 'find', 'ls']
 
 describe('Ujimu Pi sandboxed file tools acceptance', () => {
-  it('allows chat reads/searches only inside wiki and blocks raw, absolute, and traversal paths', async () => {
+  it('allows chat reads/searches through the virtual /data mount and hides host paths outside it', async () => {
     const root = await createSpecialistFixture()
     const tools = await createSandboxedFileTools({
       root,
@@ -16,20 +21,21 @@ describe('Ujimu Pi sandboxed file tools acceptance', () => {
       list: { directories: ['wiki'] }
     }, TOOL_NAMES)
 
-    await expect(executeTool(tools, 'read', { path: 'wiki/page.md' })).resolves.toMatchObject({
+    await expect(executeTool(tools, 'read', { path: '/data/wiki/page.md' })).resolves.toMatchObject({
       content: [expect.objectContaining({ text: expect.stringContaining('Artigo 1.º') })]
     })
-    await expect(executeTool(tools, 'grep', { pattern: 'Artigo', path: 'wiki' })).resolves.toMatchObject({
+    await expect(executeTool(tools, 'grep', { pattern: 'Artigo', path: '/data/wiki' })).resolves.toMatchObject({
       content: [expect.objectContaining({ text: expect.stringContaining('page.md') })]
     })
-    await expect(executeTool(tools, 'find', { pattern: '**/*.md', path: 'wiki' })).resolves.toMatchObject({
+    await expect(executeTool(tools, 'find', { pattern: '**/*.md', path: '/data/wiki' })).resolves.toMatchObject({
       content: [expect.objectContaining({ text: expect.stringContaining('page.md') })]
     })
 
-    await expect(executeTool(tools, 'read', { path: 'raw/source.md' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'read', { path: '../outside-secret.md' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'read', { path: '/etc/passwd' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'grep', { pattern: 'secret', path: 'raw' })).rejects.toThrow()
+    await expect(executeTool(tools, 'read', { path: '/data/raw/source.md' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'read', { path: '../outside-secret.md' })).rejects.toBeInstanceOf(UjimuPiPathNotFoundError)
+    await expect(executeTool(tools, 'read', { path: '/etc/passwd' })).rejects.toBeInstanceOf(UjimuPiPathNotFoundError)
+    await expect(executeTool(tools, 'read', { path: '/config/auth.json' })).rejects.toThrow('Path not found')
+    await expect(executeTool(tools, 'grep', { pattern: 'secret', path: '/data/raw' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
   })
 
   it('allows ingestion to write wiki files but not raw files or symlink escapes', async () => {
@@ -42,13 +48,13 @@ describe('Ujimu Pi sandboxed file tools acceptance', () => {
       list: { directories: ['wiki'] }
     }, TOOL_NAMES)
 
-    await expect(executeTool(tools, 'write', { path: 'wiki/new.md', content: 'new wiki page' })).resolves.toMatchObject({
+    await expect(executeTool(tools, 'write', { path: '/data/wiki/new.md', content: 'new wiki page' })).resolves.toMatchObject({
       content: [expect.objectContaining({ text: expect.stringContaining('Successfully wrote') })]
     })
     await expect(readFile(join(root, 'wiki', 'new.md'), 'utf8')).resolves.toBe('new wiki page')
 
-    await expect(executeTool(tools, 'write', { path: 'raw/source.md', content: 'changed raw' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'write', { path: 'wiki/escape.md', content: 'leak' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'write', { path: '/data/raw/source.md', content: 'changed raw' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'write', { path: '/data/wiki/escape.md', content: 'leak' })).rejects.toBeInstanceOf(UjimuPiPathNotFoundError)
     await expect(readFile(join(root, '..', 'outside-secret.md'), 'utf8')).resolves.toBe('outside secret')
   })
 
@@ -61,15 +67,15 @@ describe('Ujimu Pi sandboxed file tools acceptance', () => {
       list: { directories: [] }
     }, TOOL_NAMES)
 
-    await expect(executeTool(tools, 'read', { path: 'raw/source.txt' })).resolves.toMatchObject({
+    await expect(executeTool(tools, 'read', { path: '/data/raw/source.txt' })).resolves.toMatchObject({
       content: [expect.objectContaining({ text: expect.stringContaining('Fonte TXT') })]
     })
-    await expect(executeTool(tools, 'write', { path: 'raw/source.txt.md', content: '# Fonte TXT' })).resolves.toBeDefined()
+    await expect(executeTool(tools, 'write', { path: '/data/raw/source.txt.md', content: '# Fonte TXT' })).resolves.toBeDefined()
     await expect(readFile(join(root, 'raw', 'source.txt.md'), 'utf8')).resolves.toBe('# Fonte TXT')
 
-    await expect(executeTool(tools, 'read', { path: 'raw/source.md' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'write', { path: 'wiki/from-conversion.md', content: 'not allowed' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
-    await expect(executeTool(tools, 'ls', { path: 'raw' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'read', { path: '/data/raw/source.md' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'write', { path: '/data/wiki/from-conversion.md', content: 'not allowed' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
+    await expect(executeTool(tools, 'ls', { path: '/data/raw' })).rejects.toBeInstanceOf(UjimuPiPathPolicyError)
   })
 })
 

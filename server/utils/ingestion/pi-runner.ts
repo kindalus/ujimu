@@ -58,8 +58,8 @@ async function runPiSdkIngestion(
     },
     appendSystemPromptOverride: () => [
       'You are maintaining a Ujimu specialist LLM Wiki.',
-      'Operate only inside the current specialist directory.',
-      'Never modify files under raw/.',
+      'Operate only inside the /data virtual filesystem.',
+      'Never modify files under /data/raw.',
       'Use the legislation/regulatory LLM Wiki conventions for laws, articles, definitions, topics, amendments, derived pages, index, and log.'
     ]
   })
@@ -99,19 +99,19 @@ Specialist:
 
 Source:
 - original raw path for citations: raw/${source.raw_path}
-- Markdown ingestion path: raw/${markdownPath}
+- Markdown ingestion path: /data/raw/${markdownPath}
 - title: ${source.title}
 - original checksum: ${source.checksum}
 - Markdown checksum: ${source.conversion?.markdown_checksum ?? '(unknown)'}
 - article references detected by the app: ${source.article_refs.join(', ') || '(none)'}
 
 Instructions:
-1. Use the llm-wiki skill to ingest only the Markdown file at raw/${markdownPath}.
-2. Do not ingest raw/${source.raw_path} directly when it differs from the Markdown ingestion path.
-3. Do not modify, rename, or delete anything under raw/.
-4. Maintain the wiki/ directory using the legislation/regulatory LLM Wiki structure.
+1. Use the llm-wiki skill to ingest only the Markdown file at /data/raw/${markdownPath}.
+2. Do not ingest /data/raw/${source.raw_path} directly when it differs from the Markdown ingestion path.
+3. Do not modify, rename, or delete anything under /data/raw.
+4. Maintain the /data/wiki directory using the legislation/regulatory LLM Wiki structure.
 5. Preserve traceability from wiki pages to the original source file raw/${source.raw_path}.
-6. Update wiki/index.md and wiki/log.md if present, or create them if missing.
+6. Update /data/wiki/index.md and /data/wiki/log.md if present, or create them if missing.
 7. If this is a reingestion, reconcile existing wiki pages instead of creating duplicate source pages.
 8. If you cannot ingest the source from the available context, explain the failure clearly.
 `

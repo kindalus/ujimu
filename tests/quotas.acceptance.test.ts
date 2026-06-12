@@ -2,7 +2,10 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { createApp, createRouter, toWebHandler } from 'h3'
 import { describe, expect, it, vi } from 'vitest'
+import chatHandler from '../server/api/chat.post'
+import { createSessionToken } from '../server/utils/auth/session'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import type { ChatEngineRunner } from '../server/utils/chat/types'
 import { createCompany, replaceCompanyMemberships, setActiveCompanyForUser, upsertCorporateSubscription } from '../server/utils/companies/repository'
@@ -235,6 +238,65 @@ describe('quota and request limit acceptance', () => {
     database.close()
   })
 
+  it('does not apply request quotas to Ujimu admins in the chat API', async () => {
+    resetSpecialistRegistryForTests()
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-admin-quota-'))
+    const database = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
+    seedQuotaUser(database, 'admin-user', 'admin@example.com')
+    const specialist = await createSpecialist(
+      {
+        id: 'iva',
+        name: 'Legislação de IVA',
+        description: 'Especialista sobre legislação de IVA.',
+        wiki_type: 'legislation-regulatory',
+        system_prompt: 'Answer only from this specialist wiki.',
+        citations_required: true,
+        streaming_enabled: true
+      },
+      { dataDir }
+    )
+    await storeRawSource(specialist, {
+      fileName: 'codigo-iva.md',
+      content: '# Código do IVA\n\nArtigo 1.º\nTexto legal.'
+    })
+    const state = await scanSpecialistRawSources(specialist)
+    state.sources['codigo-iva.original.md'].status = 'ingested'
+    state.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
+    state.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
+    await writeIngestionState(specialist.paths.ingestState, state)
+
+    for (let index = 0; index < 20; index += 1) {
+      expect(evaluateAndRecordQuota(database, {
+        subject: { type: 'registered', id: 'admin-user' },
+        specialistId: 'iva',
+        userTimezone: 'Africa/Luanda',
+        occurredAt: new Date('2026-05-16T12:00:00.000Z')
+      }).allowed).toBe(true)
+    }
+
+    const fetchChat = createChatFetch(dataDir, 'admin@example.com')
+    const response = await fetchChat(new Request('http://local/api/chat', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `ujimu_session=${createSessionToken('admin-user', {
+          sessionSecret: 'quota-admin-secret',
+          now: new Date('2026-05-16T12:00:00.000Z')
+        })}`
+      },
+      body: JSON.stringify({
+        specialistId: 'iva',
+        question: 'O que diz o Artigo 1.º?',
+        clientTimezone: 'Africa/Luanda'
+      })
+    }))
+
+    expect(response.status).toBe(200)
+    await response.body?.cancel().catch(() => undefined)
+    expect(getRequestEventCount(database)).toBe(20)
+    database.close()
+  })
+
   it('checks quota before creating a chat stream and does not call the runner when denied', async () => {
     const database = await createTempDatabase()
     const { specialtiesRoot } = await createTempSpecialist('iva')
@@ -271,6 +333,34 @@ describe('quota and request limit acceptance', () => {
     database.close()
   })
 })
+
+function createChatFetch(dataDir: string, adminContacts: string): (request: Request) => Promise<Response> {
+  const app = createApp()
+  const router = createRouter()
+  router.post('/api/chat', chatHandler)
+  app.use(router)
+  const fetch = toWebHandler(app)
+
+  return async (request: Request) => {
+    const previousDataDir = process.env.UJIMU_DATA_DIR
+    const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
+    const previousAdminContacts = process.env.UJIMU_ADMIN_CONTACTS
+    const previousPiChatEnabled = process.env.UJIMU_PI_CHAT_ENABLED
+    process.env.UJIMU_DATA_DIR = dataDir
+    process.env.UJIMU_SESSION_SECRET = 'quota-admin-secret'
+    process.env.UJIMU_ADMIN_CONTACTS = adminContacts
+    delete process.env.UJIMU_PI_CHAT_ENABLED
+
+    try {
+      return await fetch(request)
+    } finally {
+      restoreEnv('UJIMU_DATA_DIR', previousDataDir)
+      restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
+      restoreEnv('UJIMU_ADMIN_CONTACTS', previousAdminContacts)
+      restoreEnv('UJIMU_PI_CHAT_ENABLED', previousPiChatEnabled)
+    }
+  }
+}
 
 async function createTempDatabase(): Promise<DatabaseSync> {
   const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-quota-db-'))
@@ -385,4 +475,12 @@ function getDeniedEventCount(database: DatabaseSync): number {
     .prepare("SELECT COUNT(*) AS count FROM request_events WHERE decision = 'denied'")
     .get() as { count: number }
   return row.count
+}
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key]
+  } else {
+    process.env[key] = value
+  }
 }

@@ -74,11 +74,13 @@ Keep real `auth.json` files out of Git. If a local environment previously used `
 
 ### Pi file-tool sandboxing
 
-Ujimu wraps Pi file tools with a realpath-based allowlist before exposing them to conversion, ingestion, or chat sessions. The wrappers reject absolute paths, home-relative paths, resource-prefixed paths, null bytes, `..` escapes, and symlink escapes.
+Ujimu wraps Pi file tools with a virtual `/data` mount plus a realpath-based allowlist before exposing them to conversion, ingestion, or chat sessions. The model sees specialist files as `/data/...`; host paths are not shown in prompts or expected tool inputs.
 
-- Chat sessions may read/search/list only `wiki/` and cannot write files.
-- Ingestion sessions may read the selected Markdown source plus `wiki/`, and may write/edit only `wiki/`.
-- Conversion sessions may read only the selected raw source and write only its derived Markdown output.
+- Chat sessions may read/search/list only `/data/wiki/` and cannot write files.
+- Ingestion sessions may read the selected Markdown source plus `/data/wiki/`, and may write/edit only `/data/wiki/`.
+- Conversion sessions may read only the selected `/data/raw/` source and write only its derived Markdown output.
+- Paths outside `/data`, including `/config`, `/bundle`, host absolute paths, home-relative paths, resource-prefixed paths, `..` escapes, and symlink escapes are reported as not found.
+- Permission-denied errors are reserved for existing `/data` paths that are real specialist resources but outside the session allowlist, such as a conversion session trying to write `/data/wiki/`.
 - `bash` remains unavailable to Ujimu Pi sessions.
 - Ujimu Pi sessions load only bundled Ujimu skills from `config/pi/skills`; user-global skills such as `~/.agents/skills` are intentionally not exposed.
 

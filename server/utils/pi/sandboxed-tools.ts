@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { access, lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path'
 import {
   createEditToolDefinition,
   createFindToolDefinition,
@@ -26,20 +26,29 @@ export interface UjimuPiPathAccess {
 
 export interface UjimuPiFileSystemPolicy {
   root: string
+  virtualRoot?: string
   read?: UjimuPiPathAccess
   write?: UjimuPiPathAccess
   list?: Pick<UjimuPiPathAccess, 'directories'>
 }
 
 export class UjimuPiPathPolicyError extends Error {
-  constructor(message = 'Path is outside the allowed Ujimu Pi filesystem policy.') {
+  constructor(message = 'Permission denied.') {
     super(message)
     this.name = 'UjimuPiPathPolicyError'
   }
 }
 
+export class UjimuPiPathNotFoundError extends Error {
+  constructor(path = '/data') {
+    super(`Path not found: ${path}`)
+    this.name = 'UjimuPiPathNotFoundError'
+  }
+}
+
 interface ResolvedPolicy {
   rootReal: string
+  virtualRoot: string
   readDirectories: string[]
   readFiles: ResolvedAllowedFile[]
   writeDirectories: string[]
@@ -56,6 +65,11 @@ interface WritableTarget {
   path: string
 }
 
+interface VirtualPathMapping {
+  relativePath: string
+  virtualPath: string
+}
+
 export async function createSandboxedFileTools(
   policy: UjimuPiFileSystemPolicy,
   toolNames: UjimuPiFileToolName[]
@@ -68,12 +82,12 @@ export async function createSandboxedFileTools(
   const findOperations = createFindOperations(resolvedPolicy)
   const lsOperations = createLsOperations(resolvedPolicy)
   const definitions: Partial<Record<UjimuPiFileToolName, ToolDefinition<any, any, any>>> = {
-    read: withInputPathValidation(createReadToolDefinition(resolvedPolicy.rootReal, { operations: readOperations }), ['path']),
-    write: withInputPathValidation(createWriteToolDefinition(resolvedPolicy.rootReal, { operations: writeOperations }), ['path']),
-    edit: withInputPathValidation(createEditToolDefinition(resolvedPolicy.rootReal, { operations: editOperations }), ['path']),
-    grep: withInputPathValidation(createGrepToolDefinition(resolvedPolicy.rootReal, { operations: grepOperations }), ['path']),
-    find: withInputPathValidation(createFindToolDefinition(resolvedPolicy.rootReal, { operations: findOperations }), ['path']),
-    ls: withInputPathValidation(createLsToolDefinition(resolvedPolicy.rootReal, { operations: lsOperations }), ['path'])
+    read: withVirtualPathMapping(createReadToolDefinition(resolvedPolicy.rootReal, { operations: readOperations }), ['path'], resolvedPolicy),
+    write: withVirtualPathMapping(createWriteToolDefinition(resolvedPolicy.rootReal, { operations: writeOperations }), ['path'], resolvedPolicy),
+    edit: withVirtualPathMapping(createEditToolDefinition(resolvedPolicy.rootReal, { operations: editOperations }), ['path'], resolvedPolicy),
+    grep: withVirtualPathMapping(createGrepToolDefinition(resolvedPolicy.rootReal, { operations: grepOperations }), ['path'], resolvedPolicy),
+    find: withVirtualPathMapping(createFindToolDefinition(resolvedPolicy.rootReal, { operations: findOperations }), ['path'], resolvedPolicy),
+    ls: withVirtualPathMapping(createLsToolDefinition(resolvedPolicy.rootReal, { operations: lsOperations }), ['path'], resolvedPolicy)
   }
 
   return toolNames.map((name) => definitions[name]).filter((tool): tool is ToolDefinition<any, any, any> => Boolean(tool))
@@ -180,6 +194,7 @@ async function resolvePolicy(policy: UjimuPiFileSystemPolicy): Promise<ResolvedP
   const rootReal = await realpath(policy.root)
   return {
     rootReal,
+    virtualRoot: normalizeVirtualRoot(policy.virtualRoot ?? '/data'),
     readDirectories: await resolveAllowedDirectories(rootReal, policy.read?.directories ?? []),
     readFiles: await resolveAllowedFiles(rootReal, policy.read?.files ?? []),
     writeDirectories: await resolveAllowedDirectories(rootReal, policy.write?.directories ?? []),
@@ -224,8 +239,11 @@ async function resolveAllowedFiles(rootReal: string, entries: string[]): Promise
 
 async function assertReadablePath(policy: ResolvedPolicy, absolutePath: string): Promise<string> {
   assertLexicallyInside(policy.rootReal, absolutePath)
-  const targetReal = await realpath(absolutePath)
-  assertRealInside(policy.rootReal, targetReal)
+  const targetReal = await realpath(absolutePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') throw new UjimuPiPathNotFoundError(toVirtualPath(policy, absolutePath))
+    throw error
+  })
+  assertRealInsideData(policy, targetReal, absolutePath)
 
   if (
     policy.readDirectories.some((directory) => isInside(directory, targetReal)) ||
@@ -234,7 +252,7 @@ async function assertReadablePath(policy: ResolvedPolicy, absolutePath: string):
     return targetReal
   }
 
-  throw new UjimuPiPathPolicyError()
+  throw new UjimuPiPathPolicyError(`Permission denied: ${toVirtualPath(policy, absolutePath)}`)
 }
 
 async function assertWritablePath(
@@ -248,22 +266,22 @@ async function assertWritablePath(
     throw error
   })
   if (existing?.isSymbolicLink()) {
-    throw new UjimuPiPathPolicyError('Refusing to write through a symbolic link.')
+    throw new UjimuPiPathNotFoundError(toVirtualPath(policy, absolutePath))
   }
 
   const nearestExistingParent = await nearestExistingAncestor(dirname(absolutePath))
-  assertRealInside(policy.rootReal, nearestExistingParent)
+  assertRealInsideData(policy, nearestExistingParent, absolutePath)
 
   const existingReal = existing ? await realpath(absolutePath) : undefined
   if (existingReal) {
-    assertRealInside(policy.rootReal, existingReal)
+    assertRealInsideData(policy, existingReal, absolutePath)
   }
 
   if (matchesWritablePolicy(policy, absolutePath, existingReal, options.directory)) {
     return { path: absolutePath }
   }
 
-  throw new UjimuPiPathPolicyError()
+  throw new UjimuPiPathPolicyError(`Permission denied: ${toVirtualPath(policy, absolutePath)}`)
 }
 
 function matchesWritablePolicy(
@@ -292,18 +310,21 @@ function matchesWritablePolicy(
 
 async function assertListablePath(policy: ResolvedPolicy, absolutePath: string): Promise<string> {
   assertLexicallyInside(policy.rootReal, absolutePath)
-  const targetReal = await realpath(absolutePath)
-  assertRealInside(policy.rootReal, targetReal)
+  const targetReal = await realpath(absolutePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') throw new UjimuPiPathNotFoundError(toVirtualPath(policy, absolutePath))
+    throw error
+  })
+  assertRealInsideData(policy, targetReal, absolutePath)
   if (policy.listDirectories.some((directory) => isInside(directory, targetReal))) {
     return targetReal
   }
-  throw new UjimuPiPathPolicyError()
+  throw new UjimuPiPathPolicyError(`Permission denied: ${toVirtualPath(policy, absolutePath)}`)
 }
 
 async function assertListableDirectory(policy: ResolvedPolicy, absolutePath: string): Promise<string> {
   const safePath = await assertListablePath(policy, absolutePath)
   if (!(await stat(safePath)).isDirectory()) {
-    throw new UjimuPiPathPolicyError('Path is not an allowed directory.')
+    throw new UjimuPiPathPolicyError(`Permission denied: ${toVirtualPath(policy, absolutePath)}`)
   }
   return safePath
 }
@@ -324,28 +345,94 @@ async function nearestExistingAncestor(path: string): Promise<string> {
   }
 }
 
-function withInputPathValidation<T extends ToolDefinition<any, any, any>>(tool: T, fields: string[]): T {
+function withVirtualPathMapping<T extends ToolDefinition<any, any, any>>(
+  tool: T,
+  fields: string[],
+  policy: ResolvedPolicy
+): T {
   return {
     ...tool,
+    description: `${tool.description}\n\nUjimu virtual filesystem: use paths under ${policy.virtualRoot}. Paths outside ${policy.virtualRoot} are not available.`,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
+      const mappedParams = { ...(params as Record<string, unknown>) }
+      const originalVirtualPaths: string[] = []
+
       for (const field of fields) {
-        const value = (params as Record<string, unknown>)[field]
+        const value = mappedParams[field]
         if (value !== undefined) {
-          assertSafeToolPathInput(value)
+          const mapping = mapToolPathInput(value, policy.virtualRoot)
+          await preflightMappedToolPath(tool.name, policy, mapping)
+          mappedParams[field] = mapping.relativePath
+          originalVirtualPaths.push(mapping.virtualPath)
         }
       }
-      return tool.execute(toolCallId, params, signal, onUpdate, ctx)
+
+      try {
+        return await tool.execute(toolCallId, mappedParams as any, signal, onUpdate, ctx)
+      } catch (error) {
+        throw sanitizeToolError(error, policy, originalVirtualPaths[0])
+      }
     }
   }
 }
 
-function assertSafeToolPathInput(value: unknown): void {
-  if (typeof value !== 'string') {
-    throw new UjimuPiPathPolicyError('Tool path must be a string.')
+async function preflightMappedToolPath(
+  toolName: string,
+  policy: ResolvedPolicy,
+  mapping: VirtualPathMapping
+): Promise<void> {
+  const absolutePath = resolve(policy.rootReal, mapping.relativePath)
+  if (toolName === 'grep') {
+    await assertReadablePath(policy, absolutePath)
   }
-  if (value.includes('\0') || value.startsWith('~') || value.startsWith('@') || isAbsolute(value)) {
-    throw new UjimuPiPathPolicyError('Absolute, home-relative, resource-prefixed, or null-byte paths are not allowed.')
+  if (toolName === 'find' || toolName === 'ls') {
+    await assertListablePath(policy, absolutePath)
   }
+}
+
+function mapToolPathInput(value: unknown, virtualRoot: string): VirtualPathMapping {
+  if (typeof value !== 'string' || value.includes('\0') || value.startsWith('~') || value.startsWith('@')) {
+    throw new UjimuPiPathNotFoundError(typeof value === 'string' ? value : virtualRoot)
+  }
+
+  const normalizedRoot = normalizeVirtualRoot(virtualRoot)
+  const normalizedInput = value.split('\\').join('/')
+  const virtualPath = posix.isAbsolute(normalizedInput)
+    ? posix.normalize(normalizedInput)
+    : posix.normalize(posix.join(normalizedRoot, normalizedInput || '.'))
+
+  if (!isVirtualInside(normalizedRoot, virtualPath)) {
+    throw new UjimuPiPathNotFoundError(value)
+  }
+
+  const relativePath = posix.relative(normalizedRoot, virtualPath)
+  return {
+    relativePath: relativePath || '.',
+    virtualPath
+  }
+}
+
+function sanitizeToolError(error: unknown, policy: ResolvedPolicy, fallbackVirtualPath: string | undefined): Error {
+  if (error instanceof UjimuPiPathPolicyError || error instanceof UjimuPiPathNotFoundError) {
+    return error
+  }
+
+  const maybeErrno = error as NodeJS.ErrnoException
+  if (maybeErrno?.code === 'ENOENT') {
+    return new UjimuPiPathNotFoundError(fallbackVirtualPath ?? policy.virtualRoot)
+  }
+
+  if (error instanceof Error) {
+    const sanitized = new Error(sanitizeHostPaths(error.message, policy))
+    sanitized.name = error.name
+    return sanitized
+  }
+
+  return new Error('Tool failed.')
+}
+
+function sanitizeHostPaths(message: string, policy: ResolvedPolicy): string {
+  return message.split(policy.rootReal).join(policy.virtualRoot)
 }
 
 function assertSafeRelativePolicyEntry(entry: string): void {
@@ -364,6 +451,34 @@ function assertRealInside(rootReal: string, absolutePath: string): void {
   if (!isInside(rootReal, absolutePath)) {
     throw new UjimuPiPathPolicyError()
   }
+}
+
+function assertRealInsideData(policy: ResolvedPolicy, realPath: string, requestedPath: string): void {
+  if (!isInside(policy.rootReal, realPath)) {
+    throw new UjimuPiPathNotFoundError(toVirtualPath(policy, requestedPath))
+  }
+}
+
+function toVirtualPath(policy: ResolvedPolicy, absolutePath: string): string {
+  const relativePath = relative(policy.rootReal, resolve(absolutePath))
+  if (relativePath === '') return policy.virtualRoot
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) return policy.virtualRoot
+  return posix.join(policy.virtualRoot, toPosixPath(relativePath))
+}
+
+function normalizeVirtualRoot(value: string): string {
+  const normalized = posix.normalize(value.split('\\').join('/'))
+  if (!posix.isAbsolute(normalized) || normalized === '/') {
+    throw new UjimuPiPathPolicyError(`Invalid Ujimu Pi virtual root: ${value}`)
+  }
+  return normalized.replace(/\/$/u, '')
+}
+
+function isVirtualInside(parent: string, child: string): boolean {
+  const normalizedParent = normalizeVirtualRoot(parent)
+  const normalizedChild = posix.normalize(child)
+  const result = posix.relative(normalizedParent, normalizedChild)
+  return result === '' || (!!result && !result.startsWith('..') && !posix.isAbsolute(result))
 }
 
 function isInside(parent: string, child: string): boolean {

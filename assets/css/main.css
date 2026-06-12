@@ -362,7 +362,7 @@ textarea, input, select { font: inherit; color: inherit; }
 }
 .prompt:focus-within { border-color: var(--ink); }
 .app[data-yellow="forte"] .prompt:focus-within { border-color: var(--yellow); }
-.prompt--off { opacity: 0.55; pointer-events: none; }
+.prompt--off { opacity: 0.55; }
 .prompt-toprow { display: flex; }
 .prompt-row { display: flex; align-items: flex-end; gap: 10px; }
 .prompt-ta {

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 import { createSandboxedFileTools, type UjimuPiFileSystemPolicy } from './sandboxed-tools'
@@ -40,6 +40,13 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     noPromptTemplates: true,
     noSkills: true,
     noThemes: true,
+    skillsOverride: (base: any) => ({
+      ...base,
+      skills: base.skills.map((skill: any) => ({
+        ...skill,
+        filePath: toVirtualBundlePath(skill.filePath, bundledPiDir)
+      }))
+    }),
     appendSystemPromptOverride: options.appendSystemPromptOverride
   })
   await loader.reload()
@@ -49,11 +56,11 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   const customTools = [...sandboxedFileTools, ...createUjimuCustomToolsForTask(options.task, options.cwd)]
 
   const result = await createAgentSession({
-    cwd: options.cwd,
+    cwd: '/data',
     resourceLoader: loader,
     tools: options.tools,
     customTools,
-    sessionManager: SessionManager.inMemory(options.cwd),
+    sessionManager: SessionManager.inMemory('/data'),
     settingsManager,
     authStorage,
     modelRegistry,
@@ -70,6 +77,14 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   })
 
   return result
+}
+
+function toVirtualBundlePath(filePath: string, bundleRoot: string): string {
+  const relativePath = relative(bundleRoot, filePath)
+  if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    return '/bundle'
+  }
+  return `/bundle/${relativePath.split(sep).join('/')}`
 }
 
 interface PiDebugContext {

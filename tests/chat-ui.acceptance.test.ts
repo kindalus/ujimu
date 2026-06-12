@@ -6,6 +6,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     const page = await readFile('pages/index.vue', 'utf8')
     const drawer = await readFile('components/AppDrawer.vue', 'utf8')
     const authModal = await readFile('components/AuthModal.vue', 'utf8')
+    const css = await readFile('assets/css/main.css', 'utf8')
     const shellSources = `${page}\n${drawer}\n${authModal}`
 
     expect(page).toContain('/api/specialists')
@@ -41,5 +42,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(shellSources).toContain('Telemóvel')
     expect(shellSources).toContain('Terminar sessão')
     expect(page).toContain(':disabled="!canSubmitQuestion"')
+    expect(css).toContain('.prompt--off { opacity: 0.55; }')
+    expect(css).not.toContain('.prompt--off { opacity: 0.55; pointer-events: none; }')
   })
 })

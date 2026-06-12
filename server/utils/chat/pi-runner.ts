@@ -83,8 +83,8 @@ async function* runPiChatStream(
     },
     appendSystemPromptOverride: () => [
       'You are the Ujimu consultation agent for one selected specialist.',
-      'Answer only from files under wiki/. Do not use raw/ as answer-time source material.',
-      'If wiki/ does not support the answer, say that the current context is insufficient.',
+      'Answer only from files under /data/wiki. Do not use /data/raw as answer-time source material.',
+      'If /data/wiki does not support the answer, say that the current context is insufficient.',
       'Every substantive answer must be grounded and cited with backend-allowed citations.',
       'Emit structured NDJSON only. Do not emit Markdown outside NDJSON event payloads.'
     ]
@@ -441,9 +441,11 @@ function tokenize(value: string): Set<string> {
   )
 }
 
-function resolvePiChatTimeoutMs(): number {
+export const DEFAULT_PI_CHAT_TIMEOUT_MS = 120_000
+
+export function resolvePiChatTimeoutMs(): number {
   const configured = Number.parseInt(process.env.UJIMU_PI_CHAT_TIMEOUT_MS ?? '', 10)
-  return Number.isFinite(configured) && configured > 0 ? configured : 30_000
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_PI_CHAT_TIMEOUT_MS
 }
 
 function buildChatPrompt(input: ChatRunnerInput): string {
@@ -463,8 +465,8 @@ Backend citation allowlist (the only citations you may emit):
 ${JSON.stringify(input.citationEvidence, null, 2)}
 
 Rules:
-1. Use only wiki/ files to answer. You may use read, grep, find, and ls only inside this specialist directory.
-2. Do not answer from general model knowledge or raw/ files.
+1. Use only /data/wiki files to answer. You may use read, grep, find, and ls only under /data/wiki.
+2. Do not answer from general model knowledge or /data/raw files.
 3. Before any answer text, emit exactly one citations event if the wiki supports the answer:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
 4. Every citation sourceFile and at least one articleRefs value must match the backend allowlist exactly.

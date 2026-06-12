@@ -143,11 +143,11 @@ async function runPiSdkConversion(
     },
     appendSystemPromptOverride: () => [
       'You are a Ujimu raw-source conversion agent.',
-      'Operate only inside the current specialist directory.',
-      'Convert exactly one raw file into faithful Markdown under raw/.',
+      'Operate only inside the /data virtual filesystem.',
+      'Convert exactly one raw file into faithful Markdown under /data/raw.',
       'Do not summarize legislation, tables, articles, rows, or source contents.',
       'Preserve the source language exactly; do not translate Portuguese or any other language into English.',
-      'Do not modify wiki/ during conversion.'
+      'Do not modify /data/wiki during conversion.'
     ]
   })
 
@@ -192,8 +192,8 @@ function commandExists(command: string): Promise<boolean> {
 
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
-  const inputPath = `raw/${source.raw_path}`
-  const outputPath = `raw/${markdownPath}`
+  const inputPath = `/data/raw/${source.raw_path}`
+  const outputPath = `/data/raw/${markdownPath}`
 
   if (/\.pdf$/i.test(source.raw_path)) {
     return `Convert exactly one uploaded PDF source into Markdown.
@@ -204,11 +204,11 @@ Source:
 - original checksum: ${source.checksum}
 
 Rules:
-1. You must call the pdf_to_markdown tool with pdfPath set to ${JSON.stringify(inputPath)}.
+1. You must call the pdf_to_markdown tool with pdfPath set to ${JSON.stringify(`raw/${source.raw_path}`)}.
 2. The pdf_to_markdown tool is responsible for creating ${outputPath}.
 3. Do not read, edit, write, or manually convert the PDF with file tools.
 4. If pdf_to_markdown fails, fail clearly and do not attempt fallback conversion.
-5. Do not modify wiki/ or any file other than ${outputPath}.
+5. Do not modify /data/wiki or any file other than ${outputPath}.
 6. End after the tool reports successful conversion metadata.
 `
   }
@@ -227,7 +227,7 @@ Rules:
 4. For XLSX, write each sheet as a Markdown heading followed by faithful Markdown tables. If the available tools cannot read the workbook, fail clearly instead of inventing content.
 5. For HTML/HTM, preserve headings, paragraphs, links, lists, and tables as Markdown.
 6. For TXT, preserve text structure and article references.
-7. Do not modify wiki/ or any file other than ${outputPath}.
+7. Do not modify /data/wiki or any file other than ${outputPath}.
 8. End after the Markdown file has been written.
 `
 }

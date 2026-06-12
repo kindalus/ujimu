@@ -97,6 +97,7 @@ Before changing product requirements, roadmap direction, specifications, or othe
 - Anonymous users are tracked with browser cookies and are limited to 5 requests per day or 20 requests per week.
 - Registered users without a subscription are limited to 20 requests per day and 100 requests per week.
 - Subscribed users have no daily limit by default, but have a configurable weekly limit; the initial target is 5000 requests per week.
+- Users with the `admin` role are exempt from chat request quotas.
 - The target post-payment subscription period is quarterly, priced at 50,000.00 AOA per quarter.
 - Live payments are not part of the first launch scope.
 - Post-launch payment integration target: Appy Pay for Multicaixa Express, Multicaixa Reference, and QR Code payments.
