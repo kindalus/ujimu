@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   openAuth: []
   logout: []
+  newConversation: []
 }>()
 
 const drawerOpen = ref(false)
@@ -33,6 +34,9 @@ function focusTemporaryDrawerStart(): void {
 }
 
 function closeTemporaryDrawer(): void {
+  if (document.activeElement instanceof HTMLElement && temporaryDrawerContent.value?.contains(document.activeElement)) {
+    document.activeElement.blur()
+  }
   drawerOpen.value = false
 }
 
@@ -40,6 +44,11 @@ function openAuth(): void {
   closeTemporaryDrawer()
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   emit('openAuth')
+}
+
+function startNewConversation(): void {
+  closeTemporaryDrawer()
+  emit('newConversation')
 }
 
 function logout(): void {
@@ -70,7 +79,7 @@ function logout(): void {
         <button class="iconbtn" type="button" aria-label="Fechar menu" @click="closeTemporaryDrawer"><UjimuIcon name="close" /></button>
       </div>
 
-      <NuxtLink class="btn btn--new" to="/" @click="closeTemporaryDrawer"><UjimuIcon name="plus" /> Nova consulta</NuxtLink>
+      <NuxtLink class="btn btn--new" to="/" @click="startNewConversation"><UjimuIcon name="plus" /> Nova consulta</NuxtLink>
 
       <div class="drawer-scroll">
         <slot name="history" :close="closeTemporaryDrawer">

@@ -155,6 +155,7 @@ const defaultBillingStatus: BillingStatusResponse = {
   ads: { visible: true }
 }
 const queueLimit = 3
+const slowResponseNoticeDelayMs = 30_000
 let idCounter = 0
 
 const specialists = ref<PublicSpecialist[]>([])
@@ -462,6 +463,23 @@ function selectSpecialist(specialistId: string): void {
   void loadHistory()
 }
 
+function startNewConversation(): void {
+  if (isStreaming.value) activeChatAbortController.value?.abort()
+
+  question.value = ''
+  messages.value = []
+  queuedQuestions.value = []
+  activeConversationId.value = ''
+  activeConversationTitle.value = ''
+  editingMessageId.value = ''
+  quotaError.value = ''
+  copiedMessageId.value = ''
+  copyErrorMessageId.value = ''
+  copyErrorMessage.value = ''
+  specialistSelectorOpen.value = false
+  inlineAdSchedule.value = []
+}
+
 function toggleSpecialistSelector(): void {
   if (isStreaming.value || specialistsPending.value) return
   specialistSelectorOpen.value = !specialistSelectorOpen.value
@@ -552,7 +570,7 @@ async function startQuestion(
     if (reactiveAssistantMessage.status === 'streaming' && !reactiveAssistantMessage.text) {
       reactiveAssistantMessage.statusMessage = 'A consulta está a demorar mais do que o habitual. Pode aguardar ou cancelar.'
     }
-  }, 15_000)
+  }, slowResponseNoticeDelayMs)
 
   try {
     const response = await fetch('/api/chat', {
@@ -780,6 +798,7 @@ function createId(prefix: string): string {
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
           @logout="logout"
+          @new-conversation="startNewConversation"
         >
           <template #history="{ close }">
             <section class="drawer-history-panel" aria-labelledby="drawer-history-title">

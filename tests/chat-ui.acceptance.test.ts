@@ -22,6 +22,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(page).toContain('quotaError')
     expect(page).toContain('Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.')
     expect(page).toContain('A consultar as fontes desta especialidade…')
+    expect(page).toContain('slowResponseNoticeDelayMs = 30_000')
     expect(page).toContain('Cancelar resposta')
     expect(page).toContain('AbortController')
     expect(shellSources).toContain('/api/auth/otp/request')
