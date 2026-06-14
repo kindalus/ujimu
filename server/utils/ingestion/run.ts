@@ -1,10 +1,11 @@
-import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { readdir, stat } from 'node:fs/promises'
+import { dirname, isAbsolute, join, normalize, sep } from 'node:path'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
-import { createPiSdkIngestionRunner, PiIngestionError, type PiIngestionRunner } from './pi-runner'
+import { createPiSdkIngestionRunner, PiIngestionError, type PiBatchIngestionResult, type PiIngestionRunner } from './pi-runner'
+import { editSpecialist } from '../specialists/manager'
 import { writeIngestionState } from './state'
-import type { IngestionSourceRecord, IngestionState } from './types'
+import type { IngestionManifest, IngestionManifestSourceSuccess, IngestionSourceRecord, IngestionState } from './types'
 import { resolveStaleProcessingMinutes } from './conversion'
 
 export interface RunPendingIngestionOptions {
@@ -48,8 +49,12 @@ export async function runPendingIngestion(
 
   const runner = options.runner ?? createPiSdkIngestionRunner()
 
-  for (const source of pendingSources) {
-    await processSource({ specialist, state, source, runner, timeoutMs: options.timeoutMs })
+  if (hasBatchIngestion(runner)) {
+    await processBatch({ specialist, state, sources: pendingSources, runner, timeoutMs: options.timeoutMs })
+  } else {
+    for (const source of pendingSources) {
+      await processSource({ specialist, state, source, runner, timeoutMs: options.timeoutMs })
+    }
   }
 
   await writeIngestionState(specialist.paths.ingestState, state)
@@ -82,6 +87,38 @@ function isMarkdownReady(source: IngestionSourceRecord): boolean {
   return source.conversion?.status === 'converted' || source.conversion?.status === 'not_required' || !source.conversion
 }
 
+async function processBatch(input: {
+  specialist: SpecialistRuntime
+  state: IngestionState
+  sources: IngestionSourceRecord[]
+  runner: PiIngestionRunner & { ingestSources: NonNullable<PiIngestionRunner['ingestSources']> }
+  timeoutMs?: number
+}): Promise<void> {
+  const { specialist, state, sources, runner, timeoutMs } = input
+  const originalSources = new Map(sources.map((source) => [source.raw_path, cloneSource(source)]))
+
+  for (const source of sources) {
+    markProcessing(source)
+  }
+  await writeIngestionState(specialist.paths.ingestState, state)
+
+  let result: PiBatchIngestionResult | IngestionManifest | void
+  try {
+    result = await runner.ingestSources(specialist, sources, { timeoutMs })
+    const manifest = resolveBatchManifest(result)
+    if (!manifest) {
+      throw new PiIngestionError('INGESTION_MANIFEST_MISSING', 'Pi ingestion did not return an ingestion manifest.')
+    }
+    await applyValidatedManifest(specialist, state, sources, manifest)
+  } catch (error) {
+    if (error instanceof PiIngestionError && error.code === 'INGESTION_MANIFEST_INVALID') {
+      restoreOriginalSources(state, originalSources)
+      await writeIngestionState(specialist.paths.ingestState, state)
+    }
+    throw error
+  }
+}
+
 async function processSource(input: {
   specialist: SpecialistRuntime
   state: IngestionState
@@ -112,6 +149,174 @@ async function processSource(input: {
   }
 
   await writeIngestionState(specialist.paths.ingestState, state)
+}
+
+function hasBatchIngestion(
+  runner: PiIngestionRunner
+): runner is PiIngestionRunner & { ingestSources: NonNullable<PiIngestionRunner['ingestSources']> } {
+  return typeof runner.ingestSources === 'function'
+}
+
+function resolveBatchManifest(result: PiBatchIngestionResult | IngestionManifest | void): IngestionManifest | undefined {
+  if (!result) return undefined
+  if ('manifest' in result) return result.manifest
+  return result
+}
+
+async function applyValidatedManifest(
+  specialist: SpecialistRuntime,
+  state: IngestionState,
+  sources: IngestionSourceRecord[],
+  manifest: IngestionManifest
+): Promise<void> {
+  await validateManifest(specialist, sources, manifest)
+  const now = new Date()
+  const successfulByRawPath = new Map(manifest.ingested.map((entry) => [entry.raw_path, entry]))
+  const failedByRawPath = new Map(manifest.failed.map((entry) => [entry.raw_path, entry]))
+  let successful = 0
+
+  for (const source of sources) {
+    const successEntry = successfulByRawPath.get(source.raw_path)
+    if (successEntry) {
+      markIngestedFromManifest(source, successEntry, now)
+      successful += 1
+      continue
+    }
+
+    const failureEntry = failedByRawPath.get(source.raw_path)!
+    markFailed(source, failureEntry.error_code, failureEntry.error_message, now)
+  }
+
+  if (successful > 0 && specialist.status !== 'active' && specialist.status !== 'suspended') {
+    const specialtiesRoot = dirname(specialist.paths.root)
+    await editSpecialist(specialist.id, { status: 'active' }, { specialtiesRoot })
+  }
+}
+
+async function validateManifest(
+  specialist: SpecialistRuntime,
+  sources: IngestionSourceRecord[],
+  manifest: IngestionManifest
+): Promise<void> {
+  if (!manifest || manifest.version !== 1 || manifest.specialist_id !== specialist.id) {
+    throw invalidManifest('Manifest version or specialist id is invalid.')
+  }
+  if (!Array.isArray(manifest.ingested) || !Array.isArray(manifest.failed)) {
+    throw invalidManifest('Manifest ingested and failed fields must be arrays.')
+  }
+
+  const expected = new Map(sources.map((source) => [source.raw_path, source]))
+  const seen = new Set<string>()
+
+  for (const entry of manifest.ingested) {
+    const source = expected.get(entry.raw_path)
+    if (!source) throw invalidManifest(`Manifest references unknown source ${entry.raw_path}.`)
+    if (seen.has(entry.raw_path)) throw invalidManifest(`Manifest references source ${entry.raw_path} more than once.`)
+    seen.add(entry.raw_path)
+    validateSuccessEntry(source, entry)
+    for (const page of entry.wiki_pages) {
+      await assertWikiPageExists(specialist.paths.wiki, page)
+    }
+  }
+
+  for (const entry of manifest.failed) {
+    const source = expected.get(entry.raw_path)
+    if (!source) throw invalidManifest(`Manifest references unknown failed source ${entry.raw_path}.`)
+    if (seen.has(entry.raw_path)) throw invalidManifest(`Manifest references source ${entry.raw_path} more than once.`)
+    seen.add(entry.raw_path)
+    if (!entry.error_code?.trim() || !entry.error_message?.trim()) {
+      throw invalidManifest(`Failed source ${entry.raw_path} is missing an error code or message.`)
+    }
+  }
+
+  for (const source of sources) {
+    if (!seen.has(source.raw_path)) {
+      throw invalidManifest(`Manifest does not mention pending source ${source.raw_path}.`)
+    }
+  }
+}
+
+function validateSuccessEntry(source: IngestionSourceRecord, entry: IngestionManifestSourceSuccess): void {
+  const expectedSourcePath = source.ingestion?.source_path ?? source.raw_path
+  if (entry.source_path !== expectedSourcePath) {
+    throw invalidManifest(`Manifest source_path for ${source.raw_path} does not match ${expectedSourcePath}.`)
+  }
+  if (!Array.isArray(entry.wiki_pages) || entry.wiki_pages.length === 0 || entry.wiki_pages.some((page) => !isSafeRelativeWikiPage(page))) {
+    throw invalidManifest(`Manifest wiki_pages for ${source.raw_path} are invalid.`)
+  }
+  if (!Array.isArray(entry.citations) || entry.citations.length === 0) {
+    throw invalidManifest(`Manifest citations for ${source.raw_path} are missing.`)
+  }
+
+  for (const citation of entry.citations) {
+    if (citation.source_file !== `raw/${source.raw_path}`) {
+      throw invalidManifest(`Manifest citation source_file for ${source.raw_path} must be raw/${source.raw_path}.`)
+    }
+    if (!citation.source_title?.trim()) {
+      throw invalidManifest(`Manifest citation title for ${source.raw_path} is missing.`)
+    }
+    if (!Array.isArray(citation.article_refs) || citation.article_refs.map((ref) => ref.trim()).filter(Boolean).length === 0) {
+      throw invalidManifest(`Manifest citation article_refs for ${source.raw_path} are missing.`)
+    }
+  }
+}
+
+async function assertWikiPageExists(wikiRoot: string, page: string): Promise<void> {
+  const pagePath = join(wikiRoot, page)
+  const pageStat = await stat(pagePath).catch(() => undefined)
+  if (!pageStat?.isFile()) {
+    throw invalidManifest(`Manifest references missing wiki page ${page}.`)
+  }
+}
+
+function isSafeRelativeWikiPage(page: string): boolean {
+  const normalized = normalize(page).split(sep).join('/')
+  return page.trim().length > 0 && !isAbsolute(page) && !normalized.startsWith('../') && normalized !== '..' && normalized.toLowerCase().endsWith('.md')
+}
+
+function invalidManifest(message: string): PiIngestionError {
+  return new PiIngestionError('INGESTION_MANIFEST_INVALID', message)
+}
+
+function markIngestedFromManifest(
+  source: IngestionSourceRecord,
+  entry: IngestionManifestSourceSuccess,
+  ingestedAt = new Date()
+): void {
+  const now = ingestedAt.toISOString()
+  source.status = 'ingested'
+  source.error_code = undefined
+  source.error_message = undefined
+  source.ingested_at = now
+  source.updated_at = now
+  source.ingestion = {
+    ...source.ingestion!,
+    status: 'ingested',
+    source_path: entry.source_path,
+    ingested_at: now,
+    updated_at: now,
+    error_code: undefined,
+    error_message: undefined,
+    skipped_reason: undefined,
+    wiki_pages: entry.wiki_pages,
+    citations: entry.citations.map((citation) => ({
+      source_file: citation.source_file.trim(),
+      source_title: citation.source_title.trim(),
+      article_refs: citation.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
+    })),
+    warnings: entry.warnings?.map((warning) => warning.trim()).filter(Boolean),
+    manifest_validated_at: now
+  }
+}
+
+function cloneSource(source: IngestionSourceRecord): IngestionSourceRecord {
+  return JSON.parse(JSON.stringify(source)) as IngestionSourceRecord
+}
+
+function restoreOriginalSources(state: IngestionState, originals: Map<string, IngestionSourceRecord>): void {
+  for (const [rawPath, source] of originals) {
+    state.sources[rawPath] = source
+  }
 }
 
 async function hasWikiMarkdownFiles(root: string): Promise<boolean> {

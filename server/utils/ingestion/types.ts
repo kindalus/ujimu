@@ -13,6 +13,12 @@ export interface SourceConversionState {
   error_message?: string
 }
 
+export interface IngestionCitationState {
+  source_file: string
+  source_title: string
+  article_refs: string[]
+}
+
 export interface SourceIngestionState {
   status: PipelineIngestionStatus
   source_path: string
@@ -21,6 +27,10 @@ export interface SourceIngestionState {
   skipped_reason?: string
   error_code?: string
   error_message?: string
+  wiki_pages?: string[]
+  citations?: IngestionCitationState[]
+  warnings?: string[]
+  manifest_validated_at?: string
 }
 
 export interface IngestionSourceRecord {
@@ -45,6 +55,28 @@ export interface IngestionSourceRecord {
 export interface IngestionState {
   version: 1
   sources: Record<string, IngestionSourceRecord>
+}
+
+export interface IngestionManifestSourceSuccess {
+  raw_path: string
+  source_path: string
+  wiki_pages: string[]
+  citations: IngestionCitationState[]
+  warnings?: string[]
+}
+
+export interface IngestionManifestSourceFailure {
+  raw_path: string
+  source_path?: string
+  error_code: string
+  error_message: string
+}
+
+export interface IngestionManifest {
+  version: 1
+  specialist_id: string
+  ingested: IngestionManifestSourceSuccess[]
+  failed: IngestionManifestSourceFailure[]
 }
 
 export interface StoredRawSource {

@@ -1,11 +1,18 @@
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
+import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import type { SpecialistRuntime } from '../specialists/schema'
-import type { IngestionSourceRecord } from './types'
+import type { IngestionManifest, IngestionSourceRecord } from './types'
 
 export const DEFAULT_PI_INGESTION_TIMEOUT_MS = 30 * 60 * 1000
 
 export interface PiIngestionResult {
   summary?: string
+}
+
+export interface PiBatchIngestionResult {
+  manifest: IngestionManifest
 }
 
 export interface PiIngestionRunner {
@@ -14,6 +21,11 @@ export interface PiIngestionRunner {
     source: IngestionSourceRecord,
     options?: PiSdkIngestionOptions
   ): Promise<PiIngestionResult | void>
+  ingestSources?(
+    specialist: SpecialistRuntime,
+    sources: IngestionSourceRecord[],
+    options?: PiSdkIngestionOptions
+  ): Promise<PiBatchIngestionResult | IngestionManifest | void>
 }
 
 export interface PiSdkIngestionOptions {
@@ -22,7 +34,7 @@ export interface PiSdkIngestionOptions {
 
 export class PiIngestionError extends Error {
   constructor(
-    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING',
+    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING' | 'INGESTION_MANIFEST_MISSING' | 'INGESTION_MANIFEST_INVALID',
     message: string
   ) {
     super(message)
@@ -33,9 +45,136 @@ export class PiIngestionError extends Error {
 export function createPiSdkIngestionRunner(): PiIngestionRunner {
   return {
     async ingestSource(specialist, source, options = {}) {
-      return runPiSdkIngestion(specialist, source, options)
+      const result = await runPiSdkBatchIngestion(specialist, [source], options)
+      return { summary: `Pi ingested ${result.manifest.ingested.length} source(s).` }
+    },
+    async ingestSources(specialist, sources, options = {}) {
+      return runPiSdkBatchIngestion(specialist, sources, options)
     }
   }
+}
+
+async function runPiSdkBatchIngestion(
+  specialist: SpecialistRuntime,
+  _sources: IngestionSourceRecord[],
+  options: PiSdkIngestionOptions
+): Promise<PiBatchIngestionResult> {
+  const cwd = specialist.paths.root
+  await mkdir(join(cwd, '.ujimu'), { recursive: true })
+  const { session, agentLog } = await createUjimuPiSession({
+    cwd,
+    task: 'ingestion',
+    modelEnvPrefix: 'UJIMU_PI_INGESTION',
+    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
+    fileSystemPolicy: {
+      root: cwd,
+      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md', 'ingest/state.json'] },
+      write: { directories: ['wiki'], files: ['.ujimu/ingestion-manifest.json'] },
+      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
+    },
+    agentLog: { specialistId: specialist.id }
+  })
+
+  let finalText = ''
+  let logStatus: AgentSessionLogCloseStatus = 'succeeded'
+  const unsubscribe = session.subscribe?.((event: any) => {
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+      finalText += event.assistantMessageEvent.delta
+    }
+  })
+
+  try {
+    await runWithTimeout(
+      () => session.prompt(buildBatchIngestionPrompt(specialist)),
+      options.timeoutMs ?? DEFAULT_PI_INGESTION_TIMEOUT_MS,
+      async () => session.abort()
+    )
+    const fileManifest = await readManifestFile(cwd)
+    const finalManifest = parseManifestFromText(finalText)
+    if (JSON.stringify(fileManifest) !== JSON.stringify(finalManifest)) {
+      throw new PiIngestionError('INGESTION_MANIFEST_INVALID', 'Pi ingestion final manifest does not match .ujimu/ingestion-manifest.json.')
+    }
+    return { manifest: fileManifest }
+  } catch (error) {
+    logStatus = error instanceof PiIngestionError && error.code === 'PI_TIMEOUT' ? 'aborted' : 'failed'
+    if (error instanceof PiIngestionError) {
+      throw error
+    }
+
+    throw new PiIngestionError(
+      'PI_EXECUTION_FAILED',
+      error instanceof Error ? error.message : 'Pi ingestion failed.'
+    )
+  } finally {
+    unsubscribe?.()
+    session.dispose()
+    await agentLog?.close(logStatus)
+  }
+}
+
+async function readManifestFile(cwd: string): Promise<IngestionManifest> {
+  const manifestPath = join(cwd, '.ujimu', 'ingestion-manifest.json')
+  const raw = await readFile(manifestPath, 'utf8').catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') {
+      throw new PiIngestionError('INGESTION_MANIFEST_MISSING', 'Pi ingestion did not write .ujimu/ingestion-manifest.json.')
+    }
+    throw error
+  })
+  return parseManifestJson(raw)
+}
+
+function parseManifestFromText(text: string): IngestionManifest {
+  const trimmed = text.trim()
+  const jsonBlock = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/iu)?.[1]?.trim()
+  if (jsonBlock) {
+    return parseManifestJson(jsonBlock)
+  }
+
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) {
+    throw new PiIngestionError('INGESTION_MANIFEST_MISSING', 'Pi ingestion final response did not include a JSON manifest.')
+  }
+
+  return parseManifestJson(trimmed.slice(start, end + 1))
+}
+
+function parseManifestJson(value: string): IngestionManifest {
+  try {
+    return JSON.parse(value) as IngestionManifest
+  } catch (error) {
+    throw new PiIngestionError(
+      'INGESTION_MANIFEST_INVALID',
+      error instanceof Error ? error.message : 'Invalid ingestion manifest JSON.'
+    )
+  }
+}
+
+function buildBatchIngestionPrompt(specialist: SpecialistRuntime): string {
+  return `Ingest all markdown files from raw that have not been ingested yet.
+
+Write a complete ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
+
+/data/.ujimu/ingestion-manifest.json specification:
+{
+  "version": 1,
+  "specialist_id": "${specialist.id}",
+  "ingested": [
+    {
+      "raw_path": "source.original.md",
+      "source_path": "source.original.md",
+      "wiki_pages": ["relative-page.md"],
+      "citations": [
+        { "source_file": "raw/source.original.md", "source_title": "Source title", "article_refs": ["Artigo 1.º"] }
+      ],
+      "warnings": []
+    }
+  ],
+  "failed": [
+    { "raw_path": "failed.md", "source_path": "failed.md", "error_code": "ERROR_CODE", "error_message": "Human readable failure" }
+  ]
+}
+`
 }
 
 async function runPiSdkIngestion(
@@ -45,26 +184,22 @@ async function runPiSdkIngestion(
 ): Promise<PiIngestionResult> {
   const cwd = specialist.paths.root
   const markdownPath = source.ingestion?.source_path ?? source.raw_path
-  const { session } = await createUjimuPiSession({
+  const { session, agentLog } = await createUjimuPiSession({
     cwd,
     task: 'ingestion',
     modelEnvPrefix: 'UJIMU_PI_INGESTION',
     tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
     fileSystemPolicy: {
       root: cwd,
-      read: { directories: ['wiki'], files: [`raw/${markdownPath}`] },
+      read: { directories: ['wiki'], files: ['AGENTS.md', `raw/${markdownPath}`] },
       write: { directories: ['wiki'] },
-      list: { directories: ['wiki'] }
+      list: { directories: ['wiki'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
     },
-    appendSystemPromptOverride: () => [
-      'You are maintaining a Ujimu specialist LLM Wiki.',
-      'Operate only inside the /data virtual filesystem.',
-      'Never modify files under /data/raw.',
-      'Use the legislation/regulatory LLM Wiki conventions for laws, articles, definitions, topics, amendments, derived pages, index, and log.'
-    ]
+    agentLog: { specialistId: specialist.id }
   })
 
   const prompt = buildIngestionPrompt(specialist, source)
+  let logStatus: AgentSessionLogCloseStatus = 'succeeded'
 
   try {
     await runWithTimeout(
@@ -74,6 +209,7 @@ async function runPiSdkIngestion(
     )
     return { summary: `Pi ingested ${source.ingestion?.source_path ?? source.raw_path}` }
   } catch (error) {
+    logStatus = error instanceof PiIngestionError && error.code === 'PI_TIMEOUT' ? 'aborted' : 'failed'
     if (error instanceof PiIngestionError) {
       throw error
     }
@@ -84,6 +220,7 @@ async function runPiSdkIngestion(
     )
   } finally {
     session.dispose()
+    await agentLog?.close(logStatus)
   }
 }
 

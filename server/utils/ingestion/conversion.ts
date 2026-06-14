@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import { createDocxToMarkdownTool } from '../pi/docx-to-markdown-tool'
 import { createPdfToMarkdownTool } from '../pi/pdf-to-markdown-tool'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
@@ -130,7 +131,7 @@ async function runPiSdkConversion(
 
   const cwd = specialist.paths.root
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
-  const { session } = await createUjimuPiSession({
+  const { session, agentLog } = await createUjimuPiSession({
     cwd,
     task: 'conversion',
     modelEnvPrefix: 'UJIMU_PI_CONVERSION',
@@ -141,6 +142,7 @@ async function runPiSdkConversion(
       write: { files: [`raw/${markdownPath}`] },
       list: { directories: [] }
     },
+    agentLog: { specialistId: specialist.id },
     appendSystemPromptOverride: () => [
       'You are a Ujimu raw-source conversion agent.',
       'Operate only inside the /data virtual filesystem.',
@@ -151,6 +153,8 @@ async function runPiSdkConversion(
     ]
   })
 
+  let logStatus: AgentSessionLogCloseStatus = 'succeeded'
+
   try {
     await runWithTimeout(
       () => session.prompt(buildConversionPrompt(specialist, source)),
@@ -158,6 +162,7 @@ async function runPiSdkConversion(
       async () => session.abort()
     )
   } catch (error) {
+    logStatus = 'failed'
     if (error instanceof PiConversionError) {
       throw error
     }
@@ -165,6 +170,7 @@ async function runPiSdkConversion(
     throw new PiConversionError('CONVERSION_FAILED', error instanceof Error ? error.message : 'Pi conversion failed.')
   } finally {
     session.dispose()
+    await agentLog?.close(logStatus)
   }
 }
 
