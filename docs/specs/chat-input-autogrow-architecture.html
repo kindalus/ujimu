@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arquitectura — Input de chat auto-expansível</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap");
+      :root { --bg: #0b0b0c; --panel: #171719; --text: #f4f4f5; --muted: #a1a1aa; --accent: #f8c400; --line: #2d2d32; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Inter, sans-serif; background: radial-gradient(circle at top right, rgba(248,196,0,.13), transparent 34%), var(--bg); color: var(--text); overflow: hidden; }
+      .slide { width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center; padding: 8vh 14vw; }
+      .slide.active { display: flex; }
+      .card { max-width: 960px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 48px; box-shadow: 0 24px 80px rgba(0,0,0,.38); }
+      h1 { font-size: clamp(2.2rem, 5vw, 4.6rem); letter-spacing: -.05em; line-height: .95; margin-bottom: 18px; }
+      h2 { font-size: clamp(1.8rem, 3vw, 3rem); letter-spacing: -.04em; margin-bottom: 22px; }
+      p, li { color: var(--muted); font-size: 1.05rem; line-height: 1.65; }
+      ul { display: grid; gap: 12px; }
+      li { list-style: none; padding-left: 18px; position: relative; }
+      li::before { content: ''; position: absolute; left: 0; top: .78em; width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
+      code { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+      .kicker { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: .82rem; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 14px; }
+      .counter { position: fixed; right: 28px; bottom: 22px; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: .85rem; }
+      @media print { body { overflow: visible; } .slide { display: flex; page-break-after: always; } .counter { display: none; } }
+    </style>
+  </head>
+  <body>
+    <section class="slide active"><div class="card"><div class="kicker">Arquitectura</div><h1>Auto-expansão no composer existente</h1><p>Decisão de arquitectura para a melhoria pequena do input de chat.</p></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Base aceite</div><h2>Não vamos redesenhar o chat</h2><ul><li>O formulário actual em <code>pages/index.vue</code> continua a ser a superfície de interacção.</li><li>O <code>textarea.prompt-ta</code> mantém o envio por <code>Enter</code> e nova linha por <code>Shift+Enter</code>.</li><li>O CSS actual em <code>assets/css/main.css</code> continua a controlar a aparência do composer.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Decisão técnica</div><h2>Altura calculada no cliente</h2><ul><li>Usar uma referência ao <code>textarea</code> e recalcular após alterações de <code>question</code>.</li><li>Medir <code>line-height</code> e padding computados para obter exactamente cinco linhas visíveis.</li><li>Aplicar <code>height</code> inline até ao limite; depois activar <code>overflow-y: auto</code>.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Exclusões</div><h2>Sem abstracção nova</h2><ul><li>Não extrair um novo componente de composer.</li><li>Não migrar para outro componente Nuxt UI neste slice.</li><li>Não alterar quota, fila, histórico, selecção de especialidade ou streaming.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Verificação</div><h2>Critérios</h2><ul><li>Teste de aceitação confirma constantes, referência do textarea, watcher e limite de cinco linhas.</li><li>Typecheck deve passar.</li><li>O composer mantém a semântica de teclado existente.</li></ul></div></section>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      let idx = 0;
+      document.getElementById('total').textContent = String(slides.length);
+      function go(next) { slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = String(idx + 1); }
+      document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+      document.addEventListener('click', (event) => { go(event.clientX > window.innerWidth / 2 ? idx + 1 : idx - 1); });
+    </script>
+  </body>
+</html>

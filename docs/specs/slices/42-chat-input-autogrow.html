@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slice 42 — Input de chat auto-expansível</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap");
+      :root { --bg: #09090b; --panel: #151518; --text: #f4f4f5; --muted: #a1a1aa; --accent: #f8c400; --line: #2b2b31; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Inter, sans-serif; background: radial-gradient(circle at top left, rgba(248,196,0,.15), transparent 35%), var(--bg); color: var(--text); overflow: hidden; }
+      .slide { width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center; padding: 8vh 14vw; }
+      .slide.active { display: flex; }
+      .card { max-width: 980px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 48px; box-shadow: 0 24px 80px rgba(0,0,0,.38); }
+      h1 { font-size: clamp(2.2rem, 5vw, 4.6rem); letter-spacing: -.05em; line-height: .95; margin-bottom: 18px; }
+      h2 { font-size: clamp(1.8rem, 3vw, 3rem); letter-spacing: -.04em; margin-bottom: 22px; }
+      p, li { color: var(--muted); font-size: 1.05rem; line-height: 1.65; }
+      ul { display: grid; gap: 12px; }
+      li { list-style: none; padding-left: 18px; position: relative; }
+      li::before { content: ''; position: absolute; left: 0; top: .78em; width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
+      code { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+      .kicker { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-size: .82rem; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 14px; }
+      .counter { position: fixed; right: 28px; bottom: 22px; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: .85rem; }
+      @media print { body { overflow: visible; } .slide { display: flex; page-break-after: always; } .counter { display: none; } }
+    </style>
+  </head>
+  <body>
+    <section class="slide active"><div class="card"><div class="kicker">Slice 42</div><h1>Input de chat auto-expansível</h1><p>Fazer o campo de pergunta crescer para cima até cinco linhas e, depois, usar scroll interno.</p></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Origem</div><h2>Decks aprovados</h2><ul><li>Brainstorm: <code>../brainstorm-chat-input-autogrow.html</code>.</li><li>Arquitectura: <code>../chat-input-autogrow-architecture.html</code>.</li><li>Contexto governante: AGENTS.md; não existe <code>docs/wiki/</code>.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Âmbito</div><h2>Comportamento aceite</h2><ul><li>Aplica-se a todos os utilizadores do chat.</li><li>O campo começa com uma linha, cresce com o conteúdo e pára em cinco linhas visíveis.</li><li>Depois de cinco linhas, o campo mantém a altura e mostra scroll interno.</li><li><code>Shift+Enter</code> insere nova linha; <code>Enter</code> envia.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Zonas de implementação</div><h2>Alteração cirúrgica</h2><ul><li><code>pages/index.vue</code>: referência ao textarea, watcher e função de auto-ajuste.</li><li><code>assets/css/main.css</code>: limite/fallback visual de cinco linhas e scroll oculto até ser necessário.</li><li><code>tests/ui-redesign-chat-workspace.acceptance.test.ts</code>: aceitação estática do contrato do composer.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Decisões de grill</div><h2>Bloqueios resolvidos</h2><ul><li>Não criar componente novo; o risco de regressão é menor mantendo o composer actual.</li><li>Calcular cinco linhas com estilos computados em vez de confiar só num valor fixo em pixels.</li><li>Usar watcher sobre <code>question</code> para cobrir digitação, edição, envio, nova consulta e selecção de especialidade.</li><li>Não alterar o contrato de envio por teclado já existente.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Exclusões</div><h2>Não fazer</h2><ul><li>Não mexer no backend de chat.</li><li>Não alterar quotas, fila, histórico ou streaming.</li><li>Não redesenhar o composer nem trocar os componentes visuais.</li><li>Não adicionar dependências.</li></ul></div></section>
+    <section class="slide"><div class="card"><div class="kicker">Condições de sucesso</div><h2>Como saber que está pronto</h2><ul><li>Teste de aceitação confirma a constante de cinco linhas e a ligação ao <code>textarea</code>.</li><li>O CSS limita a cinco linhas e activa scroll interno quando necessário.</li><li><code>npm test -- tests/ui-redesign-chat-workspace.acceptance.test.ts</code> passa.</li><li><code>npm run typecheck</code> passa.</li></ul></div></section>
+    <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+    <script>
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      let idx = 0;
+      document.getElementById('total').textContent = String(slides.length);
+      function go(next) { slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = String(idx + 1); }
+      document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+      document.addEventListener('click', (event) => { go(event.clientX > window.innerWidth / 2 ? idx + 1 : idx - 1); });
+    </script>
+  </body>
+</html>

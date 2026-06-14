@@ -93,6 +93,34 @@ Known non-blocking warnings:
 | 39 | [`39-batch-ingestion-manifest-state.html`](./39-batch-ingestion-manifest-state.html) | `verified` | 2026-06-12 | Batch ingestion session, dual-channel manifest, backend validation, and enriched `ingest/state.json`. |
 | 40 | [`40-state-driven-citations-minimal-chat-envelope.html`](./40-state-driven-citations-minimal-chat-envelope.html) | `verified` | 2026-06-12 | State-driven citation allowlist and minimal chat envelope with behaviour in specialist `AGENTS.md`. |
 | 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
+| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `grilled` | — | Chat input auto-grows up to five lines, then scrolls internally. |
+
+## Slice 42 — Chat input auto-grow
+
+Status: `grilled`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-chat-input-autogrow.html`](../brainstorm-chat-input-autogrow.html)
+- [`../chat-input-autogrow-architecture.html`](../chat-input-autogrow-architecture.html)
+
+Refinement decisions:
+
+- Apply the behaviour to all chat users.
+- Keep `Enter` as submit and `Shift+Enter` as newline.
+- Reset the field to one row when the question is cleared through submit, editing cancellation, specialist selection, conversation opening, or new consultation.
+- Limit the visible input to exactly five lines, then use internal scrolling.
+
+Grill decisions:
+
+- Preserve the existing composer and textarea instead of introducing a new component.
+- Calculate the five-line limit from computed textarea styles so the cap follows the actual typography and padding.
+- Watch `question` so both typed and programmatic changes resize the textarea.
+- Do not change quotas, queueing, history, streaming, or backend chat behaviour.
+
+Acceptance-test plan:
+
+- Extend `tests/ui-redesign-chat-workspace.acceptance.test.ts` to assert the five-line max constant, textarea ref, resize watcher, style calculation, and CSS scroll fallback.
 
 ## Agent-managed specialist wiki extension
 
