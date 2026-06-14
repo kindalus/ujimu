@@ -116,7 +116,7 @@ function parseEditInput(body: unknown): EditSpecialistInput {
       continue
     }
 
-    if (typeof value !== 'string' || value.trim().length === 0) {
+    if (typeof value !== 'string' || (field !== 'system_prompt' && value.trim().length === 0)) {
       throw createError({ statusCode: 400, statusMessage: `Invalid field ${field}` })
     }
     input[field] = value

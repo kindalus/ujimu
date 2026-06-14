@@ -1,5 +1,5 @@
 import { createError, defineEventHandler, getRouterParam, readMultipartFormData, setResponseStatus } from 'h3'
-import { isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../../utils/admin/specialists'
+import { canUploadRawSources, isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../../utils/admin/specialists'
 import { requireAuthenticatedUser } from '../../../../../utils/companies/http'
 import { recordCompanyAdminAuditEvent, requireCompanyAdminSpecialist } from '../../../../../utils/companies/specialists'
 import { initializeDatabase } from '../../../../../utils/db'
@@ -17,6 +17,16 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
   try {
     const { specialist } = await requireCompanyAdminSpecialist(database, { userId, companyId, specialistId })
+    if (!canUploadRawSources(specialist.status)) {
+      setResponseStatus(event, 409)
+      return {
+        error: {
+          code: 'SPECIALIST_NOT_READY_FOR_UPLOAD',
+          message: 'Aguarde pela conclusão da inicialização antes de carregar fontes.'
+        }
+      }
+    }
+
     const file = await readUploadFile(event)
     if (!isAllowedRawSourceFileName(file.filename)) {
       throw createError({ statusCode: 400, statusMessage: 'Unsupported source file type' })

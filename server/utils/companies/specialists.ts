@@ -5,7 +5,7 @@ import { readSpecialistSources } from '../admin/specialists'
 import type { IngestionSourceRecord } from '../ingestion/types'
 import { editSpecialist } from '../specialists/manager'
 import { getSpecialistById, getSpecialistRegistry } from '../specialists/registry'
-import type { SpecialistRuntime } from '../specialists/schema'
+import type { SpecialistRuntime, SpecialistStatus } from '../specialists/schema'
 import { requireCompanyAdmin, type CompanyAccessContext } from './http'
 
 export interface CompanySpecialistPayload {
@@ -14,7 +14,7 @@ export interface CompanySpecialistPayload {
   description: string
   wiki_type: string
   system_prompt: string
-  status: 'active' | 'suspended'
+  status: SpecialistStatus
   sources: IngestionSourceRecord[]
 }
 

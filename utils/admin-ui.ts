@@ -36,6 +36,14 @@ export interface IngestionSource {
   error_message?: string
 }
 
+export interface AgentSessionLogSummary {
+  file_name: string
+  relative_path: string
+  path: string
+  task: 'initialization' | 'conversion' | 'ingestion'
+  started_at: string
+}
+
 export interface AdminSpecialist {
   id: string
   name: string
@@ -44,13 +52,24 @@ export interface AdminSpecialist {
   system_prompt: string
   citations_required: boolean
   streaming_enabled: boolean
-  status: 'active' | 'suspended'
+  status: 'initializing' | 'awaiting_sources' | 'ingesting' | 'active' | 'suspended' | 'failed'
   company_id: string | null
   sources: IngestionSource[]
+  agent_logs: AgentSessionLogSummary[]
+}
+
+export interface AdminFailedInitialization {
+  job_id: string
+  specialist_id: string
+  error_code: string | null
+  error_message: string | null
+  failed_at: string
+  agent_logs: AgentSessionLogSummary[]
 }
 
 export interface AdminSpecialistsResponse {
   specialists: AdminSpecialist[]
+  failed_initializations?: AdminFailedInitialization[]
 }
 
 export interface AdminCompanySummary {
@@ -75,7 +94,7 @@ export interface SourceStatusCounts {
 
 export interface BackgroundJobSummary {
   id: string
-  type: 'specialist_ingestion'
+  type: 'specialist_initialization' | 'specialist_ingestion'
   specialist_id: string
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 }

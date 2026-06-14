@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRouterParam, readMultipartFormData, setResponseStatus } from 'h3'
 import { recordAdminAuditEvent } from '../../../../utils/admin/audit'
 import { requireAdmin } from '../../../../utils/admin/guards'
-import { isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../utils/admin/specialists'
+import { canUploadRawSources, isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../../utils/db'
 import { scanSpecialistRawSources } from '../../../../utils/ingestion/detect'
 import { RawSourceStorageError, storeRawSource } from '../../../../utils/ingestion/storage'
@@ -15,6 +15,15 @@ export default defineEventHandler(async (event) => {
     const specialist = await getSpecialistById(specialistId)
     if (!specialist) {
       throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
+    }
+    if (!canUploadRawSources(specialist.status)) {
+      setResponseStatus(event, 409)
+      return {
+        error: {
+          code: 'SPECIALIST_NOT_READY_FOR_UPLOAD',
+          message: 'Aguarde pela conclusão da inicialização antes de carregar fontes.'
+        }
+      }
     }
 
     const file = await readUploadFile(event)

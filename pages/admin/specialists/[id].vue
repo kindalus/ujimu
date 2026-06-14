@@ -27,7 +27,7 @@ const editForm = ref({
   system_prompt: '',
   citations_required: true,
   streaming_enabled: true,
-  status: 'active' as 'active' | 'suspended',
+  status: 'active' as AdminSpecialist['status'],
   company_id: ''
 })
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -41,9 +41,16 @@ const specialist = computed(() =>
   specialists.value.find((item) => item.id === specialistId.value)
 )
 
+const canUploadSources = computed(() => {
+  const status = specialist.value?.status
+  return status === 'awaiting_sources' || status === 'active' || status === 'suspended'
+})
+
 const canRunIngestion = computed(() =>
-  specialist.value?.sources.some((source) => canIngestSource(source)) ?? false
+  canUploadSources.value && (specialist.value?.sources.some((source) => canIngestSource(source)) ?? false)
 )
+
+const agentLogs = computed(() => specialist.value?.agent_logs ?? [])
 
 onMounted(() => {
   specialistId.value = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) ?? '')
@@ -101,10 +108,14 @@ async function updateSpecialist(): Promise<void> {
   if (!specialist.value || pending.value) return
 
   await runAdminAction(async () => {
+    const { status, ...editableFields } = editForm.value
+    const body = status === 'active' || status === 'suspended'
+      ? editForm.value
+      : editableFields
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(editForm.value)
+      body: JSON.stringify(body)
     })
     if (!response.ok) throw new Error(await readAdminApiError(response))
 
@@ -130,6 +141,7 @@ function toggleSuspended(): void {
 }
 
 function openFilePicker(): void {
+  if (!canUploadSources.value) return
   fileInput.value?.click()
 }
 
@@ -262,6 +274,56 @@ function specialistLetter(item: AdminSpecialist): string {
   return item.name.trim().slice(0, 1).toUpperCase() || 'E'
 }
 
+function specialistStatusLabel(status: AdminSpecialist['status']): string {
+  const labels: Record<AdminSpecialist['status'], string> = {
+    initializing: 'A inicializar',
+    awaiting_sources: 'A aguardar fontes',
+    ingesting: 'Em ingestão',
+    active: 'Activa',
+    suspended: 'Suspensa',
+    failed: 'Falhada'
+  }
+  return labels[status]
+}
+
+function specialistStatusClass(status: AdminSpecialist['status']): string {
+  if (status === 'active') return 'badge--ok'
+  if (status === 'initializing' || status === 'awaiting_sources' || status === 'ingesting') return 'badge--warn'
+  if (status === 'failed') return 'badge--err'
+  return 'badge--mute'
+}
+
+function workflowStatusMessage(status: AdminSpecialist['status']): string {
+  const messages: Record<AdminSpecialist['status'], string> = {
+    initializing: 'Inicialização da wiki em curso. O carregamento de fontes fica disponível quando o agente criar AGENTS.md e a estrutura inicial da wiki.',
+    awaiting_sources: 'A wiki foi inicializada. Carregue fontes oficiais e execute a ingestão.',
+    ingesting: 'Ingestão em curso. Use Actualizar para acompanhar o estado antes de carregar novas fontes.',
+    active: 'Especialidade activa. Pode carregar novas fontes ou tentar novamente fontes falhadas.',
+    suspended: 'Especialidade suspensa. A gestão de fontes continua disponível para administradores.',
+    failed: 'Fluxo do agente falhou. Consulte os registos do agente antes de tentar novamente.'
+  }
+  return messages[status]
+}
+
+function agentLogTaskLabel(task: AdminSpecialist['agent_logs'][number]['task']): string {
+  const labels: Record<AdminSpecialist['agent_logs'][number]['task'], string> = {
+    initialization: 'Inicialização',
+    conversion: 'Conversão',
+    ingestion: 'Ingestão'
+  }
+  return labels[task]
+}
+
+function agentLogStartedLabel(timestamp: string): string {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'data desconhecida'
+
+  return new Intl.DateTimeFormat('pt-PT', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date)
+}
+
 function companyName(companyId: string | null): string {
   if (!companyId) return ''
   return companies.value.find((company) => company.id === companyId)?.name || companyId
@@ -354,7 +416,7 @@ function canIngestSource(source: IngestionSource): boolean {
         <div>
           <h1 id="admin-specialist-title" class="adm-title">
             {{ specialist.name }}
-            <span v-if="specialist.status === 'suspended'" class="badge badge--mute"><span class="badge-dot" />Suspensa</span>
+            <span class="badge" :class="specialistStatusClass(specialist.status)"><span class="badge-dot" />{{ specialistStatusLabel(specialist.status) }}</span>
           </h1>
           <p class="adm-sub mono-field">/admin/specialists/{{ specialist.id }}</p>
         </div>
@@ -402,14 +464,18 @@ function canIngestSource(source: IngestionSource): boolean {
 
     <div class="adm-card">
       <div class="adm-card-toprow">
-        <h2 class="adm-card-title">Fontes oficiais</h2>
+        <div>
+          <h2 class="adm-card-title">Fontes oficiais</h2>
+          <p class="adm-card-note">{{ workflowStatusMessage(specialist.status) }}</p>
+        </div>
         <div class="adm-row-actions">
-          <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="openFilePicker"><UjimuIcon name="upload" :size="13" /> Carregar fonte</button>
+          <button class="btn btn--ghost btn--xs" type="button" :class="{ 'btn--off': !canUploadSources }" :disabled="pending || !canUploadSources" @click="openFilePicker"><UjimuIcon name="upload" :size="13" /> Carregar fonte</button>
           <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="refreshSources"><UjimuIcon name="refresh" :size="13" /> Actualizar</button>
           <button class="btn btn--primary btn--xs" :class="{ 'btn--off': !canRunIngestion || pending }" type="button" :disabled="!canRunIngestion || pending" @click="runIngestion">Executar ingestão</button>
         </div>
       </div>
-      <input ref="fileInput" type="file" style="display: none" accept=".pdf,.docx,.xlsx,.html,.txt,.htm,.csv,.md,.markdown" :disabled="pending" @change="rememberUploadFile" />
+      <input ref="fileInput" type="file" style="display: none" accept=".pdf,.docx,.xlsx,.html,.txt,.htm,.csv,.md,.markdown" :disabled="pending || !canUploadSources" @change="rememberUploadFile" />
+      <p v-if="!canUploadSources" class="adm-ingest-note"><UjimuIcon name="info" :size="14" /> {{ workflowStatusMessage(specialist.status) }}</p>
       <p v-if="ingestionNote" class="adm-ingest-note"><UjimuIcon name="info" :size="14" /> {{ ingestionNote }}</p>
       <div class="adm-srcs">
         <div v-for="source in specialist.sources" :key="source.raw_path" class="adm-src" :class="{ 'adm-src--err': source.error_message || source.conversion?.error_message || source.ingestion?.error_message }">
@@ -420,7 +486,8 @@ function canIngestSource(source: IngestionSource): boolean {
               <span class="adm-src-sub">{{ sourceSub(source) }}</span>
             </div>
             <span class="badge" :class="badgeClass(effectiveSourceStatus(source))"><span class="badge-dot" />{{ statusLabel(effectiveSourceStatus(source)) }}</span>
-            <button class="btn btn--ghost btn--xs" type="button" title="Substituir esta fonte por um novo ficheiro" :disabled="pending" @click="openFilePicker">Recarregar</button>
+            <button v-if="canIngestSource(source)" class="btn btn--ghost btn--xs" type="button" :disabled="pending || !canRunIngestion" @click="runIngestion">Tentar novamente</button>
+            <button class="btn btn--ghost btn--xs" type="button" title="Substituir esta fonte por um novo ficheiro" :disabled="pending || !canUploadSources" @click="openFilePicker">Recarregar</button>
           </div>
           <p v-if="source.error_message" class="adm-src-error">{{ source.error_message }}</p>
           <p v-if="source.conversion?.error_message" class="adm-src-error">{{ source.conversion.error_message }}</p>
@@ -429,6 +496,24 @@ function canIngestSource(source: IngestionSource): boolean {
         <p v-if="specialist.sources.length === 0" class="adm-sub">Ainda não há fontes carregadas para esta especialidade.</p>
       </div>
       <p class="adm-foot-note">A conversão dos ficheiros é automática e acontece durante a ingestão. «Recarregar» substitui o ficheiro de uma fonte; a fonte fica marcada como substituída até à próxima ingestão.</p>
+    </div>
+
+    <div class="adm-card">
+      <h2 class="adm-card-title">Registos do agente</h2>
+      <p class="adm-card-note">Sessões de inicialização, conversão e ingestão guardadas em <code>logs/agents/</code>.</p>
+      <div class="adm-srcs">
+        <div v-for="log in agentLogs" :key="log.relative_path" class="adm-src">
+          <div class="adm-src-row">
+            <UjimuIcon name="doc" :size="16" />
+            <div class="adm-src-meta">
+              <span class="adm-src-name">{{ agentLogTaskLabel(log.task) }}</span>
+              <span class="adm-src-sub mono-field">{{ log.file_name }} · {{ agentLogStartedLabel(log.started_at) }}</span>
+            </div>
+            <span class="badge badge--mute"><span class="badge-dot" />{{ log.task }}</span>
+          </div>
+        </div>
+        <p v-if="agentLogs.length === 0" class="adm-sub">Ainda não há registos do agente para esta especialidade.</p>
+      </div>
     </div>
 
     <div class="adm-card">

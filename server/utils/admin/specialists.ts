@@ -1,6 +1,9 @@
 import { extname } from 'node:path'
-import type { SpecialistRuntime } from '../specialists/schema'
+import type { DatabaseSync } from 'node:sqlite'
+import type { SpecialistRuntime, SpecialistStatus } from '../specialists/schema'
 import { readIngestionState } from '../ingestion/state'
+import { listAgentSessionLogs, type AgentSessionLogSummary } from '../agents/logs'
+import { resolveAppConfig } from '../config'
 import type { IngestionSourceRecord } from '../ingestion/types'
 
 const ALLOWED_RAW_SOURCE_EXTENSIONS = new Set([
@@ -37,9 +40,19 @@ export interface AdminSpecialistPayload {
   system_prompt: string
   citations_required: boolean
   streaming_enabled: boolean
-  status: 'active' | 'suspended'
+  status: SpecialistStatus
   company_id: string | null
   sources: IngestionSourceRecord[]
+  agent_logs: AgentSessionLogSummary[]
+}
+
+export interface AdminFailedInitializationPayload {
+  job_id: string
+  specialist_id: string
+  error_code: string | null
+  error_message: string | null
+  failed_at: string
+  agent_logs: AgentSessionLogSummary[]
 }
 
 export interface SourceStatusCounts {
@@ -63,8 +76,46 @@ export async function toAdminSpecialistPayload(
     streaming_enabled: specialist.streaming_enabled,
     status: specialist.status,
     company_id: specialist.company_id,
-    sources: await readSpecialistSources(specialist)
+    sources: await readSpecialistSources(specialist),
+    agent_logs: await listAgentSessionLogs(resolveAppConfig().dataDir, specialist.id)
   }
+}
+
+export async function listFailedInitializationPayloads(
+  database: DatabaseSync,
+  options: { limit?: number } = {}
+): Promise<AdminFailedInitializationPayload[]> {
+  const dataDir = resolveAppConfig().dataDir
+  const rows = database
+    .prepare(`
+      SELECT id, specialist_id, last_error_code, last_error_message, completed_at, updated_at
+      FROM background_jobs
+      WHERE type = 'specialist_initialization'
+        AND status = 'failed'
+      ORDER BY COALESCE(completed_at, updated_at) DESC
+      LIMIT ?
+    `)
+    .all(options.limit ?? 10) as Array<{
+      id: string
+      specialist_id: string
+      last_error_code: string | null
+      last_error_message: string | null
+      completed_at: string | null
+      updated_at: string
+    }>
+
+  return Promise.all(rows.map(async (row) => ({
+    job_id: row.id,
+    specialist_id: row.specialist_id,
+    error_code: row.last_error_code,
+    error_message: row.last_error_message,
+    failed_at: row.completed_at ?? row.updated_at,
+    agent_logs: await listAgentSessionLogs(dataDir, row.specialist_id)
+  })))
+}
+
+export function canUploadRawSources(status: SpecialistStatus): boolean {
+  return status === 'awaiting_sources' || status === 'active' || status === 'suspended'
 }
 
 export async function readSpecialistSources(

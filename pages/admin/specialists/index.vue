@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { AdminCompaniesResponse, AdminCompanySummary, AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse } from '../../../utils/admin-ui'
+import type { AdminCompaniesResponse, AdminCompanySummary, AdminFailedInitialization, AdminSessionResponse, AdminSpecialist, AdminSpecialistsResponse } from '../../../utils/admin-ui'
 import { createEmptySpecialistForm, readAdminApiError } from '../../../utils/admin-ui'
 
 const wikiPresets = [
@@ -17,6 +17,7 @@ const wikiPresets = [
 const session = ref<AdminSessionResponse>({ authenticated: false, admin: false })
 const sessionPending = ref(true)
 const specialists = ref<AdminSpecialist[]>([])
+const failedInitializations = ref<AdminFailedInitialization[]>([])
 const companies = ref<AdminCompanySummary[]>([])
 const pending = ref(false)
 const creating = ref(false)
@@ -54,6 +55,7 @@ async function loadSpecialists(): Promise<void> {
 
   const payload = (await response.json()) as AdminSpecialistsResponse
   specialists.value = payload.specialists
+  failedInitializations.value = payload.failed_initializations ?? []
 }
 
 async function loadCompanies(): Promise<void> {
@@ -79,7 +81,7 @@ async function createSpecialist(): Promise<void> {
     createForm.value = createEmptySpecialistForm()
     idTouched.value = false
     creating.value = false
-    feedback.value = 'Especialidade criada. Abra a ficha para editar fontes e ingestão.'
+    feedback.value = 'Especialidade criada. A inicialização da wiki decorre em background; actualize a lista para confirmar o resultado.'
   })
 }
 
@@ -136,6 +138,11 @@ function accessLabel(specialist: AdminSpecialist): string {
   return specialist.company_id ? `empresa: ${companyName(specialist.company_id)}` : 'público'
 }
 
+function failedInitializationLabel(failure: AdminFailedInitialization): string {
+  const message = failure.error_message?.trim()
+  return message || 'A inicialização falhou e a especialidade não foi persistida em disco.'
+}
+
 function sourceStatusFor(specialist: AdminSpecialist): string {
   const issue = specialist.sources.find((source) => ['failed', 'blocked'].includes(source.status))
   if (issue) return issue.status
@@ -146,6 +153,9 @@ function sourceStatusFor(specialist: AdminSpecialist): string {
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
+    initializing: 'A inicializar',
+    awaiting_sources: 'A aguardar fontes',
+    ingesting: 'A ingerir',
     active: 'Activo',
     suspended: 'Suspenso',
     pending: 'Pendente',
@@ -160,7 +170,7 @@ function statusLabel(status: string): string {
 
 function badgeClass(status: string): string {
   if (['active', 'ingested'].includes(status)) return 'badge--ok'
-  if (['pending', 'processing'].includes(status)) return 'badge--warn'
+  if (['initializing', 'awaiting_sources', 'ingesting', 'pending', 'processing'].includes(status)) return 'badge--warn'
   if (['failed', 'blocked'].includes(status)) return 'badge--err'
   return 'badge--mute'
 }
@@ -272,6 +282,19 @@ function badgeClass(status: string): string {
             </button>
           </div>
         </form>
+      </section>
+
+      <section v-if="failedInitializations.length > 0" class="adm-card adm-failures" role="alert" aria-labelledby="failed-initializations-title">
+        <h2 id="failed-initializations-title" class="adm-card-title">Falhas de inicialização recentes</h2>
+        <p class="adm-card-note">Quando a inicialização da wiki falha, a especialidade é removida para evitar um estado parcial.</p>
+        <ul class="adm-failure-list">
+          <li v-for="failure in failedInitializations" :key="failure.job_id" class="adm-failure-item">
+            <strong class="mono-field">{{ failure.specialist_id }}</strong>
+            <span>{{ failedInitializationLabel(failure) }}</span>
+            <span class="adm-src-sub mono-field">{{ failure.failed_at }}</span>
+            <span v-if="failure.agent_logs.length > 0" class="adm-src-sub mono-field">Registo: {{ failure.agent_logs[0].file_name }}</span>
+          </li>
+        </ul>
       </section>
 
       <section class="adm-list" aria-label="Especialidades existentes">
