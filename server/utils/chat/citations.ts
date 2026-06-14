@@ -7,18 +7,24 @@ const MAX_ARTICLE_REFS = 20
 export function isUsableCitationSource(source: IngestionSourceRecord): boolean {
   return (
     (source.status === 'ingested' || source.ingestion?.status === 'ingested') &&
-    source.title.trim().length > 0 &&
-    source.raw_path.trim().length > 0
+    source.raw_path.trim().length > 0 &&
+    (source.ingestion?.citations?.length ?? 0) > 0
   )
 }
 
-export function sourceToChatCitation(source: IngestionSourceRecord): ChatCitation {
-  const articleRefs = source.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
+export function sourceToChatCitations(source: IngestionSourceRecord): ChatCitation[] {
+  return (source.ingestion?.citations ?? []).map((citation) => ({
+    sourceTitle: citation.source_title.trim(),
+    sourceFile: citation.source_file.trim(),
+    articleRefs: citation.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
+  }))
+}
 
-  return {
+export function sourceToChatCitation(source: IngestionSourceRecord): ChatCitation {
+  return sourceToChatCitations(source)[0] ?? {
     sourceTitle: source.title.trim(),
     sourceFile: `raw/${source.raw_path}`,
-    articleRefs: articleRefs.length > 0 ? articleRefs : [source.title.trim()]
+    articleRefs: source.article_refs.map((articleRef) => articleRef.trim()).filter(Boolean)
   }
 }
 

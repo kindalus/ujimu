@@ -44,9 +44,12 @@ describe('specialist availability and access acceptance', () => {
         company_id: companyId
       }
     }))
-    expect(created.status).toBe(201)
-    const createdBody = await created.json() as { specialist: { status: string; company_id: string } }
-    expect(createdBody.specialist).toMatchObject({ status: 'suspended', company_id: companyId })
+    expect(created.status).toBe(202)
+    const createdBody = await created.json() as { specialist: { status: string; company_id: string }; job: { type: string; status: string } }
+    expect(createdBody).toMatchObject({
+      specialist: { status: 'initializing', company_id: companyId },
+      job: { type: 'specialist_initialization', status: 'queued' }
+    })
 
     const edited = await fetchApp(jsonRequest('http://local/api/admin/specialists/laboral', {
       method: 'PATCH',

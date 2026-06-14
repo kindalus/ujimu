@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import { serializeChatEvent } from '../server/utils/chat/ndjson'
+import { buildChatPrompt } from '../server/utils/chat/pi-runner'
 import type { ChatEngineRunner, ChatRunnerStreamEvent, ChatStreamEvent } from '../server/utils/chat/types'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { writeIngestionState } from '../server/utils/ingestion/state'
@@ -119,6 +120,47 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
+  it('accepts narrower article refs from any validated citation record for the same source file', async () => {
+    const { specialtiesRoot } = await createTempSpecialist('iva')
+    await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot, {
+      citations: [
+        { sourceTitle: 'IPP', articleRefs: ['IPP Artigo 109.º'] },
+        { sourceTitle: 'Texto da Pauta', articleRefs: ['Capítulos 1 a 97'] }
+      ]
+    })
+
+    const events = await collectChatEvents(
+      await createChatEventStreamFromBody(
+        { specialistId: 'iva', question: 'Classifica whey isolada.' },
+        {
+          specialtiesRoot,
+          piChatEnabled: true,
+          runner: {
+            async run() {
+              return {
+                grounded: false,
+                citations: [],
+                deltas: toAsyncDeltas([]),
+                events: toAsyncEvents([
+                  {
+                    type: 'citation',
+                    citation: { sourceTitle: 'Pauta Aduaneira', sourceFile: 'raw/codigo-iva.original.md', articleRefs: ['Artigo 109.º'] }
+                  },
+                  { type: 'delta', text: 'Resposta com fonte validada.' },
+                  { type: 'done', grounded: true }
+                ])
+              }
+            }
+          }
+        }
+      )
+    )
+
+    expect(joinDeltas(events)).toContain('Resposta com fonte validada.')
+    expect(events.some((event) => event.type === 'citation')).toBe(true)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
   it('streams live runner events only after initial citations are validated', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
@@ -210,7 +252,64 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(joinDeltas(events)).toContain('temporariamente indisponível')
     expect(events.at(-1)).toEqual({ type: 'done', grounded: false })
   })
+
+  it('builds a minimal Pi chat prompt without specialist metadata, citation allowlists, or persona', () => {
+    const specialist = createPromptTestSpecialist('Use the customs classification output format.')
+    const citationEvidence = [{ sourceTitle: 'Pauta Aduaneira', sourceFile: 'raw/pauta.md', articleRefs: ['ARTIGO 1.º'] }]
+
+    const firstPrompt = buildChatPrompt({
+      specialist,
+      question: 'Classifica este produto.',
+      citationEvidence
+    })
+    const followUpPrompt = buildChatPrompt({
+      specialist,
+      question: 'E qual é o direito de importação?',
+      citationEvidence,
+      conversationContext: [
+        { role: 'user', content: 'Classifica este produto.' },
+        { role: 'assistant', content: 'Resposta anterior.' }
+      ]
+    })
+
+    expect(firstPrompt).toBe(`Answer the user question using this specialist workspace.
+
+User question:
+Classifica este produto.
+
+Conversation context:
+(none)
+`)
+    expect(firstPrompt).not.toContain('Selected specialist')
+    expect(firstPrompt).not.toContain('Backend citation allowlist')
+    expect(firstPrompt).not.toContain('Technical protocol')
+    expect(firstPrompt).not.toContain('Use the customs classification output format.')
+    expect(followUpPrompt).not.toContain('Use the customs classification output format.')
+    expect(followUpPrompt).toContain('Conversation context:\nUSER: Classifica este produto.')
+  })
 })
+
+function createPromptTestSpecialist(systemPrompt: string): SpecialistRuntime {
+  return {
+    id: 'pauta-aduaneira',
+    name: 'Pauta Aduaneira',
+    description: 'Classifica produtos conforme a pauta aduaneira.',
+    wiki_type: 'legislation-regulatory',
+    system_prompt: systemPrompt,
+    citations_required: true,
+    streaming_enabled: true,
+    status: 'active',
+    company_id: null,
+    paths: {
+      root: '/tmp/pauta-aduaneira',
+      config: '/tmp/pauta-aduaneira/specialist.yaml',
+      raw: '/tmp/pauta-aduaneira/raw',
+      wiki: '/tmp/pauta-aduaneira/wiki',
+      ingest: '/tmp/pauta-aduaneira/ingest',
+      ingestState: '/tmp/pauta-aduaneira/ingest/state.json'
+    }
+  }
+}
 
 async function createTempSpecialist(id: string): Promise<{
   specialist: SpecialistRuntime
@@ -239,7 +338,10 @@ async function createTempSpecialist(id: string): Promise<{
 async function createIngestedSource(
   getSpecialistById: (id: string, options: { specialtiesRoot: string }) => Promise<SpecialistRuntime | undefined>,
   specialtiesRoot: string,
-  options: { articleRefs?: string[] } = {}
+  options: {
+    articleRefs?: string[]
+    citations?: Array<{ sourceTitle: string; articleRefs: string[] }>
+  } = {}
 ): Promise<void> {
   const specialist = await getSpecialistById('iva', { specialtiesRoot })
   if (!specialist) {
@@ -255,6 +357,20 @@ async function createIngestedSource(
   state.sources['codigo-iva.original.md'].status = 'ingested'
   state.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
   state.sources['codigo-iva.original.md'].article_refs = options.articleRefs ?? ['Artigo 1.º']
+  state.sources['codigo-iva.original.md'].ingestion!.citations = options.citations
+    ? options.citations.map((citation) => ({
+        source_file: 'raw/codigo-iva.original.md',
+        source_title: citation.sourceTitle,
+        article_refs: citation.articleRefs
+      }))
+    : [{
+        source_file: 'raw/codigo-iva.original.md',
+        source_title: 'Código do IVA',
+        article_refs: state.sources['codigo-iva.original.md'].article_refs.length > 0
+          ? state.sources['codigo-iva.original.md'].article_refs
+          : ['Código do IVA']
+      }]
+  state.sources['codigo-iva.original.md'].ingestion!.manifest_validated_at = '2026-05-16T00:00:00.000Z'
   state.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
   await writeIngestionState(specialist.paths.ingestState, state)
 }
