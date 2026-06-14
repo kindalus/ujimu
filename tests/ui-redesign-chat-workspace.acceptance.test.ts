@@ -51,4 +51,19 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(page).toMatch(/\.chat-panel\s*\{[\s\S]*height:\s*calc\(100dvh - 128px\)/)
     expect(page).toMatch(/\.messages\s*\{[\s\S]*min-height:\s*0/)
   })
+
+  it('caps the chat composer textarea at five visible lines before scrolling', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+    const css = await readFile('assets/css/main.css', 'utf8')
+
+    expect(page).toContain('const chatInputMaxRows = 5')
+    expect(page).toContain('const questionTextarea = ref<HTMLTextAreaElement | null>(null)')
+    expect(page).toContain('watch(question')
+    expect(page).toContain('resizeQuestionTextarea')
+    expect(page).toContain('calculateQuestionTextareaMaxHeight')
+    expect(page).toContain('ref="questionTextarea"')
+    expect(page).toContain('@keydown.enter.exact.prevent="submitQuestion"')
+    expect(css).toContain('max-height: calc((1.5em * 5) + 12px)')
+    expect(css).toContain('overflow-y: hidden')
+  })
 })

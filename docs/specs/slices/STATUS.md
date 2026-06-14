@@ -93,11 +93,11 @@ Known non-blocking warnings:
 | 39 | [`39-batch-ingestion-manifest-state.html`](./39-batch-ingestion-manifest-state.html) | `verified` | 2026-06-12 | Batch ingestion session, dual-channel manifest, backend validation, and enriched `ingest/state.json`. |
 | 40 | [`40-state-driven-citations-minimal-chat-envelope.html`](./40-state-driven-citations-minimal-chat-envelope.html) | `verified` | 2026-06-12 | State-driven citation allowlist and minimal chat envelope with behaviour in specialist `AGENTS.md`. |
 | 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
-| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `grilled` | — | Chat input auto-grows up to five lines, then scrolls internally. |
+| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `acceptance-tested` | — | Chat input auto-grows up to five lines, then scrolls internally. |
 
 ## Slice 42 — Chat input auto-grow
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -120,7 +120,8 @@ Grill decisions:
 
 Acceptance-test plan:
 
-- Extend `tests/ui-redesign-chat-workspace.acceptance.test.ts` to assert the five-line max constant, textarea ref, resize watcher, style calculation, and CSS scroll fallback.
+- Extended `tests/ui-redesign-chat-workspace.acceptance.test.ts` to assert the five-line max constant, textarea ref, resize watcher, style calculation, and CSS scroll fallback.
+- Confirmed RED with `npm test -- tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose`: failed because `chatInputMaxRows` and resize behaviour do not yet exist.
 
 ## Agent-managed specialist wiki extension
 
