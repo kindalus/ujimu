@@ -77,28 +77,76 @@ async function* runPiChatStream(
     tools: await createUjimuFileTools(cwd, ['read', 'grep', 'find', 'ls']),
     fileSystemPolicy: {
       root: cwd,
-      read: { directories: ['wiki'] },
+      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md'] },
       write: { directories: [] },
-      list: { directories: ['wiki'] }
-    },
-    appendSystemPromptOverride: () => [
-      'You are the Ujimu consultation agent for one selected specialist.',
-      'Answer only from files under /data/wiki. Do not use /data/raw as answer-time source material.',
-      'If /data/wiki does not support the answer, say that the current context is insufficient.',
-      'Every substantive answer must be grounded and cited with backend-allowed citations.',
-      'Emit structured NDJSON only. Do not emit Markdown outside NDJSON event payloads.'
-    ]
+      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
+    }
   })
 
   const queue = new AsyncEventQueue<ChatRunnerStreamEvent>()
-  const parser = createPiNdjsonParser((event) => queue.push(event))
+  let sawCitation = false
+  const parser = createPiNdjsonParser((event) => {
+    if (event.type === 'citation') {
+      sawCitation = true
+    }
+    queue.push(event)
+  })
   let promptFinished = false
+  let timeoutAborted = false
   let sawDone = false
-  let timeout: NodeJS.Timeout | undefined
+  let sawTextDelta = false
+  let finalAssistantText = ''
+  let idleTimeout: NodeJS.Timeout | undefined
+  let hardTimeout: NodeJS.Timeout | undefined
+  let timeoutAbortPromise: Promise<void> | undefined
+  const hardTimeoutMs = resolvePiChatHardTimeoutMs(timeoutMs)
+
+  function clearChatTimeouts(): void {
+    if (idleTimeout) clearTimeout(idleTimeout)
+    if (hardTimeout) clearTimeout(hardTimeout)
+    idleTimeout = undefined
+    hardTimeout = undefined
+  }
+
+  function failForTimeout(message: string): void {
+    if (promptFinished || timeoutAborted) return
+    timeoutAborted = true
+    clearChatTimeouts()
+    timeoutAbortPromise = session.abort().catch(() => undefined)
+    queue.fail(new Error(message))
+  }
+
+  function refreshIdleTimeout(): void {
+    if (promptFinished || timeoutAborted) return
+    if (idleTimeout) clearTimeout(idleTimeout)
+    idleTimeout = setTimeout(() => {
+      failForTimeout(`Pi chat had no activity for ${timeoutMs}ms.`)
+    }, timeoutMs)
+  }
 
   const unsubscribe = session.subscribe((event: any) => {
+    refreshIdleTimeout()
+
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+      sawTextDelta = true
       parser.push(event.assistantMessageEvent.delta)
+      return
+    }
+
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_end') {
+      if (typeof event.assistantMessageEvent.content === 'string') {
+        finalAssistantText = event.assistantMessageEvent.content
+      }
+      return
+    }
+
+    if (event?.type === 'message_end') {
+      finalAssistantText = extractAssistantText(event.message) || finalAssistantText
+      return
+    }
+
+    if (event?.type === 'agent_end') {
+      finalAssistantText = extractLatestAssistantText(event.messages) || finalAssistantText
     }
   })
 
@@ -106,16 +154,19 @@ async function* runPiChatStream(
     sawDone = true
   }
 
-  timeout = setTimeout(() => {
-    void session.abort().catch(() => undefined)
-    queue.fail(new Error(`Pi chat exceeded ${timeoutMs}ms.`))
-  }, timeoutMs)
+  refreshIdleTimeout()
+  hardTimeout = setTimeout(() => {
+    failForTimeout(`Pi chat exceeded maximum duration ${hardTimeoutMs}ms.`)
+  }, hardTimeoutMs)
 
   void session.prompt(buildChatPrompt(input))
     .then(() => {
+      if (!sawTextDelta && finalAssistantText) {
+        parser.push(finalAssistantText)
+      }
       parser.flush()
       if (!sawDone) {
-        queue.push({ type: 'done', grounded: false })
+        queue.push({ type: 'done', grounded: sawCitation })
       }
       queue.close()
     })
@@ -124,7 +175,7 @@ async function* runPiChatStream(
     })
     .finally(() => {
       promptFinished = true
-      if (timeout) clearTimeout(timeout)
+      clearChatTimeouts()
     })
 
   try {
@@ -132,10 +183,14 @@ async function* runPiChatStream(
   } finally {
     unsubscribe?.()
     if (!promptFinished) {
-      await session.abort().catch(() => undefined)
+      if (timeoutAbortPromise) {
+        await timeoutAbortPromise
+      } else if (!timeoutAborted) {
+        await session.abort().catch(() => undefined)
+      }
     }
     session.dispose()
-    if (timeout) clearTimeout(timeout)
+    clearChatTimeouts()
   }
 }
 
@@ -443,41 +498,23 @@ function tokenize(value: string): Set<string> {
 
 export const DEFAULT_PI_CHAT_TIMEOUT_MS = 120_000
 
+function resolvePiChatHardTimeoutMs(timeoutMs: number): number {
+  return timeoutMs * 3
+}
+
 export function resolvePiChatTimeoutMs(): number {
   const configured = Number.parseInt(process.env.UJIMU_PI_CHAT_TIMEOUT_MS ?? '', 10)
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_PI_CHAT_TIMEOUT_MS
 }
 
-function buildChatPrompt(input: ChatRunnerInput): string {
-  return `Answer the user's question for the selected Ujimu specialist.
-
-Specialist:
-- id: ${input.specialist.id}
-- name: ${input.specialist.name}
+export function buildChatPrompt(input: ChatRunnerInput): string {
+  return `Answer the user question using this specialist workspace.
 
 User question:
 ${input.question}
 
 Conversation context:
 ${formatConversationContext(input.conversationContext)}
-
-Backend citation allowlist (the only citations you may emit):
-${JSON.stringify(input.citationEvidence, null, 2)}
-
-Rules:
-1. Use only /data/wiki files to answer. You may use read, grep, find, and ls only under /data/wiki.
-2. Do not answer from general model knowledge or /data/raw files.
-3. Before any answer text, emit exactly one citations event if the wiki supports the answer:
-   {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-4. Every citation sourceFile and at least one articleRefs value must match the backend allowlist exactly.
-5. Then emit answer chunks as NDJSON delta events:
-   {"type":"delta","text":"..."}
-6. End with {"type":"done","grounded":true}.
-7. If the wiki does not support the answer, emit only:
-   {"type":"delta","text":"Ainda não tenho fontes suficientes nesta especialidade para responder com segurança."}
-   {"type":"done","grounded":false}
-8. If you cannot comply with the citation protocol, emit {"type":"done","grounded":false}.
-9. Output NDJSON only: one JSON object per line, no code fence, no prose outside JSON.
 `
 }
 
@@ -497,6 +534,34 @@ function parseJsonLine(line: string): any | undefined {
   } catch {
     return undefined
   }
+}
+
+function extractAssistantText(message: unknown): string {
+  const content = (message as { content?: unknown })?.content
+  if (!Array.isArray(content)) return ''
+
+  return content
+    .map((part) => {
+      if (!part || typeof part !== 'object') return ''
+      const text = (part as { text?: unknown }).text
+      return typeof text === 'string' ? text : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function extractLatestAssistantText(messages: unknown): string {
+  if (!Array.isArray(messages)) return ''
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if ((message as { role?: unknown })?.role === 'assistant') {
+      const text = extractAssistantText(message)
+      if (text) return text
+    }
+  }
+
+  return ''
 }
 
 function isCitationLike(value: unknown): value is ChatCitation {

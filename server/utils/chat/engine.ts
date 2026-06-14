@@ -167,7 +167,6 @@ export async function createChatEventStreamForSpecialist(
   return streamChatWithRunner({
     runner,
     runnerInput,
-    citationEvidence,
     history: historyPersistence,
     answeredAnalytics: buildAnalyticsPersistence('answered'),
     insufficientAnalytics: buildAnalyticsPersistence('insufficient_context')
@@ -234,23 +233,9 @@ function normalizeCitations(citations: ChatCitation[]): ChatCitation[] {
     .filter((citation): citation is ChatCitation => Boolean(citation))
 }
 
-function filterAllowedCitations(citations: ChatCitation[], allowedEvidence: ChatCitation[]): ChatCitation[] {
-  const allowed = new Map(
-    allowedEvidence.map((citation) => [citation.sourceFile, new Set(citation.articleRefs.map((articleRef) => articleRef.trim()))])
-  )
-
-  return citations.filter((citation) => {
-    if (!citation.sourceFile || citation.articleRefs.length === 0) return false
-    const allowedArticleRefs = allowed.get(citation.sourceFile)
-    if (!allowedArticleRefs) return false
-    return citation.articleRefs.some((articleRef) => allowedArticleRefs.has(articleRef.trim()))
-  })
-}
-
 function streamChatWithRunner(input: {
   runner: ChatEngineRunner
   runnerInput: Parameters<ChatEngineRunner['run']>[0]
-  citationEvidence: ChatCitation[]
   history?: StreamHistoryPersistence
   answeredAnalytics?: StreamAnalyticsPersistence
   insufficientAnalytics?: StreamAnalyticsPersistence
@@ -261,7 +246,6 @@ function streamChatWithRunner(input: {
     if (result.events) {
       yield* streamRunnerEventResult({
         events: result.events,
-        citationEvidence: input.citationEvidence,
         history: input.history,
         answeredAnalytics: input.answeredAnalytics,
         insufficientAnalytics: input.insufficientAnalytics
@@ -269,7 +253,7 @@ function streamChatWithRunner(input: {
       return
     }
 
-    const citations = filterAllowedCitations(normalizeCitations(result.citations), input.citationEvidence)
+    const citations = normalizeCitations(result.citations)
 
     if (result.grounded && citations.length === 0) {
       yield* fallbackStream(
@@ -330,7 +314,6 @@ interface StreamAnalyticsPersistence {
 
 async function* streamRunnerEventResult(input: {
   events: AsyncIterable<ChatRunnerStreamEvent>
-  citationEvidence: ChatCitation[]
   history?: StreamHistoryPersistence
   answeredAnalytics?: StreamAnalyticsPersistence
   insufficientAnalytics?: StreamAnalyticsPersistence
@@ -338,7 +321,7 @@ async function* streamRunnerEventResult(input: {
   let answer = ''
   const bufferedDeltas: string[] = []
   const receivedCitations: ChatCitation[] = []
-  let allowedCitations: ChatCitation[] = []
+  let citations: ChatCitation[] = []
   let citationsValidated = false
   let sawDone = false
   let grounded = false
@@ -352,8 +335,8 @@ async function* streamRunnerEventResult(input: {
 
       if (event.type === 'citation') {
         receivedCitations.push(event.citation)
-        allowedCitations = filterAllowedCitations(normalizeCitations(receivedCitations), input.citationEvidence)
-        citationsValidated = allowedCitations.length > 0
+        citations = normalizeCitations(receivedCitations)
+        citationsValidated = citations.length > 0
 
         if (citationsValidated && bufferedDeltas.length > 0) {
           for (const text of bufferedDeltas.splice(0)) {
@@ -393,13 +376,13 @@ async function* streamRunnerEventResult(input: {
         answer += text
         yield { type: 'delta', text }
       }
-      allowedCitations = []
+      citations = []
     }
 
     yield* completeStreamResult({
       answer,
       grounded,
-      citations: grounded ? allowedCitations : [],
+      citations: grounded ? citations : [],
       history: input.history,
       analytics: grounded ? input.answeredAnalytics : undefined
     })

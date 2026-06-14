@@ -229,7 +229,7 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(audit.find((event) => event.action === 'conversion_run')?.metadata_json).not.toContain('Artigo 1.º')
   })
 
-  it('rejects consultation citations that are not in the backend-provided usable evidence allowlist', async () => {
+  it('accepts consultation citations without filtering them against backend-provided evidence', async () => {
     const { specialist, specialtiesRoot } = await createTempSpecialist('iva')
     await storeRawSource(specialist, {
       fileName: 'codigo-iva.md',
@@ -238,6 +238,12 @@ describe('three Pi agent pipeline acceptance', () => {
     const state = await scanSpecialistRawSources(specialist)
     state.sources['codigo-iva.original.md'].status = 'ingested'
     state.sources['codigo-iva.original.md'].ingestion!.status = 'ingested'
+    state.sources['codigo-iva.original.md'].ingestion!.citations = [{
+      source_file: 'raw/codigo-iva.original.md',
+      source_title: 'Código do IVA',
+      article_refs: ['Artigo 1.º']
+    }]
+    state.sources['codigo-iva.original.md'].ingestion!.manifest_validated_at = '2026-05-16T00:00:00.000Z'
     state.sources['codigo-iva.original.md'].ingested_at = '2026-05-16T00:00:00.000Z'
     await writeIngestionState(specialist.paths.ingestState, state)
 
@@ -252,10 +258,16 @@ describe('three Pi agent pipeline acceptance', () => {
       )
     )
 
-    expect(joinDeltas(events)).not.toContain('Resposta com citação inventada')
-    expect(joinDeltas(events)).toContain('fontes suficientes')
-    expect(events.some((event) => event.type === 'citation')).toBe(false)
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: false })
+    expect(joinDeltas(events)).toContain('Resposta com citação inventada')
+    expect(events).toContainEqual({
+      type: 'citation',
+      citation: {
+        sourceTitle: 'Fonte inventada',
+        sourceFile: 'raw/inventado.md',
+        articleRefs: ['Artigo 99.º']
+      }
+    })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
   it('uses mutable Ujimu config outside bundled Pi resources and Pi CLI .pi discovery', async () => {
