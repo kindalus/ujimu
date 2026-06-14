@@ -576,7 +576,7 @@ textarea, input, select { font: inherit; color: inherit; }
 .adm-card-toprow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .adm-card-toprow .adm-card-note { margin-top: 3px; }
 .adm-card-note { font-size: 12.5px; color: var(--muted); margin-top: -8px; }
-.adm-create { gap: 10px; }
+.adm-create { display: flex; flex-direction: column; gap: 12px; }
 .adm-row-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .adm-list { display: flex; flex-direction: column; gap: 10px; }
 .adm-spec { flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; }
