@@ -4,7 +4,8 @@ import { requireAdmin } from '../../../utils/admin/guards'
 import { toAdminSpecialistPayload } from '../../../utils/admin/specialists'
 import { getCompany } from '../../../utils/companies/repository'
 import { initializeDatabase } from '../../../utils/db'
-import { createSpecialist, SpecialistOperationError } from '../../../utils/specialists/manager'
+import { enqueueSpecialistInitializationJob, scheduleDueBackgroundJobs } from '../../../utils/jobs/background'
+import { createSpecialist, rollbackSpecialistCreation, SpecialistOperationError } from '../../../utils/specialists/manager'
 import { SpecialistConfigError, type SpecialistConfig } from '../../../utils/specialists/schema'
 
 export default defineEventHandler(async (event) => {
@@ -14,15 +15,22 @@ export default defineEventHandler(async (event) => {
     const body = await readJsonBody(event)
     const input = parseSpecialistConfig(body)
     assertCompanyExistsWhenProvided(database, input.company_id)
-    const specialist = await createSpecialist(input)
-    recordAdminAuditEvent(database, {
-      admin,
-      action: 'specialist_created',
-      specialistId: specialist.id,
-      metadata: { wiki_type: specialist.wiki_type }
-    })
-    setResponseStatus(event, 201)
-    return { specialist: await toAdminSpecialistPayload(specialist) }
+    const specialist = await createSpecialist({ ...input, status: 'initializing' })
+    try {
+      const job = enqueueSpecialistInitializationJob(database, { specialistId: specialist.id })
+      recordAdminAuditEvent(database, {
+        admin,
+        action: 'specialist_created',
+        specialistId: specialist.id,
+        metadata: { wiki_type: specialist.wiki_type, job_id: job.id, status: job.status }
+      })
+      scheduleDueBackgroundJobs()
+      setResponseStatus(event, 202)
+      return { specialist: await toAdminSpecialistPayload(specialist), job }
+    } catch (error) {
+      await rollbackSpecialistCreation(specialist.id)
+      throw error
+    }
   } catch (error) {
     if (error instanceof SpecialistOperationError && error.code === 'SPECIALIST_ALREADY_EXISTS') {
       throw createError({ statusCode: 409, statusMessage: error.message, data: { code: error.code } })

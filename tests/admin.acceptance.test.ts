@@ -90,7 +90,11 @@ describe('admin specialist management acceptance', () => {
         }
       })
     )
-    expect(created.status).toBe(201)
+    expect(created.status).toBe(202)
+    await expect(created.json()).resolves.toMatchObject({
+      specialist: { id: 'iva', status: 'initializing' },
+      job: { type: 'specialist_initialization', status: 'queued', specialist_id: 'iva' }
+    })
     await expect(readFile(join(specialtiesRoot, 'iva', 'specialist.yaml'), 'utf8')).resolves.toContain(
       'id: iva'
     )
@@ -121,7 +125,8 @@ describe('admin specialist management acceptance', () => {
           description: 'Descrição actualizada.',
           system_prompt: 'Use apenas a wiki de IVA.',
           citations_required: true,
-          streaming_enabled: false
+          streaming_enabled: false,
+          status: 'active'
         }
       })
     )

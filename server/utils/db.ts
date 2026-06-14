@@ -293,7 +293,7 @@ const MIGRATIONS: Migration[] = [
     sql: `
       CREATE TABLE IF NOT EXISTS background_jobs (
         id TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK (type IN ('specialist_ingestion')),
+        type TEXT NOT NULL CHECK (type IN ('specialist_initialization', 'specialist_ingestion')),
         specialist_id TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
         attempts INTEGER NOT NULL DEFAULT 0,
@@ -432,6 +432,67 @@ const MIGRATIONS: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_company_admin_audit_specialist_time
         ON company_admin_audit_events (specialist_id, occurred_at);
+    `
+  },
+  {
+    version: '0013_specialist_initialization_jobs',
+    sql: `
+      CREATE TABLE background_jobs_new (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('specialist_initialization', 'specialist_ingestion')),
+        specialist_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        locked_at TEXT,
+        locked_by TEXT,
+        last_error_code TEXT,
+        last_error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+
+      INSERT INTO background_jobs_new (
+        id,
+        type,
+        specialist_id,
+        status,
+        attempts,
+        max_attempts,
+        locked_at,
+        locked_by,
+        last_error_code,
+        last_error_message,
+        created_at,
+        updated_at,
+        completed_at
+      )
+      SELECT
+        id,
+        type,
+        specialist_id,
+        status,
+        attempts,
+        max_attempts,
+        locked_at,
+        locked_by,
+        last_error_code,
+        last_error_message,
+        created_at,
+        updated_at,
+        completed_at
+      FROM background_jobs;
+
+      DROP TABLE background_jobs;
+      ALTER TABLE background_jobs_new RENAME TO background_jobs;
+
+      CREATE INDEX IF NOT EXISTS idx_background_jobs_status_time
+        ON background_jobs (status, updated_at);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_background_jobs_specialist_active
+        ON background_jobs (type, specialist_id)
+        WHERE status IN ('queued', 'running');
     `
   }
 ]

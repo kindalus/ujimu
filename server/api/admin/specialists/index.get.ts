@@ -1,6 +1,6 @@
 import { defineEventHandler } from 'h3'
 import { requireAdmin } from '../../../utils/admin/guards'
-import { toAdminSpecialistPayload } from '../../../utils/admin/specialists'
+import { listFailedInitializationPayloads, toAdminSpecialistPayload } from '../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../utils/db'
 import { getSpecialistRegistry } from '../../../utils/specialists/registry'
 
@@ -11,7 +11,8 @@ export default defineEventHandler(async (event) => {
     const snapshot = await getSpecialistRegistry()
     return {
       specialists: await Promise.all(snapshot.specialists.map(toAdminSpecialistPayload)),
-      errors: snapshot.errors
+      errors: snapshot.errors,
+      failed_initializations: await listFailedInitializationPayloads(database)
     }
   } finally {
     database.close()

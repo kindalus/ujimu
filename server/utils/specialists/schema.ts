@@ -9,7 +9,7 @@ export const LLM_WIKI_PRESETS = [
   'custom-domain'
 ] as const
 
-export const SPECIALIST_STATUSES = ['active', 'suspended'] as const
+export const SPECIALIST_STATUSES = ['initializing', 'awaiting_sources', 'ingesting', 'active', 'suspended', 'failed'] as const
 
 export type LlmWikiPreset = (typeof LLM_WIKI_PRESETS)[number]
 export type SpecialistStatus = (typeof SPECIALIST_STATUSES)[number]
@@ -19,7 +19,7 @@ export interface SpecialistConfig {
   name: string
   description: string
   wiki_type: LlmWikiPreset
-  system_prompt: string
+  system_prompt?: string
   citations_required: boolean
   streaming_enabled: boolean
   status?: SpecialistStatus
@@ -27,6 +27,7 @@ export interface SpecialistConfig {
 }
 
 export interface NormalizedSpecialistConfig extends SpecialistConfig {
+  system_prompt: string
   status: SpecialistStatus
   company_id: string | null
 }
@@ -101,7 +102,7 @@ export function validateSpecialistConfig(input: unknown, directoryId: string): N
     name: readString(input, 'name'),
     description: readString(input, 'description'),
     wiki_type: wikiType,
-    system_prompt: readString(input, 'system_prompt'),
+    system_prompt: readOptionalString(input, 'system_prompt'),
     citations_required: readBoolean(input, 'citations_required'),
     streaming_enabled: readBoolean(input, 'streaming_enabled'),
     status: readOptionalStatus(input.status),
@@ -139,11 +140,11 @@ function readOptionalStatus(value: unknown): SpecialistStatus {
     return 'active'
   }
 
-  if (value !== 'active' && value !== 'suspended') {
-    throw new SpecialistConfigError('INVALID_STATUS', 'Specialist status must be active or suspended.')
+  if (!SPECIALIST_STATUSES.includes(value as SpecialistStatus)) {
+    throw new SpecialistConfigError('INVALID_STATUS', `Specialist status must be one of: ${SPECIALIST_STATUSES.join(', ')}.`)
   }
 
-  return value
+  return value as SpecialistStatus
 }
 
 function readOptionalCompanyId(value: unknown): string | null {
@@ -167,6 +168,17 @@ function readString(record: Record<string, unknown>, key: keyof SpecialistConfig
     throw new SpecialistConfigError('INVALID_CONFIG', `Missing or invalid string field "${key}".`)
   }
 
+  return value
+}
+
+function readOptionalString(record: Record<string, unknown>, key: keyof SpecialistConfig): string {
+  const value = record[key]
+  if (value === undefined || value === null) {
+    return ''
+  }
+  if (typeof value !== 'string') {
+    throw new SpecialistConfigError('INVALID_CONFIG', `Invalid string field "${key}".`)
+  }
   return value
 }
 

@@ -9,7 +9,7 @@ export type SpecialistAccessSubject =
   | { type: 'user'; userId: string; activeCompanyId: string | null }
 
 export function canUseSpecialist(specialist: SpecialistRuntime, subject: SpecialistAccessSubject): boolean {
-  if (specialist.status === 'suspended') {
+  if (specialist.status !== 'active') {
     return false
   }
 

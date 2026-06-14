@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { deleteConversationHistoryForSpecialist } from '../history/delete'
@@ -86,6 +86,17 @@ export async function editSpecialist(
   return { ...updated, paths }
 }
 
+export async function rollbackSpecialistCreation(
+  specialistId: string,
+  options: SpecialistManagerOptions = {}
+): Promise<void> {
+  assertValidSpecialistId(specialistId)
+  const specialtiesRoot = resolveSpecialtiesRoot(options)
+  const paths = resolveSpecialistPaths(specialtiesRoot, specialistId)
+  await rm(paths.root, { recursive: true, force: true })
+  await reloadSpecialistRegistry({ specialtiesRoot })
+}
+
 export async function deleteSpecialist(
   specialistId: string,
   options: SpecialistManagerOptions = {}
@@ -115,7 +126,7 @@ function stringifySpecialistConfig(config: NormalizedSpecialistConfig): string {
       name: config.name,
       description: config.description,
       wiki_type: config.wiki_type,
-      system_prompt: config.system_prompt,
+      ...(config.system_prompt ? { system_prompt: config.system_prompt } : {}),
       citations_required: config.citations_required,
       streaming_enabled: config.streaming_enabled,
       status: config.status,

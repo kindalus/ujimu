@@ -6,9 +6,11 @@ import { initializeDatabase } from '../db'
 import { runPendingConversions, type PiConversionRunner } from '../ingestion/conversion'
 import type { PiIngestionRunner } from '../ingestion/pi-runner'
 import { runPendingIngestion } from '../ingestion/run'
+import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializationRunner, type SpecialistInitializationRunner } from '../specialists/initialization'
 import { loadSpecialistsFromDisk } from '../specialists/loader'
+import { editSpecialist, rollbackSpecialistCreation } from '../specialists/manager'
 
-export type BackgroundJobType = 'specialist_ingestion'
+export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion'
 export type BackgroundJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 export interface BackgroundJobRecord {
@@ -33,6 +35,7 @@ export interface RunDueBackgroundJobsOptions {
   piConversionEnabled?: boolean
   piIngestionEnabled?: boolean
   conversionRunner?: PiConversionRunner
+  initializationRunner?: SpecialistInitializationRunner
   runner?: PiIngestionRunner
   now?: Date
   limit?: number
@@ -48,17 +51,31 @@ export interface RunDueBackgroundJobsResult {
 
 let backgroundRunScheduled = false
 
+export function enqueueSpecialistInitializationJob(
+  database: DatabaseSync,
+  input: { specialistId: string; now?: Date }
+): BackgroundJobRecord {
+  return enqueueSpecialistJob(database, { ...input, type: 'specialist_initialization' })
+}
+
 export function enqueueSpecialistIngestionJob(
   database: DatabaseSync,
   input: { specialistId: string; now?: Date }
 ): BackgroundJobRecord {
-  const existing = findActiveSpecialistIngestionJob(database, input.specialistId)
+  return enqueueSpecialistJob(database, { ...input, type: 'specialist_ingestion' })
+}
+
+function enqueueSpecialistJob(
+  database: DatabaseSync,
+  input: { specialistId: string; type: BackgroundJobType; now?: Date }
+): BackgroundJobRecord {
+  const existing = findActiveSpecialistJob(database, input.specialistId, input.type)
   if (existing) return existing
 
   const now = (input.now ?? new Date()).toISOString()
   const job: BackgroundJobRecord = {
     id: randomUUID(),
-    type: 'specialist_ingestion',
+    type: input.type,
     specialist_id: input.specialistId,
     status: 'queued',
     attempts: 0,
@@ -107,7 +124,7 @@ export function enqueueSpecialistIngestionJob(
         job.completed_at
       )
   } catch (error) {
-    const active = findActiveSpecialistIngestionJob(database, input.specialistId)
+    const active = findActiveSpecialistJob(database, input.specialistId, input.type)
     if (active) return active
     throw error
   }
@@ -133,7 +150,7 @@ export async function runDueBackgroundJobs(
 
     result.processed += 1
     try {
-      await runSpecialistIngestionJob(locked, options)
+      await runBackgroundJob(locked, options)
       markJobSucceeded(options.database, locked.id, new Date())
       result.succeeded += 1
     } catch (error) {
@@ -158,18 +175,22 @@ export function scheduleDueBackgroundJobs(options: { dataDir?: string; env?: Rec
   timer.unref?.()
 }
 
-function findActiveSpecialistIngestionJob(database: DatabaseSync, specialistId: string): BackgroundJobRecord | undefined {
+function findActiveSpecialistJob(
+  database: DatabaseSync,
+  specialistId: string,
+  type: BackgroundJobType
+): BackgroundJobRecord | undefined {
   return database
     .prepare(`
       SELECT *
       FROM background_jobs
-      WHERE type = 'specialist_ingestion'
+      WHERE type = ?
         AND specialist_id = ?
         AND status IN ('queued', 'running')
       ORDER BY created_at ASC, id ASC
       LIMIT 1
     `)
-    .get(specialistId) as BackgroundJobRecord | undefined
+    .get(type, specialistId) as BackgroundJobRecord | undefined
 }
 
 function findDueJobs(
@@ -214,6 +235,39 @@ function lockJob(
     .get(jobId) as BackgroundJobRecord | undefined
 
   return locked?.status === 'running' && locked.locked_by === input.workerId ? locked : undefined
+}
+
+async function runBackgroundJob(
+  job: BackgroundJobRecord,
+  options: RunDueBackgroundJobsOptions
+): Promise<void> {
+  if (job.type === 'specialist_initialization') {
+    await runSpecialistInitializationJob(job, options)
+    return
+  }
+
+  await runSpecialistIngestionJob(job, options)
+}
+
+async function runSpecialistInitializationJob(
+  job: BackgroundJobRecord,
+  options: RunDueBackgroundJobsOptions
+): Promise<void> {
+  const dataDir = options.dataDir ?? resolveAppConfig().dataDir
+  const snapshot = await loadSpecialistsFromDisk({ dataDir })
+  const specialist = snapshot.specialists.find((item) => item.id === job.specialist_id)
+  if (!specialist) {
+    throw createJobError('SPECIALIST_NOT_FOUND', `Specialist "${job.specialist_id}" was not found.`)
+  }
+
+  try {
+    await (options.initializationRunner ?? createPiSdkSpecialistInitializationRunner()).initializeSpecialist(specialist)
+    await assertSpecialistInitializedWorkspace(specialist)
+    await editSpecialist(specialist.id, { status: 'awaiting_sources' }, { dataDir })
+  } catch (error) {
+    await rollbackSpecialistInitialization(dataDir, specialist.id)
+    throw error
+  }
 }
 
 async function runSpecialistIngestionJob(
@@ -270,6 +324,10 @@ function markJobFailed(database: DatabaseSync, jobId: string, error: unknown, fa
       WHERE id = ?
     `)
     .run(resolveErrorCode(error), sanitizeErrorMessage(error), now, now, jobId)
+}
+
+async function rollbackSpecialistInitialization(dataDir: string, specialistId: string): Promise<void> {
+  await rollbackSpecialistCreation(specialistId, { dataDir })
 }
 
 async function runScheduledBackgroundJobs(dataDir: string | undefined): Promise<void> {
