@@ -157,6 +157,7 @@ const defaultBillingStatus: BillingStatusResponse = {
 const queueLimit = 3
 const slowResponseNoticeDelayMs = 30_000
 const chatInputMaxRows = 5
+const specialistDescriptionPreviewLimit = 256
 let idCounter = 0
 
 const specialists = ref<PublicSpecialist[]>([])
@@ -434,6 +435,12 @@ async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
 function renderAssistantMessageHtml(message: ChatUiMessage): string {
   const text = message.text || message.statusMessage || (message.status === 'streaming' ? 'A preparar resposta...' : '')
   return renderMarkdownToSafeHtml(text)
+}
+
+function specialistDescriptionPreview(description: string): string {
+  if (description.length <= specialistDescriptionPreviewLimit) return description
+
+  return `${description.slice(0, specialistDescriptionPreviewLimit - 1).trimEnd()}…`
 }
 
 function resizeQuestionTextarea(): void {
@@ -886,7 +893,7 @@ function createId(prefix: string): string {
                 >
                   <span class="spec-chip-letter spec-chip-letter--lg">{{ specialist.name.slice(0, 1) }}</span>
                   <span class="spec-card-name">{{ specialist.name }}</span>
-                  <span class="spec-card-short">{{ specialist.description }}</span>
+                  <span class="spec-card-short" :title="specialist.description">{{ specialistDescriptionPreview(specialist.description) }}</span>
                 </button>
               </div>
               <p v-if="specialistsPending" class="empty-sub">A carregar especialidades...</p>
@@ -1041,7 +1048,7 @@ function createId(prefix: string): string {
                   <span class="spec-chip-letter">{{ specialist.name.slice(0, 1) }}</span>
                   <span class="spec-opt-text">
                     <span class="spec-opt-name">{{ specialist.name }}</span>
-                    <span class="spec-opt-short">{{ specialist.description }}</span>
+                    <span class="spec-opt-short" :title="specialist.description">{{ specialistDescriptionPreview(specialist.description) }}</span>
                   </span>
                   <UjimuIcon v-if="specialist.id === selectedSpecialistId" name="check" />
                 </button>

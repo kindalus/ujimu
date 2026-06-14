@@ -66,4 +66,18 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(css).toContain('max-height: calc((1.5em * 5) + 12px)')
     expect(css).toContain('overflow-y: hidden')
   })
+
+  it('uses an opaque specialist dropdown and clips specialist descriptions to 256 characters', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+    const css = await readFile('assets/css/main.css', 'utf8')
+
+    expect(page).toContain('const specialistDescriptionPreviewLimit = 256')
+    expect(page).toContain('function specialistDescriptionPreview(description: string): string')
+    expect(page).toContain('description.length <= specialistDescriptionPreviewLimit')
+    expect(page).toContain('description.slice(0, specialistDescriptionPreviewLimit - 1).trimEnd()')
+    expect(page).toContain('<span class="spec-card-short" :title="specialist.description">{{ specialistDescriptionPreview(specialist.description) }}</span>')
+    expect(page).toContain('<span class="spec-opt-short" :title="specialist.description">{{ specialistDescriptionPreview(specialist.description) }}</span>')
+    expect(css).toContain('background: var(--surface-solid)')
+    expect(css).toContain('backdrop-filter: none')
+  })
 })

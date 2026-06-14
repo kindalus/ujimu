@@ -57,6 +57,7 @@ textarea, input, select { font: inherit; color: inherit; }
   /* tokens — tema claro */
   --bg: #FAFAF7;
   --surface: #FFFFFF;
+  --surface-solid: #FFFFFF;
   --surface-2: #F2F1EC;
   --ink: #16150F;
   --muted: #6F6E66;
@@ -77,6 +78,7 @@ textarea, input, select { font: inherit; color: inherit; }
 .app[data-theme="dark"] {
   --bg: #131310;
   --surface: #1C1C18;
+  --surface-solid: #1C1C18;
   --surface-2: #232320;
   --ink: #F2F1EA;
   --muted: #9C9A8E;
@@ -392,8 +394,9 @@ textarea, input, select { font: inherit; color: inherit; }
 .spec-chip--set { color: var(--ink); border-color: var(--line); background: var(--surface-2); }
 .spec-pop {
   position: absolute; bottom: calc(100% + 10px); left: 0; width: 340px; z-index: 30;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  background: var(--surface-solid); border: 1px solid var(--line); border-radius: 16px;
   box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 2px;
+  opacity: 1; backdrop-filter: none; background-clip: padding-box;
 }
 .spec-pop-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 6px 10px 4px; }
 .spec-opt { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 11px; text-align: left; }
