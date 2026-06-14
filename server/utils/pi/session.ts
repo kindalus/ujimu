@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs'
 import { isAbsolute, join, relative, sep } from 'node:path'
+import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 import { createSandboxedFileTools, type UjimuPiFileSystemPolicy } from './sandboxed-tools'
 
-export type PiTaskName = 'conversion' | 'ingestion' | 'chat'
+export type PiTaskName = AgentSessionLogTask | 'chat'
 
 export interface CreateUjimuPiSessionOptions {
   cwd: string
@@ -13,9 +14,19 @@ export interface CreateUjimuPiSessionOptions {
   fileSystemPolicy: UjimuPiFileSystemPolicy
   appendSystemPromptOverride?: () => string[]
   modelEnvPrefix?: string
+  agentLog?: {
+    dataDir?: string
+    specialistId: string
+    now?: Date
+  }
 }
 
-export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions): Promise<{ session: any }> {
+export interface CreateUjimuPiSessionResult {
+  session: any
+  agentLog?: AgentSessionLogger
+}
+
+export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions): Promise<CreateUjimuPiSessionResult> {
   const {
     AuthStorage,
     createAgentSession,
@@ -67,16 +78,26 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     ...(selectedModel ? { model: selectedModel as any } : {})
   } as any)
 
-  attachPiDebugLogger(result.session, {
+  const sessionContext = {
     task: options.task,
     cwd: options.cwd,
     configDir,
     bundledPiDir,
     tools: [...options.tools, ...customTools.map((tool: any) => tool.name)],
     model: selectedModel
-  })
+  }
 
-  return result
+  attachPiDebugLogger(result.session, sessionContext)
+
+  let agentLog: AgentSessionLogger | undefined
+  try {
+    agentLog = await attachAgentSessionLogger(result.session, sessionContext, options)
+  } catch (error) {
+    result.session.dispose()
+    throw error
+  }
+
+  return { ...result, ...(agentLog ? { agentLog } : {}) }
 }
 
 function toVirtualBundlePath(filePath: string, bundleRoot: string): string {
@@ -111,6 +132,52 @@ function attachPiDebugLogger(session: any, context: PiDebugContext): void {
   session.subscribe((event: unknown) => {
     writePiDebugEvent('session_event', event)
   })
+}
+
+async function attachAgentSessionLogger(
+  session: any,
+  context: PiDebugContext,
+  options: CreateUjimuPiSessionOptions
+): Promise<AgentSessionLogger | undefined> {
+  if (!options.agentLog || !isAgentSessionLogTask(options.task)) {
+    return undefined
+  }
+
+  const logger = await createAgentSessionLogger({
+    dataDir: options.agentLog.dataDir,
+    specialistId: options.agentLog.specialistId,
+    task: options.task,
+    now: options.agentLog.now
+  })
+
+  logger.writeSessionCreated({
+    task: context.task,
+    tools: context.tools,
+    model: context.model ? 'configured' : 'default'
+  })
+
+  if (typeof session?.subscribe !== 'function') {
+    logger.writeEvent({ type: 'session_subscribe_unavailable' })
+    return logger
+  }
+
+  const unsubscribe = session.subscribe((event: unknown) => {
+    logger.writeEvent(event)
+  })
+
+  return {
+    path: logger.path,
+    writeSessionCreated: (event) => logger.writeSessionCreated(event),
+    writeEvent: (event) => logger.writeEvent(event),
+    close: async (status) => {
+      unsubscribe?.()
+      await logger.close(status)
+    }
+  }
+}
+
+function isAgentSessionLogTask(task: PiTaskName): task is AgentSessionLogTask {
+  return task === 'initialization' || task === 'conversion' || task === 'ingestion'
 }
 
 function writePiDebugEvent(event: string, payload: unknown): void {
