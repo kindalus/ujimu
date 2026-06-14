@@ -93,11 +93,11 @@ Known non-blocking warnings:
 | 39 | [`39-batch-ingestion-manifest-state.html`](./39-batch-ingestion-manifest-state.html) | `verified` | 2026-06-12 | Batch ingestion session, dual-channel manifest, backend validation, and enriched `ingest/state.json`. |
 | 40 | [`40-state-driven-citations-minimal-chat-envelope.html`](./40-state-driven-citations-minimal-chat-envelope.html) | `verified` | 2026-06-12 | State-driven citation allowlist and minimal chat envelope with behaviour in specialist `AGENTS.md`. |
 | 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
-| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `acceptance-tested` | — | Chat input auto-grows up to five lines, then scrolls internally. |
+| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `implemented` | — | Chat input auto-grows up to five lines, then scrolls internally; full verification blocked by unrelated existing failures. |
 
 ## Slice 42 — Chat input auto-grow
 
-Status: `acceptance-tested`
+Status: `implemented`
 
 Originating brainstorm and architecture:
 
@@ -121,7 +121,21 @@ Grill decisions:
 Acceptance-test plan:
 
 - Extended `tests/ui-redesign-chat-workspace.acceptance.test.ts` to assert the five-line max constant, textarea ref, resize watcher, style calculation, and CSS scroll fallback.
-- Confirmed RED with `npm test -- tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose`: failed because `chatInputMaxRows` and resize behaviour do not yet exist.
+- Confirmed RED with `npm test -- tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose`: failed because `chatInputMaxRows` and resize behaviour did not yet exist.
+
+Implementation:
+
+- Added a textarea ref, five-row constant, resize watcher, computed max-height helper, and initial mounted resize in `pages/index.vue`.
+- Added the textarea `ref` binding while preserving `Enter` submit and `Shift+Enter` newline behaviour.
+- Updated `.prompt-ta` in `assets/css/main.css` with a five-line max-height fallback and hidden overflow until scrolling is required.
+
+Verification:
+
+- `npm test -- tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- Chrome DevTools check on `http://127.0.0.1:3000/` — passed for DOM/style inspection: textarea exists with `rows=1`, computed max-height is five lines plus padding, and `overflow-y` starts hidden; console only showed Nuxt development info logs.
+- `npm test` — blocked by unrelated existing failures in `tests/admin-agent-workflow.acceptance.test.ts` and `tests/pi-agent-pipeline.acceptance.test.ts`.
 
 ## Agent-managed specialist wiki extension
 

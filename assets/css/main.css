@@ -367,7 +367,7 @@ textarea, input, select { font: inherit; color: inherit; }
 .prompt-row { display: flex; align-items: flex-end; gap: 10px; }
 .prompt-ta {
   flex: 1; border: none; outline: none; background: transparent; resize: none;
-  padding: 6px 4px; max-height: 160px; line-height: 1.5;
+  padding: 6px 4px; max-height: calc((1.5em * 5) + 12px); line-height: 1.5; overflow-y: hidden;
 }
 .prompt-ta::placeholder { color: var(--muted); }
 .sendbtn {

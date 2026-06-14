@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   buildInlineAdStreamItems,
   countCompletedAssistantResponses,
@@ -156,6 +156,7 @@ const defaultBillingStatus: BillingStatusResponse = {
 }
 const queueLimit = 3
 const slowResponseNoticeDelayMs = 30_000
+const chatInputMaxRows = 5
 let idCounter = 0
 
 const specialists = ref<PublicSpecialist[]>([])
@@ -165,6 +166,7 @@ const selectedSpecialistId = ref('')
 const specialistSelectorOpen = ref(false)
 const specialistSelectorRef = ref<HTMLElement | null>(null)
 const question = ref('')
+const questionTextarea = ref<HTMLTextAreaElement | null>(null)
 const messages = ref<ChatMessage[]>([])
 const queuedQuestions = ref<QueuedQuestion[]>([])
 const activeConversationId = ref('')
@@ -190,6 +192,7 @@ onMounted(() => {
   void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
+  void nextTick(resizeQuestionTextarea)
 })
 
 onBeforeUnmount(() => {
@@ -239,6 +242,10 @@ const composerHelp = computed(() => {
 
 watch(completedAssistantResponseCount, (count) => {
   inlineAdSchedule.value = extendInlineAdSchedule(inlineAdSchedule.value, count)
+})
+
+watch(question, () => {
+  void nextTick(resizeQuestionTextarea)
 })
 
 async function recordVisit(): Promise<void> {
@@ -427,6 +434,28 @@ async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
 function renderAssistantMessageHtml(message: ChatUiMessage): string {
   const text = message.text || message.statusMessage || (message.status === 'streaming' ? 'A preparar resposta...' : '')
   return renderMarkdownToSafeHtml(text)
+}
+
+function resizeQuestionTextarea(): void {
+  const textarea = questionTextarea.value
+  if (!textarea) return
+
+  textarea.style.height = 'auto'
+  const maxHeight = calculateQuestionTextareaMaxHeight(textarea)
+  const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
+  textarea.style.height = `${nextHeight}px`
+  textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+}
+
+function calculateQuestionTextareaMaxHeight(textarea: HTMLTextAreaElement): number {
+  const styles = window.getComputedStyle(textarea)
+  const lineHeight = Number.parseFloat(styles.lineHeight)
+  const paddingTop = Number.parseFloat(styles.paddingTop)
+  const paddingBottom = Number.parseFloat(styles.paddingBottom)
+
+  return (Number.isFinite(lineHeight) ? lineHeight : 24) * chatInputMaxRows +
+    (Number.isFinite(paddingTop) ? paddingTop : 0) +
+    (Number.isFinite(paddingBottom) ? paddingBottom : 0)
 }
 
 async function loadSpecialists(): Promise<void> {
@@ -1023,6 +1052,7 @@ function createId(prefix: string): string {
           <div class="prompt-row">
             <textarea
               id="question"
+              ref="questionTextarea"
               v-model="question"
               class="prompt-ta"
               rows="1"
