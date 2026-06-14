@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arquitectura — Wiki de especialidade gerida por agente</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg: #11110f; --panel: #1b1b17; --panel-2: #24241f; --text: #f4f1e8; --muted: #aaa594; --line: #37352f; --accent: #f7ce1b; --ok: #84cc8c; --danger: #e5736c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: radial-gradient(circle at top right, rgba(247,206,27,.16), transparent 30%), linear-gradient(135deg, #11110f, #191914 68%, #14130d); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
+    .slide { width: 100vw; height: 100vh; display: none; padding: 7vh 10vw; align-items: center; justify-content: center; }
+    .slide.active { display: flex; }
+    .frame { width: min(1120px, 100%); }
+    h1, h2 { letter-spacing: -.035em; line-height: 1.05; }
+    h1 { font-size: clamp(2.8rem, 6vw, 5.8rem); font-weight: 700; margin: 0 0 1rem; }
+    h2 { font-size: clamp(2rem, 4vw, 3.6rem); font-weight: 700; margin: 0 0 1.4rem; }
+    p, li { font-size: clamp(1.02rem, 1.45vw, 1.22rem); color: var(--muted); line-height: 1.55; }
+    ul { margin: 0; padding-left: 1.2rem; }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .12em; font-size: .82rem; margin-bottom: 1rem; }
+    .panel { background: color-mix(in srgb, var(--panel) 90%, transparent); border: 1px solid var(--line); border-radius: 24px; padding: 1.4rem; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .kicker { color: var(--text); font-weight: 600; }
+    code { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: .94em; }
+    .pill { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: .35rem .7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: .82rem; }
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .7rem; align-items: stretch; }
+    .step { border: 1px solid var(--line); background: var(--panel-2); border-radius: 18px; padding: .9rem; min-height: 120px; }
+    .step b { display: block; color: var(--text); margin-bottom: .4rem; }
+    .step span { color: var(--muted); font-size: .95rem; line-height: 1.35; }
+    .counter { position: fixed; right: 2rem; bottom: 1.5rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: .85rem; }
+    .bar { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--accent); width: calc((var(--idx) + 1) / var(--total) * 100%); transition: width .2s ease; }
+    @media print { body { overflow: auto; } .slide { display: flex; page-break-after: always; } .counter, .bar { display: none; } }
+  </style>
+</head>
+<body style="--idx: 0; --total: 11;">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Arquitectura · Zafir</div>
+    <h1>Wiki de especialidade gerida por agente</h1>
+    <p>Desenho técnico para criação transaccional, inicialização LLM Wiki, ingestão em lote e auditoria legível.</p>
+    <div class="pill">Origem: docs/specs/brainstorm-agent-managed-specialist-wiki.html</div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Princípio central</div>
+    <h2>Separar autonomia de autoridade</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Agente.</span> Mantém o conhecimento: <code>AGENTS.md</code>, <code>wiki/</code>, ligações, páginas, índice e log da wiki.</p></div>
+      <div class="panel"><p><span class="kicker">Backend.</span> Mantém autoridade operacional: <code>specialist.yaml</code>, <code>raw/</code>, <code>ingest/state.json</code>, jobs, estados, rollback e validações.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Criação</div>
+    <h2>Job transaccional em background</h2>
+    <div class="flow">
+      <div class="step"><b>1. Pedido</b><span>Admin cria especialidade sem fonte obrigatória. <code>system_prompt</code> é opcional.</span></div>
+      <div class="step"><b>2. Staging</b><span>Backend cria directório, <code>specialist.yaml</code> e estado privado <code>initializing</code>.</span></div>
+      <div class="step"><b>3. Inicialização</b><span>Agente cria <code>AGENTS.md</code>, <code>wiki/index.md</code>, <code>wiki/log.md</code> e taxonomia.</span></div>
+      <div class="step"><b>4. Validação</b><span>Backend confirma ficheiros essenciais e escreve log global de inicialização.</span></div>
+      <div class="step"><b>5. Disponível ao admin</b><span>Estado <code>awaiting_sources</code>; upload aparece. Ainda invisível no chat.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Rollback</div>
+    <h2>Falha de inicialização reverte tudo</h2>
+    <div class="panel">
+      <ul>
+        <li>Se o agente falha antes de completar a inicialização, a criação é revertida.</li>
+        <li>O directório temporário da especialidade é removido ou movido para quarentena técnica.</li>
+        <li>Nenhuma especialidade parcialmente inicializada aparece ao admin como editável.</li>
+        <li>O log global de inicialização falhada é preservado em <code>&lt;UJIMU_DATA_DIR&gt;/logs/agents/</code>.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Estados</div>
+    <h2>Ciclo visível ao admin</h2>
+    <div class="grid three">
+      <div class="panel"><p><span class="kicker"><code>initializing</code></span><br/>Job de criação em curso.</p></div>
+      <div class="panel"><p><span class="kicker"><code>awaiting_sources</code></span><br/>Wiki pronta; upload permitido.</p></div>
+      <div class="panel"><p><span class="kicker"><code>ingesting</code></span><br/>Conversão/ingestão em curso.</p></div>
+      <div class="panel"><p><span class="kicker"><code>active</code></span><br/>Pelo menos uma fonte ingerida.</p></div>
+      <div class="panel"><p><span class="kicker"><code>suspended</code></span><br/>Ocultada manualmente.</p></div>
+      <div class="panel"><p><span class="kicker"><code>failed</code></span><br/>Falha recuperável visível ao admin.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Ingestão</div>
+    <h2>Sessão única, fontes sequenciais</h2>
+    <div class="panel">
+      <ul>
+        <li>Backend calcula fontes pendentes em <code>ingest/state.json</code> e só passa Markdown elegível em <code>raw/</code>.</li>
+        <li>O agente lê <code>AGENTS.md</code> e processa cada fonte sequencialmente, mantendo o ritual LLM Wiki.</li>
+        <li>O agente actualiza <code>wiki/</code>, <code>wiki/index.md</code> e <code>wiki/log.md</code>.</li>
+        <li>O agente não lê nem escreve <code>ingest/state.json</code>.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Manifesto</div>
+    <h2>Handoff estruturado para o backend</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Duplo canal.</span> O agente devolve manifesto como output final e escreve também <code>.ujimu/ingestion-manifest.json</code>.</p></div>
+      <div class="panel"><p><span class="kicker">Conteúdo.</span> Fontes ingeridas, fontes falhadas, páginas wiki criadas/alteradas, citações permitidas, erros e avisos.</p></div>
+      <div class="panel"><p><span class="kicker">Validação.</span> Backend cruza manifesto com fontes pendentes, ficheiros realmente existentes e regras de citação.</p></div>
+      <div class="panel"><p><span class="kicker">Persistência.</span> Só o manifesto validado enriquece <code>ingest/state.json</code>.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Estado operacional</div>
+    <h2><code>state.json</code> enriquecido, mas não uma wiki</h2>
+    <div class="panel">
+      <ul>
+        <li>Guarda estado por fonte, checksums, erros, páginas wiki tocadas, citações permitidas e caminhos de logs/manifestos.</li>
+        <li>Serve como fonte backend-owned da allowlist de citações.</li>
+        <li>Não guarda texto integral das fontes, conteúdo completo da wiki ou raciocínio do agente.</li>
+        <li>É um índice operacional e auditável, não uma segunda base de conhecimento.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Chat e citações</div>
+    <h2>Envelope técnico mínimo</h2>
+    <div class="panel">
+      <ul>
+        <li>O comportamento substantivo vive no <code>AGENTS.md</code> da especialidade.</li>
+        <li>O backend não injecta instruções editoriais de resposta.</li>
+        <li>O backend passa só pergunta, especialista, allowlist de citações e formato técnico de eventos.</li>
+        <li>O backend valida: resposta fundamentada exige citação permitida; citações fora da allowlist são rejeitadas.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Auditoria</div>
+    <h2>Logs globais por sessão</h2>
+    <div class="panel">
+      <ul>
+        <li>Directório: <code>&lt;UJIMU_DATA_DIR&gt;/logs/agents/</code>.</li>
+        <li>Formato: <code>YYYY-MM-DDTHH-mm-ss-SSSZ-[specialist_id]-[initialization|conversion|ingestion].log</code>.</li>
+        <li>Conteúdo legível: mensagens, raciocínio visível, chamadas a tools, respostas de tools, ficheiros tocados, resumo final.</li>
+        <li>Raciocínio oculto/encriptado é marcado como indisponível se não houver forma legítima de o tornar legível.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Para decidir</div>
+    <h2>Pontos de arquitectura ainda abertos</h2>
+    <div class="panel">
+      <ul>
+        <li>Directório exacto de staging para criação transaccional.</li>
+        <li>Política quando output final e ficheiro de manifesto divergem.</li>
+        <li>Formato exacto do manifesto e limites de validação de <code>articleRefs</code>.</li>
+        <li>Como mostrar progresso e logs no admin sem expor dados sensíveis.</li>
+        <li>Quando verificar documentação oficial Pi antes de implementar alterações no SDK/session events.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">11</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let idx = 0;
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', total);
+    function go(next) {
+      slides[idx].classList.remove('active');
+      idx = Math.max(0, Math.min(next, total - 1));
+      slides[idx].classList.add('active');
+      document.getElementById('current').textContent = String(idx + 1);
+      document.body.style.setProperty('--idx', idx);
+    }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); }
+      if (event.key === 'ArrowLeft') go(idx - 1);
+    });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>

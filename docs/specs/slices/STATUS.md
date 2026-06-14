@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-06-11
+Last updated: 2026-06-13
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,12 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 36 assistant response copy work:
+Latest full verification after the specialist initialization prompt and wiki-root fix:
 
-- `npm test` — passed, 141 tests
+- `npm test` — passed, 177 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit --audit-level=high` — passed, 0 vulnerabilities
+- Dependency audit note: a new upstream `esbuild` advisory appeared during prior verification; resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin.
 - Chrome DevTools browser check — passed: `/admin`, `/admin/analytics`, and `/admin/ops` render the expected route-specific unauthenticated/admin-blocking surfaces; console output has no errors or warnings beyond Nuxt development info logs.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
@@ -87,6 +88,274 @@ Known non-blocking warnings:
 | 34 | [`34-corporate-specialist-management-api.html`](./34-corporate-specialist-management-api.html) | `verified` | 2026-06-11 | Corporate admin specialist-management API for prompt and source upload without ingestion. |
 | 35 | [`35-corporate-specialist-management-ui.html`](./35-corporate-specialist-management-ui.html) | `verified` | 2026-06-11 | Corporate admin specialist-management UI for prompt, source upload, and source states. |
 | 36 | [`36-copy-assistant-response-with-sources.html`](./36-copy-assistant-response-with-sources.html) | `verified` | 2026-06-11 | In-chat copy action for assistant responses including citations. |
+| 37 | [`37-agent-session-audit-log-foundation.html`](./37-agent-session-audit-log-foundation.html) | `verified` | 2026-06-12 | Global human-readable agent session logs for initialization, conversion, and ingestion. |
+| 38 | [`38-transactional-specialist-initialization.html`](./38-transactional-specialist-initialization.html) | `verified` | 2026-06-12 | Background transactional specialist initialization with agent-owned `AGENTS.md`/`wiki/` and backend rollback. |
+| 39 | [`39-batch-ingestion-manifest-state.html`](./39-batch-ingestion-manifest-state.html) | `verified` | 2026-06-12 | Batch ingestion session, dual-channel manifest, backend validation, and enriched `ingest/state.json`. |
+| 40 | [`40-state-driven-citations-minimal-chat-envelope.html`](./40-state-driven-citations-minimal-chat-envelope.html) | `verified` | 2026-06-12 | State-driven citation allowlist and minimal chat envelope with behaviour in specialist `AGENTS.md`. |
+| 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
+
+## Agent-managed specialist wiki extension
+
+Status: `verified`
+
+Approved originating decks:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Planning decisions:
+
+- Create specialists through a transactional background initialization job.
+- Backend owns `specialist.yaml`, `raw/`, `ingest/state.json`, states, jobs, validation, and rollback.
+- Agent initialization generates the specialist wiki instructions and seed files while the backend owns `specialist.yaml`, `raw/`, `ingest/state.json`, states, jobs, validation, and rollback.
+- `system_prompt` is optional; substantive behaviour and citation discipline live in the specialist `AGENTS.md`.
+- Admin may create a specialist without an initial source; upload is enabled only after wiki initialization.
+- A specialist becomes chat-visible only after at least one source is ingested successfully.
+- Ingestion runs as one batch session over pending Markdown sources while preserving the LLM Wiki ritual per source.
+- Ingestion produces a dual-channel manifest: final structured output and `.ujimu/ingestion-manifest.json`.
+- Backend validates the manifest before enriching `ingest/state.json`; `state.json` remains an operational index, not a second wiki.
+- Citation allowlists come from backend-owned state, not directly from agent prose.
+- Global agent logs live under `<UJIMU_DATA_DIR>/logs/agents/` using ISO-safe filenames for `initialization`, `conversion`, and `ingestion` sessions.
+- Chat prompt injection is limited to the technical envelope: user question, selected specialist, citation allowlist, and event format.
+- Before implementing Pi SDK event/log behaviour, consult the official Pi documentation and current SDK API.
+
+Implemented order:
+
+1. Slice 37 added the global human-readable agent session logging foundation.
+2. Slice 38 added transactional specialist initialization and rollback.
+3. Slice 39 added batch ingestion manifests and state enrichment.
+4. Slice 40 moved chat citations to enriched state and minimized backend prompt injection.
+5. Slice 41 exposed the workflow in admin UI/API with progress, upload gating, logs, and retry.
+
+## Slice 37 — Agent session audit log foundation
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Refinement decisions:
+
+- Build the audit foundation before transactional initialization.
+- Keep logs as simple global files under `<UJIMU_DATA_DIR>/logs/agents/`; do not add a database table or admin UI in this slice.
+- Use a common logger module plus `createUjimuPiSession()` attachment so Pi initialization, conversion, and ingestion sessions inherit the foundation.
+- Log complete assistant text and useful tool call/result payloads, with sensitive strings redacted and long text truncated.
+
+Grill decisions:
+
+- Use ISO-safe filenames: `YYYY-MM-DDTHH-mm-ss-SSSZ-[specialist_id]-[initialization|conversion|ingestion].log`.
+- Redact sensitive strings such as email addresses, bearer/JWT tokens, API-key-like strings, and phone numbers.
+- Redact sensitive object keys such as `apiKey`, `secret`, `token`, `password`, `cookie`, and `session`.
+- Never write `thinking_delta` or `toolcall_delta` entries; they are noisy and do not help audit the final action.
+- Record `tool_call` with tool arguments and `tool_result` with the final redacted result content.
+- Chat sessions remain out of scope for this audit-log foundation.
+
+Acceptance-test plan:
+
+- Add `tests/agent-session-logs.acceptance.test.ts` to verify log path format, header content, complete assistant text, tool arguments/results, redaction, and noisy-delta suppression.
+- Confirmed initial RED with `npm test -- tests/agent-session-logs.acceptance.test.ts --reporter=verbose` before `server/utils/agents/logs.ts` existed.
+- Confirmed correction RED when the live logs still contained `text_delta`/`thinking_delta` noise and omitted tool arguments/results.
+
+Implementation:
+
+- Added `server/utils/agents/logs.ts` with `createAgentSessionLogger()`, path helpers, useful event formatting, redaction, truncation, and safe close handling.
+- Added optional `agentLog` attachment to `server/utils/pi/session.ts`, based on Pi SDK `session.subscribe()` events.
+- Attached logs to Pi-backed initialization, conversion, and ingestion sessions, closing them as `succeeded`, `failed`, or `aborted` as appropriate.
+- Did not change `ingest/state.json`, chat behaviour, or admin UI.
+
+Verification:
+
+- `npm test -- tests/agent-session-logs.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 175 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
+
+## Slice 38 — Transactional specialist initialization
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Refinement decisions:
+
+- Keep `createSpecialist()` available as the internal filesystem utility for existing tests and admin/system setup.
+- Change the admin creation endpoint to create specialists in `initializing` and return `202 Accepted` with both `specialist` and `job`.
+- Add `specialist_initialization` to the recoverable background job system instead of creating a second job framework.
+- Keep upload gating and rich admin progress UI for Slice 41; this slice exposes enough state/API for the workflow.
+
+Grill decisions:
+
+- `system_prompt` is optional; absent prompts normalize to an empty string and are omitted from YAML when empty.
+- Supported statuses are now `initializing`, `awaiting_sources`, `ingesting`, `active`, `suspended`, and `failed`.
+- Public specialist access only accepts `active`; newly created `initializing` and post-init `awaiting_sources` specialists stay hidden from chat selection.
+- The initialization agent can write only within the initialization workspace; backend still owns `specialist.yaml`, `raw/`, `ingest/state.json`, jobs, states, validation, and rollback.
+- Successful initialization requires root `AGENTS.md`, plus `wiki/index.md` and `wiki/log.md`.
+- Initialization failure rolls back the specialist directory and leaves the background job failed for audit/retry visibility.
+
+Acceptance-test plan:
+
+- Add `tests/specialist-initialization.acceptance.test.ts` for admin creation, job completion, rollback, optional prompt loading, and public hiding of non-active states.
+- Update admin/access/db tests for the new `202 + job` contract and background job migration.
+- Confirmed RED before implementation: new statuses, optional prompt, and initialization job behaviour were missing.
+
+Implementation:
+
+- Added `server/utils/specialists/initialization.ts` with a mockable runner contract, Pi SDK runner, timeout handling, and minimum-output validation.
+- Added `specialist_initialization` jobs to `server/utils/jobs/background.ts`.
+- Added database migration `0013_specialist_initialization_jobs` and widened fresh `background_jobs` creation.
+- Updated specialist schema for optional prompt and new statuses.
+- Updated admin specialist creation to enqueue initialization, return `202`, record audit metadata, schedule the worker, and rollback if enqueueing fails.
+- Updated public access to hide every non-`active` specialist.
+
+Verification:
+
+- `npm test -- tests/specialist-initialization.acceptance.test.ts tests/db.test.ts tests/admin.acceptance.test.ts --reporter=verbose` — passed.
+- `npm test` — passed, 166 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
+
+## Slice 39 — Batch ingestion manifest state
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Refinement decisions:
+
+- Add batch ingestion via `ingestSources()` while keeping `ingestSource()` for legacy tests and compatible runners.
+- The backend validates the manifest before committing enriched state.
+- Enriched state lives under each source's `ingestion` field: `wiki_pages`, `citations`, `warnings`, and `manifest_validated_at`.
+- Invalid manifests restore the prior pending source records rather than leaving sources failed or processing.
+
+Grill decisions:
+
+- A valid manifest must mention every pending source exactly once, either in `ingested` or `failed`.
+- Manifest `specialist_id` must match the selected specialist.
+- Successful entries must reference existing relative Markdown pages under `wiki/`.
+- Successful citations must use `source_file: raw/<raw_path>` and non-empty article references.
+- A first successful ingestion publishes non-suspended/non-active specialists as `active`.
+- Partial failures mark only the failed sources failed; successful sources remain ingested and publish/keep the specialist active.
+
+Acceptance-test plan:
+
+- Add `tests/batch-ingestion-manifest.acceptance.test.ts` for one-call batch ingestion, enriched state, first-success publication, partial failures, and invalid-manifest rollback.
+- Confirmed RED before implementation: batch callback was not invoked, manifests were ignored, and invalid manifests did not reject safely.
+
+Implementation:
+
+- Added ingestion manifest types to `server/utils/ingestion/types.ts`.
+- Added Pi SDK batch ingestion in `server/utils/ingestion/pi-runner.ts`, including `.ujimu/ingestion-manifest.json` and final-output comparison.
+- Updated `server/utils/ingestion/run.ts` to prefer `ingestSources()`, validate manifests, enrich state, support partial failures, publish successful first ingestions, and preserve legacy single-source fallback.
+- Kept backend ownership of `ingest/state.json`; the agent only returns/writes the manifest.
+
+Verification:
+
+- `npm test -- tests/batch-ingestion-manifest.acceptance.test.ts tests/ingestion.acceptance.test.ts tests/pi-agent-pipeline.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 169 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
+
+## Slice 40 — State-driven citations and minimal chat envelope
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Refinement decisions:
+
+- Citation evidence comes only from validated `ingestion.citations` in backend-owned `ingest/state.json`.
+- Legacy source metadata (`title`, `article_refs`) no longer creates chat allowlist evidence by itself.
+- The chat prompt no longer injects specialist `system_prompt`; specialist behaviour belongs in the specialist `AGENTS.md` generated during initialization.
+- The backend prompt contains only technical envelope data: selected specialist identity, user question, conversation context, backend citation allowlist, and NDJSON protocol.
+
+Grill decisions:
+
+- Ingested sources without validated citation metadata are treated as unusable for grounded chat.
+- Existing backend citation filtering remains the final authority for live runner events and non-streaming runner results.
+- The safe insufficient-context path remains the behaviour when no validated citation evidence exists.
+- The Pi chat system prompt override keeps only technical runtime constraints and no broad editorial answer rules.
+
+Acceptance-test plan:
+
+- Add `tests/state-driven-citations.acceptance.test.ts` for enriched-state citations, rejection of sources without validated citations, and minimal chat prompt contents.
+- Update chat/history/analytics fixtures so successful grounded chat tests seed validated citation metadata.
+- Confirmed RED before implementation: citation evidence still used legacy source metadata and the prompt still injected `system_prompt` plus broad rules.
+
+Implementation:
+
+- Updated `server/utils/chat/citations.ts` and `server/utils/chat/context.ts` to build citation evidence from `ingestion.citations`.
+- Updated `server/utils/chat/pi-runner.ts` to remove specialist prompt injection and broad response rules from the chat prompt.
+- Kept backend filtering of emitted citations against the exact allowlist.
+- Updated tests that require grounded chat to seed validated citations.
+
+Verification:
+
+- `npm test -- tests/state-driven-citations.acceptance.test.ts tests/chat.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 172 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
+
+## Slice 41 — Admin agent workflow progress and recovery
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-managed-specialist-wiki.html`](../brainstorm-agent-managed-specialist-wiki.html)
+- [`../agent-managed-specialist-wiki-architecture.html`](../agent-managed-specialist-wiki-architecture.html)
+
+Refinement decisions:
+
+- Upload gating must be enforced in backend endpoints, not only in UI.
+- Raw source upload is allowed for `awaiting_sources`, `active`, and `suspended` specialists.
+- Raw source upload is blocked for `initializing`, `ingesting`, and `failed` specialists.
+- Admin specialist payloads include summarized global agent logs for initialization, conversion, and ingestion sessions.
+- This slice exposes log metadata only; it does not add public or admin download/read endpoints for log file contents.
+
+Grill decisions:
+
+- The retry control reuses the existing ingestion run endpoint instead of adding a new retry endpoint.
+- Existing wiki content is not deleted by retrying failed sources.
+- Company-admin raw uploads follow the same readiness gate as global admin uploads.
+- The UI should explain why upload is blocked while initialization/ingestion/failure states are active.
+
+Acceptance-test plan:
+
+- Add `tests/admin-agent-workflow.acceptance.test.ts`.
+- Confirm RED before implementation: upload was not state-gated, admin payload lacked `agent_logs`, and the detail page lacked the new workflow markers.
+- Verify upload rejection leaves raw storage untouched before initialization completes.
+- Verify global log filenames are parsed into task and start timestamp metadata.
+
+Implementation:
+
+- Added `listAgentSessionLogs()` to `server/utils/agents/logs.ts`.
+- Added `agent_logs` to admin specialist payloads in `server/utils/admin/specialists.ts`.
+- Added `canUploadRawSources()` and enforced it in admin and company raw upload endpoints.
+- Updated `pages/admin/specialists/[id].vue` with workflow status badges/messages, upload gating, agent log list, and retry button.
+- Updated `utils/admin-ui.ts` with `AgentSessionLogSummary` and `agent_logs` payload typing.
+
+Verification:
+
+- `npm test -- tests/admin-agent-workflow.acceptance.test.ts --reporter=verbose` — passed.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 175 tests.
+- `npm run build` — passed with existing warnings.
+- `npm audit --audit-level=high` — passed, 0 vulnerabilities.
 
 ## Chat message actions extension
 

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainstorm — Inicialização e ingestão wiki por agente</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg: #11110f; --panel: #1b1b17; --panel-2: #24241f; --text: #f4f1e8; --muted: #a8a393; --line: #38362f; --accent: #f7ce1b; --danger: #e5736c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: radial-gradient(circle at top right, rgba(247,206,27,.18), transparent 32%), var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
+    .slide { width: 100vw; height: 100vh; display: none; padding: 8vh 12vw; align-items: center; justify-content: center; }
+    .slide.active { display: flex; }
+    .frame { width: min(1100px, 100%); }
+    h1, h2 { letter-spacing: -.03em; line-height: 1.05; }
+    h1 { font-size: clamp(2.8rem, 6vw, 5.8rem); font-weight: 700; margin: 0 0 1.2rem; }
+    h2 { font-size: clamp(2rem, 4vw, 3.6rem); font-weight: 700; margin: 0 0 1.4rem; }
+    p, li { font-size: clamp(1.02rem, 1.5vw, 1.25rem); color: var(--muted); line-height: 1.55; }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .12em; font-size: .82rem; margin-bottom: 1rem; }
+    .panel { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 24px; padding: 1.4rem; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .kicker { color: var(--text); font-weight: 600; }
+    code { font-family: 'IBM Plex Mono', monospace; color: var(--accent); }
+    .pill { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--line); border-radius: 999px; padding: .35rem .7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: .82rem; }
+    .warn { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+    .counter { position: fixed; right: 2rem; bottom: 1.5rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: .85rem; }
+    .bar { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--accent); width: calc((var(--idx) + 1) / var(--total) * 100%); transition: width .2s ease; }
+    @media print { body { overflow: auto; } .slide { display: flex; page-break-after: always; } .counter, .bar { display: none; } }
+  </style>
+</head>
+<body style="--idx: 0; --total: 14;">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Brainstorm vivo · Zafir</div>
+    <h1>Especialistas com wiki gerida por agente</h1>
+    <p>Refinar a mudança de fluxo: criação de especialidade → inicialização LLM Wiki por agente → conversão/ingestão auditáveis.</p>
+    <div class="pill">docs/specs/brainstorm-agent-managed-specialist-wiki.html</div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Objectivo actual</div>
+    <h2>Dar mais responsabilidade ao agente sem perder controlo</h2>
+    <div class="panel">
+      <p><span class="kicker">Ideia central:</span> o backend cria a especialidade mínima e pede ao agente para inicializar a estrutura LLM Wiki e o <code>AGENTS.md</code>, usando defaults quando a especificação não for completa.</p>
+      <p><span class="kicker">Valor esperado:</span> wikis mais consistentes com o padrão LLM Wiki, menos lógica rígida no backend, e melhor rastreabilidade por logs de sessão.</p>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Contexto governante verificado</div>
+    <h2>Estado do repositório</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Sem <code>docs/wiki/</code>.</span> Não há wiki de projecto a consultar nesta fase.</p></div>
+      <div class="panel"><p><span class="kicker">AGENTS.md do projecto.</span> Especialistas vivem em directórios, têm <code>specialist.yaml</code>, <code>raw/</code>, <code>wiki/</code>, <code>ingest/state.json</code>.</p></div>
+      <div class="panel"><p><span class="kicker">LLM Wiki skill.</span> Inicialização deve criar schema, <code>wiki/index.md</code>, <code>wiki/log.md</code>, taxonomia e ritual por preset.</p></div>
+      <div class="panel"><p><span class="kicker">Pi como dependência.</span> Detalhes de integração devem continuar alinhados com documentação oficial antes da implementação.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Fluxo actual</div>
+    <h2>O backend estrutura quase tudo</h2>
+    <div class="panel">
+      <ul>
+        <li><code>createSpecialist()</code> cria <code>raw/</code>, <code>wiki/</code>, <code>ingest/</code>, <code>state.json</code> e <code>specialist.yaml</code>.</li>
+        <li>A ingestão actual manda o agente ingerir uma fonte Markdown específica.</li>
+        <li>A conversão pode ser por ferramentas dedicadas ou sessão Pi, mas a auditoria humana ainda não é o artefacto principal.</li>
+        <li>O debug Pi actual é orientado a eventos JSON, não a leitura humana.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Fluxo proposto</div>
+    <h2>O agente inicializa e opera o workspace</h2>
+    <div class="panel">
+      <ul>
+        <li>Backend cria directório da especialidade e <code>specialist.yaml</code>.</li>
+        <li>Backend chama sessão de gestão/inicialização no <code>cwd</code> da especialidade.</li>
+        <li>Prompt: “Inicializa um LLM Wiki…” com nome, preset, uso, fontes e descrição.</li>
+        <li>Agente cria estrutura, <code>AGENTS.md</code>, <code>wiki/index.md</code>, <code>wiki/log.md</code> e subdirectórios.</li>
+        <li>Ingestão posterior: “Faz a ingestão das fontes em <code>raw</code> ainda não ingeridas”.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Hipóteses e tensões</div>
+    <h2>O desenho precisa de fronteiras claras</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Autonomia.</span> Mais simples e flexível, mas menos determinístico.</p></div>
+      <div class="panel"><p><span class="kicker">Segurança.</span> O agente deve poder escrever <code>AGENTS.md</code> e <code>wiki/</code>, mas não tocar em <code>raw/</code> sem autorização.</p></div>
+      <div class="panel"><p><span class="kicker">Estados.</span> O backend continua a precisar de saber o que ficou pendente, convertido, ingerido ou falhado.</p></div>
+      <div class="panel warn"><p><span class="kicker">Pensamento do agente.</span> Logs devem ser auditáveis, mas não devem expor raciocínio oculto/encriptado nem dados sensíveis.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões confirmadas</div>
+    <h2>Contrato de criação e ingestão</h2>
+    <div class="panel">
+      <ul>
+        <li>A especialidade pode ser criada sem fonte inicial, mas fica invisível no chat até haver pelo menos uma fonte ingerida.</li>
+        <li>O <code>system_prompt</code> do especialista passa a opcional; o comportamento principal fica no <code>AGENTS.md</code> da especialidade.</li>
+        <li>A opção de upload de fonte só fica disponível ao admin depois de o wiki estar inicializado.</li>
+        <li>Se a inicialização agente falhar, o backend reverte a criação inteira.</li>
+        <li><code>ingest/state.json</code> é responsabilidade exclusiva do backend; o agente não o lê nem escreve.</li>
+        <li>A ingestão pendente corre numa sessão única para todas as fontes elegíveis.</li>
+        <li>Os logs globais vivem em <code>&lt;UJIMU_DATA_DIR&gt;/logs/agents/</code>.</li>
+        <li>Há logs por sessão de inicialização, conversão e ingestão.</li>
+        <li>Os ficheiros de log usam ISO seguro para ficheiros: <code>YYYY-MM-DDTHH-mm-ss-SSSZ-[specialist_id]-[initialization|conversion|ingestion].log</code>.</li>
+        <li>Estados de admin: <code>initializing</code>, <code>awaiting_sources</code>, <code>ingesting</code>, <code>active</code>, <code>suspended</code>, <code>failed</code>.</li>
+        <li>Na primeira ingestão, basta uma fonte ingerida com sucesso para publicar a especialidade; fontes falhadas ficam registadas para retry.</li>
+        <li>Em ingestões posteriores, falhas parciais não retiram a especialidade de <code>active</code>; ficam registadas para retry/admin review.</li>
+        <li>Os logs mostram raciocínio visível, chamadas a tools, respostas das tools e marcam raciocínio encriptado/oculto quando não for decifrável.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Variações a considerar</div>
+    <h2>Quatro formas de dar autonomia ao agente</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">A. Inicialização bloqueante.</span> O pedido de criação só responde quando a wiki está pronta. Simples, mas frágil em timeouts.</p></div>
+      <div class="panel"><p><span class="kicker">B. Job transaccional.</span> Cria em estado privado, corre init+ingestão em background, publica apenas quando passa. Melhor UX admin.</p></div>
+      <div class="panel"><p><span class="kicker">C. Agente só de wiki.</span> Backend gere estados e fontes; agente gere <code>AGENTS.md</code> e <code>wiki/</code>. Fronteira limpa.</p></div>
+      <div class="panel"><p><span class="kicker">D. Auditoria primeiro.</span> Cada sessão produz log humano normalizado antes de actualizar estado. Mais seguro, mais trabalho.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Direcção convergida</div>
+    <h2>Job transaccional + fronteira backend/agente + auditoria</h2>
+    <div class="panel">
+      <ul>
+        <li>O backend inicia um job em background para criar a especialidade até ao estado inicializado.</li>
+        <li>O backend gere <code>specialist.yaml</code>, <code>raw/</code>, <code>ingest/state.json</code>, estados, jobs e rollback.</li>
+        <li>O agente gere apenas o workspace LLM Wiki: <code>AGENTS.md</code> e <code>wiki/</code>.</li>
+        <li>O comportamento de resposta e citação deve ser incorporado organicamente no <code>AGENTS.md</code> durante a inicialização.</li>
+        <li>Após inicialização, o admin pode carregar fontes; a publicação no chat exige pelo menos uma ingestão bem-sucedida.</li>
+        <li>Todas as sessões de inicialização, conversão e ingestão produzem logs globais auditáveis em formato legível.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Prompt e citações</div>
+    <h2>Menos injecção, mais contrato no workspace</h2>
+    <div class="panel">
+      <ul>
+        <li>O admin pode fornecer <code>system_prompt</code>, mas já não é obrigatório.</li>
+        <li>O backend não deve injectar instruções amplas de resposta no chat.</li>
+        <li>Instruções de citação e fundamentação devem ser dadas ao agente de inicialização para serem escritas no <code>AGENTS.md</code>.</li>
+        <li>O backend continua responsável por validar que respostas substantivas têm citações permitidas e fonte rastreável.</li>
+        <li>Separação confirmada: o backend só fornece envelope técnico — pergunta, especialista, allowlist de citações e formato de eventos.</li>
+        <li>Qualquer prompt técnico remanescente deve limitar-se a protocolo/segurança, não a estilo ou conteúdo de resposta.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Compatibilidade LLM Wiki</div>
+    <h2>Manifesto não substitui a ingestão</h2>
+    <div class="panel">
+      <ul>
+        <li>O skill LLM Wiki exige ler o schema <code>AGENTS.md</code>, ler fontes completamente, actualizar páginas relevantes, <code>wiki/index.md</code> e <code>wiki/log.md</code>.</li>
+        <li>O <code>llm-wiki</code> em <code>~/.agents/skills</code> tem as mesmas instruções base de inicialização/operação.</li>
+        <li>A cópia embutida em Ujimu só adiciona o override: ingerir apenas Markdown em <code>raw/</code>; fontes não Markdown passam primeiro pela conversão.</li>
+        <li>A sessão única em lote deve processar cada fonte pendente sequencialmente, mantendo o ritual LLM Wiki por fonte.</li>
+        <li>O manifesto é um relatório estruturado adicional para o backend actualizar <code>state.json</code>; não substitui <code>wiki/log.md</code> nem páginas de fonte.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Estado backend vs ingestão agente</div>
+    <h2>Como o <code>state.json</code> aprende o que foi ingerido?</h2>
+    <div class="panel">
+      <ul>
+        <li>Problema identificado: se o agente escreve o wiki, o backend precisa de uma saída estruturada para actualizar <code>ingest/state.json</code>.</li>
+        <li>Decisão: o agente deve devolver o manifesto como output final e também escrevê-lo num ficheiro temporário controlado.</li>
+        <li>O backend valida o manifesto contra <code>raw/</code>, ficheiros realmente modificados em <code>wiki/</code> e regras de citação.</li>
+        <li>Só depois da validação o backend actualiza <code>ingest/state.json</code>.</li>
+        <li><code>state.json</code> pode ser enriquecido com metadados operacionais validados, mas não vira uma segunda wiki.</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Questões abertas</div>
+    <h2>Antes de desenhar fatias</h2>
+    <div class="panel">
+      <ul>
+        <li>Que eventos Pi podem ser decifrados tecnicamente e quais devem ficar marcados como ocultos?</li>
+      </ul>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Registo de iteração</div>
+    <h2>Iterações 1–10</h2>
+    <div class="panel">
+      <p><span class="kicker">Iteração 1:</span> substituir o workflow rígido por inicialização/ingestão conduzidas por agente, com <code>AGENTS.md</code> por especialidade e logs human-readable por sessão.</p>
+      <p><span class="kicker">Iteração 2:</span> especialidade só consultável após inicialização e uma ingestão; falha de init reverte tudo; <code>state.json</code> fica no backend; ingestão em sessão única; logs expõem apenas raciocínio visível ou marcam ocultação.</p>
+      <p><span class="kicker">Idea-refine:</span> variações registadas: init bloqueante, job transaccional, agente só de wiki, auditoria primeiro.</p>
+      <p><span class="kicker">Iteração 3:</span> direcção convergida para job transaccional em background, com backend dono dos estados/rollback e agente dono apenas do wiki.</p>
+      <p><span class="kicker">Iteração 4:</span> criação pode ocorrer sem fonte; upload fica disponível só após inicialização do wiki; publicação no chat continua dependente de ingestão bem-sucedida.</p>
+      <p><span class="kicker">Iteração 5:</span> logs auditáveis são globais em <code>&lt;UJIMU_DATA_DIR&gt;/logs/agents/</code> e incluem sessões de inicialização, conversão e ingestão.</p>
+      <p><span class="kicker">Iteração 6:</span> nomes de log usam ISO seguro para ficheiros, sem <code>:</code> nem <code>.</code>.</p>
+      <p><span class="kicker">Iteração 7:</span> estados de admin aceites: <code>initializing</code>, <code>awaiting_sources</code>, <code>ingesting</code>, <code>active</code>, <code>suspended</code>, <code>failed</code>.</p>
+      <p><span class="kicker">Iteração 8:</span> primeira ingestão publica a especialidade se pelo menos uma fonte for ingerida; falhas parciais ficam em <code>state.json</code> para retry.</p>
+      <p><span class="kicker">Iteração 9:</span> falhas parciais em ingestões posteriores mantêm a especialidade <code>active</code>; as fontes falhadas ficam para retry/admin review.</p>
+      <p><span class="kicker">Iteração 10:</span> <code>system_prompt</code> torna-se opcional; instruções de resposta/citação passam para o <code>AGENTS.md</code> inicializado pelo agente; backend conserva apenas validação/protocolo mínimo.</p>
+      <p><span class="kicker">Iteração 11:</span> separação aceite: backend envia apenas envelope técnico de chat; comportamento substantivo vive no <code>AGENTS.md</code>.</p>
+      <p><span class="kicker">Iteração 12:</span> questão levantada: como o backend actualiza <code>state.json</code> se o agente faz a ingestão; direcção proposta é manifesto estruturado validado pelo backend.</p>
+      <p><span class="kicker">Iteração 13:</span> verificação do LLM Wiki: manifesto é compatível se for relatório adicional, mantendo leitura de <code>AGENTS.md</code>, ingestão completa por fonte, <code>wiki/index.md</code> e <code>wiki/log.md</code>.</p>
+      <p><span class="kicker">Iteração 14:</span> comparação com <code>~/.agents/skills/llm-wiki</code>: instruções base coincidem; Ujimu só acrescenta o override de ingerir Markdown em <code>raw/</code>.</p>
+      <p><span class="kicker">Iteração 15:</span> manifesto de ingestão decidido como duplo canal: output final estruturado e ficheiro temporário controlado, para robustez.</p>
+      <p><span class="kicker">Iteração 16:</span> <code>state.json</code> será enriquecido apenas como índice operacional validado: páginas wiki tocadas, citações permitidas, manifesto/log associados e erros.</p>
+      <p><span class="kicker">Próximo passo:</span> fechar o brainstorming e avançar para arquitectura após aprovação explícita do deck.</p>
+    </div>
+  </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">14</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let idx = 0;
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', total);
+    function go(next) {
+      slides[idx].classList.remove('active');
+      idx = Math.max(0, Math.min(next, total - 1));
+      slides[idx].classList.add('active');
+      document.getElementById('current').textContent = String(idx + 1);
+      document.body.style.setProperty('--idx', idx);
+    }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); }
+      if (event.key === 'ArrowLeft') go(idx - 1);
+    });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>
