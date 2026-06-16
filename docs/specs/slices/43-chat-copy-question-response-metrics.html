@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slice 43 — Copiar pergunta e métricas da resposta</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap');
+    :root { --bg:#080806; --panel:#15130d; --text:#fffaf0; --muted:#c9c0a8; --accent:#f9d616; --line:rgba(255,255,255,.14); }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 20% 0%, rgba(249,214,22,.18), transparent 32%), var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 12vw; }
+    .slide.active { display:flex; }
+    .panel { width:min(1080px, 100%); border:1px solid var(--line); border-radius:28px; padding:46px; background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow:0 24px 90px rgba(0,0,0,.45); }
+    h1 { margin:0 0 18px; font-size:clamp(2.4rem, 5vw, 5.2rem); line-height:.92; letter-spacing:-.06em; font-weight:900; }
+    h2 { margin:0 0 22px; font-size:clamp(2rem, 4vw, 3.7rem); line-height:.95; letter-spacing:-.055em; font-weight:900; }
+    p, li { color:var(--muted); font-size:1.15rem; line-height:1.45; }
+    ul { display:grid; gap:12px; margin:0; padding-left:1.25rem; }
+    code { color:#fff6b8; font-family:'JetBrains Mono', monospace; }
+    .kicker { color:var(--accent); text-transform:uppercase; letter-spacing:.18em; font-weight:900; font-size:.78rem; margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { border:1px solid var(--line); border-radius:20px; padding:20px; background:rgba(0,0,0,.2); }
+    .badge { display:inline-flex; border:1px solid rgba(249,214,22,.45); border-radius:999px; padding:6px 10px; color:#fff6b8; background:rgba(249,214,22,.12); font-weight:800; margin-bottom:10px; }
+    .counter { position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:800; }
+    @media print { body { overflow:visible; } .slide { display:flex; page-break-after:always; } .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="panel"><div class="kicker">Corte 43</div><h1>Copiar pergunta e métricas da resposta</h1><p>Um corte único para acrescentar a cópia de perguntas e a linha de duração/tokens da resposta mais recente.</p></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Origem</div><h2>Especificações aprovadas</h2><ul><li>Brainstorm: <code>../brainstorm-chat-copy-and-response-metrics.html</code>.</li><li>Arquitectura: <code>../chat-copy-and-response-metrics-architecture.html</code>.</li><li>Arquitectura global não reaberta; usar a base actual.</li><li>Sem <code>docs/wiki/</code>; o contexto governante vem do repositório.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Ideia</div><h2>Valor para o utilizador</h2><ul><li>O utilizador pode copiar a pergunta sem seleccionar texto manualmente.</li><li>A conversa ganha transparência sobre quanto demorou a resposta.</li><li>Quando o fornecedor disponibilizar metadados fiáveis, a resposta mostra tokens.</li><li>O histórico não ganha dados efémeros que o produto decidiu não guardar.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Escopo</div><h2>Incluído</h2><ul><li>Botão de copiar pergunta em mensagens do utilizador.</li><li>Evento opcional <code>metrics</code> no contrato interno de fluxo.</li><li>Medição no cliente desde envio até <code>done</code>.</li><li>Renderização só na resposta concluída mais recente da sessão.</li><li>Formatação <code>3,2 s · 1 248 tokens</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Exclusões</div><h2>Fora do corte</h2><ul><li>Persistir métricas no histórico ou na base de dados.</li><li>Mostrar “tokens indisponíveis”.</li><li>Estimar tokens quando o fornecedor não devolve metadados.</li><li>Alterar quotas, custos, citações, grounding, ingestão ou desenho global.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Zonas prováveis</div><h2>Ficheiros a tocar</h2><div class="grid"><div class="card"><span class="badge">UI</span><p><code>pages/index.vue</code> para estado, manipuladores, leitura de eventos e template.</p></div><div class="card"><span class="badge">Área de transferência</span><p><code>utils/chat-copy.ts</code> se for útil isolar formatação de pergunta.</p></div><div class="card"><span class="badge">Fluxo</span><p><code>server/utils/chat/types.ts</code> e <code>server/utils/chat/engine.ts</code> para evento opcional.</p></div><div class="card"><span class="badge">Pi</span><p><code>server/utils/chat/pi-runner.ts</code> para tokens quando <code>usage.totalTokens</code> existir.</p></div></div></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Refinamento</div><h2>Decisões de ideia</h2><ul><li>Manter uma só acção de cópia por pergunta; sem menu ou partilha.</li><li>Usar estado efémero no objecto da mensagem, não um store global.</li><li>Tokens são dados observados, não calculados.</li><li>A resposta anterior mantém a métrica até outra resposta terminar.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Grill</div><h2>Decisões bloqueadas</h2><ul><li>Botão de copiar pergunta fica junto da pergunta, preservando o botão de edição quando existir.</li><li><code>metrics</code> é evento aditivo e opcional para não partir consumidores existentes.</li><li>A duração no cliente é a fonte de verdade para esta UI, porque a decisão inclui fluxo até terminar.</li><li>Se a resposta falhar ou for cancelada, não mostrar métrica de sucesso.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Testes de aceitação</div><h2>Provas antes do código</h2><ul><li>Testar formatação de pergunta e escrita na área de transferência.</li><li>Testar que a UI expõe <code>Copiar pergunta</code> e mantém <code>Copiar resposta</code>.</li><li>Testar contrato de <code>metrics</code> no fluxo com tokens opcionais.</li><li>Testar parsing/renderização da duração e última resposta no template por inspecção estática.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Implementação</div><h2>Concluído</h2><ul><li><code>utils/chat-metrics.ts</code> formata duração e tokens.</li><li>O fluxo aceita evento opcional <code>metrics</code> e propaga tokens antes de <code>done</code>.</li><li>A UI copia perguntas e mostra métricas só na última resposta concluída.</li><li>Editar/copiar pergunta ficam por baixo da pergunta, como botões de ícone com tooltip, revelados no hover/foco.</li><li>O executor Pi tenta extrair <code>usage.totalTokens</code> quando disponível.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Sucesso</div><h2>Verificado</h2><ul><li>Testes direccionados do corte passaram.</li><li><code>npm run typecheck</code> passou.</li><li><code>npm run build</code> passou com os avisos conhecidos.</li><li><code>npm test</code> passou com 195 testes.</li></ul></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')]; let idx = 0;
+    document.getElementById('total').textContent = slides.length;
+    function go(next){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+    document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>

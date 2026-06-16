@@ -83,7 +83,7 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     cwd: options.cwd,
     configDir,
     bundledPiDir,
-    tools: [...options.tools, ...customTools.map((tool: any) => tool.name)],
+    tools: [...new Set([...options.tools, ...customTools.map((tool: any) => tool.name)])],
     model: selectedModel
   }
 
@@ -145,6 +145,7 @@ async function attachAgentSessionLogger(
 
   const logger = await createAgentSessionLogger({
     dataDir: options.agentLog.dataDir,
+    specialistDir: options.cwd,
     specialistId: options.agentLog.specialistId,
     task: options.task,
     now: options.agentLog.now

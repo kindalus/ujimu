@@ -7,6 +7,7 @@ export type AgentSessionLogCloseStatus = 'succeeded' | 'failed' | 'aborted' | 'd
 
 export interface CreateAgentSessionLoggerOptions {
   dataDir?: string
+  specialistDir?: string
   specialistId: string
   task: AgentSessionLogTask
   now?: Date
@@ -52,9 +53,9 @@ export async function createAgentSessionLogger(
   options: CreateAgentSessionLoggerOptions
 ): Promise<AgentSessionLogger> {
   const startedAt = options.now ?? new Date()
-  const dataDir = options.dataDir ?? resolveAppConfig().dataDir
-  const directory = getAgentSessionLogDirectory(dataDir)
-  const logPath = getAgentSessionLogPath(dataDir, options.specialistId, options.task, startedAt)
+  const specialistDir = options.specialistDir ?? getDefaultSpecialistDir(options.dataDir, options.specialistId)
+  const directory = getAgentSessionLogDirectory(specialistDir)
+  const logPath = getAgentSessionLogPath(specialistDir, options.specialistId, options.task, startedAt)
   let pendingWrite: Promise<void> = Promise.resolve()
   let writeError: unknown
   const state: AgentSessionLogState = { assistantText: '' }
@@ -101,26 +102,30 @@ export async function createAgentSessionLogger(
   }
 }
 
-export function getAgentSessionLogDirectory(dataDir: string): string {
-  return join(dataDir, 'logs', 'agents')
+function getDefaultSpecialistDir(dataDir: string | undefined, specialistId: string): string {
+  return join(dataDir ?? resolveAppConfig().dataDir, 'specialties', toSafePathSegment(specialistId))
+}
+
+export function getAgentSessionLogDirectory(specialistDir: string): string {
+  return join(specialistDir, 'logs')
 }
 
 export function getAgentSessionLogPath(
-  dataDir: string,
+  specialistDir: string,
   specialistId: string,
   task: AgentSessionLogTask,
   date: Date = new Date()
 ): string {
   const timestamp = toIsoSafeTimestamp(date)
-  return join(getAgentSessionLogDirectory(dataDir), `${timestamp}-${toSafePathSegment(specialistId)}-${task}.md`)
+  return join(getAgentSessionLogDirectory(specialistDir), `${timestamp}-${toSafePathSegment(specialistId)}-${task}.md`)
 }
 
 export function toIsoSafeTimestamp(date: Date): string {
   return date.toISOString().replace(/:/gu, '-').replace('.', '-')
 }
 
-export async function listAgentSessionLogs(dataDir: string, specialistId: string): Promise<AgentSessionLogSummary[]> {
-  const directory = getAgentSessionLogDirectory(dataDir)
+export async function listAgentSessionLogs(specialistDir: string, specialistId: string): Promise<AgentSessionLogSummary[]> {
+  const directory = getAgentSessionLogDirectory(specialistDir)
   const safeSpecialistId = toSafePathSegment(specialistId)
   const pattern = new RegExp(`^(.+Z)-${escapeRegExp(safeSpecialistId)}-(initialization|conversion|ingestion)\\.(md|log)$`, 'u')
   let fileNames: string[] = []
@@ -142,7 +147,7 @@ export async function listAgentSessionLogs(dataDir: string, specialistId: string
 
       return [{
         file_name: fileName,
-        relative_path: `logs/agents/${fileName}`,
+        relative_path: `logs/${fileName}`,
         path: join(directory, fileName),
         task: match[2] as AgentSessionLogTask,
         started_at: startedAt

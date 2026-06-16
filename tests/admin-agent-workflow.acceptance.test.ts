@@ -30,18 +30,19 @@ describe('admin agent workflow progress and recovery acceptance', () => {
     expect(allowed.status).toBe(201)
   })
 
-  it('returns global agent logs in the admin specialist payload', async () => {
+  it('returns specialist-local agent logs in the admin specialist payload', async () => {
     const { dataDir } = await createTempData()
     await seedAdmin(dataDir)
     await createSpecialist(validSpecialist({ status: 'awaiting_sources' }), { dataDir })
-    await mkdir(join(dataDir, 'logs', 'agents'), { recursive: true })
+    await mkdir(join(dataDir, 'specialties', 'iva', 'logs'), { recursive: true })
+    await mkdir(join(dataDir, 'specialties', 'falhou', 'logs'), { recursive: true })
     await writeFile(
-      join(dataDir, 'logs', 'agents', '2026-06-12T10-20-30-123Z-iva-ingestion.md'),
+      join(dataDir, 'specialties', 'iva', 'logs', '2026-06-12T10-20-30-123Z-iva-ingestion.md'),
       '# Ujimu agent session log\n',
       'utf8'
     )
     await writeFile(
-      join(dataDir, 'logs', 'agents', '2026-06-12T11-20-30-123Z-falhou-initialization.md'),
+      join(dataDir, 'specialties', 'falhou', 'logs', '2026-06-12T11-20-30-123Z-falhou-initialization.md'),
       '# Ujimu agent session log\n',
       'utf8'
     )
@@ -91,16 +92,17 @@ describe('admin agent workflow progress and recovery acceptance', () => {
     })
   })
 
-  it('documents workflow states, upload gating, logs, and retry controls in the admin detail page', async () => {
-    const page = await readFile('pages/admin/specialists/[id].vue', 'utf8')
+  it('documents workflow states, upload gating, logs, and retry controls in the admin pages', async () => {
+    const detailPage = await readFile('pages/admin/specialists/[id].vue', 'utf8')
+    const listPage = await readFile('pages/admin/specialists/index.vue', 'utf8')
 
-    expect(page).toContain('canUploadSources')
-    expect(page).toContain('Inicialização da wiki em curso')
-    expect(page).toContain('Registos do agente')
-    expect(page).toContain('Tentar novamente')
-    expect(page).toContain('Falhas de inicialização recentes')
-    expect(page).toContain('failedInitializations')
-    expect(page).toContain('agent_logs')
+    expect(detailPage).toContain('canUploadSources')
+    expect(detailPage).toContain('Inicialização da wiki em curso')
+    expect(detailPage).toContain('Registos do agente')
+    expect(detailPage).toContain('Tentar novamente')
+    expect(detailPage).toContain('agent_logs')
+    expect(listPage).toContain('Falhas de inicialização recentes')
+    expect(listPage).toContain('failedInitializations')
   })
 })
 

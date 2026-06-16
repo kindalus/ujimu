@@ -31,7 +31,7 @@ describe('UI redesign chat workspace acceptance', () => {
 
     expect(page).toContain('const reactiveUserMessage = messages.value[messages.value.length - 2]!')
     expect(page).toContain('const reactiveAssistantMessage = messages.value[messages.value.length - 1]!')
-    expect(page).toContain('await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage)')
+    expect(page).toContain('await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage, responseStartedAt)')
     expect(page).not.toContain('await readChatStream(response, assistantMessage, userMessage)')
   })
 
@@ -65,6 +65,21 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(page).toContain('@keydown.enter.exact.prevent="submitQuestion"')
     expect(css).toContain('max-height: calc((1.5em * 5) + 12px)')
     expect(css).toContain('overflow-y: hidden')
+  })
+
+  it('shows response metrics only on the latest completed assistant response in memory', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+
+    expect(page).toContain("import { formatChatResponseMetrics } from '../utils/chat-metrics'")
+    expect(page).toContain('responseMetrics?: ChatResponseMetrics')
+    expect(page).toContain('const latestResponseMetricMessageId = computed')
+    expect(page).toContain('function responseMetricsLabel(message: ChatUiMessage): string')
+    expect(page).toContain('formatChatResponseMetrics(message.responseMetrics)')
+    expect(page).toContain('responseStartedAt')
+    expect(page).toContain("event.type === 'metrics'")
+    expect(page).toContain('performance.now()')
+    expect(page).toContain('class="ai-note response-metrics"')
+    expect(page).toContain('{{ responseMetricsLabel(item.message) }}')
   })
 
   it('uses an opaque specialist dropdown and clips specialist descriptions to 256 characters', async () => {

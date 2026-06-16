@@ -15,13 +15,21 @@ export interface ChatHistoryEvent {
   titleStatus: 'generated' | 'pending'
 }
 
+export interface ChatMetricsEvent {
+  type: 'metrics'
+  totalTokens?: number
+}
+
+export type ChatGroundingFailureReason = 'missing_citation_evidence' | 'missing_required_citations'
+
 export type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
+  | ChatMetricsEvent
   | ChatHistoryEvent
-  | { type: 'done'; grounded: boolean }
+  | { type: 'done'; grounded: boolean; reason?: ChatGroundingFailureReason }
   | { type: 'error'; code: string; message: string }
 
 export type ChatRunnerStreamEvent =
@@ -29,6 +37,7 @@ export type ChatRunnerStreamEvent =
   | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
+  | ChatMetricsEvent
   | { type: 'done'; grounded: boolean }
 
 export interface ChatConversationContextMessage {

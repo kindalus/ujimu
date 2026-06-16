@@ -1,4 +1,4 @@
-import { extname } from 'node:path'
+import { extname, join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import type { SpecialistRuntime, SpecialistStatus } from '../specialists/schema'
 import { readIngestionState } from '../ingestion/state'
@@ -77,7 +77,7 @@ export async function toAdminSpecialistPayload(
     status: specialist.status,
     company_id: specialist.company_id,
     sources: await readSpecialistSources(specialist),
-    agent_logs: await listAgentSessionLogs(resolveAppConfig().dataDir, specialist.id)
+    agent_logs: await listAgentSessionLogs(specialist.paths.root, specialist.id)
   }
 }
 
@@ -110,7 +110,7 @@ export async function listFailedInitializationPayloads(
     error_code: row.last_error_code,
     error_message: row.last_error_message,
     failed_at: row.completed_at ?? row.updated_at,
-    agent_logs: await listAgentSessionLogs(dataDir, row.specialist_id)
+    agent_logs: await listAgentSessionLogs(join(dataDir, 'specialties', row.specialist_id), row.specialist_id)
   })))
 }
 

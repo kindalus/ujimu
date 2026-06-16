@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-06-13
+Last updated: 2026-06-16
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,13 +20,13 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after the specialist initialization prompt and wiki-root fix:
+Latest full verification after Slice 43 chat copy and response metrics:
 
-- `npm test` — passed, 177 tests
+- `npm test` — passed, 195 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit --audit-level=high` — passed, 0 vulnerabilities
-- Dependency audit note: a new upstream `esbuild` advisory appeared during prior verification; resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin.
+- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `nuxt`, `vite`, `protobufjs`, and `ws`; dependency remediation is outside Slice 43.
+- Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
 - Chrome DevTools browser check — passed: `/admin`, `/admin/analytics`, and `/admin/ops` render the expected route-specific unauthenticated/admin-blocking surfaces; console output has no errors or warnings beyond Nuxt development info logs.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
@@ -93,11 +93,64 @@ Known non-blocking warnings:
 | 39 | [`39-batch-ingestion-manifest-state.html`](./39-batch-ingestion-manifest-state.html) | `verified` | 2026-06-12 | Batch ingestion session, dual-channel manifest, backend validation, and enriched `ingest/state.json`. |
 | 40 | [`40-state-driven-citations-minimal-chat-envelope.html`](./40-state-driven-citations-minimal-chat-envelope.html) | `verified` | 2026-06-12 | State-driven citation allowlist and minimal chat envelope with behaviour in specialist `AGENTS.md`. |
 | 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
-| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `implemented` | — | Chat input auto-grows up to five lines, then scrolls internally; full verification blocked by unrelated existing failures. |
+| 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `verified` | 2026-06-16 | Chat input auto-grows up to five lines, then scrolls internally. |
+| 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
+
+## Slice 43 — Copy question and latest response metrics
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-chat-copy-and-response-metrics.html`](../brainstorm-chat-copy-and-response-metrics.html)
+- [`../chat-copy-and-response-metrics-architecture.html`](../chat-copy-and-response-metrics-architecture.html)
+
+Refinement decisions:
+
+- Add copy support for user questions without changing edit, history, queueing, or response-copy behaviour.
+- Measure duration in the client from question submission until the stream emits `done`.
+- Keep response metrics in memory only; do not persist them in history or SQLite.
+- Show metrics only on the most recent completed assistant response in the current session.
+- Show token count only when the stream provides reliable usage metadata.
+
+Grill decisions:
+
+- Preserve the current `pages/index.vue` message structure instead of introducing a message-action component.
+- Add an optional `metrics` stream event for token totals; old clients can ignore it.
+- Treat client duration as the displayed duration because the product requirement includes streaming through response completion.
+- Do not show metrics for failed or cancelled responses.
+
+Acceptance-test plan:
+
+- Extend clipboard tests to cover copying user questions and the presence of UI controls.
+- Extend chat stream tests to cover optional token metrics from runner events.
+- Extend UI workspace tests to assert latest-response metric state, formatting, and template rendering.
+
+Acceptance-test RED:
+
+- `npm test -- tests/chat-response-metrics.acceptance.test.ts tests/chat-response-copy.acceptance.test.ts tests/chat.acceptance.test.ts tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose` — failed as expected because `utils/chat-metrics.ts`, copy-question UI, stream `metrics` events, and response-metric state were not implemented yet.
+
+Implementation:
+
+- Added `utils/chat-metrics.ts` for deterministic `3,2 s · 1 248 tokens` formatting and token omission when unavailable.
+- Added optional `metrics` events to the chat runner/server stream contract and passed validated totals through before `done`.
+- Taught the Pi chat runner to extract `usage.totalTokens` from final assistant messages when the SDK provides it.
+- Added copy-question controls in the user message UI while preserving response-copy behaviour.
+- Refined user-question actions so edit and copy sit below the question, use icon buttons with tooltips, and reveal on hover/focus.
+- Added in-memory response metrics to `pages/index.vue`, measured from submit to `done`, and rendered only on the latest completed assistant response.
+
+Verification:
+
+- `npm test -- tests/chat-response-metrics.acceptance.test.ts tests/chat-response-copy.acceptance.test.ts tests/chat.acceptance.test.ts tests/ui-redesign-chat-workspace.acceptance.test.ts --reporter=verbose` — passed, including the hover-revealed icon-button guard for edit/copy question actions.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- Chrome DevTools check on `http://127.0.0.1:3000/` — passed: selected a specialist, sent a question, and observed `Copiar pergunta`, `Copiar resposta`, and a metric line such as `9,4 s · 2 819 tokens`; console only showed Nuxt development info logs.
+- `npm test` — passed, 195 tests after the edit-question visibility regression guard was added.
+- `npm audit --audit-level=high` — failed with upstream dependency advisories outside this slice.
 
 ## Slice 42 — Chat input auto-grow
 
-Status: `implemented`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -135,7 +188,7 @@ Verification:
 - `npm run typecheck` — passed.
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
 - Chrome DevTools check on `http://127.0.0.1:3000/` — passed for DOM/style inspection: textarea exists with `rows=1`, computed max-height is five lines plus padding, and `overflow-y` starts hidden; console only showed Nuxt development info logs.
-- `npm test` — blocked by unrelated existing failures in `tests/admin-agent-workflow.acceptance.test.ts` and `tests/pi-agent-pipeline.acceptance.test.ts`.
+- `npm test` — passed, 195 tests, during Slice 43 follow-up verification on 2026-06-16.
 
 ## Agent-managed specialist wiki extension
 

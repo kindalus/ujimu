@@ -88,6 +88,47 @@ Conversation context:
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
+  it('streams plain assistant text when citations are not required and the model does not emit NDJSON', async () => {
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async () => {
+          subscriber?.({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_delta', delta: '**Assunto:** Convocatória\n\nExmo. Senhor,' }
+          })
+          subscriber?.({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_end', content: '**Assunto:** Convocatória\n\nExmo. Senhor,' }
+          })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => {
+            subscriber = undefined
+          }
+        }),
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiChatRunner } = await import('../server/utils/chat/pi-runner')
+    const run = await createPiChatRunner().run({
+      specialist: specialistRuntimeFixture({ citationsRequired: false }),
+      question: 'Escreve a convocatória.',
+      citationEvidence: []
+    })
+
+    const events = []
+    for await (const event of run.events!) {
+      events.push(event)
+    }
+
+    expect(events).toContainEqual({ type: 'delta', text: '**Assunto:** Convocatória\n\nExmo. Senhor,' })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
   it('keeps an active Pi chat alive when session events continue before the idle timeout', async () => {
     vi.useFakeTimers()
     const previousTimeout = process.env.UJIMU_PI_CHAT_TIMEOUT_MS
@@ -256,14 +297,14 @@ Conversation context:
   })
 })
 
-function specialistRuntimeFixture(): SpecialistRuntime {
+function specialistRuntimeFixture(options: { citationsRequired?: boolean } = {}): SpecialistRuntime {
   return {
     id: 'iva',
     name: 'Legislação de IVA',
     description: 'Especialista sobre legislação de IVA.',
     wiki_type: 'legislation-regulatory',
     system_prompt: 'Responder como consultor fiscal.',
-    citations_required: true,
+    citations_required: options.citationsRequired ?? true,
     streaming_enabled: true,
     status: 'active',
     company_id: null,

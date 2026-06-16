@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brainstorm — Cópia de perguntas e métricas de resposta</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap');
+    :root { --bg:#080806; --panel:#15130d; --text:#fffaf0; --muted:#c9c0a8; --accent:#f9d616; --line:rgba(255,255,255,.14); }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 20% 0%, rgba(249,214,22,.18), transparent 32%), var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 12vw; }
+    .slide.active { display:flex; }
+    .panel { width:min(1080px, 100%); border:1px solid var(--line); border-radius:28px; padding:46px; background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow:0 24px 90px rgba(0,0,0,.45); }
+    h1 { margin:0 0 18px; font-size:clamp(2.4rem, 5vw, 5.2rem); line-height:.92; letter-spacing:-.06em; font-weight:900; }
+    h2 { margin:0 0 22px; font-size:clamp(2rem, 4vw, 3.7rem); line-height:.95; letter-spacing:-.055em; font-weight:900; }
+    p, li { color:var(--muted); font-size:1.15rem; line-height:1.45; }
+    ul { display:grid; gap:12px; margin:0; padding-left:1.25rem; }
+    code { color:#fff6b8; font-family:'JetBrains Mono', monospace; }
+    .kicker { color:var(--accent); text-transform:uppercase; letter-spacing:.18em; font-weight:900; font-size:.78rem; margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { border:1px solid var(--line); border-radius:20px; padding:20px; background:rgba(0,0,0,.2); }
+    .badge { display:inline-flex; border:1px solid rgba(249,214,22,.45); border-radius:999px; padding:6px 10px; color:#fff6b8; background:rgba(249,214,22,.12); font-weight:800; margin-bottom:10px; }
+    .counter { position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:800; }
+    @media print { body { overflow:visible; } .slide { display:flex; page-break-after:always; } .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="panel"><div class="kicker">Brainstorm vivo</div><h1>Cópia de perguntas e métricas de resposta</h1><p>Estender as acções da conversa: copiar perguntas, e mostrar no fim da resposta mais recente quanto tempo o agente demorou e, quando disponível, quantos tokens foram usados.</p></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Objectivo actual</div><h2>Mais transparência na conversa</h2><ul><li>Permitir copiar perguntas do utilizador, tal como já se copiam respostas.</li><li>Mostrar duração da resposta no fim da mensagem do assistente.</li><li>Mostrar tokens apenas se o servidor tiver dados fiáveis.</li><li>Preservar fluxo, histórico, citações e edição de perguntas.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Contexto governante</div><h2>Fontes verificadas</h2><div class="grid"><div class="card"><span class="badge">Sem docs/wiki</span><p>Não existe <code>docs/wiki/</code>; o contexto vem de <code>AGENTS.md</code>, specs existentes e código actual.</p></div><div class="card"><span class="badge">Spec anterior</span><p><code>brainstorm-chat-message-actions.html</code> cobre copiar respostas com fontes; esta extensão não deve reabrir decisões fora do escopo.</p></div></div></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Base técnica observada</div><h2>Onde o comportamento vive hoje</h2><ul><li><code>pages/index.vue</code> controla mensagens, fluxo, cópia de resposta e UI de acções.</li><li><code>utils/chat-copy.ts</code> formata respostas com citações para a área de transferência.</li><li><code>server/utils/chat/engine.ts</code> emite eventos NDJSON de resposta.</li><li><code>server/utils/chat/pi-runner.ts</code> recebe eventos Pi e pode observar metadados do fornecedor.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Direcções possíveis</div><h2>Três níveis de ambição</h2><ul><li><strong>Mínimo:</strong> copiar perguntas; medir duração no cliente desde envio até <code>done</code>.</li><li><strong>Servidor exacto:</strong> o servidor mede duração da execução e emite metadados antes de <code>done</code>.</li><li><strong>Tokens:</strong> incluir contagem só quando o executor recebe metadados fiáveis do fornecedor; caso contrário, omitir.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Recomendação actual</div><h2>Seguro e incremental</h2><ul><li>Copiar pergunta deve reutilizar <code>copyTextToClipboard</code> com texto simples.</li><li>Duração deve ser medida desde o envio até a resposta terminar.</li><li>Tokens devem aparecer apenas quando existirem dados fiáveis; se não existirem, a métrica é omitida.</li><li>Não persistir métricas no histórico; mostrar apenas a resposta mais recente da sessão.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Decisões fechadas</div><h2>Comportamento esperado</h2><ul><li>Tempo contado desde o envio da pergunta até a resposta terminar.</li><li>Métricas não ficam guardadas no histórico retomado.</li><li>Quando tokens não estiverem disponíveis, não mostrar nada sobre tokens.</li><li>Formato visual: <code>3,2 s · 1 248 tokens</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Exclusões propostas</div><h2>Não mexer agora</h2><ul><li>Não acrescentar regeneração de respostas.</li><li>Não alterar quotas nem usar tokens para cobrança.</li><li>Não expor custo do fornecedor ao utilizador.</li><li>Não mudar o formato das citações nem a política de grounding.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Iteração 1</div><h2>Pedido recebido</h2><ul><li>O utilizador pediu copiar também a pergunta.</li><li>O utilizador pediu tempo no final de cada resposta.</li><li>O utilizador pediu número de tokens “se possível”.</li><li>Brainstorm iniciado; perguntas abertas registadas.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Iteração 2</div><h2>Respostas recebidas</h2><ul><li>Duração: desde o envio até a resposta terminar.</li><li>Histórico: não persistir métricas; interpretação actual é mostrar só na última resposta da sessão.</li><li>Tokens: omitir quando indisponíveis.</li><li>Formato escolhido: <code>3,2 s · 1 248 tokens</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Aprovação</div><h2>Brainstorm aprovado</h2><ul><li>O utilizador aprovou o deck na conversa.</li><li>Interpretação aceite: métricas só na resposta mais recente da sessão.</li><li>Próximo passo Zafir: desenho e arquitectura sobre a base existente.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Iteração 3</div><h2>Arquitectura global não reaberta</h2><ul><li>O utilizador escolheu usar a arquitectura actual como base de referência.</li><li>A decisão evita mudanças de produto e mantém o trabalho cirúrgico.</li><li>O desenho mínimo foi registado em <code>docs/specs/chat-copy-and-response-metrics-architecture.html</code>.</li></ul></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')]; let idx = 0;
+    document.getElementById('total').textContent = slides.length;
+    function go(next){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+    document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>

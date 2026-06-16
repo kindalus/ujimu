@@ -37,14 +37,33 @@ describe('assistant response copy acceptance', () => {
     expect(writes).toEqual(['Resposta\n\nFontes:\n1. Fonte'])
   })
 
-  it('exposes copy controls only for completed assistant responses', async () => {
+  it('exposes copy controls for user questions and completed assistant responses', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
 
+    expect(page).toContain('Copiar pergunta')
+    expect(page).toContain('copyUserQuestion(item.message)')
+    expect(page).toContain('Não foi possível copiar a pergunta.')
     expect(page).toContain('Copiar resposta')
     expect(page).toContain("item.message.role === 'assistant' && item.message.status === 'done'")
     expect(page).toContain('copyAssistantResponse(item.message)')
     expect(page).toContain('Resposta copiada.')
     expect(page).toContain('Não foi possível copiar a resposta.')
-    expect(page).not.toContain('Copiar pergunta')
+  })
+
+  it('keeps edit and copy question actions below the user question as hover-revealed icon buttons with tooltips', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+    const css = await readFile('assets/css/main.css', 'utf8')
+
+    expect(page).toMatch(/<div class="bubble">\{\{ item\.message\.text \}\}<\/div>[\s\S]*<div class="msg-user-actions">/)
+    expect(page).toContain('class="iconbtn msg-edit"')
+    expect(page).toContain('title="Editar pergunta"')
+    expect(page).toContain('aria-label="Editar pergunta"')
+    expect(page).toContain('@click="startEditingQuestion(item.message)"')
+    expect(page).toContain('class="iconbtn msg-copy"')
+    expect(page).toContain(':title="copiedMessageId === item.message.id ? \'Pergunta copiada\' : \'Copiar pergunta\'"')
+    expect(page).toContain('@click="copyUserQuestion(item.message)"')
+    expect(page).not.toContain("{{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar pergunta' }}")
+    expect(css).toContain('.msg-user-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }')
+    expect(css).toContain('.msg--user:hover .msg-user-actions, .msg--user:focus-within .msg-user-actions { opacity: 1; pointer-events: auto; }')
   })
 })

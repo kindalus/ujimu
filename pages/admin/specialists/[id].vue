@@ -500,7 +500,7 @@ function canIngestSource(source: IngestionSource): boolean {
 
     <div class="adm-card">
       <h2 class="adm-card-title">Registos do agente</h2>
-      <p class="adm-card-note">Sessões de inicialização, conversão e ingestão guardadas em <code>logs/agents/</code>.</p>
+      <p class="adm-card-note">Sessões de inicialização, conversão e ingestão guardadas em <code>logs/</code> da especialidade.</p>
       <div class="adm-srcs">
         <div v-for="log in agentLogs" :key="log.relative_path" class="adm-src">
           <div class="adm-src-row">

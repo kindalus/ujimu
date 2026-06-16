@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arquitectura — Cópia de perguntas e métricas de resposta</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap');
+    :root { --bg:#080806; --panel:#15130d; --text:#fffaf0; --muted:#c9c0a8; --accent:#f9d616; --line:rgba(255,255,255,.14); }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 20% 0%, rgba(249,214,22,.18), transparent 32%), var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:7vh 12vw; }
+    .slide.active { display:flex; }
+    .panel { width:min(1080px, 100%); border:1px solid var(--line); border-radius:28px; padding:46px; background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow:0 24px 90px rgba(0,0,0,.45); }
+    h1 { margin:0 0 18px; font-size:clamp(2.4rem, 5vw, 5.2rem); line-height:.92; letter-spacing:-.06em; font-weight:900; }
+    h2 { margin:0 0 22px; font-size:clamp(2rem, 4vw, 3.7rem); line-height:.95; letter-spacing:-.055em; font-weight:900; }
+    p, li { color:var(--muted); font-size:1.15rem; line-height:1.45; }
+    ul { display:grid; gap:12px; margin:0; padding-left:1.25rem; }
+    code { color:#fff6b8; font-family:'JetBrains Mono', monospace; }
+    .kicker { color:var(--accent); text-transform:uppercase; letter-spacing:.18em; font-weight:900; font-size:.78rem; margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { border:1px solid var(--line); border-radius:20px; padding:20px; background:rgba(0,0,0,.2); }
+    .badge { display:inline-flex; border:1px solid rgba(249,214,22,.45); border-radius:999px; padding:6px 10px; color:#fff6b8; background:rgba(249,214,22,.12); font-weight:800; margin-bottom:10px; }
+    .counter { position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:800; }
+    @media print { body { overflow:visible; } .slide { display:flex; page-break-after:always; } .counter { display:none; } }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="panel"><div class="kicker">Arquitectura</div><h1>Cópia de perguntas e métricas de resposta</h1><p>Usar a arquitectura actual como base de referência e acrescentar apenas o estado mínimo necessário para a conversa.</p></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Origem</div><h2>Brainstorm aprovado</h2><ul><li>Referência: <code>docs/specs/brainstorm-chat-copy-and-response-metrics.html</code>.</li><li>O utilizador escolheu não rever a arquitectura global.</li><li>Decisão: preservar a estrutura actual de conversa em fluxo, histórico e citações.</li><li>Não existe <code>docs/wiki/</code>; aplicam-se <code>AGENTS.md</code>, especificações e código actual.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Base</div><h2>Fronteiras existentes</h2><div class="grid"><div class="card"><span class="badge">UI</span><p><code>pages/index.vue</code> mantém mensagens, fluxo, histórico, acções e estado de cópia.</p></div><div class="card"><span class="badge">Área de transferência</span><p><code>utils/chat-copy.ts</code> já concentra a escrita na área de transferência e formata respostas com fontes.</p></div><div class="card"><span class="badge">Fluxo</span><p><code>server/utils/chat/engine.ts</code> e <code>types.ts</code> definem eventos NDJSON da resposta.</p></div><div class="card"><span class="badge">Pi</span><p>Eventos <code>message_end</code> podem trazer <code>usage.totalTokens</code>; se não trouxerem, a UI omite tokens.</p></div></div></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Desenho UI</div><h2>Copiar pergunta</h2><ul><li>Mostrar uma acção de cópia junto da pergunta do utilizador.</li><li>Copiar apenas o texto da pergunta, sem prefixos nem metadados.</li><li>Reutilizar o feedback actual: “Copiado” quando corre bem e erro curto quando falha.</li><li>Manter edição de pergunta separada; copiar não altera histórico nem fila.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Desenho UI</div><h2>Métricas da última resposta</h2><ul><li>Medir no cliente com <code>performance.now()</code>, desde o envio até ao evento <code>done</code>.</li><li>Guardar a métrica apenas no objecto de mensagem em memória.</li><li>Mostrar a linha só na resposta concluída mais recente da sessão.</li><li>Formato: <code>3,2 s · 1 248 tokens</code>; sem tokens, mostrar apenas <code>3,2 s</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Tokens</div><h2>Opcional por contrato</h2><ul><li>Acrescentar um evento opcional de metadados no fluxo, sem obrigar os executores a emiti-lo.</li><li>O executor Pi tenta ler <code>usage.totalTokens</code> de mensagens finais quando existir.</li><li>Executores de teste podem emitir tokens para validar a UI sem depender de fornecedor externo.</li><li>Não estimar tokens, não mostrar custo e não usar esta métrica para quotas.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Persistência</div><h2>Sem alteração de histórico</h2><ul><li>Não adicionar colunas à base de dados.</li><li>Não alterar endpoints de histórico.</li><li>Ao retomar uma conversa, métricas antigas não aparecem.</li><li>Ao fazer nova pergunta, a métrica visível passa para a nova resposta quando terminar.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">API interna</div><h2>Contrato mínimo</h2><ul><li><code>ChatStreamEvent</code> ganha um evento opcional: <code>{ type: 'metrics', totalTokens?: number }</code>.</li><li><code>ChatRunnerStreamEvent</code> ganha o mesmo evento para executores que souberem medir tokens.</li><li>O evento é informativo e deve ser ignorado por clientes antigos.</li><li><code>done</code> continua a ser o marcador de conclusão da resposta.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Exclusões</div><h2>Fora deste desenho</h2><ul><li>Persistir métricas no histórico.</li><li>Mostrar tokens indisponíveis.</li><li>Calcular custo monetário ou expor dados do fornecedor.</li><li>Alterar grounding, citações, quotas ou ingestão.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Condição de sucesso</div><h2>Verificável no corte</h2><ul><li>Há botão para copiar perguntas concluídas.</li><li>A resposta copiada continua a incluir fontes.</li><li>Apenas a última resposta concluída mostra duração.</li><li>Tokens aparecem quando o fluxo os envia e desaparecem quando não são enviados.</li></ul></div></section>
+
+  <section class="slide"><div class="panel"><div class="kicker">Aprovação</div><h2>Desenho aprovado</h2><ul><li>O utilizador aprovou o desenho na conversa.</li><li>A arquitectura global permanece como base de referência.</li><li>O próximo passo é um corte único e pequeno para testes e implementação.</li></ul></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')]; let idx = 0;
+    document.getElementById('total').textContent = slides.length;
+    function go(next){ slides[idx].classList.remove('active'); idx = Math.max(0, Math.min(next, slides.length - 1)); slides[idx].classList.add('active'); document.getElementById('current').textContent = idx + 1; }
+    document.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(idx + 1); } if (event.key === 'ArrowLeft') go(idx - 1); });
+    document.addEventListener('click', (event) => { event.clientX > window.innerWidth / 2 ? go(idx + 1) : go(idx - 1); });
+  </script>
+</body>
+</html>

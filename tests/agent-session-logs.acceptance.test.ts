@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createAgentSessionLogger } from '../server/utils/agents/logs'
 
 describe('agent session audit logs acceptance', () => {
-  it('writes useful global logs with complete assistant text and redacted tool arguments/results', async () => {
+  it('writes useful specialist-local logs with complete assistant text and redacted tool arguments/results', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-agent-logs-'))
     const logger = await createAgentSessionLogger({
       dataDir,
@@ -63,7 +63,7 @@ describe('agent session audit logs acceptance', () => {
     logger.writeEvent({ type: 'turn_end' })
     await logger.close('succeeded')
 
-    expect(logger.path).toBe(join(dataDir, 'logs', 'agents', '2026-06-12T10-20-30-123Z-iva-legislation-ingestion.md'))
+    expect(logger.path).toBe(join(dataDir, 'specialties', 'iva-legislation', 'logs', '2026-06-12T10-20-30-123Z-iva-legislation-ingestion.md'))
 
     const contents = await readFile(logger.path, 'utf8')
     expect(contents).toContain('# Ujimu agent session log')

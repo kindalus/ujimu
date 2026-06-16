@@ -6,6 +6,8 @@ import {
   extendInlineAdSchedule
 } from '../utils/inline-ads'
 import { copyTextToClipboard, formatAssistantResponseForClipboard } from '../utils/chat-copy'
+import { formatChatResponseMetrics } from '../utils/chat-metrics'
+import type { ChatResponseMetrics } from '../utils/chat-metrics'
 import { renderMarkdownToSafeHtml } from '../utils/markdown'
 
 interface PublicSpecialist {
@@ -97,11 +99,14 @@ interface ChatCitation {
   articleRefs: string[]
 }
 
+type ChatGroundingFailureReason = 'missing_citation_evidence' | 'missing_required_citations'
+
 type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
+  | { type: 'metrics'; totalTokens?: number }
   | {
       type: 'history'
       conversationId: string
@@ -110,7 +115,7 @@ type ChatStreamEvent =
       title: string
       titleStatus: 'generated' | 'pending'
     }
-  | { type: 'done'; grounded: boolean }
+  | { type: 'done'; grounded: boolean; reason?: ChatGroundingFailureReason }
   | { type: 'error'; code: string; message: string }
 
 interface ChatMessage {
@@ -119,7 +124,9 @@ interface ChatMessage {
   text: string
   citations: ChatCitation[]
   grounded?: boolean
+  groundingReason?: ChatGroundingFailureReason
   historyMessageId?: string
+  responseMetrics?: ChatResponseMetrics
   status: 'streaming' | 'done' | 'error'
   statusMessage?: string
 }
@@ -211,6 +218,16 @@ const chatUiMessages = computed<ChatUiMessage[]>(() =>
   }))
 )
 const completedAssistantResponseCount = computed(() => countCompletedAssistantResponses(messages.value))
+const latestResponseMetricMessageId = computed(() => {
+  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
+    const message = messages.value[index]
+    if (message?.role === 'assistant' && message.status === 'done' && message.responseMetrics) {
+      return message.id
+    }
+  }
+
+  return ''
+})
 const chatStreamItems = computed(() => buildInlineAdStreamItems(
   chatUiMessages.value,
   inlineAdSchedule.value,
@@ -432,9 +449,44 @@ async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
   }
 }
 
+async function copyUserQuestion(message: ChatUiMessage): Promise<void> {
+  if (message.role !== 'user' || message.status !== 'done') return
+
+  copiedMessageId.value = ''
+  copyErrorMessageId.value = ''
+  copyErrorMessage.value = ''
+
+  try {
+    await copyTextToClipboard(message.text)
+    copiedMessageId.value = message.id
+  } catch {
+    copyErrorMessageId.value = message.id
+    copyErrorMessage.value = 'Não foi possível copiar a pergunta.'
+  }
+}
+
 function renderAssistantMessageHtml(message: ChatUiMessage): string {
   const text = message.text || message.statusMessage || (message.status === 'streaming' ? 'A preparar resposta...' : '')
   return renderMarkdownToSafeHtml(text)
+}
+
+function groundingNotice(message: ChatUiMessage): string {
+  if (message.status !== 'done' || message.grounded !== false) return ''
+
+  if (message.groundingReason === 'missing_citation_evidence') {
+    return 'Sem fontes citáveis: esta especialidade exige citações, mas ainda não há fontes ingeridas com citações validadas.'
+  }
+
+  if (message.groundingReason === 'missing_required_citations') {
+    return 'Citações obrigatórias em falta: o agente não apresentou fontes validadas para esta resposta.'
+  }
+
+  return ''
+}
+
+function responseMetricsLabel(message: ChatUiMessage): string {
+  if (message.id !== latestResponseMetricMessageId.value || !message.responseMetrics) return ''
+  return formatChatResponseMetrics(message.responseMetrics)
 }
 
 function specialistDescriptionPreview(description: string): string {
@@ -586,6 +638,7 @@ async function startQuestion(
   let continueQueue = true
   const previousMessages = options.replaceFromMessageId ? [...messages.value] : undefined
   const abortController = new AbortController()
+  const responseStartedAt = performance.now()
   let slowResponseTimer: ReturnType<typeof setTimeout> | undefined
 
   if (options.replaceFromMessageId) {
@@ -645,7 +698,7 @@ async function startQuestion(
       return
     }
 
-    await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage)
+    await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage, responseStartedAt)
 
     if (previousMessages && reactiveAssistantMessage.status === 'error') {
       messages.value = previousMessages
@@ -704,7 +757,8 @@ async function readQuotaErrorMessage(response: Response): Promise<string> {
 async function readChatStream(
   response: Response,
   assistantMessage: ChatMessage,
-  userMessage: ChatMessage
+  userMessage: ChatMessage,
+  responseStartedAt: number
 ): Promise<void> {
   const reader = response.body?.getReader()
   if (!reader) {
@@ -722,21 +776,22 @@ async function readChatStream(
     buffer = lines.pop() ?? ''
 
     for (const line of lines) {
-      handleChatEventLine(line, assistantMessage, userMessage)
+      handleChatEventLine(line, assistantMessage, userMessage, responseStartedAt)
     }
 
     if (done) break
   }
 
   if (buffer.trim()) {
-    handleChatEventLine(buffer, assistantMessage, userMessage)
+    handleChatEventLine(buffer, assistantMessage, userMessage, responseStartedAt)
   }
 }
 
 function handleChatEventLine(
   line: string,
   assistantMessage: ChatMessage,
-  userMessage: ChatMessage
+  userMessage: ChatMessage,
+  responseStartedAt: number
 ): void {
   const event = parseChatEvent(line)
   if (!event) return
@@ -764,6 +819,17 @@ function handleChatEventLine(
     return
   }
 
+  if (event.type === 'metrics') {
+    const totalTokens = normalizeTotalTokens(event.totalTokens)
+    if (totalTokens) {
+      assistantMessage.responseMetrics = {
+        durationMs: assistantMessage.responseMetrics?.durationMs ?? 0,
+        totalTokens
+      }
+    }
+    return
+  }
+
   if (event.type === 'history') {
     activeConversationId.value = event.conversationId
     activeConversationTitle.value = event.title
@@ -776,8 +842,14 @@ function handleChatEventLine(
 
   if (event.type === 'done') {
     assistantMessage.grounded = event.grounded
+    assistantMessage.groundingReason = event.reason
     assistantMessage.statusMessage = undefined
     if (assistantMessage.status !== 'error') {
+      const totalTokens = assistantMessage.responseMetrics?.totalTokens
+      assistantMessage.responseMetrics = {
+        durationMs: Math.max(0, performance.now() - responseStartedAt),
+        ...(totalTokens ? { totalTokens } : {})
+      }
       assistantMessage.status = 'done'
     }
     return
@@ -794,7 +866,7 @@ function parseChatEvent(line: string): ChatStreamEvent | undefined {
 
   try {
     const parsed = JSON.parse(line) as ChatStreamEvent
-    if (['status', 'heartbeat', 'delta', 'citation', 'history', 'done', 'error'].includes(parsed.type)) {
+    if (['status', 'heartbeat', 'delta', 'citation', 'metrics', 'history', 'done', 'error'].includes(parsed.type)) {
       return parsed
     }
   } catch {
@@ -802,6 +874,11 @@ function parseChatEvent(line: string): ChatStreamEvent | undefined {
   }
 
   return undefined
+}
+
+function normalizeTotalTokens(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return undefined
+  return Math.trunc(value)
 }
 
 function createId(prefix: string): string {
@@ -918,23 +995,39 @@ function createId(prefix: string): string {
 
           <template v-for="item in chatStreamItems" :key="item.id">
             <div v-if="item.type === 'message' && item.message.role === 'user'" class="msg msg--user">
-              <button
-                v-if="item.message.historyMessageId"
-                class="iconbtn msg-edit"
-                type="button"
-                title="Editar pergunta"
-                :disabled="isStreaming"
-                @click="startEditingQuestion(item.message)"
-              >
-                <UjimuIcon name="edit" />
-              </button>
-              <div class="bubble">{{ item.message.text }}</div>
+              <div class="msg-user-stack">
+                <div class="bubble">{{ item.message.text }}</div>
+                <div class="msg-user-actions">
+                  <button
+                    v-if="item.message.historyMessageId"
+                    class="iconbtn msg-edit"
+                    type="button"
+                    title="Editar pergunta"
+                    aria-label="Editar pergunta"
+                    :disabled="isStreaming"
+                    @click="startEditingQuestion(item.message)"
+                  >
+                    <UjimuIcon name="edit" />
+                  </button>
+                  <button
+                    class="iconbtn msg-copy"
+                    :class="{ 'iconbtn--done': copiedMessageId === item.message.id }"
+                    type="button"
+                    :title="copiedMessageId === item.message.id ? 'Pergunta copiada' : 'Copiar pergunta'"
+                    :aria-label="copiedMessageId === item.message.id ? 'Pergunta copiada' : 'Copiar pergunta'"
+                    @click="copyUserQuestion(item.message)"
+                  >
+                    <UjimuIcon :name="copiedMessageId === item.message.id ? 'check' : 'copy'" />
+                  </button>
+                </div>
+                <p v-if="copyErrorMessageId === item.message.id" class="ai-note copy-error msg-copy-error" role="alert">{{ copyErrorMessage }}</p>
+              </div>
             </div>
 
-            <div v-else-if="item.type === 'message'" class="msg msg--ai" :class="{ 'msg--nocontext': item.message.grounded === false }">
+            <div v-else-if="item.type === 'message'" class="msg msg--ai" :class="{ 'msg--nocontext': Boolean(groundingNotice(item.message)) }">
               <span class="ai-mark" aria-hidden="true">U</span>
               <div class="ai-body">
-                <span v-if="item.message.grounded === false && item.message.status === 'done'" class="nocontext-tag"><UjimuIcon name="info" /> Contexto insuficiente</span>
+                <span v-if="groundingNotice(item.message)" class="nocontext-tag"><UjimuIcon name="info" /> {{ groundingNotice(item.message) }}</span>
                 <div class="ai-text" :class="{ 'ai-text--streaming': item.message.status === 'streaming' }">
                   <div class="assistant-markdown" v-html="renderAssistantMessageHtml(item.message)" />
                   <span v-if="item.message.status === 'streaming'" class="caret" />
@@ -958,6 +1051,7 @@ function createId(prefix: string): string {
                     <UjimuIcon :name="copiedMessageId === item.message.id ? 'check' : 'copy'" />
                     {{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar resposta' }}
                   </button>
+                  <p v-if="responseMetricsLabel(item.message)" class="ai-note response-metrics">{{ responseMetricsLabel(item.message) }}</p>
                   <p class="ai-note">Gerado por IA · pode conter imprecisões</p>
                   <p v-if="copyErrorMessageId === item.message.id" class="ai-note copy-error" role="alert">{{ copyErrorMessage }}</p>
                 </div>

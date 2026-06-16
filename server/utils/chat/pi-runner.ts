@@ -85,9 +85,18 @@ async function* runPiChatStream(
 
   const queue = new AsyncEventQueue<ChatRunnerStreamEvent>()
   let sawCitation = false
+  let parsedEventCount = 0
+  let rawAssistantText = ''
+  let pendingDoneEvent: Extract<ChatRunnerStreamEvent, { type: 'done' }> | undefined
+  let finalTotalTokens: number | undefined
   const parser = createPiNdjsonParser((event) => {
+    parsedEventCount += 1
     if (event.type === 'citation') {
       sawCitation = true
+    }
+    if (event.type === 'done') {
+      pendingDoneEvent = event
+      return
     }
     queue.push(event)
   })
@@ -128,8 +137,10 @@ async function* runPiChatStream(
     refreshIdleTimeout()
 
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+      const delta = typeof event.assistantMessageEvent.delta === 'string' ? event.assistantMessageEvent.delta : ''
       sawTextDelta = true
-      parser.push(event.assistantMessageEvent.delta)
+      rawAssistantText += delta
+      parser.push(delta)
       return
     }
 
@@ -140,13 +151,20 @@ async function* runPiChatStream(
       return
     }
 
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'done') {
+      finalTotalTokens = extractTotalTokens(event.assistantMessageEvent.message) ?? finalTotalTokens
+      return
+    }
+
     if (event?.type === 'message_end') {
       finalAssistantText = extractAssistantText(event.message) || finalAssistantText
+      finalTotalTokens = extractTotalTokens(event.message) ?? finalTotalTokens
       return
     }
 
     if (event?.type === 'agent_end') {
       finalAssistantText = extractLatestAssistantText(event.messages) || finalAssistantText
+      finalTotalTokens = extractLatestAssistantTotalTokens(event.messages) ?? finalTotalTokens
     }
   })
 
@@ -165,8 +183,19 @@ async function* runPiChatStream(
         parser.push(finalAssistantText)
       }
       parser.flush()
-      if (!sawDone) {
-        queue.push({ type: 'done', grounded: sawCitation })
+      const fallbackAssistantText = finalAssistantText || rawAssistantText
+      if (finalTotalTokens) {
+        queue.push({ type: 'metrics', totalTokens: finalTotalTokens })
+      }
+      if (pendingDoneEvent) {
+        queue.push(pendingDoneEvent)
+      } else if (!sawDone) {
+        if (!input.specialist.citations_required && parsedEventCount === 0 && fallbackAssistantText.trim().length > 0) {
+          queue.push({ type: 'delta', text: fallbackAssistantText })
+          queue.push({ type: 'done', grounded: true })
+        } else {
+          queue.push({ type: 'done', grounded: sawCitation })
+        }
       }
       queue.close()
     })
@@ -352,6 +381,16 @@ function parsePiNdjsonLine(
 
   if (event.type === 'delta' && typeof event.text === 'string') {
     enqueue({ type: 'delta', text: event.text })
+    return
+  }
+
+  if (event.type === 'metrics') {
+    const totalTokens = typeof event.totalTokens === 'number' && Number.isFinite(event.totalTokens) && event.totalTokens > 0
+      ? Math.trunc(event.totalTokens)
+      : undefined
+    if (totalTokens) {
+      enqueue({ type: 'metrics', totalTokens })
+    }
     return
   }
 
@@ -562,6 +601,26 @@ function extractLatestAssistantText(messages: unknown): string {
   }
 
   return ''
+}
+
+function extractTotalTokens(message: unknown): number | undefined {
+  const totalTokens = (message as { usage?: { totalTokens?: unknown } })?.usage?.totalTokens
+  if (typeof totalTokens !== 'number' || !Number.isFinite(totalTokens) || totalTokens <= 0) return undefined
+  return Math.trunc(totalTokens)
+}
+
+function extractLatestAssistantTotalTokens(messages: unknown): number | undefined {
+  if (!Array.isArray(messages)) return undefined
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if ((message as { role?: unknown })?.role === 'assistant') {
+      const totalTokens = extractTotalTokens(message)
+      if (totalTokens) return totalTokens
+    }
+  }
+
+  return undefined
 }
 
 function isCitationLike(value: unknown): value is ChatCitation {

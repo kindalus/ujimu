@@ -248,14 +248,23 @@ textarea, input, select { font: inherit; color: inherit; }
 .empty-source { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
 
 /* ---------- Mensagens ---------- */
-.msg--user { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.msg--user { display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; }
+.msg-user-stack { max-width: 78%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.msg-user-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.msg--user:hover .msg-user-actions, .msg--user:focus-within .msg-user-actions { opacity: 1; pointer-events: auto; }
+.msg-user-actions .iconbtn { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); }
+.msg-user-actions .iconbtn > .iconify { width: 14px; height: 14px; }
+.msg-user-actions .iconbtn:hover { color: var(--ink); background: var(--surface-2); }
+.msg-user-actions .iconbtn--done { color: #2C7A3D; border-color: currentColor; }
+.app[data-theme="dark"] .msg-user-actions .iconbtn--done { color: #7BC88A; }
+.msg-user-stack .bubble { max-width: 100%; }
+.msg-copy-error { margin: 0; }
 .bubble {
   max-width: 78%; background: var(--surface-2); border-radius: 18px 18px 4px 18px;
   padding: 11px 16px; white-space: pre-wrap;
 }
 .app[data-yellow="forte"] .bubble { background: var(--yellow-soft); }
-.msg-edit { opacity: 0; order: -1; }
-.msg--user:hover .msg-edit { opacity: 1; }
+.msg-edit { order: 0; }
 .bubble--edit { max-width: 100%; width: 100%; background: var(--surface); border: 1px solid var(--line-strong); }
 .bubble-ta { width: 100%; border: none; outline: none; background: transparent; resize: vertical; min-height: 48px; }
 .bubble-edit-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
