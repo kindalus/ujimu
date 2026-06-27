@@ -77,6 +77,10 @@ export function isGeneratedMarkdownArtifact(rawPath: string): boolean {
 }
 
 export function toGeneratedMarkdownPath(rawPath: string): string {
+  return toConvertedMarkdownPath(rawPath)
+}
+
+export function toConvertedMarkdownPath(rawPath: string): string {
   return `${rawPath}.md`
 }
 
@@ -132,8 +136,7 @@ function createPendingRecord(input: {
 }): IngestionSourceRecord {
   const articleRefs = input.text ? extractArticleRefs(input.text) : []
   const title = inferSourceTitle(input.rawPath, input.text)
-  const isMarkdown = MARKDOWN_RAW_EXTENSIONS.has(input.extension)
-  const markdownPath = isMarkdown ? input.rawPath : toGeneratedMarkdownPath(input.rawPath)
+  const markdownPath = toConvertedMarkdownPath(input.rawPath)
   const previousChecksum = input.existing?.checksum
   const wasReplaced = Boolean(previousChecksum && previousChecksum !== input.checksum)
 
@@ -143,25 +146,17 @@ function createPendingRecord(input: {
     raw_path: input.rawPath,
     checksum: input.checksum,
     ...(wasReplaced ? { previous_checksum: previousChecksum, replaced_at: input.now } : {}),
-    status: isMarkdown ? 'pending' : 'blocked',
+    status: 'pending',
     title,
     article_refs: articleRefs,
-    conversion: isMarkdown
-      ? {
-          status: 'not_required',
-          markdown_path: markdownPath,
-          markdown_checksum: input.checksum,
-          updated_at: input.now
-        }
-      : {
-          status: 'pending',
-          markdown_path: markdownPath,
-          updated_at: input.now
-        },
+    conversion: {
+      status: 'pending',
+      markdown_path: markdownPath,
+      updated_at: input.now
+    },
     ingestion: {
-      status: isMarkdown ? 'pending' : 'blocked',
+      status: 'pending',
       source_path: markdownPath,
-      ...(isMarkdown ? {} : { skipped_reason: 'conversion_pending' }),
       updated_at: input.now
     },
     detected_at: input.now,
@@ -173,26 +168,32 @@ function ensurePipelineDefaults(
   source: IngestionSourceRecord,
   input: { rawPath: string; checksum: string; extension: string; content: Buffer; text?: string; now: string }
 ): IngestionSourceRecord {
-  const isMarkdown = MARKDOWN_RAW_EXTENSIONS.has(input.extension)
-  const markdownPath = source.conversion?.markdown_path ?? (isMarkdown ? input.rawPath : toGeneratedMarkdownPath(input.rawPath))
-  const ingestionStatus = source.ingestion?.status ?? (source.status === 'blocked' ? 'blocked' : source.status)
-  const normalizedIngestionStatus = ingestionStatus === 'blocked' ? 'blocked' : ingestionStatus
-  const conversionStatus = source.conversion?.status ?? (isMarkdown ? 'not_required' : source.status === 'ingested' ? 'converted' : 'pending')
+  const isIngested = source.status === 'ingested' || source.ingestion?.status === 'ingested'
+  const markdownPath = isIngested && source.conversion?.markdown_path
+    ? source.conversion.markdown_path
+    : toConvertedMarkdownPath(input.rawPath)
+  const existingIngestionStatus = source.ingestion?.status ?? (source.status === 'blocked' ? 'blocked' : source.status)
+  const normalizedIngestionStatus = existingIngestionStatus === 'blocked' && source.ingestion?.skipped_reason === 'conversion_pending'
+    ? 'pending'
+    : existingIngestionStatus
+  const existingConversionStatus = source.conversion?.status ?? (source.status === 'ingested' ? 'converted' : 'pending')
+  const normalizedConversionStatus = existingConversionStatus === 'not_required' && !isIngested ? 'pending' : existingConversionStatus
 
   return {
     ...source,
+    status: source.status === 'blocked' && source.ingestion?.skipped_reason === 'conversion_pending' ? 'pending' : source.status,
     conversion: {
-      status: conversionStatus,
-      markdown_path: markdownPath,
-      ...(isMarkdown && !source.conversion?.markdown_checksum ? { markdown_checksum: input.checksum } : {}),
       ...source.conversion,
+      status: normalizedConversionStatus,
+      markdown_path: markdownPath,
       updated_at: source.conversion?.updated_at ?? input.now
     },
     ingestion: {
-      status: normalizedIngestionStatus,
-      source_path: source.ingestion?.source_path ?? markdownPath,
-      ...(source.ingested_at && !source.ingestion?.ingested_at ? { ingested_at: source.ingested_at } : {}),
       ...source.ingestion,
+      status: normalizedIngestionStatus,
+      source_path: isIngested ? (source.ingestion?.source_path ?? markdownPath) : markdownPath,
+      ...(source.ingested_at && !source.ingestion?.ingested_at ? { ingested_at: source.ingested_at } : {}),
+      ...(normalizedIngestionStatus === 'pending' ? { skipped_reason: undefined } : {}),
       updated_at: source.ingestion?.updated_at ?? input.now
     }
   }

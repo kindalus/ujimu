@@ -1,148 +1,315 @@
 # Wiki schema template
 
-This file is **not** the schema itself — it is the template the skill instantiates for the user's wiki. Every `{{placeholder}}` should be replaced with a value decided during the domain interview. Every comment marked `<!-- guidance -->` is for the LLM filling out the template and should be removed from the final file written to the user's wiki.
+This file is **not** the schema itself. It is the template instantiated during initialization as `AGENTS.md`, `CLAUDE.md`, or `wiki-schema.md` at the user's wiki root.
 
-When you instantiate this for a user, write the result to the wiki root as `AGENTS.md`, `CLAUDE.md`, or `wiki-schema.md` (per the convention chosen during initialization), and remove all guidance comments. The result should read as a clean, self-contained document the user can review.
+When instantiating it:
+
+- Replace every `{{placeholder}}`.
+- Remove all guidance comments.
+- Make the result self-contained.
+- Do not weaken OKF. The schema may add stricter rules only.
 
 ---
 
 ```markdown
 # {{Wiki Name}}
 
-<!-- guidance: a one-line description, e.g. "A research wiki on alignment evaluations" -->
 {{One-sentence description of this wiki's purpose.}}
 
-This document is the schema for this wiki. It tells future LLM sessions how the wiki is organized and what conventions to follow. **Read this file at the start of every session before performing any operation.**
+This is the operating schema for this OKF-backed LLM wiki. Future LLM sessions must read this file before converting, ingesting, querying, linting, or modifying the wiki.
 
 ## Purpose
 
-{{Two or three sentences describing what this wiki is for, what kinds of questions it should be able to answer, and the user's intent in maintaining it.}}
+{{Two or three sentences describing what this wiki is for, what questions it should answer, who the audience is, and why the user wants it maintained over time.}}
 
 ## Architecture
 
-- `raw/` — source documents. **Read-only.** Never modify, rename, or delete files here without explicit instruction from the user.
-- `wiki/` — markdown pages authored and maintained by the LLM. This is the working layer.
-- This file (`{{schema-filename}}`) — the schema you are reading now. Co-authored with the user; update it (with their approval) when conventions evolve.
+This wiki has four layers:
+
+- `raw/` — original source files collected by the user. **Read-only for the LLM.** Do not modify, rename, or delete without explicit user instruction.
+- `converted/` — generated markdown conversions of files in `raw/`. Every source passes through this layer before ingestion, including markdown/text via `conversion_status: passthrough`. This layer is generated and may be overwritten by reconversion.
+- `wiki/` — curated knowledge authored and maintained by the LLM. This is a fully OKF-compliant bundle.
+- `{{schema-filename}}` — this schema file. Update it only when conventions change, and append to the schema changelog.
+
+The required pipeline is:
+
+```text
+raw/ -> converted/ -> wiki/
+```
+
+Never ingest directly from `raw/`. Never query directly from `raw/`. Conversion is the only operation that reads raw sources.
+
+## OKF contract
+
+`wiki/` follows OKF as defined by the skill's `references/OKF-SPEC.md`:
+
+- Every non-reserved `.md` file in `wiki/` has YAML frontmatter.
+- Every concept page has a non-empty `type` field.
+- `wiki/index.md` has no frontmatter and follows the OKF index format.
+- `wiki/log.md` uses date-grouped `YYYY-MM-DD` entries.
+- Internal links use standard markdown links.
+- Unknown frontmatter fields are allowed and must be preserved when reasonable.
+
+This schema adds local requirements but does not weaken OKF.
 
 ## Page taxonomy
 
-The wiki contains the following types of pages, each in its own subdirectory of `wiki/`:
+The wiki contains these page types:
 
-<!-- guidance: list every page type from the chosen preset (or custom design). Include subdirectory, what each page describes, and a short slug convention. -->
+<!-- guidance: Replace with the chosen preset/custom taxonomy. Include directory, OKF type value, purpose, and slug convention. Keep `sources`, `derived`, `index`, and `log`. -->
 
-- **`wiki/sources/`** — {{description of source pages: what each one summarizes, what fields it contains}}
-- **`wiki/{{type-2}}/`** — {{description}}
-- **`wiki/{{type-3}}/`** — {{description}}
-<!-- ... add as many as the preset specifies ... -->
-- **`wiki/derived/`** — pages produced from queries: comparisons, analyses, connections, syntheses across multiple sources. Filed by default rather than discarded into chat history. See "Query workflow" below.
-- **`wiki/index.md`** — catalog of all pages, updated on every ingest and on every filed query. Organized by page type.
-- **`wiki/log.md`** — chronological record of operations. Each entry starts with `## [YYYY-MM-DD] {{operation}} | {{summary}}`. Operation values include `init`, `ingest`, `query`, `query-filed`, `lint`, plus any others your wiki uses.
+- `wiki/sources/` — `type: Source`. One page per ingested source. Source pages summarize the converted source and provide source lineage back to both `raw/` and `converted/`.
+- `wiki/{{type-directory}}/` — `type: {{Type Value}}`. {{Description and slug convention.}}
+- `wiki/derived/` — `type: Derived Analysis` unless a more specific derived type is appropriate. Filed answers, comparisons, syntheses, and cross-source analyses produced from queries.
+- `wiki/index.md` — OKF index of all pages, grouped by page type.
+- `wiki/log.md` — OKF date-grouped update log.
 
 ## Naming conventions
 
-- Page filenames: {{kebab-case | snake_case | Title Case}} (e.g. `{{example-filename}}.md`).
-- Slugs in cross-references: {{slug rule, e.g. lowercase kebab-case matching filename without extension}}.
-- Source-page slugs: {{rule, e.g. `YYYY-MM-DD-short-title` or `author-year-keyword`}}.
+- Page filenames: {{kebab-case by default, or chosen convention}}.
+- Source page slugs: derive from title or filename; use stable human-readable kebab-case. If a collision occurs, append a short hash from the raw SHA-256. Do not rename on re-ingest unless the user explicitly asks.
+- Derived page slugs: short, human-readable kebab-case derived from the query topic.
+- Converted paths: preserve the raw relative path and append `.md`, e.g. `raw/report.pdf` -> `converted/report.pdf.md`.
 
-## Cross-reference style
+## Cross-reference rules
 
-- **Link syntax:** {{`[[Wikilinks]]` (Obsidian) | `[Display Text](relative/path.md)` (plain markdown)}}.
-- **What links to what:** {{the cross-reference rules from the preset, e.g. "Source pages link to every entity and concept they discuss. Entity pages link back to all sources that mention them. Concept pages list all sources discussing them and all related concepts."}}
-- **Inline citations:** {{format, e.g. "After a claim, append `[source-slug]` linking to the source's summary page"}}.
+- Link syntax: standard markdown links, e.g. `[Display Text](/concepts/example.md)`.
+- Source pages link to every material entity/concept/page they discuss.
+- Entity/concept/domain pages link back to source pages that support their claims.
+- Derived pages cite the wiki pages they synthesize.
+- Prefer links to curated `wiki/` pages over direct links to `converted/` assets. Source pages may link to raw, converted, and converted assets in their Source Material section.
 
-## Frontmatter conventions
+## Converted-source contract
 
-<!-- guidance: only include if the user opted in to YAML frontmatter. Otherwise replace this whole section with "Pages do not use YAML frontmatter in this wiki." -->
+Every file in `converted/` starts with frontmatter like:
 
-Pages use YAML frontmatter as follows:
+```yaml
+---
+type: Converted Source
+title: "{{Example source title}}"
+source_path: ../raw/{{example-source}}
+source_format: {{pdf | docx | md | txt | html | image | spreadsheet | other}}
+source_sha256: "sha256:..."
+converted_at: {{ISO 8601 datetime}}
+conversion_status: {{full | partial | lossy | ocr-full | ocr-partial | summary-only | metadata-only | passthrough | failed}}
+conversion_method: "{{tool or method}}"
+warnings: []
+---
+```
 
-- **Source pages:** `title`, `author`, `date_published`, `date_ingested`, `source_url` or `source_path`, `tags`.
-- **Entity pages:** `tags`, `aliases` (other names this entity goes by), `last_updated`.
-- **Other types:** {{specify per-type as needed, or "no required frontmatter"}}.
+Conversion statuses:
 
-## Ingestion ritual
+- Auto-ingest allowed: `full`, `ocr-full`, `lossy`, `passthrough`.
+- User confirmation required before ingest: `partial`, `ocr-partial`, `summary-only`, `metadata-only`.
+- Never ingest: `failed`.
 
-When the user asks to ingest a new source from `raw/`, perform the following steps in order:
+If conversion extracts assets, place them beside the converted file as `<converted-basename>.assets/` and include a compact manifest in frontmatter when possible:
 
-1. **Read the source.** If it's long, read fully — do not skim. If it has images and they're available locally, view them.
-2. **Discuss with the user.** Briefly state the key takeaways and ask if there's anything specific to emphasize. Do not skip this step unless the user has explicitly said "batch mode, no discussion."
-3. **Write the source page** in `wiki/sources/` following the {{slug rule}} for the filename. The page should contain:
-   - {{required sections, e.g. summary, key claims, methodology, contribution to thesis, open questions}}
-4. **Update or create entity / concept pages** for everything material the source mentions. {{Domain-specific guidance, e.g. "Each character mentioned gets their page updated with new behavior, dialogue, or revelations from this chapter — but only what is on-screen in this chapter."}}
-5. **Cross-link.** Add backlinks from entity/concept pages to the source page. Add forward links from the source page to all entity/concept pages.
-6. **Flag contradictions.** If anything in the new source disagrees with existing wiki content, do not silently overwrite. Add a "Conflicting evidence" subsection to the relevant page.
-7. **Update synthesis pages** if the user maintains any (e.g. `wiki/synthesis.md`, `wiki/me.md`, `wiki/thesis.md`). {{Specify how, per the preset.}}
-8. **Update `wiki/index.md`** with the new source and any new entity/concept pages.
-9. **Append to `wiki/log.md`:** `## [YYYY-MM-DD] ingest | {{Source Title}}` followed by 1–2 lines on what changed.
+```yaml
+assets_dir: report.pdf.assets
+assets:
+  - path: report.pdf.assets/image-001.png
+    kind: image
+    description: "Short description."
+    extraction_status: extracted
+    description_status: model-described
+    confidence: medium
+```
+
+## Wiki frontmatter conventions
+
+All wiki pages except `wiki/index.md` and `wiki/log.md` require OKF frontmatter.
+
+### Source pages
+
+Required:
+
+```yaml
+---
+type: Source
+source_kind: {{pdf | docx | md | txt | html | image | spreadsheet | other}}
+title: "{{Title}}"
+description: "{{One-line description}}"
+source_path: ../../raw/{{source-path}}
+source_sha256: "sha256:..."
+converted_path: ../../converted/{{converted-path}}
+converted_sha256: "sha256:..."
+conversion_status: {{status}}
+tags: [source]
+timestamp: {{ISO 8601 datetime}}
+---
+```
+
+Required body sections:
+
+```markdown
+# Source Material
+
+- Original: [raw path](../../raw/...)
+- Converted: [converted path](../../converted/...)
+- Conversion status: `...`
+
+# Summary
+
+# Key Claims
+
+# Related Pages
+
+# Citations
+```
+
+<!-- guidance: Adjust required source sections for the chosen domain. -->
+
+### Derived pages
+
+Required:
+
+```yaml
+---
+type: Derived Analysis
+title: "{{Title}}"
+description: "{{One-line description}}"
+source_pages:
+  - /sources/example.md
+tags: [derived]
+timestamp: {{ISO 8601 datetime}}
+---
+```
+
+### Other page types
+
+<!-- guidance: Add per-type frontmatter rules. Every page type must include `type`; add `title`, `description`, `tags`, `timestamp`, `aliases`, `status`, `owner`, or domain fields as useful. -->
+
+- `wiki/{{type-directory}}/` pages require: `type`, `title`, `description`, `tags`, `timestamp`.
+
+## Convert workflow
+
+When asked to convert a source:
+
+1. Locate the source in `raw/`. If ambiguous, ask.
+2. Compute `source_sha256`.
+3. Determine the converted path using the path mapping rule.
+4. If the converted file exists and `source_sha256` matches, do nothing unless reconversion was requested.
+5. If absent or stale, convert using available tools.
+6. For markdown/text, create a passthrough converted file. If original frontmatter is parseable, store it as `original_frontmatter`.
+7. Extract assets when useful into `<converted-basename>.assets/` and describe them when possible.
+8. If conversion fails, create a `conversion_status: failed` stub and stop.
+
+## Ingestion workflow
+
+When asked to ingest a source:
+
+1. Convert first if needed. Ingest only from `converted/`.
+2. Stop if conversion failed. Ask before ingesting statuses that require confirmation.
+3. Read the converted file completely.
+4. Discuss key takeaways with the user unless explicit batch/no-discussion mode was requested.
+5. Create or update the source page in `wiki/sources/`.
+6. Update or create all material entity/concept/domain pages.
+7. Cross-link source pages and related pages.
+8. Apply domain-specific contradiction/supersession rules.
+9. Update any synthesis pages if the source changes the overall picture.
+10. Update `wiki/index.md`.
+11. Append an OKF-format entry to `wiki/log.md`.
+
+## Re-ingest workflow
+
+Re-ingest is idempotent.
+
+1. Locate raw, converted, and existing source page.
+2. If raw hash changed, reconvert automatically.
+3. If converted hash did not change and no enrichment/schema change was requested, report no-op.
+4. Otherwise update the existing source page without changing its slug by default.
+5. Propagate changed information to related pages.
+6. Treat improved conversion corrections as ingestion corrections, not source contradictions.
+7. Update index and log.
 
 ## Query workflow
 
-When the user asks a question of the wiki:
+When asked a question:
 
-1. **Read `wiki/index.md`** to find candidate pages.
-2. **Read the candidate pages** in full (don't rely on snippets).
-3. **Synthesize an answer** with inline citations to wiki pages (and through them, to sources).
-4. **File the answer in `wiki/derived/` by default.** The default is to file, not to ask. Substantive answers — comparisons, analyses, connections, syntheses across multiple pages — are knowledge that belongs in the wiki, not in chat history. Update `wiki/index.md` under "Derived" and append a `query-filed` entry to `wiki/log.md`.
+1. Start with `wiki/index.md`.
+2. Read relevant wiki pages in full.
+3. Follow cross-references.
+4. If detail is missing, consult relevant `converted/` files through source-page links. Never read `raw/` directly.
+5. Answer with citations to wiki pages.
+6. File substantive answers in `wiki/derived/` by default.
+7. Update `wiki/index.md` and `wiki/log.md` when filing.
 
-   Skip filing only for: simple lookups (the answer is already on an existing page), single-source restatements, casual back-and-forth, or when the user explicitly says "don't bother." Even when skipping, log a `query` entry recording what was asked and why it wasn't filed — this is what the lint workflow uses to catch misses.
+Skip filing only for simple lookups, single-source restatements, casual back-and-forth, or explicit user instruction not to file.
 
 ## Lint workflow
 
-When asked to lint the wiki:
+When asked to lint:
 
-1. **Contradictions** — pages or sections that disagree with each other.
-2. **Stale claims** — older claims that newer sources have superseded but weren't updated.
-3. **Orphan pages** — no inbound links.
-4. **Missing pages** — concepts referenced multiple times but with no page of their own.
-5. **Missing cross-references** — entities/concepts mentioned on a page but not linked.
-6. **Gaps** — important sub-topics conspicuously absent given the wiki's purpose. Suggest sources or queries the user might pursue.
-7. **Unfiled queries** — recent `query` entries in `wiki/log.md` with no matching `query-filed`. Reconstruct and file the substantive ones; skip the genuinely simple lookups. Find them with `grep "^## \[" wiki/log.md | grep -E "query \|" | tail -30`.
-8. Report findings to the user and ask which to address. Do not silently apply fixes.
+1. Validate OKF conformance in `wiki/`.
+2. Validate local schema requirements.
+3. Check source lineage: source pages reference both raw and converted files, with hashes.
+4. Check stale conversions: raw hash vs converted frontmatter.
+5. Check stale ingests: converted hash vs source-page frontmatter.
+6. Report failed/partial conversions and questionable ingests.
+7. Check contradictions, stale claims, orphans, missing pages, missing cross-references, overgrown pages, gaps, and unfiled substantive queries.
+8. Present findings before applying fixes.
+9. Apply approved fixes and log the lint pass.
 
-## Domain-specific notes
+## Log format
 
-<!-- guidance: this section is where preset-specific quirks go. Pick the bullets that apply. Remove the section if nothing applies. -->
+`wiki/log.md` uses OKF date groups, newest first:
 
-{{Examples — keep what fits, drop the rest:}}
+```markdown
+# Directory Update Log
 
-- **Spoiler discipline:** Information from later chapters/sources never appears on entity pages until those chapters/sources have been ingested. Each entity page may carry an `_As of: {{watermark}}_` marker.
-- **Privacy:** {{rules for real names, redaction, etc.}}
-- **Tone:** {{neutral / personal / formal — relevant for personal wikis especially}}
-- **Trust calibration:** {{e.g. "Treat peer-reviewed papers as higher-confidence than blog posts; record the confidence level on claims."}}
+## 2026-06-26
+* **Ingest**: Added [Example Source](/sources/example-source.md) and updated [Example Concept](/concepts/example-concept.md).
+* **Query filed**: Filed [Comparison of A and B](/derived/comparison-of-a-and-b.md).
+```
 
-## What this wiki does NOT do
+Do not use the old bracketed llm-wiki log heading format.
 
-<!-- guidance: helpful to be explicit about non-goals. Example bullets: -->
+## Domain-specific rules
 
-- Pages are not invented from general knowledge. Every claim should trace to a source in `raw/` (or the user's stated input). If a gap is conspicuous, surface it; do not paper over it.
-- The wiki is not a chat log. Casual back-and-forth lives in conversation; only filed answers, summaries, and entity/concept knowledge live in `wiki/`.
-- The LLM does not modify `raw/`.
+<!-- guidance: Keep only rules that apply. Examples below. -->
+
+- **Spoiler discipline:** {{Rule for time-bounded knowledge, if any.}}
+- **Privacy:** {{Redaction/pseudonym/real-name policy.}}
+- **Supersession:** {{Rules for amendments, ADRs, policies, or versions that supersede older claims.}}
+- **Trust calibration:** {{How to record source reliability or confidence.}}
+- **Lifecycle:** {{Statuses and review cadence for help articles, runbooks, policies, etc.}}
+- **No-invention rule:** {{What the LLM must not infer or fabricate.}}
+
+## What this wiki does not do
+
+- It does not ingest directly from `raw/`.
+- It does not treat `converted/` as curated knowledge.
+- It does not use chat history as durable storage.
+- It does not invent claims to fill gaps.
+- It does not weaken OKF for convenience.
 
 ## Open questions and known gaps
 
-<!-- guidance: optional. Useful to seed during init with anything the user mentioned but didn't decide. The lint workflow can also append here. -->
+<!-- guidance: Add unresolved decisions from initialization, or write "None yet." -->
 
-- {{question 1}}
-- {{question 2}}
+- {{Open question 1}}
 
 ## Schema changelog
 
-- **{{YYYY-MM-DD}}** — initial schema authored during wiki init.
-<!-- append future entries when the schema is amended -->
+- **{{YYYY-MM-DD}}** — Initial schema authored during OKF-backed LLM wiki initialization.
 ```
 
 ---
 
-## Filling out the template — quick reference
+## Filling out the template
+
+Use the initialization interview and selected preset to fill:
 
 | Placeholder | Source |
 |---|---|
-| `{{Wiki Name}}` | Interview Q1 (purpose) — choose a short title with the user |
-| `{{One-sentence description}}` | Interview Q1 |
-| Page taxonomy bullets | Domain preset (research / book / personal / business / custom) |
-| Naming conventions | Default to kebab-case unless user prefers otherwise |
-| Cross-reference link syntax | Interview Q14 (Obsidian or plain) |
-| Frontmatter section | Interview Q15 (yes/no) |
-| Ingestion-ritual step 4 | Domain preset's "ingestion strategy" |
-| Domain-specific notes | Interview Q11 (spoilers), Q12 (privacy), preset notes |
-| Schema filename | `AGENTS.md` / `CLAUDE.md` / `wiki-schema.md` per env |
+| `{{Wiki Name}}` | User-approved name |
+| Purpose text | Interview purpose/audience/success answers |
+| Page taxonomy | Selected preset plus customizations |
+| Naming conventions | User preference or default kebab-case |
+| Schema filename | `AGENTS.md`, `CLAUDE.md`, or `wiki-schema.md` |
+| Frontmatter rules | OKF + stricter local schema decisions |
+| Domain-specific rules | Spoilers, privacy, supersession, confidence, lifecycle |
+| Open questions | Any unresolved decisions |
+
+If a placeholder cannot be filled confidently, ask before writing the schema.

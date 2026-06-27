@@ -161,7 +161,7 @@ describe('legislation wiki raw ingestion acceptance', () => {
     expect(state.sources['codigo-iva.original.md'].status).toBe('ingested')
   })
 
-  it('keeps PDF sources blocked until manual conversion succeeds', async () => {
+  it('sends PDF sources to the ingestion agent and keeps failures retryable', async () => {
     const specialist = await createTempSpecialist('iva')
     await storeRawSource(specialist, {
       fileName: 'scan.pdf',
@@ -172,15 +172,15 @@ describe('legislation wiki raw ingestion acceptance', () => {
     await runPendingIngestion(specialist, {
       piIngestionEnabled: true,
       runner: fakeRunner(() => {
-        throw new Error('PDF should not reach Pi in this slice')
+        throw new Error('Agent-owned conversion failed.')
       })
     })
 
     const state = await readIngestionState(specialist.paths.ingestState)
     expect(state.sources['scan.pdf']).toMatchObject({
-      status: 'blocked',
-      conversion: { status: 'pending', markdown_path: 'scan.pdf.md' },
-      ingestion: { status: 'blocked', source_path: 'scan.pdf.md' }
+      status: 'failed',
+      conversion: { status: 'failed', markdown_path: 'scan.pdf.md' },
+      ingestion: { status: 'failed', source_path: 'scan.pdf.md' }
     })
     expect(state.sources['scan.pdf'].checksum).toMatch(/^sha256:/)
   })

@@ -107,6 +107,7 @@ describe('specialist registry acceptance', () => {
 
     const specialistDir = join(specialtiesRoot, 'pauta-aduaneira')
     expect((await stat(join(specialistDir, 'raw'))).isDirectory()).toBe(true)
+    expect((await stat(join(specialistDir, 'converted'))).isDirectory()).toBe(true)
     expect((await stat(join(specialistDir, 'wiki'))).isDirectory()).toBe(true)
     expect((await stat(join(specialistDir, 'ingest'))).isDirectory()).toBe(true)
     expect((await stat(join(specialistDir, 'ingest', 'state.json'))).isFile()).toBe(true)

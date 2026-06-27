@@ -3,7 +3,7 @@ import { hostname } from 'node:os'
 import type { DatabaseSync } from 'node:sqlite'
 import { resolveAppConfig } from '../config'
 import { initializeDatabase } from '../db'
-import { runPendingConversions, type PiConversionRunner } from '../ingestion/conversion'
+import type { PiConversionRunner } from '../ingestion/conversion'
 import type { PiIngestionRunner } from '../ingestion/pi-runner'
 import { runPendingIngestion } from '../ingestion/run'
 import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializationRunner, type SpecialistInitializationRunner } from '../specialists/initialization'
@@ -280,11 +280,6 @@ async function runSpecialistIngestionJob(
   if (!specialist) {
     throw createJobError('SPECIALIST_NOT_FOUND', `Specialist "${job.specialist_id}" was not found.`)
   }
-
-  await runPendingConversions(specialist, {
-    piConversionEnabled: options.piConversionEnabled,
-    ...(options.conversionRunner ? { runner: options.conversionRunner } : {})
-  })
 
   await runPendingIngestion(specialist, {
     piIngestionEnabled: options.piIngestionEnabled,

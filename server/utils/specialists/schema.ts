@@ -37,6 +37,7 @@ export interface SpecialistRuntime extends NormalizedSpecialistConfig {
     root: string
     config: string
     raw: string
+    converted: string
     wiki: string
     ingest: string
     ingestState: string

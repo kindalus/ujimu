@@ -1,6 +1,16 @@
 export type IngestionSourceStatus = 'pending' | 'processing' | 'ingested' | 'failed' | 'blocked'
 
 export type ConversionStatus = 'not_required' | 'pending' | 'processing' | 'converted' | 'failed'
+export type LlmWikiConversionStatus =
+  | 'full'
+  | 'partial'
+  | 'lossy'
+  | 'ocr-full'
+  | 'ocr-partial'
+  | 'summary-only'
+  | 'metadata-only'
+  | 'passthrough'
+  | 'failed'
 export type PipelineIngestionStatus = 'blocked' | 'pending' | 'processing' | 'ingested' | 'failed'
 
 export interface SourceConversionState {
@@ -9,6 +19,9 @@ export interface SourceConversionState {
   markdown_checksum?: string
   converted_at?: string
   updated_at?: string
+  conversion_status?: LlmWikiConversionStatus
+  conversion_method?: string
+  warnings?: string[]
   error_code?: string
   error_message?: string
 }
@@ -72,12 +85,34 @@ export interface IngestionManifestSourceFailure {
   error_message: string
 }
 
-export interface IngestionManifest {
+export interface IngestionManifestV1 {
   version: 1
   specialist_id: string
   ingested: IngestionManifestSourceSuccess[]
   failed: IngestionManifestSourceFailure[]
 }
+
+export interface AgentOwnedIngestionManifestSourceSuccess extends IngestionManifestSourceSuccess {
+  converted_path: string
+  source_sha256: string
+  converted_sha256: string
+  conversion_status: LlmWikiConversionStatus
+}
+
+export interface AgentOwnedIngestionManifestSourceFailure extends IngestionManifestSourceFailure {
+  stage?: 'conversion' | 'ingestion'
+  converted_path?: string
+  conversion_status?: LlmWikiConversionStatus
+}
+
+export interface IngestionManifestV2 {
+  version: 2
+  specialist_id: string
+  processed: AgentOwnedIngestionManifestSourceSuccess[]
+  failed: AgentOwnedIngestionManifestSourceFailure[]
+}
+
+export type IngestionManifest = IngestionManifestV1 | IngestionManifestV2
 
 export interface StoredRawSource {
   relativePath: string

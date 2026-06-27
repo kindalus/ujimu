@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-06-16
+Last updated: 2026-06-27
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,14 +20,14 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 43 chat copy and response metrics:
+Latest full verification after Slice 44 agent-owned conversion and ingestion:
 
 - `npm test` — passed, 195 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `nuxt`, `vite`, `protobufjs`, and `ws`; dependency remediation is outside Slice 43.
+- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `@earendil-works/pi-coding-agent`, `nuxt`, `vite`, `protobufjs`, `undici`, and `ws`; dependency remediation is outside Slice 44.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools browser check — passed: `/admin`, `/admin/analytics`, and `/admin/ops` render the expected route-specific unauthenticated/admin-blocking surfaces; console output has no errors or warnings beyond Nuxt development info logs.
+- Chrome DevTools browser check — not rerun for Slice 44 because the change is backend/ops pipeline behaviour with no new browser UI surface.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -95,6 +95,55 @@ Known non-blocking warnings:
 | 41 | [`41-admin-agent-workflow-progress-recovery.html`](./41-admin-agent-workflow-progress-recovery.html) | `verified` | 2026-06-12 | Admin workflow for initialization states, upload gating, logs, and recovery/retry. |
 | 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `verified` | 2026-06-16 | Chat input auto-grows up to five lines, then scrolls internally. |
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
+| 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
+
+## Slice 44 — Agent-owned conversion and ingestion
+
+Status: `verified`
+
+Originating brainstorm and architecture:
+
+- [`../brainstorm-agent-owned-conversion-ingestion.html`](../brainstorm-agent-owned-conversion-ingestion.html)
+- [`../agent-owned-conversion-ingestion-architecture.html`](../agent-owned-conversion-ingestion-architecture.html)
+
+Refinement decisions:
+
+- Follow the updated `llm-wiki` invariant: `raw/ -> converted/ -> wiki/`.
+- Make the normal ingestion job responsible for conversion and wiki ingestion in one agent session.
+- Keep Ujimu validation at system boundaries: upload checks, sandbox policy, manifest shape, safe paths, hashes, wiki page existence, and citation metadata.
+- Do not validate conversion fidelity, article extraction quality, or converted-source prose in Ujimu backend code.
+- Keep the legacy conversion endpoint available for transition, but stop calling it from the background ingestion worker.
+
+Grill decisions:
+
+- Add `converted/` as a first-class specialist path and creation-time directory.
+- Treat supported uploaded sources as pending for ingestion even when conversion is still needed.
+- Use manifest v2 with `processed[]` entries that include conversion status and converted hashes.
+- Only accept auto-ingest conversion statuses (`full`, `ocr-full`, `lossy`, `passthrough`) as successful processed entries; statuses requiring confirmation must be reported as failures.
+- Restore pending state when a manifest is invalid.
+
+Acceptance-test plan:
+
+- Update ingestion prompt tests to assert the `converted/` sandbox and manifest v2 contract.
+- Update batch-ingestion tests to create converted files, validate converted hashes/frontmatter, and enrich state from manifest v2.
+- Update background-job tests to assert the legacy conversion runner is not called in the normal ingestion path.
+- Update source-detection tests to assert direct Markdown and PDFs are pending for agent-owned conversion/ingestion.
+
+Implementation:
+
+- Added `paths.converted` to specialist runtime paths and create-specialist directory creation.
+- Updated source detection so every supported raw source targets `converted/<raw-path>.md` and remains pending for ingestion.
+- Updated Pi ingestion runner file policy and prompt to use the `llm-wiki` convert-before-ingest workflow.
+- Added manifest v2 validation and state enrichment for conversion status, converted checksums, wiki pages, and citations.
+- Stopped the background ingestion worker from invoking `runPendingConversions()` before ingestion.
+- Updated operations docs, environment comments, and project instructions to reflect agent-owned conversion.
+
+Verification:
+
+- `npm test` — passed, 195 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- `npm audit --audit-level=high` — failed with upstream dependency advisories outside this slice.
 
 ## Slice 43 — Copy question and latest response metrics
 
@@ -207,11 +256,11 @@ Planning decisions:
 - `system_prompt` is optional; substantive behaviour and citation discipline live in the specialist `AGENTS.md`.
 - Admin may create a specialist without an initial source; upload is enabled only after wiki initialization.
 - A specialist becomes chat-visible only after at least one source is ingested successfully.
-- Ingestion runs as one batch session over pending Markdown sources while preserving the LLM Wiki ritual per source.
+- Ingestion runs as one batch session over pending raw sources; the agent converts them into `converted/` before ingesting into `wiki/`.
 - Ingestion produces a dual-channel manifest: final structured output and `.ujimu/ingestion-manifest.json`.
 - Backend validates the manifest before enriching `ingest/state.json`; `state.json` remains an operational index, not a second wiki.
 - Citation allowlists come from backend-owned state, not directly from agent prose.
-- Global agent logs live under `<UJIMU_DATA_DIR>/logs/agents/` using ISO-safe filenames for `initialization`, `conversion`, and `ingestion` sessions.
+- Agent logs live under each specialist's local `logs/` directory using ISO-safe filenames for `initialization`, `conversion`, and `ingestion` sessions.
 - Chat prompt injection is limited to the technical envelope: user question, selected specialist, citation allowlist, and event format.
 - Before implementing Pi SDK event/log behaviour, consult the official Pi documentation and current SDK API.
 

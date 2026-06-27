@@ -239,6 +239,10 @@ Rules:
 }
 
 function shouldRunConversion(source: IngestionSourceRecord, now: Date, staleCutoffMs: number): boolean {
+  if (/\.(md|markdown)$/i.test(source.raw_path)) {
+    return false
+  }
+
   const status = source.conversion?.status
   if (status === 'pending' || status === 'failed') {
     return true

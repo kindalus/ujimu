@@ -45,6 +45,8 @@ Specialist:
 - description: Especialista em regulação fintech angolana.
 - wiki type: legislation-regulatory
 
+The backend has already created raw/, converted/, wiki/, and ingest/. Respect the llm-wiki contract raw/ -> converted/ -> wiki/.
+
 Create these required files:
 - AGENTS.md
 - wiki/index.md
@@ -109,6 +111,7 @@ function specialistRuntimeFixture(systemPrompt = ''): SpecialistRuntime {
       root: '/tmp/ujimu/specialties/perito-fintech',
       config: '/tmp/ujimu/specialties/perito-fintech/specialist.yaml',
       raw: '/tmp/ujimu/specialties/perito-fintech/raw',
+      converted: '/tmp/ujimu/specialties/perito-fintech/converted',
       wiki: '/tmp/ujimu/specialties/perito-fintech/wiki',
       ingest: '/tmp/ujimu/specialties/perito-fintech/ingest',
       ingestState: '/tmp/ujimu/specialties/perito-fintech/ingest/state.json'

@@ -103,6 +103,7 @@ function createPromptSpecialist(systemPrompt: string): SpecialistRuntime {
       root: '/tmp/pauta-aduaneira',
       config: '/tmp/pauta-aduaneira/specialist.yaml',
       raw: '/tmp/pauta-aduaneira/raw',
+      converted: '/tmp/pauta-aduaneira/converted',
       wiki: '/tmp/pauta-aduaneira/wiki',
       ingest: '/tmp/pauta-aduaneira/ingest',
       ingestState: '/tmp/pauta-aduaneira/ingest/state.json'

@@ -49,11 +49,12 @@ Before changing product requirements, roadmap direction, specifications, or othe
 - On application start and on demand reload, the backend must check for source documents that have not yet been ingested.
 - Ingestion state is stored per specialist in `ingest/state.json`.
 - Official sources are always submitted as files, such as PDF, TXT, Markdown, or similar formats, and stored in the specialist `raw/` directory before ingestion.
+- Generated conversion artefacts belong in the specialist `converted/` directory, using the `llm-wiki` path mapping `raw/<relative-path> -> converted/<relative-path>.md`.
 - There is no raw file size restriction in the MVP.
 - OCR is not required in the MVP; scanned PDFs that need OCR are out of scope until a later phase.
 - Pi-backed ingestion uses the Pi SDK in-process, scoped to the specialist directory, with file tools only (`read`, `write`, `edit`, `grep`, `find`, `ls`) and no `bash` by default.
 - Pi-backed ingestion must be explicitly enabled with `UJIMU_PI_INGESTION_ENABLED=true`; when disabled, pending sources remain pending rather than being marked failed.
-- In the initial ingestion implementation, PDF files may be stored and detected, but text extraction is not implemented; PDFs are marked failed with an unsupported-source error when ingestion runs.
+- The ingestion agent owns the normal `raw/ -> converted/ -> wiki/` flow through the bundled `llm-wiki` skill; Ujimu validates paths, hashes, manifest structure, wiki page existence, and citation metadata but does not hard-code conversion fidelity rules.
 - Administrators can create specialties, choose the LLM Wiki preset, configure fields, define specialist system prompts, and upload documents for ingestion.
 - Administrators can delete a specialty; deleting a specialty must also delete customer conversation history for that specialty.
 
@@ -74,8 +75,8 @@ Before changing product requirements, roadmap direction, specifications, or othe
 - Every substantive answer to a user must cite the relevant source material.
 - User-facing citations appear at the end of the answer.
 - Citations should reference the original source file; for legislation/regulatory specialties, cite titles and articles rather than wiki page names.
-- Keep raw uploaded/source documents distinct from generated wiki pages.
-- Preserve traceability from answer → wiki page → source document.
+- Keep raw uploaded/source documents, generated converted Markdown, and curated wiki pages distinct.
+- Preserve traceability from answer → wiki page → converted source → raw source document.
 - Repeated user questions may indicate missing wiki coverage; aggregate these signals and surface them for admin review before adding new content.
 
 ## Chat experience
@@ -180,6 +181,7 @@ This is a starting convention and may evolve after product clarification:
     example-specialist/
       specialist.yaml
       raw/
+      converted/
       wiki/
       ingest/
         state.json

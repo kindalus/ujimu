@@ -312,6 +312,7 @@ function specialistRuntimeFixture(options: { citationsRequired?: boolean } = {})
       root: '/tmp/ujimu/specialties/iva',
       config: '/tmp/ujimu/specialties/iva/specialist.yaml',
       raw: '/tmp/ujimu/specialties/iva/raw',
+      converted: '/tmp/ujimu/specialties/iva/converted',
       wiki: '/tmp/ujimu/specialties/iva/wiki',
       ingest: '/tmp/ujimu/specialties/iva/ingest',
       ingestState: '/tmp/ujimu/specialties/iva/ingest/state.json'

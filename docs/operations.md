@@ -42,10 +42,10 @@ Configure these outside source control:
 - `UJIMU_DB_PATH` — optional SQLite override; defaults under `UJIMU_DATA_DIR`.
 - `UJIMU_CONFIG_DIR` — mutable application configuration directory; defaults to `~/.config/ujimu` and stores Pi `auth.json`, `models.json`, and `settings.json`.
 - `UJIMU_PI_BUNDLE_DIR` — optional override for bundled Pi resources; defaults to `config/pi` and stores product skills, tools, extensions, and seed config files.
-- `UJIMU_PI_CONVERSION_ENABLED` — set to `true` only where admins may run raw-to-Markdown conversion.
-- `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may ingest converted Markdown into specialist wikis.
+- `UJIMU_PI_CONVERSION_ENABLED` — legacy/manual conversion endpoint flag; the normal ingestion worker no longer depends on this flag.
+- `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may let the ingestion agent convert `raw/` into `converted/` and ingest into specialist wikis.
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
-- `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — maximum validated converted Markdown size; defaults to `1048576`.
+- `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
 - `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `<UJIMU_CONFIG_DIR>/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
 
@@ -77,8 +77,8 @@ Keep real `auth.json` files out of Git. If a local environment previously used `
 Ujimu wraps Pi file tools with a virtual `/data` mount plus a realpath-based allowlist before exposing them to conversion, ingestion, or chat sessions. The model sees specialist files as `/data/...`; host paths are not shown in prompts or expected tool inputs.
 
 - Chat sessions may read/search/list only `/data/wiki/` and cannot write files.
-- Ingestion sessions may read the selected Markdown source plus `/data/wiki/`, and may write/edit only `/data/wiki/`.
-- Conversion sessions may read only the selected `/data/raw/` source and write only its derived Markdown output.
+- Ingestion sessions may read `/data/raw/`, `/data/converted/`, `/data/wiki/`, `AGENTS.md`, and `ingest/state.json`; they may write `/data/converted/`, `/data/wiki/`, and `.ujimu/ingestion-manifest.json`.
+- Legacy conversion sessions may read only the selected `/data/raw/` source and write only its derived Markdown output.
 - Paths outside `/data`, including `/config`, `/bundle`, host absolute paths, home-relative paths, resource-prefixed paths, `..` escapes, and symlink escapes are reported as not found.
 - Permission-denied errors are reserved for existing `/data` paths that are real specialist resources but outside the session allowlist, such as a conversion session trying to write `/data/wiki/`.
 - `bash` remains unavailable to Ujimu Pi sessions.
@@ -86,13 +86,15 @@ Ujimu wraps Pi file tools with a virtual `/data` mount plus a realpath-based all
 
 This is an application-level guard. For a stronger production isolation boundary, run the process or tool execution inside a container, VM, or equivalent sandbox with only the required specialist directory mounted.
 
-### DOCX conversion
+### Agent-owned conversion during ingestion
 
-DOCX conversion is handled by a Ujimu-controlled OpenXML extractor for files under `raw/`. It writes the deterministic output `raw/<source>.docx.md` without asking the model to read external DOCX skills or execute shell commands. Complex DOCX constructs may still require manual source preparation if the generated Markdown is too small or unusable.
+The normal source-processing path is now owned by the `llm-wiki` skill inside the ingestion agent session. The agent converts each pending source from `raw/` to `converted/<raw relative path>.md`, then ingests only from `converted/` into the OKF-compliant `wiki/`. Ujimu validates the resulting manifest, converted file paths/hashes, wiki page paths, and citation shape before updating `ingest/state.json`; it does not validate conversion fidelity or source content.
 
-## Gemini PDF-to-Markdown conversion dependency
+The legacy DOCX/PDF conversion utilities and `/conversion/run` endpoint remain for transitional/manual use, but the background ingestion worker does not call them.
 
-PDF conversion through the `pdf_to_markdown` tool depends on the Gemini CLI in the production/container runtime:
+## Legacy Gemini PDF-to-Markdown conversion dependency
+
+Manual PDF conversion through the legacy `pdf_to_markdown` tool depends on the Gemini CLI in the production/container runtime:
 
 - `gemini` must be installed and available on `PATH`.
 - `timeout` must be available on `PATH` in the container runtime; the script uses `timeout 600s` per PDF.
@@ -109,17 +111,17 @@ cd /path/to/specialist-root
 /path/to/ujimu/config/pi/tools/pdf_to_markdown.sh raw/small-sample.pdf
 ```
 
-Expected result: the command prints JSON metadata only and creates `raw/small-sample.pdf.md`. Do not run this smoke test in CI because it requires real Gemini credentials and an external service call.
+Expected result: the command prints JSON metadata only and creates `raw/small-sample.pdf.md`. This is not the normal ingestion-worker path. Do not run this smoke test in CI because it requires real Gemini credentials and an external service call.
 
 ## Pi conversion, ingestion, and consultation smoke test
 
 Run this smoke path only in a configured non-production environment with `<UJIMU_CONFIG_DIR>/auth.json` present outside source control or credentials provided through environment variables, and with the Pi enable flags set deliberately. Before production, run it with the exact provider/model configuration intended for production; a successful smoke with a temporary model proves the pipeline shape, not the final production model choice.
 
 1. Upload a small official source through the admin console.
-2. Click `Executar ingestão` and confirm that raw files that still need conversion first produce `raw/<original filename>.md`, then continue into ingestion.
-3. Confirm that the wiki is updated while citations still reference the original uploaded file.
+2. Click `Executar ingestão` and confirm that the ingestion agent creates or updates `converted/<original filename>.md`, then updates `wiki/`.
+3. Confirm that the wiki source pages trace to both the original uploaded file and the converted file, while chat citations still reference the original uploaded file.
 4. Ask a scoped chat question and confirm that the response streams only after validated citations are available.
-5. Review admin audit events for safe conversion counts; do not log source contents, prompts, answers, or secrets.
+5. Review admin audit events and specialist-local agent logs; do not log source contents, prompts, answers, or secrets outside the intended agent-session log.
 
 ## SQLite backup
 

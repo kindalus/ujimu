@@ -14,21 +14,26 @@ vi.mock('../server/utils/pi/session', () => ({
 }))
 
 describe('Pi ingestion prompt acceptance', () => {
-  it('asks Pi to ingest pending Markdown from raw without listing sources in the prompt', async () => {
+  it('asks Pi to convert raw sources through converted before ingestion without listing sources in the prompt', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-ingestion-prompt-'))
     const specialist = specialistRuntimeFixture(root)
     await mkdir(specialist.paths.raw, { recursive: true })
+    await mkdir(specialist.paths.converted, { recursive: true })
     await mkdir(specialist.paths.wiki, { recursive: true })
     await mkdir(specialist.paths.ingest, { recursive: true })
     await writeFile(join(specialist.paths.ingest, 'state.json'), '{"version":1,"sources":{}}')
 
     const source = sourceRecordFixture()
     const manifest: IngestionManifest = {
-      version: 1,
+      version: 2,
       specialist_id: specialist.id,
-      ingested: [{
+      processed: [{
         raw_path: source.raw_path,
         source_path: source.ingestion!.source_path,
+        converted_path: source.conversion!.markdown_path,
+        source_sha256: source.checksum,
+        converted_sha256: 'sha256:converted',
+        conversion_status: 'passthrough',
         wiki_pages: ['codigo-iva.md'],
         citations: [{ source_file: `raw/${source.raw_path}`, source_title: source.title, article_refs: source.article_refs }],
         warnings: []
@@ -64,29 +69,43 @@ describe('Pi ingestion prompt acceptance', () => {
 
     await createPiSdkIngestionRunner().ingestSources!(specialist, [source], { timeoutMs: 1000 })
 
-    expect(prompts).toEqual([`Ingest all markdown files from raw that have not been ingested yet.
+    expect(prompts).toEqual([`Use the llm-wiki skill to process pending Ujimu specialist sources in batch/no-discussion mode.
 
-Write a complete ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
+Follow the llm-wiki contract exactly:
+- Convert raw sources from /data/raw into /data/converted before ingesting.
+- Ingest only from /data/converted into /data/wiki.
+- Never modify, rename, or delete files in /data/raw.
+- Keep /data/wiki OKF-compliant and update its index and log.
+
+Read /data/AGENTS.md and /data/ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+
+Write a complete Ujimu ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 
 /data/.ujimu/ingestion-manifest.json specification:
 {
-  "version": 1,
+  "version": 2,
   "specialist_id": "iva",
-  "ingested": [
+  "processed": [
     {
-      "raw_path": "source.original.md",
-      "source_path": "source.original.md",
+      "raw_path": "source.pdf",
+      "source_path": "source.pdf.md",
+      "converted_path": "source.pdf.md",
+      "source_sha256": "sha256:...",
+      "converted_sha256": "sha256:...",
+      "conversion_status": "full",
       "wiki_pages": ["relative-page.md"],
       "citations": [
-        { "source_file": "raw/source.original.md", "source_title": "Source title", "article_refs": ["Artigo 1.º"] }
+        { "source_file": "raw/source.pdf", "source_title": "Source title", "article_refs": ["Artigo 1.º"] }
       ],
       "warnings": []
     }
   ],
   "failed": [
-    { "raw_path": "failed.md", "source_path": "failed.md", "error_code": "ERROR_CODE", "error_message": "Human readable failure" }
+    { "raw_path": "failed.pdf", "stage": "conversion", "converted_path": "failed.pdf.md", "conversion_status": "failed", "error_code": "ERROR_CODE", "error_message": "Human readable failure" }
   ]
 }
+
+Only include conversion_status values allowed by the llm-wiki skill. Put sources that require user confirmation before ingestion in failed[] with a clear error_message instead of processed[].
 `])
     expect(prompts[0]).not.toContain(source.raw_path)
     expect(prompts[0]).not.toContain(source.checksum)
@@ -95,9 +114,9 @@ Write a complete ingestion manifest to /data/.ujimu/ingestion-manifest.json and 
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
     expect(sessionOptions.fileSystemPolicy).toEqual({
       root: specialist.paths.root,
-      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md', 'ingest/state.json'] },
-      write: { directories: ['wiki'], files: ['.ujimu/ingestion-manifest.json'] },
-      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
+      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
+      write: { directories: ['wiki', 'converted'], files: ['.ujimu/ingestion-manifest.json'] },
+      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
     })
   })
 })
@@ -117,6 +136,7 @@ function specialistRuntimeFixture(root: string): SpecialistRuntime {
       root,
       config: join(root, 'specialist.yaml'),
       raw: join(root, 'raw'),
+      converted: join(root, 'converted'),
       wiki: join(root, 'wiki'),
       ingest: join(root, 'ingest'),
       ingestState: join(root, 'ingest', 'state.json')
@@ -134,13 +154,12 @@ function sourceRecordFixture(): IngestionSourceRecord {
     title: 'Código do IVA',
     article_refs: ['Artigo 1.º'],
     conversion: {
-      status: 'not_required',
-      markdown_path: 'codigo-iva.original.md',
-      markdown_checksum: 'sha256:original'
+      status: 'pending',
+      markdown_path: 'codigo-iva.original.md.md'
     },
     ingestion: {
       status: 'pending',
-      source_path: 'codigo-iva.original.md'
+      source_path: 'codigo-iva.original.md.md'
     },
     detected_at: '2026-06-13T00:00:00.000Z',
     updated_at: '2026-06-13T00:00:00.000Z'

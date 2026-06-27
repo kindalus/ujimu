@@ -80,6 +80,7 @@ function createSpecialist(root: string): SpecialistRuntime {
       root,
       config: join(root, 'specialist.yaml'),
       raw: join(root, 'raw'),
+      converted: join(root, 'converted'),
       wiki: join(root, 'wiki'),
       ingest: join(root, 'ingest'),
       ingestState: join(root, 'ingest', 'state.json')

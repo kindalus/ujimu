@@ -46,12 +46,16 @@ export function createPiSdkIngestionRunner(): PiIngestionRunner {
   return {
     async ingestSource(specialist, source, options = {}) {
       const result = await runPiSdkBatchIngestion(specialist, [source], options)
-      return { summary: `Pi ingested ${result.manifest.ingested.length} source(s).` }
+      return { summary: `Pi ingested ${countManifestSuccesses(result.manifest)} source(s).` }
     },
     async ingestSources(specialist, sources, options = {}) {
       return runPiSdkBatchIngestion(specialist, sources, options)
     }
   }
+}
+
+function countManifestSuccesses(manifest: IngestionManifest): number {
+  return manifest.version === 2 ? manifest.processed.length : manifest.ingested.length
 }
 
 async function runPiSdkBatchIngestion(
@@ -68,9 +72,9 @@ async function runPiSdkBatchIngestion(
     tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
     fileSystemPolicy: {
       root: cwd,
-      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md', 'ingest/state.json'] },
-      write: { directories: ['wiki'], files: ['.ujimu/ingestion-manifest.json'] },
-      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
+      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
+      write: { directories: ['wiki', 'converted'], files: ['.ujimu/ingestion-manifest.json'] },
+      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
     },
     agentLog: { specialistId: specialist.id }
   })
@@ -151,29 +155,43 @@ function parseManifestJson(value: string): IngestionManifest {
 }
 
 function buildBatchIngestionPrompt(specialist: SpecialistRuntime): string {
-  return `Ingest all markdown files from raw that have not been ingested yet.
+  return `Use the llm-wiki skill to process pending Ujimu specialist sources in batch/no-discussion mode.
 
-Write a complete ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
+Follow the llm-wiki contract exactly:
+- Convert raw sources from /data/raw into /data/converted before ingesting.
+- Ingest only from /data/converted into /data/wiki.
+- Never modify, rename, or delete files in /data/raw.
+- Keep /data/wiki OKF-compliant and update its index and log.
+
+Read /data/AGENTS.md and /data/ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+
+Write a complete Ujimu ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 
 /data/.ujimu/ingestion-manifest.json specification:
 {
-  "version": 1,
+  "version": 2,
   "specialist_id": "${specialist.id}",
-  "ingested": [
+  "processed": [
     {
-      "raw_path": "source.original.md",
-      "source_path": "source.original.md",
+      "raw_path": "source.pdf",
+      "source_path": "source.pdf.md",
+      "converted_path": "source.pdf.md",
+      "source_sha256": "sha256:...",
+      "converted_sha256": "sha256:...",
+      "conversion_status": "full",
       "wiki_pages": ["relative-page.md"],
       "citations": [
-        { "source_file": "raw/source.original.md", "source_title": "Source title", "article_refs": ["Artigo 1.º"] }
+        { "source_file": "raw/source.pdf", "source_title": "Source title", "article_refs": ["Artigo 1.º"] }
       ],
       "warnings": []
     }
   ],
   "failed": [
-    { "raw_path": "failed.md", "source_path": "failed.md", "error_code": "ERROR_CODE", "error_message": "Human readable failure" }
+    { "raw_path": "failed.pdf", "stage": "conversion", "converted_path": "failed.pdf.md", "conversion_status": "failed", "error_code": "ERROR_CODE", "error_message": "Human readable failure" }
   ]
 }
+
+Only include conversion_status values allowed by the llm-wiki skill. Put sources that require user confirmation before ingestion in failed[] with a clear error_message instead of processed[].
 `
 }
 
@@ -191,9 +209,9 @@ async function runPiSdkIngestion(
     tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
     fileSystemPolicy: {
       root: cwd,
-      read: { directories: ['wiki'], files: ['AGENTS.md', `raw/${markdownPath}`] },
-      write: { directories: ['wiki'] },
-      list: { directories: ['wiki'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
+      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
+      write: { directories: ['wiki', 'converted'] },
+      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
     },
     agentLog: { specialistId: specialist.id }
   })
@@ -227,7 +245,7 @@ async function runPiSdkIngestion(
 function buildIngestionPrompt(specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.ingestion?.source_path ?? source.raw_path
 
-  return `Ingest exactly one Markdown source into this specialist wiki.
+  return `Use the llm-wiki skill to convert and ingest exactly one specialist source.
 
 Specialist:
 - id: ${specialist.id}
@@ -236,21 +254,20 @@ Specialist:
 
 Source:
 - original raw path for citations: raw/${source.raw_path}
-- Markdown ingestion path: /data/raw/${markdownPath}
+- converted Markdown path: /data/converted/${markdownPath}
 - title: ${source.title}
 - original checksum: ${source.checksum}
-- Markdown checksum: ${source.conversion?.markdown_checksum ?? '(unknown)'}
 - article references detected by the app: ${source.article_refs.join(', ') || '(none)'}
 
 Instructions:
-1. Use the llm-wiki skill to ingest only the Markdown file at /data/raw/${markdownPath}.
-2. Do not ingest /data/raw/${source.raw_path} directly when it differs from the Markdown ingestion path.
+1. Convert /data/raw/${source.raw_path} to /data/converted/${markdownPath} before ingestion.
+2. Ingest only from /data/converted/${markdownPath}; do not ingest directly from /data/raw.
 3. Do not modify, rename, or delete anything under /data/raw.
-4. Maintain the /data/wiki directory using the legislation/regulatory LLM Wiki structure.
-5. Preserve traceability from wiki pages to the original source file raw/${source.raw_path}.
+4. Maintain the /data/wiki directory using the specialist schema and OKF rules.
+5. Preserve traceability from wiki pages to raw/${source.raw_path} and converted/${markdownPath}.
 6. Update /data/wiki/index.md and /data/wiki/log.md if present, or create them if missing.
 7. If this is a reingestion, reconcile existing wiki pages instead of creating duplicate source pages.
-8. If you cannot ingest the source from the available context, explain the failure clearly.
+8. If you cannot convert or ingest the source from the available context, explain the failure clearly.
 `
 }
 

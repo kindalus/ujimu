@@ -105,6 +105,8 @@ Specialist:
 - description: ${specialist.description}
 - wiki type: ${specialist.wiki_type}
 
+The backend has already created raw/, converted/, wiki/, and ingest/. Respect the llm-wiki contract raw/ -> converted/ -> wiki/.
+
 Create these required files:
 - AGENTS.md
 - wiki/index.md

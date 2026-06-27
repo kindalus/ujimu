@@ -51,6 +51,7 @@ export async function createSpecialist(
   }
 
   await mkdir(paths.raw, { recursive: true })
+  await mkdir(paths.converted, { recursive: true })
   await mkdir(paths.wiki, { recursive: true })
   await mkdir(paths.ingest, { recursive: true })
   await writeFile(paths.ingestState, '{}\n')

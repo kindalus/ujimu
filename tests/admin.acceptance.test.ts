@@ -1,4 +1,5 @@
-import { mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -350,7 +351,7 @@ describe('admin specialist management acceptance', () => {
     database.close()
   })
 
-  it('runs pending conversion before ingestion inside the recoverable ingestion job', async () => {
+  it('lets the ingestion agent convert pending raw sources inside the recoverable ingestion job', async () => {
     const { dataDir } = await createTempAdminData()
     await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
     await createSpecialist(validSpecialist('iva'), { dataDir })
@@ -375,19 +376,40 @@ describe('admin specialist management acceptance', () => {
     const result = await runDueBackgroundJobs({
       database,
       dataDir,
-      piConversionEnabled: true,
+      piConversionEnabled: false,
       piIngestionEnabled: true,
       conversionRunner: {
-        async convertSource(specialist, source) {
-          await writeFile(
-            join(specialist.paths.raw, source.conversion!.markdown_path),
-            `# Convertido\n\nArtigo 1.º\nMarkdown de ${source.raw_path} com conteúdo suficiente.`
-          )
+        async convertSource() {
+          throw new Error('Legacy conversion runner should not be called.')
         }
       },
       runner: {
-        async ingestSource(specialist, source) {
-          await writeFile(join(specialist.paths.wiki, 'index.md'), `# Wiki\n\nFonte: ${source.ingestion!.source_path}\n`)
+        async ingestSource() {
+          throw new Error('This test expects batch ingestion.')
+        },
+        async ingestSources(specialist, sources) {
+          const source = sources[0]!
+          const convertedPath = source.conversion!.markdown_path
+          const convertedContent = `---\ntype: Converted Source\ntitle: "${source.title}"\nsource_path: ../raw/${source.raw_path}\nsource_format: txt\nsource_sha256: "${source.checksum}"\nconverted_at: 2026-06-27T00:00:00.000Z\nconversion_status: full\nconversion_method: "test"\nwarnings: []\n---\n\n# Convertido\n\nArtigo 1.º\nMarkdown de ${source.raw_path} com conteúdo suficiente.`
+          await mkdir(specialist.paths.converted, { recursive: true })
+          await writeFile(join(specialist.paths.converted, convertedPath), convertedContent)
+          await writeFile(join(specialist.paths.wiki, 'index.md'), `# Wiki\n\nFonte: ${convertedPath}\n`)
+          return {
+            version: 2,
+            specialist_id: specialist.id,
+            processed: [{
+              raw_path: source.raw_path,
+              source_path: convertedPath,
+              converted_path: convertedPath,
+              source_sha256: source.checksum,
+              converted_sha256: toChecksum(convertedContent),
+              conversion_status: 'full' as const,
+              wiki_pages: ['index.md'],
+              citations: [{ source_file: `raw/${source.raw_path}`, source_title: source.title, article_refs: ['Artigo 1.º'] }],
+              warnings: []
+            }],
+            failed: []
+          }
         }
       }
     })
@@ -397,7 +419,7 @@ describe('admin specialist management acceptance', () => {
     expect(specialist).toBeTruthy()
     const state = await readIngestionState(specialist!.paths.ingestState)
     expect(state.sources['lei.txt']).toMatchObject({
-      conversion: { status: 'converted', markdown_path: 'lei.txt.md', markdown_checksum: expect.stringMatching(/^sha256:/) },
+      conversion: { status: 'converted', markdown_path: 'lei.txt.md', markdown_checksum: expect.stringMatching(/^sha256:/), conversion_status: 'full' },
       ingestion: { status: 'ingested', source_path: 'lei.txt.md' },
       status: 'ingested'
     })
@@ -624,6 +646,10 @@ function readJobStatuses(database: DatabaseSync): Array<{ id: string; status: st
   return database
     .prepare('SELECT id, status, attempts FROM background_jobs ORDER BY created_at, id')
     .all() as Array<{ id: string; status: string; attempts: number }>
+}
+
+function toChecksum(content: string | Buffer): string {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`
 }
 
 function restoreEnv(key: string, value: string | undefined): void {

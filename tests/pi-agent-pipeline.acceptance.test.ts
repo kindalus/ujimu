@@ -24,7 +24,7 @@ import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 const execFileAsync = promisify(execFile)
 
 describe('three Pi agent pipeline acceptance', () => {
-  it('renames direct Markdown uploads to .original.md and marks them ready for Markdown-only ingestion', async () => {
+  it('renames direct Markdown uploads to .original.md and marks them pending for agent-owned conversion and ingestion', async () => {
     const { specialist } = await createTempSpecialist('iva')
 
     const stored = await storeRawSource(specialist, {
@@ -53,13 +53,12 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(source).toMatchObject({
       raw_path: 'lei.original.md',
       conversion: {
-        status: 'not_required',
-        markdown_path: 'lei.original.md',
-        markdown_checksum: expect.stringMatching(/^sha256:/)
+        status: 'pending',
+        markdown_path: 'lei.original.md.md'
       },
       ingestion: {
         status: 'pending',
-        source_path: 'lei.original.md'
+        source_path: 'lei.original.md.md'
       }
     })
   })
@@ -82,7 +81,7 @@ describe('three Pi agent pipeline acceptance', () => {
         markdown_path: 'lei.pdf.md'
       },
       ingestion: {
-        status: 'blocked',
+        status: 'pending',
         source_path: 'lei.pdf.md'
       }
     })
@@ -129,7 +128,7 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(after.sources['falhou.csv'].conversion.status).toBe('converted')
   })
 
-  it('ingests only ready Markdown sources, skips blocked conversion states, and cites original uploads', async () => {
+  it('ingests pending raw sources through their converted Markdown targets and cites original uploads', async () => {
     const { specialist } = await createTempSpecialist('iva')
     await mkdir(specialist.paths.raw, { recursive: true })
     await writeFile(join(specialist.paths.raw, 'lei.pdf'), '%PDF-1.7 textual pdf placeholder')
@@ -155,14 +154,16 @@ describe('three Pi agent pipeline acceptance', () => {
       })
     })
 
-    expect(ingestedMarkdownPaths).toEqual(['lei.pdf.md', 'manual.original.md'])
+    expect(ingestedMarkdownPaths).toEqual(['lei.pdf.md', 'manual.original.md.md', 'pendente.docx.md'])
     const state = await readIngestionState(specialist.paths.ingestState) as any
     expect(state.sources['lei.pdf']).toMatchObject({
       raw_path: 'lei.pdf',
       ingestion: { status: 'ingested', source_path: 'lei.pdf.md' }
     })
-    expect(state.sources['pendente.docx'].ingestion.status).toBe('blocked')
-    expect(state.sources['manual.original.md'].ingestion.status).toBe('ingested')
+    expect(state.sources['pendente.docx'].ingestion.status).toBe('ingested')
+    expect(state.sources['manual.original.md']).toMatchObject({
+      ingestion: { status: 'ingested', source_path: 'manual.original.md.md' }
+    })
   })
 
   it('rejects generated Markdown artefact and mismatched MIME uploads at the admin boundary', async () => {

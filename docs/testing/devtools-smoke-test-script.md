@@ -52,7 +52,7 @@ Upload the small direct Markdown source fixture to the smoke-test specialist.
 
 The upload should be accepted, normalized as an original Markdown source, and stored without path traversal or duplicate-source warnings. Reload sources for the specialist.
 
-The source should show conversion `not_required` and ingestion pending or ready. If Pi ingestion is enabled for the run, run ingestion and expect the source to become ingested and update the specialist wiki. If Pi ingestion is disabled, the source should remain pending rather than being marked failed because ingestion was unavailable.
+The source should show a deterministic converted target under `converted/` and remain pending until ingestion runs. If Pi ingestion is enabled for the run, run ingestion and expect the agent to create a passthrough converted source, ingest it, and update the specialist wiki. If Pi ingestion is disabled, the source should remain pending rather than being marked failed because ingestion/conversion was unavailable.
 
 ### 4. Public specialist chooser and consultation
 
@@ -94,7 +94,7 @@ The smoke run passes only if:
 - Public health responds with minimal liveness.
 - Admin access control distinguishes admin from anonymous users.
 - A specialist can be created and appears in public and admin listings.
-- A Markdown source can be uploaded and reaches the expected ingestion-ready, ingested, or disabled-pending state.
+- A Markdown source can be uploaded and reaches the expected pending, ingested, or disabled-pending state.
 - Public consultation produces either a grounded cited answer or the documented safe fallback, depending on Pi availability.
 - Out-of-scope consultation fails closed without invented citations.
 - Quota, session, and security-header basics show no obvious regression.
@@ -110,7 +110,7 @@ The smoke run passes only if:
 | Specialist create/list | 2, 4 | One specialist is created, listed in admin, and visible publicly. |
 | Prompt privacy and AI disclosure | 2, 4 | Internal prompt is not exposed; AI disclosure is visible. |
 | Markdown upload and source state | 3 | Direct Markdown upload is accepted and reaches the expected pipeline state. |
-| Ingestion or disabled fallback | 3, 4 | Ingestion succeeds when enabled, or remains safely pending/blocked when disabled. |
+| Ingestion or disabled fallback | 3, 4 | Agent-owned conversion/ingestion succeeds when enabled, or remains safely pending when disabled. |
 | Public consultation | 4 | In-scope question yields grounded cited answer or configured safe fallback. |
 | Grounding failure | 4 | Out-of-scope question fails closed without invented citations. |
 | Quota/session/security basics | 5 | Server-side quota, cookies, headers, and external-call boundaries show no obvious regression. |

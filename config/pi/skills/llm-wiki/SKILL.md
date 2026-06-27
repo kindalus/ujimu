@@ -1,107 +1,152 @@
 ---
 name: llm-wiki
-description: Build and maintain a persistent, interlinked markdown knowledge base (a "wiki") that the LLM writes and the user curates — the inverse of typical RAG, where knowledge accumulates and compounds across sources rather than being re-derived per query. Use this skill whenever the user wants to start a wiki, knowledge base, research notebook, book companion, journal-backed system, team wiki, help-desk / FAQ / customer-support KB, engineering wiki / runbook / ADR collection, due-diligence file, legislation/regulatory database, or any domain-specific knowledge repo built from sources over time. Also use it to ingest a new source (article, paper, transcript, chapter, law, amendment, post-mortem) into an existing wiki, query a wiki, run a lint, or when asked about Andrej Karpathy's "LLM Wiki" pattern. Trigger even without the word "wiki" — phrases like "organize my reading", "document our services", "track everything on X", or "summarize this and file it" all qualify.
+description: "Build and maintain OKF-backed LLM wikis: raw sources are converted into auditable markdown, then ingested into a fully OKF-compliant wiki that compounds knowledge through summaries, cross-references, filed queries, and linting."
+license: MIT
 ---
 
-# LLM Wiki
+# OKF-backed LLM Wiki
 
-A skill for building and maintaining a persistent, LLM-authored markdown wiki that compounds knowledge across sources. Based on the pattern described by Andrej Karpathy: the user curates sources and asks questions; the LLM does all reading, summarizing, cross-referencing, filing, and bookkeeping.
+A skill for building and maintaining a persistent, LLM-authored markdown wiki that compounds knowledge across sources. It implements Andrej Karpathy's LLM Wiki pattern with an explicit persistence contract: `wiki/` is a fully OKF-compliant knowledge bundle, while `raw/` and `converted/` support source custody and conversion.
 
-## What makes this different from RAG
+## The core idea
 
-Most LLM-plus-documents setups (NotebookLM, ChatGPT file uploads, generic RAG) re-derive knowledge from raw sources on every query. Nothing accumulates. This skill works the opposite way: ingest a source once, integrate it into an evolving network of markdown pages, and the synthesis stays in place. Cross-references are pre-computed. Contradictions are pre-flagged. The wiki is a compounding artifact, not a query-time index.
+Most LLM-plus-document workflows re-derive knowledge from raw files on every query. This skill works the opposite way: ingest a source once, integrate it into a durable network of markdown pages, and keep that synthesis current as more sources and questions arrive.
 
-This means **your role is fundamentally different** from a conversational assistant:
-- You are the maintainer of a long-lived markdown repo, not a one-shot answerer.
-- Almost every operation touches multiple files (a single ingest may update 10–15 pages).
-- Persistence and cross-references matter more than rhetorical polish.
-- You write the wiki; the user does not (or rarely does).
+Your role is not to be a one-shot answerer. Your role is to maintain a long-lived knowledge repo:
 
-## The three layers
+- The user curates sources and asks questions.
+- You convert sources, summarize them, cross-link them, file derived answers, and keep indexes/logs current.
+- Knowledge accumulates in files, not in chat history.
+- The wiki gets more valuable because every ingest and substantive query updates the persistent artifact.
 
-Every LLM-wiki has the same architecture:
+## Non-negotiable architecture
 
-1. **`raw/`** — source documents the user collected. Articles, papers, PDFs, transcripts, images, journal entries. **Read-only from your perspective.** Never modify these. They are the source of truth.
-2. **`wiki/`** — markdown pages you author and maintain: summaries, entity pages, concept pages, comparisons, an index, a log. You own this layer entirely.
-3. **The schema file** (e.g. `AGENTS.md`, `CLAUDE.md`, or `wiki-schema.md` at the repo root) — domain-specific conventions for *this particular wiki*: what page types exist, how they're named, what cross-references look like, what happens on ingest. You and the user co-author this during initialization, and you read it at the start of every session.
+Every OKF-backed LLM wiki has four layers:
 
-The exact directory names (`raw/`, `wiki/`) are conventions — adapt to what already exists.
+1. **`raw/`** — original source files collected by the user. These are immutable source-of-truth artifacts. Do not modify, rename, or delete them unless the user explicitly asks.
+2. **`converted/`** — generated markdown representations of files in `raw/`. Every source passes through this layer, including `.md` and `.txt` files via `conversion_status: passthrough`. This layer is generated, non-curated, and may be overwritten during reconversion.
+3. **`wiki/`** — the curated knowledge bundle authored and maintained by the LLM. This directory must be fully compliant with `references/OKF-SPEC.md`.
+4. **Schema file** — `AGENTS.md`, `CLAUDE.md`, or `wiki-schema.md` at the repo root. It records domain-specific conventions for this wiki: page taxonomy, naming, additional frontmatter rules, ingestion style, and domain-specific exceptions.
 
-## Mode detection: do this first, every session
+The invariant is:
 
-Before doing anything else, figure out which mode you're in by inspecting the working directory:
+```text
+raw/ -> converted/ -> wiki/
+```
 
-- **No schema file present** (no `AGENTS.md` / `CLAUDE.md` / `wiki-schema.md` describing a wiki, no `wiki/` directory) → **Initialization mode**. The user is starting fresh. Read `references/initialization.md` and run the domain interview before creating any files. **The skill must establish the domain before scaffolding the wiki — different domains demand different page taxonomies and different ingestion rituals, and a wiki bootstrapped without that context will accumulate sloppy structure that's painful to fix later.**
-- **Schema file present, normal operation requested** (ingest, query, lint, browse) → **Operating mode**. Read the wiki's own schema file first — it overrides anything in this skill where they conflict, because it was tuned for this specific wiki. Then read `references/operations.md` for the relevant workflow.
-- **Schema file present, but user wants to substantially restructure** (new domain, reorganization, schema rewrite) → Treat as a guided re-initialization. Read both `references/initialization.md` and the existing schema, and propose a migration plan rather than blowing away the existing wiki.
+Never ingest directly from `raw/`. Never answer a substantive query by reading `raw/` directly. Conversion is the only operation that reads `raw/`; ingest and query operate on `converted/` and `wiki/`.
 
-If you're unsure which mode you're in, ask the user — don't guess. Creating a wiki on top of an existing one, or re-running init when the user wanted ingest, is the kind of mistake that wastes a session.
+## OKF persistence contract
 
-## Initializing a new wiki
+`wiki/` is the only OKF bundle. It must follow `references/OKF-SPEC.md`:
 
-When you detect initialization mode, **read `references/initialization.md` in full before asking any questions or writing any files.** That file contains:
+- Every non-reserved `.md` file in `wiki/` has YAML frontmatter.
+- Every concept page has a non-empty `type` field.
+- Internal links use standard markdown links, not Obsidian wikilinks.
+- `wiki/index.md` follows the OKF index format and has no frontmatter.
+- `wiki/log.md` follows the OKF date-grouped log format.
+- The local schema may add stricter requirements, but it must never weaken OKF.
 
-- The domain interview (questions to elicit purpose, scope, source types, page taxonomy, cross-reference patterns)
-- Domain presets (research, book companion, personal journal, business knowledge, custom) with tailored ingestion strategies
-- The bootstrap procedure (directories, schema file, seed index, seed log)
-- The schema file template (in `references/wiki-schema-template.md`) — instantiate it with the answers from the interview
+Before creating or modifying files inside `wiki/`, read `references/OKF-SPEC.md` unless you already read it in the current session.
 
-The output of initialization is: a directory tree, a populated schema file, an empty `wiki/index.md`, an empty `wiki/log.md`, and a clear next step for the user (typically: "drop your first source into `raw/` and tell me to ingest it").
+## Converted-source contract
 
-**Do not skip the interview** even when the user gives a one-line description like "I want a wiki for my PhD research." The domain still has many degrees of freedom (what sub-area, which entity types matter, source mix, naming conventions) that determine whether the wiki will be useful or annoying six months in.
+`converted/` is not an OKF bundle, but every converted markdown file uses an OKF-like audit contract:
 
-## Operating on an existing wiki
+```yaml
+---
+type: Converted Source
+title: "Source title or filename"
+source_path: ../raw/path/to/source.pdf
+source_format: pdf
+source_sha256: "sha256:..."
+converted_at: 2026-06-26T12:00:00Z
+conversion_status: full
+conversion_method: "tool or method used"
+warnings: []
+---
+```
 
-When you detect operating mode:
+Use the deterministic path mapping:
 
-1. **Read the schema file first.** It defines the conventions you must follow: page types, naming, cross-reference style, ingestion ritual, log format. Treat it as authoritative. If it disagrees with this SKILL.md, it wins.
-2. **Read `wiki/index.md`** to orient yourself in the existing knowledge.
-3. **Read recent entries in `wiki/log.md`** (last ~10 entries) to understand what's been done lately and the user's current threads of inquiry.
-4. **Then perform the requested operation** following `references/operations.md`.
+```text
+raw/<relative-path> -> converted/<relative-path>.md
+```
 
-The three core operations are:
+Examples:
 
-- **Ingest** — process a new source from `raw/` into the wiki. Touches many pages. See `references/operations.md#ingest`.
-- **Query** — answer a user question against the wiki. Substantive answers are filed back as pages by default — see the "Queries compound too" principle below. See `references/operations.md#query`.
-- **Lint** — health-check the wiki for contradictions, stale claims, orphans, missing pages, gaps. See `references/operations.md#lint`.
+```text
+raw/report.pdf       -> converted/report.pdf.md
+raw/report.docx      -> converted/report.docx.md
+raw/notes.md         -> converted/notes.md.md
+raw/folder/a.txt     -> converted/folder/a.txt.md
+```
 
-Other operations (rename a page, merge pages, split a page, refactor a section) are valid and should follow the same discipline: update cross-references, append to the log, keep the index current.
+Allowed `conversion_status` values:
 
-## Core principles (apply to every operation)
+- `full` — complete conversion with essential text/structure preserved.
+- `partial` — only part of the content was extracted with confidence.
+- `lossy` — broadly usable conversion, but layout/tables/images/structure were degraded.
+- `ocr-full` — complete conversion via OCR.
+- `ocr-partial` — OCR conversion was incomplete or low confidence.
+- `summary-only` — no faithful conversion; only a description/summary exists.
+- `metadata-only` — only metadata is available.
+- `passthrough` — original was already markdown/text and was normalized/copied.
+- `failed` — conversion failed; create a stub in `converted/` and stop.
 
-These are the things that go wrong if you forget them. Internalize them.
+Auto-ingest is allowed for `full`, `ocr-full`, `lossy`, and `passthrough`. Ask for user confirmation before ingesting `partial`, `ocr-partial`, `summary-only`, or `metadata-only`. Never ingest `failed`.
 
-**Cross-references are the value.** A summary page in isolation is not much better than the source. The wiki's worth comes from the dense network of links between pages. When you write or update a page, ask: what other pages should link *to* this, and what should this link *to*? Use the schema's link convention (typically `[[Page Name]]` for Obsidian-style or `[Page Name](page-name.md)` for plain markdown — check the schema).
+## Mode detection: do this first
 
-**A single ingest touches many files.** This is normal and good. A new source might mention five entities (update their pages), introduce two new concepts (create new pages), confirm or contradict three existing claims (update those pages and flag contradictions), and warrant a new comparison or synthesis. Plus the summary page, the index update, and the log entry. Do all of this in one pass. Humans abandon wikis because this maintenance burden is unbearable for a person; it's trivial for you.
+Inspect the working directory before acting:
 
-**Queries compound too.** Ingest is not the only way knowledge enters the wiki. When the user asks a substantive question and you produce a non-trivial answer — a comparison between two entities, an analysis across multiple sources, a connection neither of you had explicitly noticed before — that answer is *itself* knowledge worth keeping. **The default is to file it as a page in `wiki/derived/`** (or whatever location the schema specifies), not to leave it floating in chat history where it will be lost. Treat filing derived pages as a parallel discipline to ingestion: same rigor, same cross-references, same log entry. The point of the wiki is that the user's *thinking* accumulates alongside their reading; if every clever synthesis evaporates when the conversation ends, half the value is gone. The exceptions to filing — simple lookups, restatement of one source, casual back-and-forth — are real but narrower than they feel in the moment. When in doubt, file.
+- **No schema file and no `wiki/` directory** -> initialization mode. Read `references/initialization.md`, run the domain interview, confirm the design, then scaffold.
+- **Schema file present** -> operating mode. Read the schema first. It defines this wiki's local conventions and may be stricter than the base skill.
+- **User asks to convert** -> run the convert operation from `references/operations.md`. This creates or updates `converted/` only.
+- **User asks to ingest** -> run convert first if needed, then ingest from `converted/` into `wiki/`.
+- **Existing non-OKF llm-wiki detected** -> migration is out of scope for this skill rewrite. Do not mutate it automatically; tell the user this wiki does not match the OKF-backed contract and ask for explicit migration instructions.
 
-**Cite sources inside wiki pages.** Every claim that came from a source should be traceable back to that source. The convention is set by the schema, but typically: `[source-slug]` references after claims, with the source-slug pointing to the summary page in `wiki/sources/`.
+If you are unsure which mode applies, ask. Do not guess.
 
-**Flag, don't hide, contradictions.** If a new source contradicts an existing claim, do not silently overwrite. Add a "Disputes" or "Conflicting evidence" subsection to the relevant page that records both views and which source said what. The user often cares more about the disagreement than the consensus.
+## Core principles
 
-**Log everything.** Every ingest, every query that produced a filed answer, every lint pass — append a one-line entry to `wiki/log.md` with the date and a brief description. This is how the user (and you, in future sessions) reconstruct what happened.
+**Convert before ingesting.** A source is not ingestible until it has a corresponding converted markdown file. This makes every wiki claim traceable to an auditable markdown representation, not an opaque binary or remote page.
 
-**The user curates, you maintain.** Resist the urge to invent claims, fill gaps with web-search-generic content, or do things the user didn't ask for. The wiki should reflect what the user has actually read and asked about. If a gap is conspicuous, surface it ("I notice we have nothing on X — want me to look for sources?") rather than papering over it.
+**Cross-references are the value.** A standalone summary is only marginally better than the source. The wiki becomes valuable when source pages, concepts, entities, debates, and derived pages link to each other with meaningful prose around those links.
 
-**Keep raw/ pristine.** Never modify, rename, or delete files in `raw/`. If the user wants to remove a source from the wiki, that's a wiki-layer operation: remove the summary page, prune cross-references, log the removal — leave `raw/` alone unless the user explicitly says otherwise.
+**A single ingest touches many files.** This is normal. One source may create a source page, update several entity/concept pages, add or revise a debate, touch a synthesis page, update the index, and append to the log.
 
-**Prefer many small focused pages over a few sprawling ones.** Easier to link to, easier to update, better graph view. If a page exceeds ~500 lines or covers multiple distinct topics, propose splitting it.
+**Queries compound too.** Substantive answers are filed by default in `wiki/derived/`. Comparisons, analyses, and cross-source connections should not evaporate into chat history. Simple lookups, single-source restatements, casual back-and-forth, and explicit "do not file" requests are exceptions.
+
+**Cite through the wiki.** Claims in curated pages should trace back to source pages; source pages trace to both `raw/` and `converted/` through frontmatter and a visible "Source Material" section.
+
+**Flag contradictions.** Do not silently overwrite an existing claim when a new source disagrees. Add a dispute/conflicting-evidence section unless the local schema defines a domain-specific supersession model, such as legislation or ADRs.
+
+**Do not curate `converted/`.** If conversion is wrong, improve conversion, reconvert, or correct the curated interpretation in `wiki/`. Do not hand-maintain `converted/` as if it were the wiki.
+
+**Keep pages focused.** Prefer many small, linkable pages over sprawling pages. If a page exceeds roughly 500 lines or mixes multiple topics, propose a split.
+
+## Operations
+
+Read `references/operations.md` for detailed workflows:
+
+- **Convert** — create/update `converted/<relative-raw-path>.md` from a source in `raw/`.
+- **Ingest** — convert first if needed, then integrate the converted source into the OKF-compliant `wiki/`.
+- **Re-ingest** — idempotently refresh an existing source page and propagate changes without duplicates.
+- **Query** — answer from `wiki/`, optionally consult `converted/` when the wiki lacks detail, and file substantive answers.
+- **Lint** — check wiki health, OKF conformance, conversion staleness, links, orphans, contradictions, and unfiled queries.
 
 ## Tooling notes
 
-- The wiki is just a directory of markdown files. Plain `cat`, `grep`, `find`, `ls` work fine for navigating it at small-to-moderate scale. At larger scale (many hundreds of pages), the user may want a search tool like [qmd](https://github.com/tobi/qmd) — note its existence if they ask, but don't push it.
-- The user is often viewing the wiki in [Obsidian](https://obsidian.md). The schema file should record whether to use `[[wikilinks]]` (Obsidian) or standard `[markdown](links.md)`. If unsure, ask once at init time and record the answer in the schema.
-- If the user has Obsidian Web Clipper, expect new sources to arrive as markdown files with frontmatter (URL, title, date) — the schema should treat that as a known source format.
-- The wiki is well-suited to being a git repo. After init, suggest `git init` if it isn't one already.
-
-## When you don't know something
-
-If the user's request implies wiki conventions that aren't covered in either this SKILL.md or the wiki's schema file, **ask the user once and then record the answer in the schema** so the question doesn't recur. The schema is meant to grow as the wiki matures.
+- The repo is just files. Use ordinary shell tools to list, search, hash, and inspect it.
+- Conversion tooling is environment-dependent. Prefer common tools when available (`pandoc`, `pdftotext`, PDF parsers, OCR, HTML readability tools), but the contract matters more than the tool.
+- If assets are extracted during conversion, place them beside the converted file as `<converted-basename>.assets/` and include a compact manifest in the converted file's frontmatter.
+- The wiki is well-suited to git. Suggest `git init` after scaffolding if the directory is not already versioned.
 
 ## Reference files
 
-- `references/initialization.md` — Read at the start of any new-wiki session. Contains the full domain interview, the domain presets with their tailored ingestion strategies, and the bootstrap procedure.
-- `references/wiki-schema-template.md` — The template you instantiate for the user's wiki during initialization. Has placeholders and inline guidance.
-- `references/operations.md` — Read when performing ingest/query/lint on an existing wiki. Step-by-step workflows for each operation.
+- `references/OKF-SPEC.md` — the persistence format for `wiki/`. Read before writing or modifying `wiki/`.
+- `references/initialization.md` — initialization interview, presets, and bootstrap procedure.
+- `references/wiki-schema-template.md` — template instantiated as the repo-local schema file.
+- `references/operations.md` — detailed convert, ingest, query, re-ingest, and lint workflows.
+- `references/andrej-karpathy-post.md` — conceptual source for the LLM Wiki pattern; keep it as historical/reference material.
