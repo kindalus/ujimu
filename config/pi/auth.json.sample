@@ -1,14 +1,14 @@
 {
   "anthropic": {
     "type": "api_key",
-    "key": "ANTHROPIC_API_KEY"
+    "key": "$ANTHROPIC_API_KEY"
   },
   "openai": {
     "type": "api_key",
-    "key": "OPENAI_API_KEY"
+    "key": "$OPENAI_API_KEY"
   },
   "openrouter": {
     "type": "api_key",
-    "key": "OPENROUTER_API_KEY"
+    "key": "$OPENROUTER_API_KEY"
   }
 }

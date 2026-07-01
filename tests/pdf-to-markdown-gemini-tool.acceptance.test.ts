@@ -106,6 +106,47 @@ exit 88
     expect(ingestionTools.map((tool: { name: string }) => tool.name)).not.toContain('pdf_to_markdown')
     expect(chatTools.map((tool: { name: string }) => tool.name)).not.toContain('pdf_to_markdown')
   })
+
+  it('includes conversion custom tools in the Pi SDK allowlist', async () => {
+    const sessionModule = await import('../server/utils/pi/session') as any
+    const {
+      createAgentSession,
+      DefaultResourceLoader,
+      SessionManager,
+      SettingsManager
+    } = await import('@earendil-works/pi-coding-agent')
+    const conversionTools = sessionModule.createUjimuCustomToolsForTask('conversion')
+    const enabledTools = sessionModule.createUjimuPiEnabledToolNames(
+      ['read', 'write', 'edit', 'grep', 'find', 'ls'],
+      conversionTools
+    )
+    const settingsManager = SettingsManager.inMemory()
+    const loader = new DefaultResourceLoader({
+      cwd: process.cwd(),
+      agentDir: await mkdtemp(join(tmpdir(), 'ujimu-pi-sdk-loader-')),
+      settingsManager,
+      noContextFiles: true,
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true
+    })
+    await loader.reload()
+
+    const { session } = await createAgentSession({
+      resourceLoader: loader,
+      tools: enabledTools,
+      customTools: conversionTools,
+      sessionManager: SessionManager.inMemory(),
+      settingsManager
+    })
+
+    try {
+      expect(session.agent.state.tools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
+    } finally {
+      session.dispose()
+    }
+  })
 })
 
 async function createPdfWorkspace(fileName: string): Promise<{ root: string }> {

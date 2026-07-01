@@ -65,11 +65,12 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   const selectedModel = await resolveTaskModel(modelRegistry, settingsManager, options.modelEnvPrefix)
   const sandboxedFileTools = await createSandboxedFileTools(options.fileSystemPolicy, options.tools)
   const customTools = [...sandboxedFileTools, ...createUjimuCustomToolsForTask(options.task, options.cwd)]
+  const enabledTools = createUjimuPiEnabledToolNames(options.tools, customTools)
 
   const result = await createAgentSession({
     cwd: '/data',
     resourceLoader: loader,
-    tools: options.tools,
+    tools: enabledTools,
     customTools,
     sessionManager: SessionManager.inMemory('/data'),
     settingsManager,
@@ -83,7 +84,7 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     cwd: options.cwd,
     configDir,
     bundledPiDir,
-    tools: [...new Set([...options.tools, ...customTools.map((tool: any) => tool.name)])],
+    tools: enabledTools,
     model: selectedModel
   }
 
@@ -238,6 +239,16 @@ export function createUjimuFileTools(
   toolNames: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
 ): Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'> {
   return toolNames
+}
+
+export function createUjimuPiEnabledToolNames(
+  fileTools: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>,
+  customTools: Array<{ name?: unknown }>
+): string[] {
+  return [...new Set([
+    ...fileTools,
+    ...customTools.map((tool) => tool.name).filter((name): name is string => typeof name === 'string' && name.length > 0)
+  ])]
 }
 
 export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {

@@ -310,7 +310,7 @@ describe('three Pi agent pipeline acceptance', () => {
       expect(skills.skills.map((skill) => skill.name)).toEqual(['llm-wiki'])
       expect(extensions.errors).toEqual([])
       expect(trackedPi.stdout.trim()).toBe('')
-      await expect(readFile(join(configDir, 'auth.json'), 'utf8')).resolves.toContain('OPENROUTER_API_KEY')
+      await expect(readFile(join(configDir, 'auth.json'), 'utf8')).resolves.toContain('$OPENROUTER_API_KEY')
       await expect(readFile(join(configDir, 'models.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
       await expect(readFile(join(configDir, 'settings.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
       await expect(readFile('.gitignore', 'utf8')).resolves.toContain('config/pi/auth.json')

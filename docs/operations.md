@@ -70,7 +70,7 @@ Mutable Ujimu Pi configuration lives under `<UJIMU_CONFIG_DIR>`, defaulting to `
 
 Versioned Ujimu Pi resources live under `config/pi/`: product skills, extensions, tools, and the seed copies of the three mutable config files. Do not move product skills, extensions, or tools back under the repository `.pi/` directory: Pi CLI reserves `.pi/` for project-local developer runtime configuration and will auto-discover resources there during development.
 
-Keep real `auth.json` files out of Git. If a local environment previously used `.pi/auth.json`, copy the credentials to `<UJIMU_CONFIG_DIR>/auth.json`.
+Keep real `auth.json` files out of Git. If a local environment previously used `.pi/auth.json`, copy the credentials to `<UJIMU_CONFIG_DIR>/auth.json`. Pi `auth.json` environment references must use explicit `$ENV_VAR` interpolation, for example `"key": "$OPENROUTER_API_KEY"`; a bare uppercase value is treated as a literal key by current Pi releases.
 
 ### Pi file-tool sandboxing
 
