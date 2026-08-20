@@ -10,7 +10,8 @@ import { initializeDatabase } from '../../../../utils/db'
 import { SpecialistConfigError } from '../../../../utils/specialists/schema'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   const specialistId = getRouterParam(event, 'specialistId')
   if (!companyId || !specialistId) {
@@ -18,7 +19,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = parsePromptPatchBody(await readRequiredJsonBody(event))
-  const database = await initializeDatabase()
   try {
     const { specialist } = await requireCompanyAdminSpecialist(database, { userId, companyId, specialistId })
     const updated = await updateCompanySpecialistPrompt(specialist, body.system_prompt)
@@ -35,8 +35,6 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: error.message, data: { code: error.code } })
     }
     throw error
-  } finally {
-    database.close()
   }
 })
 

@@ -4,7 +4,8 @@ import { BillingValidationError, createCorporateBillingCheckout } from '../../..
 import { initializeDatabase } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({
       statusCode: 401,
@@ -15,7 +16,6 @@ export default defineEventHandler(async (event) => {
 
   const body = await readJsonBody(event)
   const input = parseCorporateCheckoutBody(body)
-  const database = await initializeDatabase()
 
   try {
     const checkout = createCorporateBillingCheckout(database, {
@@ -26,12 +26,11 @@ export default defineEventHandler(async (event) => {
     return checkout
   } catch (error) {
     if (error instanceof BillingValidationError) {
-      throw createError({ statusCode: 400, statusMessage: error.message, data: { code: error.code } })
+      const statusCode = error.code === 'COMPANY_ADMIN_REQUIRED' ? 403 : 400
+      throw createError({ statusCode, statusMessage: error.message, data: { code: error.code } })
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

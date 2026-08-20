@@ -19,6 +19,7 @@ import { getActiveCompanyForUser } from '../utils/companies/repository'
 import { initializeDatabase } from '../utils/db'
 import { QuotaExceededError } from '../utils/quota/errors'
 import { resolveQuotaSubject } from '../utils/quota/identity'
+import { assertMaxRequestBytes, MAX_JSON_BODY_BYTES } from '../utils/security/request-guards'
 
 export default defineEventHandler(async (event) => {
   const contentType = getRequestHeader(event, 'content-type') ?? ''
@@ -29,6 +30,8 @@ export default defineEventHandler(async (event) => {
       data: { code: 'INVALID_CHAT_REQUEST' }
     })
   }
+
+  assertMaxRequestBytes(event, MAX_JSON_BODY_BYTES)
 
   const body = await readBody(event, { strict: true }).catch(() => {
     throw createError({
@@ -75,10 +78,8 @@ export default defineEventHandler(async (event) => {
       'x-accel-buffering': 'no'
     })
 
-    return sendIterable(event, closeDatabaseAfterStream(stream, database), { serializer: serializeChatEvent })
+    return sendIterable(event, stream, { serializer: serializeChatEvent })
   } catch (error) {
-    database.close()
-
     if (error instanceof QuotaExceededError) {
       setResponseStatus(event, 429)
       return { error: error.payload }
@@ -100,15 +101,4 @@ function resolveActiveCompanyQuotaSubject(database: DatabaseSync, userId: string
   const activeCompany = getActiveCompanyForUser(database, userId)
   if (!activeCompany?.active) return null
   return { type: 'company', id: activeCompany.id, seats: activeCompany.seats }
-}
-
-async function* closeDatabaseAfterStream(
-  stream: AsyncIterable<ChatStreamEvent>,
-  database: DatabaseSync
-): AsyncIterable<ChatStreamEvent> {
-  try {
-    yield* stream
-  } finally {
-    database.close()
-  }
 }

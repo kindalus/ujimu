@@ -62,16 +62,18 @@ describe('quota and request limit acceptance', () => {
     expect(windows.weekly.resetAtUtc.toISOString()).toBe('2026-05-17T23:00:00.000Z')
   })
 
-  it('creates an opaque httpOnly anonymous identity cookie only when one is missing', () => {
+  it('creates a signed httpOnly anonymous identity cookie only when a trustworthy one is missing', () => {
+    const sessionSecret = 'anon-cookie-secret'
     const created = resolveAnonymousIdentity(undefined, {
       generateId: () => '00000000-0000-4000-8000-000000000001',
-      isProduction: false
+      isProduction: false,
+      sessionSecret
     })
 
     expect(created.subject).toEqual({ type: 'anonymous', id: '00000000-0000-4000-8000-000000000001' })
     expect(created.cookieToSet).toMatchObject({
       name: ANONYMOUS_QUOTA_COOKIE_NAME,
-      value: '00000000-0000-4000-8000-000000000001',
+      value: expect.stringMatching(/^00000000-0000-4000-8000-000000000001\..+/),
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -80,9 +82,38 @@ describe('quota and request limit acceptance', () => {
       }
     })
 
-    const existing = resolveAnonymousIdentity('existing-anon-id')
-    expect(existing.subject).toEqual({ type: 'anonymous', id: 'existing-anon-id' })
-    expect(existing.cookieToSet).toBeUndefined()
+    const reused = resolveAnonymousIdentity(created.cookieToSet?.value, { sessionSecret })
+    expect(reused.subject).toEqual({ type: 'anonymous', id: '00000000-0000-4000-8000-000000000001' })
+    expect(reused.cookieToSet).toBeUndefined()
+  })
+
+  it('refuses anonymous quota cookies that were not signed by this server', () => {
+    const sessionSecret = 'anon-cookie-secret'
+    const minted = resolveAnonymousIdentity(undefined, {
+      generateId: () => '00000000-0000-4000-8000-000000000002',
+      sessionSecret
+    })
+
+    // An attacker cannot mint their own subject id, nor claim someone else's, without the secret.
+    for (const forged of ['attacker-chosen-id', '00000000-0000-4000-8000-000000000002', `${minted.subject.id}.notasignature`]) {
+      const resolved = resolveAnonymousIdentity(forged, {
+        generateId: () => 'server-minted',
+        sessionSecret
+      })
+      expect(resolved.subject.id).toBe('server-minted')
+      expect(resolved.cookieToSet).toBeDefined()
+    }
+
+    // A cookie signed with a different secret is rejected too.
+    const otherServer = resolveAnonymousIdentity(undefined, {
+      generateId: () => '00000000-0000-4000-8000-000000000003',
+      sessionSecret: 'a-different-secret'
+    })
+    const rejected = resolveAnonymousIdentity(otherServer.cookieToSet?.value, {
+      generateId: () => 'server-minted',
+      sessionSecret
+    })
+    expect(rejected.subject.id).toBe('server-minted')
   })
 
   it('records allowed and denied anonymous events and blocks after the daily limit', async () => {
@@ -280,8 +311,7 @@ describe('quota and request limit acceptance', () => {
       headers: {
         'content-type': 'application/json',
         cookie: `ujimu_session=${createSessionToken('admin-user', {
-          sessionSecret: 'quota-admin-secret',
-          now: new Date('2026-05-16T12:00:00.000Z')
+          sessionSecret: 'quota-admin-secret'
         })}`
       },
       body: JSON.stringify({

@@ -2,6 +2,17 @@ FROM node:26-trixie-slim AS build
 
 WORKDIR /app
 
+ARG UJIMU_LLM_WIKI_REPO=https://github.com/kindalus/skills.git
+ARG UJIMU_LLM_WIKI_REF=
+ARG UJIMU_LLM_WIKI_SUBDIR=skills/llm-wiki
+ENV UJIMU_LLM_WIKI_REPO=${UJIMU_LLM_WIKI_REPO}
+ENV UJIMU_LLM_WIKI_REF=${UJIMU_LLM_WIKI_REF}
+ENV UJIMU_LLM_WIKI_SUBDIR=${UJIMU_LLM_WIKI_SUBDIR}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

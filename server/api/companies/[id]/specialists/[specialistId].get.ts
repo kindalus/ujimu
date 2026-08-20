@@ -4,18 +4,14 @@ import { requireCompanyAdminSpecialist, toCompanySpecialistPayload } from '../..
 import { initializeDatabase } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   const specialistId = getRouterParam(event, 'specialistId')
   if (!companyId || !specialistId) {
     throw createError({ statusCode: 404, statusMessage: 'Specialist not found', data: { code: 'SPECIALIST_NOT_FOUND' } })
   }
 
-  const database = await initializeDatabase()
-  try {
-    const { specialist } = await requireCompanyAdminSpecialist(database, { userId, companyId, specialistId })
-    return { specialist: await toCompanySpecialistPayload(specialist) }
-  } finally {
-    database.close()
-  }
+  const { specialist } = await requireCompanyAdminSpecialist(database, { userId, companyId, specialistId })
+  return { specialist: await toCompanySpecialistPayload(specialist) }
 })

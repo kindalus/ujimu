@@ -10,4 +10,5 @@ node_modules/
 .local/
 .pi/
 config/pi/auth.json
+config/pi/skills/llm-wiki/
 config/container/*.env

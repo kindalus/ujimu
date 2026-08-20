@@ -4,14 +4,14 @@ import { updateCompany } from '../../utils/companies/repository'
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   if (!companyId) {
     throw createError({ statusCode: 404, statusMessage: 'Company not found' })
   }
 
   const rawBody = await readRequiredJsonBody(event)
-  const database = await initializeDatabase()
   try {
     requireCompanyAdmin(database, userId, companyId)
     const body = parseCompanyBody(rawBody)
@@ -19,8 +19,6 @@ export default defineEventHandler(async (event) => {
     return toCompanyDetailPayload(requireCompanyAdmin(database, userId, companyId))
   } catch (error) {
     mapCompanyError(error)
-  } finally {
-    database.close()
   }
 })
 

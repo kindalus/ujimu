@@ -21,8 +21,8 @@ export interface CompanyAccessContext {
   memberships: CompanyMembershipRecord[]
 }
 
-export function requireAuthenticatedUser(event: H3Event): string {
-  const session = readSessionFromEvent(event)
+export function requireAuthenticatedUser(event: H3Event, database: DatabaseSync): string {
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required', data: { code: 'AUTHENTICATION_REQUIRED' } })
   }

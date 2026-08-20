@@ -171,8 +171,7 @@ function seedUser(database: Awaited<ReturnType<typeof initializeDatabase>>, user
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'company-test-session-secret',
-      now: new Date('2026-06-10T10:00:00.000Z')
+      sessionSecret: 'company-test-session-secret'
     })}`
   })
 }

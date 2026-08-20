@@ -1,11 +1,9 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
+import { createUjimuPiSession } from '../pi/session'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { IngestionManifest, IngestionSourceRecord } from './types'
-
-export const DEFAULT_PI_INGESTION_TIMEOUT_MS = 30 * 60 * 1000
 
 export interface PiIngestionResult {
   summary?: string
@@ -18,23 +16,17 @@ export interface PiBatchIngestionResult {
 export interface PiIngestionRunner {
   ingestSource(
     specialist: SpecialistRuntime,
-    source: IngestionSourceRecord,
-    options?: PiSdkIngestionOptions
+    source: IngestionSourceRecord
   ): Promise<PiIngestionResult | void>
   ingestSources?(
     specialist: SpecialistRuntime,
-    sources: IngestionSourceRecord[],
-    options?: PiSdkIngestionOptions
+    sources: IngestionSourceRecord[]
   ): Promise<PiBatchIngestionResult | IngestionManifest | void>
-}
-
-export interface PiSdkIngestionOptions {
-  timeoutMs?: number
 }
 
 export class PiIngestionError extends Error {
   constructor(
-    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING' | 'INGESTION_MANIFEST_MISSING' | 'INGESTION_MANIFEST_INVALID',
+    public readonly code: 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING' | 'INGESTION_MANIFEST_MISSING' | 'INGESTION_MANIFEST_INVALID',
     message: string
   ) {
     super(message)
@@ -44,12 +36,12 @@ export class PiIngestionError extends Error {
 
 export function createPiSdkIngestionRunner(): PiIngestionRunner {
   return {
-    async ingestSource(specialist, source, options = {}) {
-      const result = await runPiSdkBatchIngestion(specialist, [source], options)
+    async ingestSource(specialist, source) {
+      const result = await runPiSdkBatchIngestion(specialist, [source])
       return { summary: `Pi ingested ${countManifestSuccesses(result.manifest)} source(s).` }
     },
-    async ingestSources(specialist, sources, options = {}) {
-      return runPiSdkBatchIngestion(specialist, sources, options)
+    async ingestSources(specialist, sources) {
+      return runPiSdkBatchIngestion(specialist, sources)
     }
   }
 }
@@ -60,8 +52,7 @@ function countManifestSuccesses(manifest: IngestionManifest): number {
 
 async function runPiSdkBatchIngestion(
   specialist: SpecialistRuntime,
-  _sources: IngestionSourceRecord[],
-  options: PiSdkIngestionOptions
+  _sources: IngestionSourceRecord[]
 ): Promise<PiBatchIngestionResult> {
   const cwd = specialist.paths.root
   await mkdir(join(cwd, '.ujimu'), { recursive: true })
@@ -69,13 +60,6 @@ async function runPiSdkBatchIngestion(
     cwd,
     task: 'ingestion',
     modelEnvPrefix: 'UJIMU_PI_INGESTION',
-    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
-    fileSystemPolicy: {
-      root: cwd,
-      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
-      write: { directories: ['wiki', 'converted'], files: ['.ujimu/ingestion-manifest.json'] },
-      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
-    },
     agentLog: { specialistId: specialist.id }
   })
 
@@ -88,11 +72,7 @@ async function runPiSdkBatchIngestion(
   })
 
   try {
-    await runWithTimeout(
-      () => session.prompt(buildBatchIngestionPrompt(specialist)),
-      options.timeoutMs ?? DEFAULT_PI_INGESTION_TIMEOUT_MS,
-      async () => session.abort()
-    )
+    await session.prompt(buildBatchIngestionPrompt(specialist))
     const fileManifest = await readManifestFile(cwd)
     const finalManifest = parseManifestFromText(finalText)
     if (JSON.stringify(fileManifest) !== JSON.stringify(finalManifest)) {
@@ -100,7 +80,7 @@ async function runPiSdkBatchIngestion(
     }
     return { manifest: fileManifest }
   } catch (error) {
-    logStatus = error instanceof PiIngestionError && error.code === 'PI_TIMEOUT' ? 'aborted' : 'failed'
+    logStatus = 'failed'
     if (error instanceof PiIngestionError) {
       throw error
     }
@@ -158,16 +138,16 @@ function buildBatchIngestionPrompt(specialist: SpecialistRuntime): string {
   return `Use the llm-wiki skill to process pending Ujimu specialist sources in batch/no-discussion mode.
 
 Follow the llm-wiki contract exactly:
-- Convert raw sources from /data/raw into /data/converted before ingesting.
-- Ingest only from /data/converted into /data/wiki.
-- Never modify, rename, or delete files in /data/raw.
-- Keep /data/wiki OKF-compliant and update its index and log.
+- Convert raw sources from raw/ into converted/ before ingesting.
+- Ingest only from converted/ into wiki/.
+- Never modify, rename, or delete files in raw/.
+- Keep wiki/ OKF-compliant and update its index and log.
 
-Read /data/AGENTS.md and /data/ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 
-Write a complete Ujimu ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
+Write a complete Ujimu ingestion manifest to .ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 
-/data/.ujimu/ingestion-manifest.json specification:
+.ujimu/ingestion-manifest.json specification:
 {
   "version": 2,
   "specialist_id": "${specialist.id}",
@@ -197,8 +177,7 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
 
 async function runPiSdkIngestion(
   specialist: SpecialistRuntime,
-  source: IngestionSourceRecord,
-  options: PiSdkIngestionOptions
+  source: IngestionSourceRecord
 ): Promise<PiIngestionResult> {
   const cwd = specialist.paths.root
   const markdownPath = source.ingestion?.source_path ?? source.raw_path
@@ -206,13 +185,6 @@ async function runPiSdkIngestion(
     cwd,
     task: 'ingestion',
     modelEnvPrefix: 'UJIMU_PI_INGESTION',
-    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
-    fileSystemPolicy: {
-      root: cwd,
-      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
-      write: { directories: ['wiki', 'converted'] },
-      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
-    },
     agentLog: { specialistId: specialist.id }
   })
 
@@ -220,14 +192,10 @@ async function runPiSdkIngestion(
   let logStatus: AgentSessionLogCloseStatus = 'succeeded'
 
   try {
-    await runWithTimeout(
-      () => session.prompt(prompt),
-      options.timeoutMs ?? DEFAULT_PI_INGESTION_TIMEOUT_MS,
-      async () => session.abort()
-    )
+    await session.prompt(prompt)
     return { summary: `Pi ingested ${source.ingestion?.source_path ?? source.raw_path}` }
   } catch (error) {
-    logStatus = error instanceof PiIngestionError && error.code === 'PI_TIMEOUT' ? 'aborted' : 'failed'
+    logStatus = 'failed'
     if (error instanceof PiIngestionError) {
       throw error
     }
@@ -254,48 +222,19 @@ Specialist:
 
 Source:
 - original raw path for citations: raw/${source.raw_path}
-- converted Markdown path: /data/converted/${markdownPath}
+- converted Markdown path: converted/${markdownPath}
 - title: ${source.title}
 - original checksum: ${source.checksum}
 - article references detected by the app: ${source.article_refs.join(', ') || '(none)'}
 
 Instructions:
-1. Convert /data/raw/${source.raw_path} to /data/converted/${markdownPath} before ingestion.
-2. Ingest only from /data/converted/${markdownPath}; do not ingest directly from /data/raw.
-3. Do not modify, rename, or delete anything under /data/raw.
-4. Maintain the /data/wiki directory using the specialist schema and OKF rules.
+1. Convert raw/${source.raw_path} to converted/${markdownPath} before ingestion.
+2. Ingest only from converted/${markdownPath}; do not ingest directly from raw/.
+3. Do not modify, rename, or delete anything under raw/.
+4. Maintain the wiki/ directory using the specialist schema and OKF rules.
 5. Preserve traceability from wiki pages to raw/${source.raw_path} and converted/${markdownPath}.
-6. Update /data/wiki/index.md and /data/wiki/log.md if present, or create them if missing.
+6. Update wiki/index.md and wiki/log.md if present, or create them if missing.
 7. If this is a reingestion, reconcile existing wiki pages instead of creating duplicate source pages.
 8. If you cannot convert or ingest the source from the available context, explain the failure clearly.
 `
-}
-
-async function runWithTimeout(
-  operation: () => Promise<void>,
-  timeoutMs: number,
-  onTimeout: () => Promise<void>
-): Promise<void> {
-  let timeout: NodeJS.Timeout | undefined
-  let timedOut = false
-
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    timeout = setTimeout(() => {
-      timedOut = true
-      reject(new PiIngestionError('PI_TIMEOUT', `Pi ingestion exceeded ${timeoutMs}ms.`))
-    }, timeoutMs)
-  })
-
-  try {
-    await Promise.race([operation(), timeoutPromise])
-  } catch (error) {
-    if (timedOut) {
-      await onTimeout().catch(() => undefined)
-    }
-    throw error
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  }
 }

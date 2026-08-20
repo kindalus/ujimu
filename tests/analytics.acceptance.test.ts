@@ -22,7 +22,7 @@ import { getSpecialistById, resetSpecialistRegistryForTests } from '../server/ut
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 
 describe('question analytics and content gaps acceptance', () => {
-  it('records only visible answered and insufficient-context question outcomes', async () => {
+  it('records visible answered question outcomes and ignores failed streams', async () => {
     const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
     await createTempSpecialist('iva', dataDir)
     await createIngestedSource(specialtiesRoot, 'iva')
@@ -89,7 +89,7 @@ describe('question analytics and content gaps acceptance', () => {
     expect(rows[0]?.fingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(rows[1]).toMatchObject({
       specialist_id: 'empty',
-      outcome: 'insufficient_context',
+      outcome: 'answered',
       question_text: 'Existe uma regra sem fontes?',
       normalized_question: 'existe uma regra sem fontes'
     })
@@ -310,6 +310,44 @@ describe('question analytics and content gaps acceptance', () => {
     expect(visitors.status).toBe(200)
     await expect(visitors.json()).resolves.toMatchObject({ month, distinctVisitors: 2 })
   })
+
+  it('collapses repeat visits so an unauthenticated caller cannot grow the table without bound', async () => {
+    const { dataDir } = await createTempAnalyticsData()
+    const fetchAnalytics = createAnalyticsFetch(dataDir, 'admin@example.com')
+
+    const first = await fetchAnalytics(new Request('http://local/api/analytics/visit', { method: 'POST' }))
+    const visitorCookie = first.headers.get('set-cookie')?.split(';')[0]
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      await fetchAnalytics(new Request('http://local/api/analytics/visit', {
+        method: 'POST',
+        headers: visitorCookie ? { cookie: visitorCookie } : undefined
+      }))
+    }
+
+    const database = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
+    const rows = database.prepare('SELECT COUNT(*) AS count FROM visitor_events').get() as { count: number }
+    database.close()
+
+    expect(rows.count).toBe(1)
+  })
+
+  it('ignores a forged visitor cookie instead of storing it', async () => {
+    const { dataDir } = await createTempAnalyticsData()
+    const fetchAnalytics = createAnalyticsFetch(dataDir, 'admin@example.com')
+
+    await fetchAnalytics(new Request('http://local/api/analytics/visit', {
+      method: 'POST',
+      headers: { cookie: 'ujimu_visitor_id=not-a-uuid-just-attacker-text' }
+    }))
+
+    const database = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
+    const row = database.prepare('SELECT visitor_id FROM visitor_events').get() as { visitor_id: string }
+    database.close()
+
+    expect(row.visitor_id).not.toBe('not-a-uuid-just-attacker-text')
+    expect(row.visitor_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  })
 })
 
 async function createTempAnalyticsData(): Promise<{
@@ -501,8 +539,7 @@ function createAnalyticsFetch(dataDir: string, adminContacts: string): (request:
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'analytics-test-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'analytics-test-secret'
     })}`
   })
 }

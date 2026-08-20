@@ -1,7 +1,8 @@
 import { createError, defineEventHandler, getRequestHeader, readBody, setResponseStatus } from 'h3'
-import { OtpDeliveryError, OtpValidationError, requestOtp } from '../../../utils/auth/otp'
+import { OtpDeliveryError, OtpRateLimitError, OtpValidationError, requestOtp } from '../../../utils/auth/otp'
 import { initializeDatabase } from '../../../utils/db'
 import { createNotificationProviderFromEnv } from '../../../utils/notifications/provider'
+import { resolveTrustedClientIp } from '../../../utils/security/client-ip'
 
 export default defineEventHandler(async (event) => {
   const contentType = getRequestHeader(event, 'content-type') ?? ''
@@ -15,10 +16,17 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
   try {
+    const requestIp = resolveTrustedClientIp(event)
     return await requestOtp(database, parseOtpRequestBody(body), {
-      provider: createNotificationProviderFromEnv()
+      provider: createNotificationProviderFromEnv(),
+      ...(requestIp ? { requestIp } : {})
     })
   } catch (error) {
+    if (error instanceof OtpRateLimitError) {
+      setResponseStatus(event, 429)
+      return { error: { code: error.code, message: error.message } }
+    }
+
     if (error instanceof OtpValidationError) {
       throw createError({
         statusCode: 400,
@@ -33,8 +41,6 @@ export default defineEventHandler(async (event) => {
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

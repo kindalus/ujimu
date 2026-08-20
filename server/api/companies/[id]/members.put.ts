@@ -4,14 +4,14 @@ import { replaceCompanyMemberships } from '../../../utils/companies/repository'
 import { initializeDatabase } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   if (!companyId) {
     throw createError({ statusCode: 404, statusMessage: 'Company not found' })
   }
 
   const body = parseMembersBody(await readRequiredJsonBody(event))
-  const database = await initializeDatabase()
   try {
     requireCompanyAdmin(database, userId, companyId)
     const memberships = replaceCompanyMemberships(database, {
@@ -22,8 +22,6 @@ export default defineEventHandler(async (event) => {
     return { memberships }
   } catch (error) {
     mapCompanyError(error)
-  } finally {
-    database.close()
   }
 })
 

@@ -44,9 +44,6 @@ exit 88
     expect(geminiArgs[2]).toContain('Do not return the converted document on stdout')
     expect(geminiArgs[2].toLowerCase()).toContain('markdown')
 
-    const timeoutArgs = await readNullSeparatedArgs(fakeBin.timeoutLog)
-    expect(timeoutArgs[0]).toBe('600s')
-    expect(timeoutArgs[1]).toBe('gemini')
   })
 
   it('rejects invalid PDF inputs before invoking gemini', async () => {
@@ -94,7 +91,7 @@ exit 88
     expect(existsSync(join(workspace.root, 'raw', 'lei.pdf.md'))).toBe(false)
   })
 
-  it('exposes pdf_to_markdown only to conversion Pi sessions', async () => {
+  it('exposes pdf_to_markdown to every Ujimu Pi session by default', async () => {
     const sessionModule = await import('../server/utils/pi/session') as any
 
     expect(sessionModule.createUjimuCustomToolsForTask).toBeTypeOf('function')
@@ -103,11 +100,11 @@ exit 88
     const chatTools = await sessionModule.createUjimuCustomToolsForTask('chat')
 
     expect(conversionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
-    expect(ingestionTools.map((tool: { name: string }) => tool.name)).not.toContain('pdf_to_markdown')
-    expect(chatTools.map((tool: { name: string }) => tool.name)).not.toContain('pdf_to_markdown')
+    expect(ingestionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
+    expect(chatTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
   })
 
-  it('includes conversion custom tools in the Pi SDK allowlist', async () => {
+  it('includes project custom tools in the Pi SDK enabled tool list', async () => {
     const sessionModule = await import('../server/utils/pi/session') as any
     const {
       createAgentSession,
@@ -116,10 +113,7 @@ exit 88
       SettingsManager
     } = await import('@earendil-works/pi-coding-agent')
     const conversionTools = sessionModule.createUjimuCustomToolsForTask('conversion')
-    const enabledTools = sessionModule.createUjimuPiEnabledToolNames(
-      ['read', 'write', 'edit', 'grep', 'find', 'ls'],
-      conversionTools
-    )
+    const enabledTools = sessionModule.createUjimuPiEnabledToolNames(conversionTools)
     const settingsManager = SettingsManager.inMemory()
     const loader = new DefaultResourceLoader({
       cwd: process.cwd(),
@@ -159,24 +153,12 @@ async function createPdfWorkspace(fileName: string): Promise<{ root: string }> {
 async function createFakeGeminiBin(options: { mode: 'success' | 'auth-failure' }): Promise<{
   bin: string
   geminiLog: string
-  timeoutLog: string
 }> {
   const root = await mkdtemp(join(tmpdir(), 'ujimu-fake-gemini-'))
   const bin = join(root, 'bin')
   await mkdir(bin, { recursive: true })
   const geminiLog = join(root, 'gemini.args')
-  const timeoutLog = join(root, 'timeout.args')
 
-  await writeFile(join(bin, 'timeout'), `#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\\0' "$@" > "${timeoutLog}"
-if [ "$1" != "600s" ]; then
-  echo "unexpected timeout: $1" >&2
-  exit 94
-fi
-shift
-exec "$@"
-`)
   await writeFile(join(bin, 'gemini'), `#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\0' "$@" > "${geminiLog}"
@@ -190,10 +172,9 @@ cat > raw/Documento.PDF.md <<'MARKDOWN'
 Texto convertido com conteúdo suficiente.
 MARKDOWN
 `)
-  await chmod(join(bin, 'timeout'), 0o755)
   await chmod(join(bin, 'gemini'), 0o755)
 
-  return { bin, geminiLog, timeoutLog }
+  return { bin, geminiLog }
 }
 
 async function runPdfTool(

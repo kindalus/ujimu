@@ -10,14 +10,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const database = await initializeDatabase()
-  try {
-    requireAdmin(database, event)
-    const payload = await getAdminCompanyDetailPayload(database, companyId)
-    if (!payload) {
-      throw createError({ statusCode: 404, statusMessage: 'Company not found', data: { code: 'COMPANY_NOT_FOUND' } })
-    }
-    return payload
-  } finally {
-    database.close()
+  requireAdmin(database, event)
+  const payload = await getAdminCompanyDetailPayload(database, companyId)
+  if (!payload) {
+    throw createError({ statusCode: 404, statusMessage: 'Company not found', data: { code: 'COMPANY_NOT_FOUND' } })
   }
+  return payload
 })

@@ -10,6 +10,7 @@ coverage
 !.env.sample
 config/container/*.env
 config/pi/auth.json
+config/pi/skills/llm-wiki
 *.log
 .DS_Store
 .local

@@ -199,8 +199,7 @@ function validSpecialist(id: string, options: { companyId?: string; systemPrompt
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: SESSION_SECRET,
-      now: new Date('2026-06-10T10:00:00.000Z')
+      sessionSecret: SESSION_SECRET
     })}`
   })
 }

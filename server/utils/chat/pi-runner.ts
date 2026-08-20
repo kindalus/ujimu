@@ -1,7 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
-import type { ChatCitation, ChatEngineRun, ChatEngineRunner, ChatRunnerInput, ChatRunnerStreamEvent } from './types'
+import { createUjimuPiSession } from '../pi/session'
+import type { ChatCitation, ChatEngineRunner, ChatRunnerInput, ChatRunnerStreamEvent } from './types'
 
 const SERVICE_UNAVAILABLE_MESSAGE =
   'O serviço de resposta está temporariamente indisponível. Tente novamente dentro de alguns minutos.'
@@ -33,112 +31,44 @@ export function createPiChatRunner(): ChatEngineRunner {
         grounded: false,
         citations: [],
         deltas: toAsyncDeltas([]),
-        events: runPiChatStreamWithFallback(input, resolvePiChatTimeoutMs())
+        events: runPiChatStream(input)
       }
     }
   }
 }
 
-async function* runPiChatStreamWithFallback(
-  input: ChatRunnerInput,
-  timeoutMs: number
-): AsyncIterable<ChatRunnerStreamEvent> {
-  let emittedDelta = false
-
-  try {
-    for await (const event of runPiChatStream(input, timeoutMs)) {
-      if (event.type === 'delta') {
-        emittedDelta = true
-      }
-      yield event
-    }
-  } catch {
-    if (emittedDelta) {
-      throw new Error('Pi chat stream failed after answer output started.')
-    }
-
-    // Fall back to a deterministic wiki-only answer. The fallback never uses raw files
-    // or model knowledge; it only quotes/summarizes already-ingested wiki markdown.
-    yield { type: 'status', message: 'A preparar uma resposta a partir do wiki disponível…' }
-    yield* chatRunToEvents(await createWikiExtractiveRun(input))
-  }
-}
-
-async function* runPiChatStream(
-  input: ChatRunnerInput,
-  timeoutMs: number
-): AsyncIterable<ChatRunnerStreamEvent> {
+async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunnerStreamEvent> {
   yield { type: 'status', message: 'A consultar as fontes desta especialidade…' }
 
   const cwd = input.specialist.paths.root
   const { session } = await createUjimuPiSession({
     cwd,
-    task: 'chat',
-    tools: await createUjimuFileTools(cwd, ['read', 'grep', 'find', 'ls']),
-    fileSystemPolicy: {
-      root: cwd,
-      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md'] },
-      write: { directories: [] },
-      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
-    }
+    task: 'chat'
   })
 
   const queue = new AsyncEventQueue<ChatRunnerStreamEvent>()
-  let sawCitation = false
-  let parsedEventCount = 0
   let rawAssistantText = ''
-  let pendingDoneEvent: Extract<ChatRunnerStreamEvent, { type: 'done' }> | undefined
+  let finalAssistantText = ''
   let finalTotalTokens: number | undefined
-  const parser = createPiNdjsonParser((event) => {
-    parsedEventCount += 1
-    if (event.type === 'citation') {
-      sawCitation = true
-    }
+  let promptFinished = false
+  let sawTerminalEvent = false
+  let emittedAssistantOutput = false
+  let pendingDoneEvent: Extract<ChatRunnerStreamEvent, { type: 'done' }> | undefined
+
+  const parser = createPiOutputParser((event) => {
     if (event.type === 'done') {
+      sawTerminalEvent = true
       pendingDoneEvent = event
       return
     }
+
+    emittedAssistantOutput = true
     queue.push(event)
   })
-  let promptFinished = false
-  let timeoutAborted = false
-  let sawDone = false
-  let sawTextDelta = false
-  let finalAssistantText = ''
-  let idleTimeout: NodeJS.Timeout | undefined
-  let hardTimeout: NodeJS.Timeout | undefined
-  let timeoutAbortPromise: Promise<void> | undefined
-  const hardTimeoutMs = resolvePiChatHardTimeoutMs(timeoutMs)
-
-  function clearChatTimeouts(): void {
-    if (idleTimeout) clearTimeout(idleTimeout)
-    if (hardTimeout) clearTimeout(hardTimeout)
-    idleTimeout = undefined
-    hardTimeout = undefined
-  }
-
-  function failForTimeout(message: string): void {
-    if (promptFinished || timeoutAborted) return
-    timeoutAborted = true
-    clearChatTimeouts()
-    timeoutAbortPromise = session.abort().catch(() => undefined)
-    queue.fail(new Error(message))
-  }
-
-  function refreshIdleTimeout(): void {
-    if (promptFinished || timeoutAborted) return
-    if (idleTimeout) clearTimeout(idleTimeout)
-    idleTimeout = setTimeout(() => {
-      failForTimeout(`Pi chat had no activity for ${timeoutMs}ms.`)
-    }, timeoutMs)
-  }
 
   const unsubscribe = session.subscribe((event: any) => {
-    refreshIdleTimeout()
-
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
       const delta = typeof event.assistantMessageEvent.delta === 'string' ? event.assistantMessageEvent.delta : ''
-      sawTextDelta = true
       rawAssistantText += delta
       parser.push(delta)
       return
@@ -168,34 +98,27 @@ async function* runPiChatStream(
     }
   })
 
-  parser.onDone = () => {
-    sawDone = true
-  }
-
-  refreshIdleTimeout()
-  hardTimeout = setTimeout(() => {
-    failForTimeout(`Pi chat exceeded maximum duration ${hardTimeoutMs}ms.`)
-  }, hardTimeoutMs)
-
   void session.prompt(buildChatPrompt(input))
     .then(() => {
-      if (!sawTextDelta && finalAssistantText) {
+      if (!rawAssistantText && finalAssistantText) {
         parser.push(finalAssistantText)
       }
       parser.flush()
-      const fallbackAssistantText = finalAssistantText || rawAssistantText
+
+      const assistantText = finalAssistantText || rawAssistantText
+      if (!emittedAssistantOutput && assistantText.trim().length > 0) {
+        queue.push({ type: 'delta', text: assistantText })
+        emittedAssistantOutput = true
+      }
+
       if (finalTotalTokens) {
         queue.push({ type: 'metrics', totalTokens: finalTotalTokens })
       }
+
       if (pendingDoneEvent) {
         queue.push(pendingDoneEvent)
-      } else if (!sawDone) {
-        if (!input.specialist.citations_required && parsedEventCount === 0 && fallbackAssistantText.trim().length > 0) {
-          queue.push({ type: 'delta', text: fallbackAssistantText })
-          queue.push({ type: 'done', grounded: true })
-        } else {
-          queue.push({ type: 'done', grounded: sawCitation })
-        }
+      } else if (!sawTerminalEvent) {
+        queue.push({ type: 'done', grounded: emittedAssistantOutput })
       }
       queue.close()
     })
@@ -204,7 +127,6 @@ async function* runPiChatStream(
     })
     .finally(() => {
       promptFinished = true
-      clearChatTimeouts()
     })
 
   try {
@@ -212,62 +134,10 @@ async function* runPiChatStream(
   } finally {
     unsubscribe?.()
     if (!promptFinished) {
-      if (timeoutAbortPromise) {
-        await timeoutAbortPromise
-      } else if (!timeoutAborted) {
-        await session.abort().catch(() => undefined)
-      }
+      await session.abort().catch(() => undefined)
     }
     session.dispose()
-    clearChatTimeouts()
   }
-}
-
-async function createWikiExtractiveRun(input: ChatRunnerInput): Promise<ChatEngineRun> {
-  const citation = input.citationEvidence[0]
-  if (!citation) {
-    return {
-      grounded: false,
-      citations: [],
-      deltas: toAsyncDeltas(['Ainda não tenho fontes suficientes nesta especialidade para responder com segurança.'])
-    }
-  }
-
-  const pages = await readWikiPages(input.specialist.paths.wiki)
-  const snippets = selectRelevantSnippets(pages, input.question)
-  if (snippets.length === 0) {
-    return {
-      grounded: false,
-      citations: [],
-      deltas: toAsyncDeltas(['Ainda não tenho fontes suficientes nesta especialidade para responder com segurança.'])
-    }
-  }
-
-  const answer = [
-    'Com base no wiki desta especialidade:',
-    '',
-    ...snippets.map((snippet) => `- ${snippet}`)
-  ].join('\n')
-
-  return {
-    grounded: true,
-    citations: [citation],
-    deltas: toAsyncDeltas([answer])
-  }
-}
-
-async function* chatRunToEvents(run: ChatEngineRun): AsyncIterable<ChatRunnerStreamEvent> {
-  if (run.grounded) {
-    for (const citation of run.citations) {
-      yield { type: 'citation', citation }
-    }
-  }
-
-  for await (const text of run.deltas) {
-    yield { type: 'delta', text }
-  }
-
-  yield { type: 'done', grounded: run.grounded }
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {
@@ -332,40 +202,43 @@ class AsyncEventQueue<T> implements AsyncIterable<T> {
   }
 }
 
-function createPiNdjsonParser(enqueue: (event: ChatRunnerStreamEvent) => void): {
+function createPiOutputParser(enqueue: (event: ChatRunnerStreamEvent) => void): {
   push(chunk: string): void
   flush(): void
-  onDone?: () => void
 } {
   let buffer = ''
-  const parser = {
+
+  return {
     push(chunk: string) {
       buffer += chunk
       const lines = buffer.split(/\r?\n/u)
       buffer = lines.pop() ?? ''
       for (const line of lines) {
-        parsePiNdjsonLine(line, enqueue, parser)
+        parsePiOutputLine(line, true, enqueue)
       }
     },
     flush() {
-      if (buffer.trim()) {
-        parsePiNdjsonLine(buffer, enqueue, parser)
+      if (buffer.length > 0) {
+        parsePiOutputLine(buffer, false, enqueue)
       }
       buffer = ''
-    },
-    onDone: undefined as (() => void) | undefined
+    }
   }
-
-  return parser
 }
 
-function parsePiNdjsonLine(
-  line: string,
-  enqueue: (event: ChatRunnerStreamEvent) => void,
-  parser: { onDone?: () => void }
-): void {
-  const event = parseJsonLine(line.trim())
-  if (!event || typeof event !== 'object') return
+function parsePiOutputLine(line: string, hadTrailingNewline: boolean, enqueue: (event: ChatRunnerStreamEvent) => void): void {
+  const trimmed = line.trim()
+  if (!trimmed) {
+    if (hadTrailingNewline || line.length > 0) enqueue({ type: 'delta', text: hadTrailingNewline ? `${line}\n` : line })
+    return
+  }
+
+  const event = parseJsonLine(trimmed)
+  if (!event || typeof event !== 'object') {
+    if (/^[\[{]/u.test(trimmed)) return
+    enqueue({ type: 'delta', text: hadTrailingNewline ? `${line}\n` : line })
+    return
+  }
 
   if (event.type === 'citations' && Array.isArray(event.citations)) {
     for (const citation of event.citations.filter(isCitationLike)) {
@@ -395,159 +268,21 @@ function parsePiNdjsonLine(
   }
 
   if (event.type === 'done') {
-    parser.onDone?.()
-    enqueue({ type: 'done', grounded: event.grounded === true })
+    enqueue({ type: 'done', grounded: event.grounded !== false })
   }
-}
-
-interface WikiPageContent {
-  path: string
-  content: string
-}
-
-async function readWikiPages(root: string, relativeRoot = ''): Promise<WikiPageContent[]> {
-  const entries = await readdir(join(root, relativeRoot), { withFileTypes: true }).catch(() => [])
-  const pages: WikiPageContent[] = []
-
-  for (const entry of entries) {
-    const relativePath = join(relativeRoot, entry.name)
-    const absolutePath = join(root, relativePath)
-    if (entry.isDirectory()) {
-      pages.push(...await readWikiPages(root, relativePath))
-      continue
-    }
-
-    if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-      const content = await readFile(absolutePath, 'utf8').catch(() => '')
-      if (content.trim().length > 0) {
-        pages.push({ path: relativePath, content })
-      }
-    }
-  }
-
-  return pages
-}
-
-function selectRelevantSnippets(pages: WikiPageContent[], question: string): string[] {
-  const queryTerms = tokenize(question)
-  const candidates = pages
-    .filter((page) => !/(^|\/)index\.md$/u.test(page.path) && !/(^|\/)log\.md$/u.test(page.path))
-    .flatMap((page) => splitWikiSections(page.content).map((section) => ({ page, section })))
-    .map(({ page, section }) => {
-      const block = normalizeSnippet(section)
-      return { block, score: scoreSnippet(`${page.path} ${section}`, queryTerms) + scorePagePath(page.path, queryTerms) }
-    })
-    .filter((candidate) => isUsefulSnippet(candidate.block) && candidate.score > 0)
-    .sort((left, right) => right.score - left.score || right.block.length - left.block.length)
-
-  const selected: string[] = []
-  for (const candidate of candidates) {
-    if (selected.some((snippet) => snippet.includes(candidate.block) || candidate.block.includes(snippet))) continue
-    selected.push(candidate.block)
-    if (selected.length >= 3) break
-  }
-
-  return selected
-}
-
-function splitWikiSections(content: string): string[] {
-  const sections: string[] = []
-  let current: string[] = []
-
-  for (const line of content.split(/\r?\n/u)) {
-    if (/^#{1,6}\s+/u.test(line) && current.length > 0) {
-      sections.push(current.join('\n'))
-      current = [line]
-      continue
-    }
-
-    current.push(line)
-  }
-
-  if (current.length > 0) {
-    sections.push(current.join('\n'))
-  }
-
-  return sections
-}
-
-function isUsefulSnippet(snippet: string): boolean {
-  if (snippet.length < 60) return false
-  if (snippet.toLowerCase().startsWith('source file:')) return false
-  if (/source file:|citation ref:/iu.test(snippet)) return false
-  if (/^links\s+/iu.test(snippet)) return false
-  if (/^(\[[^\]]+\]\([^\)]+\)\s*)+$/u.test(snippet)) return false
-  if (/^from value proposition to scalable business model$/iu.test(snippet)) return false
-  return true
-}
-
-function scorePagePath(path: string, queryTerms: Set<string>): number {
-  const normalizedPath = path.toLowerCase()
-  let score = 0
-  const boosts: Array<[string[], string, number]> = [
-    [['proposta', 'valor', 'cliente', 'problema', 'solucao'], 'value-proposition', 12],
-    [['canvas', 'blocos', 'receita', 'custos'], 'business-model-canvas', 14],
-    [['modelo', 'negocio', 'business'], 'business-model-canvas', 8],
-    [['mvp', 'validacao', 'validar', 'testar', 'pivot', 'aprendizagem'], 'validation-mvp-learning', 14],
-    [['escala', 'escalar', 'crescimento', 'growth', 'product', 'market'], 'scaling-product-market-fit-growth', 24]
-  ]
-
-  for (const [terms, pathPart, boost] of boosts) {
-    if (terms.some((term) => queryTerms.has(term)) && normalizedPath.includes(pathPart)) {
-      score += boost
-    }
-  }
-
-  return score
-}
-
-function normalizeSnippet(block: string): string {
-  return block
-    .replace(/^#{1,6}\s+/gmu, '')
-    .replace(/^[-*]\s+/gmu, '')
-    .replace(/^\d+\.\s+/gmu, '')
-    .replace(/\s+/gu, ' ')
-    .trim()
-}
-
-function scoreSnippet(snippet: string, queryTerms: Set<string>): number {
-  const terms = tokenize(snippet)
-  let score = 0
-  for (const term of queryTerms) {
-    if (terms.has(term)) score += term.length > 5 ? 2 : 1
-  }
-  return score
-}
-
-function tokenize(value: string): Set<string> {
-  const stopwords = new Set([
-    'a', 'ao', 'as', 'com', 'da', 'de', 'do', 'dos', 'e', 'em', 'entre', 'o', 'os', 'para', 'por',
-    'qual', 'quais', 'quando', 'como', 'que', 'uma', 'um', 'the', 'and', 'for', 'with', 'from'
-  ])
-
-  return new Set(
-    value
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/gu, '')
-      .match(/[\p{L}\p{N}]{3,}/gu)
-      ?.filter((term) => !stopwords.has(term)) ?? []
-  )
-}
-
-export const DEFAULT_PI_CHAT_TIMEOUT_MS = 120_000
-
-function resolvePiChatHardTimeoutMs(timeoutMs: number): number {
-  return timeoutMs * 3
-}
-
-export function resolvePiChatTimeoutMs(): number {
-  const configured = Number.parseInt(process.env.UJIMU_PI_CHAT_TIMEOUT_MS ?? '', 10)
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_PI_CHAT_TIMEOUT_MS
 }
 
 export function buildChatPrompt(input: ChatRunnerInput): string {
   return `Answer the user question using this specialist workspace.
+
+The current working directory is the specialist root. Use the available tools normally.
+If you include machine-readable citations, emit them as JSON lines in one of these optional shapes:
+{"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
+{"type":"citation","citation":{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}}
+Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu.
+
+Known citation metadata, if useful:
+${formatCitationEvidence(input.citationEvidence)}
 
 User question:
 ${input.question}
@@ -555,6 +290,14 @@ ${input.question}
 Conversation context:
 ${formatConversationContext(input.conversationContext)}
 `
+}
+
+function formatCitationEvidence(citations: ChatRunnerInput['citationEvidence']): string {
+  if (citations.length === 0) {
+    return '(none)'
+  }
+
+  return citations.map((citation) => JSON.stringify(citation)).join('\n')
 }
 
 function formatConversationContext(context: ChatRunnerInput['conversationContext']): string {
@@ -626,7 +369,11 @@ function extractLatestAssistantTotalTokens(messages: unknown): number | undefine
 function isCitationLike(value: unknown): value is ChatCitation {
   if (!value || typeof value !== 'object') return false
   const citation = value as ChatCitation
-  return typeof citation.sourceTitle === 'string' && Array.isArray(citation.articleRefs)
+  return (
+    typeof citation.sourceTitle === 'string' &&
+    (citation.sourceFile === undefined || typeof citation.sourceFile === 'string') &&
+    Array.isArray(citation.articleRefs)
+  )
 }
 
 async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {

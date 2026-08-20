@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import adminSessionHandler from '../server/api/admin/session.get'
 import devLoginStatusHandler from '../server/api/auth/dev-login.get'
 import devLoginHandler from '../server/api/auth/dev-login.post'
+import logoutHandler from '../server/api/auth/logout.post'
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../server/utils/auth/session'
 import { initializeDatabase } from '../server/utils/db'
 
@@ -135,6 +136,40 @@ describe('development-only authentication acceptance', () => {
     expect(productionPost.status).toBe(404)
     expect(productionPost.headers.get('set-cookie')).toBeNull()
   })
+
+  it('stops honouring a session token after logout, even though the token itself is still unexpired', async () => {
+    const dataDir = await createTempDataDir()
+    const fetchDev = createDevAuthFetch(dataDir, {
+      NODE_ENV: 'development',
+      UJIMU_DEV_AUTH_ENABLED: 'true',
+      UJIMU_DEV_USER_CONTACTS: 'admin@dev.local',
+      UJIMU_ADMIN_CONTACTS: 'admin@dev.local'
+    })
+
+    const login = await fetchDev(jsonRequest('http://local/api/auth/dev-login', {
+      method: 'POST',
+      body: { channel: 'email', contact: 'admin@dev.local' }
+    }))
+    const sessionCookie = readSessionCookie(login)
+    const cookieHeader = new Headers({ cookie: `${SESSION_COOKIE_NAME}=${sessionCookie}` })
+
+    await expect(
+      fetchDev(new Request('http://local/api/admin/session', { headers: cookieHeader })).then((r) => r.json())
+    ).resolves.toMatchObject({ authenticated: true })
+
+    const loggedOut = await fetchDev(new Request('http://local/api/auth/logout', {
+      method: 'POST',
+      headers: cookieHeader
+    }))
+    expect(loggedOut.status).toBe(200)
+
+    // The token's signature and expiry are both still fine; only the server-side epoch changed.
+    expect(verifySessionToken(sessionCookie, { sessionSecret: 'dev-auth-test-secret' })).toMatchObject({ epoch: 0 })
+
+    await expect(
+      fetchDev(new Request('http://local/api/admin/session', { headers: cookieHeader })).then((r) => r.json())
+    ).resolves.toMatchObject({ authenticated: false, admin: false })
+  })
 })
 
 async function createTempDataDir(): Promise<string> {
@@ -147,6 +182,7 @@ function createDevAuthFetch(dataDir: string, env: Record<string, string | undefi
   router.get('/api/auth/dev-login', devLoginStatusHandler)
   router.post('/api/auth/dev-login', devLoginHandler)
   router.get('/api/admin/session', adminSessionHandler)
+  router.post('/api/auth/logout', logoutHandler)
   app.use(router)
   const fetch = toWebHandler(app)
 

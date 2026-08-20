@@ -177,7 +177,8 @@ describe('passkey authentication acceptance', () => {
             userId: otp.userId,
             authMethod: 'otp',
             issuedAt: new Date('2026-05-16T12:00:00.000Z'),
-            expiresAt: new Date('2026-08-14T12:00:00.000Z')
+            expiresAt: new Date('2026-08-14T12:00:00.000Z'),
+            epoch: 0
           },
           origin: 'http://localhost:3000'
         },
@@ -194,7 +195,8 @@ describe('passkey authentication acceptance', () => {
             userId: otp.userId,
             authMethod: 'passkey',
             issuedAt: new Date('2026-05-16T12:15:00.000Z'),
-            expiresAt: new Date('2026-08-14T12:15:00.000Z')
+            expiresAt: new Date('2026-08-14T12:15:00.000Z'),
+            epoch: 0
           },
           origin: 'http://localhost:3000'
         },
@@ -218,7 +220,8 @@ describe('passkey authentication acceptance', () => {
       userId: otp.userId,
       authMethod: 'otp',
       issuedAt: new Date('2026-05-16T12:00:00.000Z'),
-      expiresAt: new Date('2026-08-14T12:00:00.000Z')
+      expiresAt: new Date('2026-08-14T12:00:00.000Z'),
+      epoch: 0
     }
 
     await passkeys.createPasskeyRegistrationOptions(

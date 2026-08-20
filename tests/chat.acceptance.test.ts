@@ -38,7 +38,7 @@ describe('specialist chat streaming and citations acceptance', () => {
     ).rejects.toMatchObject({ statusCode: 404, code: 'SPECIALIST_NOT_FOUND' })
   })
 
-  it('fails closed with a rich citation-evidence reason when citations are required and the specialist has no usable evidence', async () => {
+  it('does not block answers when citations are required but no usable evidence exists', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     const calls: string[] = []
 
@@ -55,12 +55,10 @@ describe('specialist chat streaming and citations acceptance', () => {
       )
     )
 
-    expect(calls).toEqual([])
-    expect(events[0]).toMatchObject({ type: 'delta' })
-    expect(joinDeltas(events)).toContain('especialidade exige citações')
-    expect(joinDeltas(events)).toContain('Motivo:')
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: false, reason: 'missing_citation_evidence' })
+    expect(calls).toEqual(['called'])
+    expect(joinDeltas(events)).toContain('Resposta fundamentada.')
     expect(events.some((event) => event.type === 'citation')).toBe(false)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
   it('does not block uncited answers when the specialist does not require citations', async () => {
@@ -191,7 +189,76 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
-  it('streams live runner events only after initial citations are validated', async () => {
+  it('does not reject live runner citations that are not backed by ingestion evidence', async () => {
+    const { specialtiesRoot } = await createTempSpecialist('iva')
+    await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
+
+    const events = await collectChatEvents(
+      await createChatEventStreamFromBody(
+        { specialistId: 'iva', question: 'O que diz o Artigo 1.º?' },
+        {
+          specialtiesRoot,
+          piChatEnabled: true,
+          runner: {
+            async run() {
+              return {
+                grounded: false,
+                citations: [],
+                deltas: toAsyncDeltas([]),
+                events: toAsyncEvents([
+                  {
+                    type: 'citation',
+                    citation: { sourceTitle: 'Consolidação das Leis do Trabalho', sourceFile: 'raw/clt-brasil.md', articleRefs: ['Artigo 58.º'] }
+                  },
+                  { type: 'delta', text: 'Resposta com fonte inventada.' },
+                  { type: 'done', grounded: true }
+                ])
+              }
+            }
+          }
+        }
+      )
+    )
+
+    expect(joinDeltas(events)).toContain('Resposta com fonte inventada.')
+    expect(events.some((event) => event.type === 'citation')).toBe(true)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
+  it('drops malformed live runner citations without blocking the answer', async () => {
+    const { specialtiesRoot } = await createTempSpecialist('iva')
+
+    const events = await collectChatEvents(
+      await createChatEventStreamFromBody(
+        { specialistId: 'iva', question: 'O que diz o Artigo 1.º?' },
+        {
+          specialtiesRoot,
+          piChatEnabled: true,
+          runner: {
+            async run() {
+              return {
+                grounded: false,
+                citations: [],
+                deltas: toAsyncDeltas([]),
+                events: toAsyncEvents([
+                  { type: 'citation', citation: { sourceTitle: 'Fonte sem artigos', articleRefs: [] } as any },
+                  { type: 'citation', citation: undefined as any },
+                  { type: 'delta', text: 'Resposta sem citação mostrada.' },
+                  { type: 'done', grounded: true }
+                ])
+              }
+            }
+          }
+        }
+      )
+    )
+
+    expect(joinDeltas(events)).toContain('Resposta sem citação mostrada.')
+    expect(events.some((event) => event.type === 'citation')).toBe(false)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
+  it('streams live runner events and renders any valid citation at the end', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
 
@@ -274,7 +341,7 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
-  it('converts a grounded engine result without citations into an explicit required-citation fallback', async () => {
+  it('streams a grounded engine result even when citations are missing', async () => {
     const { specialtiesRoot } = await createTempSpecialist('iva')
     await createIngestedSource((await import('../server/utils/specialists/registry')).getSpecialistById, specialtiesRoot)
 
@@ -297,10 +364,9 @@ describe('specialist chat streaming and citations acceptance', () => {
       )
     )
 
-    expect(joinDeltas(events)).not.toContain('Resposta sem fonte')
-    expect(joinDeltas(events)).toContain('especialidade exige citações')
-    expect(joinDeltas(events)).toContain('Motivo:')
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: false, reason: 'missing_required_citations' })
+    expect(joinDeltas(events)).toContain('Resposta sem fonte.')
+    expect(events.some((event) => event.type === 'citation')).toBe(false)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
   it('streams a service-unavailable assistant response when Pi chat is disabled', async () => {
@@ -318,7 +384,7 @@ describe('specialist chat streaming and citations acceptance', () => {
     expect(events.at(-1)).toEqual({ type: 'done', grounded: false })
   })
 
-  it('builds a minimal Pi chat prompt without specialist metadata, citation allowlists, or persona', () => {
+  it('builds a Pi chat prompt with optional citations and no specialist persona', () => {
     const specialist = createPromptTestSpecialist('Use the customs classification output format.')
     const citationEvidence = [{ sourceTitle: 'Pauta Aduaneira', sourceFile: 'raw/pauta.md', articleRefs: ['ARTIGO 1.º'] }]
 
@@ -337,17 +403,13 @@ describe('specialist chat streaming and citations acceptance', () => {
       ]
     })
 
-    expect(firstPrompt).toBe(`Answer the user question using this specialist workspace.
-
-User question:
-Classifica este produto.
-
-Conversation context:
-(none)
-`)
+    expect(firstPrompt).toContain('Answer the user question using this specialist workspace.')
+    expect(firstPrompt).toContain('The current working directory is the specialist root. Use the available tools normally.')
+    expect(firstPrompt).toContain('Known citation metadata, if useful:')
+    expect(firstPrompt).toContain('{"sourceTitle":"Pauta Aduaneira","sourceFile":"raw/pauta.md","articleRefs":["ARTIGO 1.º"]}')
+    expect(firstPrompt).toContain('{"type":"citations"')
+    expect(firstPrompt).toContain('User question:\nClassifica este produto.')
     expect(firstPrompt).not.toContain('Selected specialist')
-    expect(firstPrompt).not.toContain('Backend citation allowlist')
-    expect(firstPrompt).not.toContain('Technical protocol')
     expect(firstPrompt).not.toContain('Use the customs classification output format.')
     expect(followUpPrompt).not.toContain('Use the customs classification output format.')
     expect(followUpPrompt).toContain('Conversation context:\nUSER: Classifica este produto.')

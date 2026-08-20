@@ -22,10 +22,12 @@ export interface MonthlyVisitorCount {
 }
 
 const MONTH_PATTERN = /^\d{4}-\d{2}$/
+// The cookie is client-supplied and lands in visitor_events, so only accept ids we could have minted.
+const VISITOR_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function resolveVisitorIdentity(event: H3Event): ResolvedVisitorIdentity {
   const existing = getCookie(event, VISITOR_COOKIE_NAME)?.trim()
-  if (existing) {
+  if (existing && VISITOR_ID_PATTERN.test(existing)) {
     return { visitorId: existing, created: false }
   }
 
@@ -41,19 +43,27 @@ export function resolveVisitorIdentity(event: H3Event): ResolvedVisitorIdentity 
   return { visitorId, created: true }
 }
 
+/**
+ * One row per visitor per day. The endpoint is unauthenticated, so without this a client could
+ * grow the table (and the SQLite file that also holds sessions) without bound. Monthly reporting
+ * counts distinct visitors, so collapsing repeat visits does not change what admins see.
+ */
 export function recordVisit(database: DatabaseSync, input: RecordVisitInput): void {
   const occurredAt = input.occurredAt ?? new Date()
+  const timestamp = occurredAt.toISOString()
   database
     .prepare(`
-      INSERT INTO visitor_events (id, visitor_id, user_id, occurred_at, month)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO visitor_events (id, visitor_id, user_id, occurred_at, month, day)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT DO NOTHING
     `)
     .run(
       randomUUID(),
       input.visitorId,
       input.userId?.trim() || null,
-      occurredAt.toISOString(),
-      monthFromDate(occurredAt)
+      timestamp,
+      monthFromDate(occurredAt),
+      timestamp.slice(0, 10)
     )
 }
 

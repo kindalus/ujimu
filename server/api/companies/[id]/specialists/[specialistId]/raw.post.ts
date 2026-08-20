@@ -3,18 +3,19 @@ import { canUploadRawSources, isAllowedRawSourceFileName, isCompatibleRawSourceC
 import { requireAuthenticatedUser } from '../../../../../utils/companies/http'
 import { recordCompanyAdminAuditEvent, requireCompanyAdminSpecialist } from '../../../../../utils/companies/specialists'
 import { initializeDatabase } from '../../../../../utils/db'
+import { assertMaxRequestBytes, assertSameOriginRequest, MAX_UPLOAD_BYTES } from '../../../../../utils/security/request-guards'
 import { scanSpecialistRawSources } from '../../../../../utils/ingestion/detect'
 import { RawSourceStorageError, storeRawSource } from '../../../../../utils/ingestion/storage'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   const specialistId = getRouterParam(event, 'specialistId')
   if (!companyId || !specialistId) {
     throw createError({ statusCode: 404, statusMessage: 'Specialist not found', data: { code: 'SPECIALIST_NOT_FOUND' } })
   }
 
-  const database = await initializeDatabase()
   try {
     const { specialist } = await requireCompanyAdminSpecialist(database, { userId, companyId, specialistId })
     if (!canUploadRawSources(specialist.status)) {
@@ -26,6 +27,10 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
+
+    assertSameOriginRequest(event)
+
+    assertMaxRequestBytes(event, MAX_UPLOAD_BYTES)
 
     const file = await readUploadFile(event)
     if (!isAllowedRawSourceFileName(file.filename)) {
@@ -62,8 +67,6 @@ export default defineEventHandler(async (event) => {
       })
     }
     throw error
-  } finally {
-    database.close()
   }
 })
 

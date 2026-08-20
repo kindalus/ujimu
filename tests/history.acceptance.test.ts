@@ -39,8 +39,7 @@ describe('conversation history and editing acceptance', () => {
     expect(anonymous.status).toBe(401)
 
     const otherUserToken = createSessionToken('user-b', {
-      sessionSecret: 'history-test-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'history-test-secret'
     })
     const crossUser = await fetchHistory(
       new Request(`http://local/api/history/${saved.conversationId}`, {

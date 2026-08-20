@@ -1,6 +1,6 @@
-import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { createSessionToken } from './session'
+import { createSessionToken, readSessionEpoch } from './session'
 import type { NotificationProvider, OtpDeliveryChannel } from '../notifications/provider'
 import { NotificationProviderConfigurationError } from '../notifications/provider'
 
@@ -9,9 +9,22 @@ export type OtpChannel = OtpDeliveryChannel
 export const GENERIC_OTP_REQUEST_MESSAGE = 'Se o contacto estiver correcto, enviaremos um código de acesso.'
 export const GENERIC_OTP_FAILURE_MESSAGE = 'Código inválido ou expirado.'
 export const OTP_DELIVERY_FAILURE_MESSAGE = 'Não foi possível enviar o código neste momento. Tente novamente mais tarde.'
+export const OTP_RATE_LIMIT_MESSAGE = 'Demasiados pedidos de código. Aguarde alguns minutos antes de tentar de novo.'
 
 const OTP_TTL_MS = 10 * 60 * 1000
 const OTP_MAX_ATTEMPTS = 5
+
+/**
+ * Per-challenge attempts alone cannot stop brute force, because every new request starts a fresh
+ * challenge with a zeroed counter. These windows bound requests and cumulative failures instead.
+ */
+export const OTP_CONTACT_REQUEST_LIMIT = 3
+export const OTP_CONTACT_REQUEST_WINDOW_MS = 15 * 60 * 1000
+export const OTP_IP_REQUEST_LIMIT = 10
+export const OTP_IP_REQUEST_WINDOW_MS = 60 * 60 * 1000
+export const OTP_CONTACT_FAILURE_LIMIT = 10
+export const OTP_CONTACT_FAILURE_WINDOW_MS = 60 * 60 * 1000
+const OTP_RETENTION_MS = 24 * 60 * 60 * 1000
 
 let generatedOtpPepper: string | undefined
 
@@ -29,6 +42,7 @@ export interface RequestOtpOptions {
   now?: Date
   generateCode?: () => string
   pepper?: string
+  requestIp?: string
 }
 
 export interface VerifyOtpOptions {
@@ -68,6 +82,16 @@ export class OtpVerificationError extends Error {
   }
 }
 
+export class OtpRateLimitError extends Error {
+  public readonly statusCode = 429
+  public readonly code = 'OTP_RATE_LIMITED'
+
+  constructor(message = OTP_RATE_LIMIT_MESSAGE) {
+    super(message)
+    this.name = 'OtpRateLimitError'
+  }
+}
+
 export class OtpDeliveryError extends Error {
   public readonly statusCode = 503
   public readonly code = 'OTP_DELIVERY_FAILED'
@@ -85,6 +109,11 @@ export async function requestOtp(
 ): Promise<{ message: string }> {
   const normalized = normalizeOtpContact(input)
   const now = options.now ?? new Date()
+  const requestIpHash = options.requestIp ? hashRequestIp(options.requestIp) : undefined
+
+  purgeExpiredOtpChallenges(database, now)
+  assertRequestRateLimit(database, normalized, requestIpHash, now)
+
   const code = (options.generateCode ?? generateOtpCode)()
   const codeHash = hashOtpCode(code, options.pepper)
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS)
@@ -113,8 +142,9 @@ export async function requestOtp(
           created_at,
           expires_at,
           attempts,
-          max_attempts
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+          max_attempts,
+          request_ip_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
       `)
       .run(
         challengeId,
@@ -123,7 +153,8 @@ export async function requestOtp(
         codeHash,
         now.toISOString(),
         expiresAt.toISOString(),
-        OTP_MAX_ATTEMPTS
+        OTP_MAX_ATTEMPTS,
+        requestIpHash ?? null
       )
 
     await options.provider.deliverOtp({
@@ -161,6 +192,8 @@ export async function verifyOtp(
   }
 
   const now = options.now ?? new Date()
+  assertVerifyRateLimit(database, normalized, now)
+
   const challenge = getActiveChallenge(database, normalized)
 
   if (!challenge) {
@@ -174,7 +207,7 @@ export async function verifyOtp(
     throw new OtpVerificationError()
   }
 
-  if (challenge.code_hash !== hashOtpCode(code, options.pepper)) {
+  if (!matchesCodeHash(challenge.code_hash, hashOtpCode(code, options.pepper))) {
     database
       .prepare('UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?')
       .run(challenge.id)
@@ -189,7 +222,12 @@ export async function verifyOtp(
 
   return {
     user,
-    sessionToken: createSessionToken(user.id, { now, sessionSecret: options.sessionSecret, authMethod: 'otp' })
+    sessionToken: createSessionToken(user.id, {
+      now,
+      sessionSecret: options.sessionSecret,
+      authMethod: 'otp',
+      epoch: readSessionEpoch(database, user.id) ?? 0
+    })
   }
 }
 
@@ -306,6 +344,68 @@ function createUser(database: DatabaseSync, now: Date): string {
     .prepare('INSERT INTO users (id, created_at) VALUES (?, ?)')
     .run(userId, now.toISOString())
   return userId
+}
+
+function assertRequestRateLimit(
+  database: DatabaseSync,
+  normalized: { channel: OtpChannel; contact: string },
+  requestIpHash: string | undefined,
+  now: Date
+): void {
+  const contactSince = new Date(now.getTime() - OTP_CONTACT_REQUEST_WINDOW_MS).toISOString()
+  const contactCount = database
+    .prepare('SELECT COUNT(*) AS count FROM otp_challenges WHERE channel = ? AND contact = ? AND created_at >= ?')
+    .get(normalized.channel, normalized.contact, contactSince) as { count: number }
+
+  if (contactCount.count >= OTP_CONTACT_REQUEST_LIMIT) {
+    throw new OtpRateLimitError()
+  }
+
+  if (!requestIpHash) return
+
+  const ipSince = new Date(now.getTime() - OTP_IP_REQUEST_WINDOW_MS).toISOString()
+  const ipCount = database
+    .prepare('SELECT COUNT(*) AS count FROM otp_challenges WHERE request_ip_hash = ? AND created_at >= ?')
+    .get(requestIpHash, ipSince) as { count: number }
+
+  if (ipCount.count >= OTP_IP_REQUEST_LIMIT) {
+    throw new OtpRateLimitError()
+  }
+}
+
+function assertVerifyRateLimit(
+  database: DatabaseSync,
+  normalized: { channel: OtpChannel; contact: string },
+  now: Date
+): void {
+  const since = new Date(now.getTime() - OTP_CONTACT_FAILURE_WINDOW_MS).toISOString()
+  const failures = database
+    .prepare(`
+      SELECT COALESCE(SUM(attempts), 0) AS failures
+      FROM otp_challenges
+      WHERE channel = ? AND contact = ? AND created_at >= ?
+    `)
+    .get(normalized.channel, normalized.contact, since) as { failures: number }
+
+  if (failures.failures >= OTP_CONTACT_FAILURE_LIMIT) {
+    throw new OtpRateLimitError()
+  }
+}
+
+function purgeExpiredOtpChallenges(database: DatabaseSync, now: Date): void {
+  database
+    .prepare('DELETE FROM otp_challenges WHERE expires_at < ?')
+    .run(new Date(now.getTime() - OTP_RETENTION_MS).toISOString())
+}
+
+function matchesCodeHash(stored: string, candidate: string): boolean {
+  const storedBuffer = Buffer.from(stored, 'hex')
+  const candidateBuffer = Buffer.from(candidate, 'hex')
+  return storedBuffer.length === candidateBuffer.length && timingSafeEqual(storedBuffer, candidateBuffer)
+}
+
+function hashRequestIp(ip: string): string {
+  return createHash('sha256').update(ip.trim()).digest('hex')
 }
 
 function generateOtpCode(): string {

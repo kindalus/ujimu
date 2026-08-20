@@ -28,7 +28,7 @@ export function filterAccessibleSpecialists(
 }
 
 export function resolveSpecialistAccessSubject(database: DatabaseSync, event: H3Event): SpecialistAccessSubject {
-  const session = readSessionFromEvent(event)
+  const session = readSessionFromEvent(event, database)
   if (!session || !userExists(database, session.userId)) {
     return { type: 'anonymous' }
   }

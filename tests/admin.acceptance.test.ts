@@ -590,8 +590,7 @@ function createAdminFetch(
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'admin-test-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'admin-test-secret'
     })}`
   })
 }

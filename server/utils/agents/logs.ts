@@ -360,7 +360,7 @@ function languageForPath(path: string | undefined): string {
 }
 
 function displayPath(path: string): string {
-  return sanitizeLogText(path.replace(/^\/data\/?/u, '')) || '/data'
+  return sanitizeLogText(path) || '.'
 }
 
 function extractToolResultText(value: unknown): string {

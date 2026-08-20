@@ -4,14 +4,10 @@ import { getActiveCompanyForUser, listUserCompanies } from '../../utils/companie
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
   const database = await initializeDatabase()
-  try {
-    return {
-      companies: listUserCompanies(database, userId),
-      activeCompany: getActiveCompanyForUser(database, userId)
-    }
-  } finally {
-    database.close()
+  const userId = requireAuthenticatedUser(event, database)
+  return {
+    companies: listUserCompanies(database, userId),
+    activeCompany: getActiveCompanyForUser(database, userId)
   }
 })

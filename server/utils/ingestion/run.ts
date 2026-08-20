@@ -22,7 +22,6 @@ import { resolveStaleProcessingMinutes } from './conversion'
 export interface RunPendingIngestionOptions {
   piIngestionEnabled?: boolean
   runner?: PiIngestionRunner
-  timeoutMs?: number
   staleProcessingMinutes?: number
 }
 
@@ -101,10 +100,10 @@ export async function runPendingIngestion(
   const runner = options.runner ?? createPiSdkIngestionRunner()
 
   if (hasBatchIngestion(runner)) {
-    await processBatch({ specialist, state, sources: pendingSources, runner, timeoutMs: options.timeoutMs })
+    await processBatch({ specialist, state, sources: pendingSources, runner })
   } else {
     for (const source of pendingSources) {
-      await processSource({ specialist, state, source, runner, timeoutMs: options.timeoutMs })
+      await processSource({ specialist, state, source, runner })
     }
   }
 
@@ -145,9 +144,8 @@ async function processBatch(input: {
   state: IngestionState
   sources: IngestionSourceRecord[]
   runner: PiIngestionRunner & { ingestSources: NonNullable<PiIngestionRunner['ingestSources']> }
-  timeoutMs?: number
 }): Promise<void> {
-  const { specialist, state, sources, runner, timeoutMs } = input
+  const { specialist, state, sources, runner } = input
   const originalSources = new Map(sources.map((source) => [source.raw_path, cloneSource(source)]))
 
   for (const source of sources) {
@@ -157,7 +155,7 @@ async function processBatch(input: {
 
   let result: PiBatchIngestionResult | IngestionManifest | void
   try {
-    result = await runner.ingestSources(specialist, sources, { timeoutMs })
+    result = await runner.ingestSources(specialist, sources)
     const manifest = resolveBatchManifest(result)
     if (!manifest) {
       throw new PiIngestionError('INGESTION_MANIFEST_MISSING', 'Pi ingestion did not return an ingestion manifest.')
@@ -177,15 +175,14 @@ async function processSource(input: {
   state: IngestionState
   source: IngestionSourceRecord
   runner: PiIngestionRunner
-  timeoutMs?: number
 }): Promise<void> {
-  const { specialist, state, source, runner, timeoutMs } = input
+  const { specialist, state, source, runner } = input
 
   markProcessing(source)
   await writeIngestionState(specialist.paths.ingestState, state)
 
   try {
-    await runner.ingestSource(specialist, source, { timeoutMs })
+    await runner.ingestSource(specialist, source)
     if (!(await hasWikiMarkdownFiles(specialist.paths.wiki))) {
       throw new PiIngestionError(
         'WIKI_OUTPUT_MISSING',

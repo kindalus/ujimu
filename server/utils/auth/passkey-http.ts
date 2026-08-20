@@ -1,5 +1,7 @@
-import { createError, getHeader, getRequestHeader, readBody, type H3Event } from 'h3'
+import { createError, getRequestHeader, readBody, type H3Event } from 'h3'
+import type { DatabaseSync } from 'node:sqlite'
 import { resolveVisitorIdentity } from '../analytics/visitors'
+import { resolveTrustedClientIp } from '../security/client-ip'
 import { readSessionFromEvent } from './session'
 import { normalizePasskeyRateLimitSubject, PasskeyError, resolvePasskeyConfig, type PasskeyRateLimitSubject } from './passkeys'
 
@@ -32,8 +34,8 @@ export async function readPasskeyJsonBody(event: H3Event): Promise<Record<string
   return body as Record<string, unknown>
 }
 
-export function requireSession(event: H3Event) {
-  const session = readSessionFromEvent(event)
+export function requireSession(event: H3Event, database: DatabaseSync) {
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
@@ -69,18 +71,8 @@ export function assertPasskeyMutationOrigin(event: H3Event): void {
 
 export function resolvePasskeySubject(event: H3Event): PasskeyRateLimitSubject {
   const visitor = resolveVisitorIdentity(event)
-  const ip = getDirectIp(event)
-  return normalizePasskeyRateLimitSubject({ visitorId: visitor.visitorId, ip })
-}
-
-function getDirectIp(event: H3Event): string | undefined {
-  const direct = getHeader(event, 'x-real-ip')
-  if (direct && process.env.UJIMU_TRUST_PROXY_HEADERS === 'true') return direct
-
-  const forwarded = getHeader(event, 'x-forwarded-for')
-  if (forwarded && process.env.UJIMU_TRUST_PROXY_HEADERS === 'true') {
-    return forwarded.split(',')[0]?.trim()
-  }
-
-  return event.node?.req.socket.remoteAddress
+  return normalizePasskeyRateLimitSubject({
+    visitorId: visitor.visitorId,
+    ip: resolveTrustedClientIp(event)
+  })
 }

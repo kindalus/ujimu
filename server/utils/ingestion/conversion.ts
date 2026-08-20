@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import { createDocxToMarkdownTool } from '../pi/docx-to-markdown-tool'
 import { createPdfToMarkdownTool } from '../pi/pdf-to-markdown-tool'
-import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
+import { createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
 import { extractArticleRefs, inferSourceTitle } from './metadata'
@@ -15,19 +15,13 @@ import type { IngestionSourceRecord, IngestionState } from './types'
 export interface PiConversionRunner {
   convertSource(
     specialist: SpecialistRuntime,
-    source: IngestionSourceRecord,
-    options?: PiConversionRunnerOptions
+    source: IngestionSourceRecord
   ): Promise<void>
-}
-
-export interface PiConversionRunnerOptions {
-  timeoutMs?: number
 }
 
 export interface RunPendingConversionsOptions {
   piConversionEnabled?: boolean
   runner?: PiConversionRunner
-  timeoutMs?: number
   maxMarkdownBytes?: number
   staleProcessingMinutes?: number
 }
@@ -88,7 +82,7 @@ export async function runPendingConversions(
     await writeIngestionState(specialist.paths.ingestState, state)
 
     try {
-      await runner.convertSource(specialist, source, { timeoutMs: options.timeoutMs })
+      await runner.convertSource(specialist, source)
       await validateConvertedMarkdown(specialist, source, resolveMaxMarkdownBytes(options.maxMarkdownBytes))
       markConverted(source)
       converted += 1
@@ -105,16 +99,15 @@ export async function runPendingConversions(
 
 export function createPiSdkConversionRunner(): PiConversionRunner {
   return {
-    async convertSource(specialist, source, options = {}) {
-      await runPiSdkConversion(specialist, source, options)
+    async convertSource(specialist, source) {
+      await runPiSdkConversion(specialist, source)
     }
   }
 }
 
 async function runPiSdkConversion(
   specialist: SpecialistRuntime,
-  source: IngestionSourceRecord,
-  options: PiConversionRunnerOptions
+  source: IngestionSourceRecord
 ): Promise<void> {
   if (/\.pdf$/i.test(source.raw_path)) {
     await assertPdfConversionPrerequisites()
@@ -135,32 +128,13 @@ async function runPiSdkConversion(
     cwd,
     task: 'conversion',
     modelEnvPrefix: 'UJIMU_PI_CONVERSION',
-    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
-    fileSystemPolicy: {
-      root: cwd,
-      read: { files: [`raw/${source.raw_path}`] },
-      write: { files: [`raw/${markdownPath}`] },
-      list: { directories: [] }
-    },
-    agentLog: { specialistId: specialist.id },
-    appendSystemPromptOverride: () => [
-      'You are a Ujimu raw-source conversion agent.',
-      'Operate only inside the /data virtual filesystem.',
-      'Convert exactly one raw file into faithful Markdown under /data/raw.',
-      'Do not summarize legislation, tables, articles, rows, or source contents.',
-      'Preserve the source language exactly; do not translate Portuguese or any other language into English.',
-      'Do not modify /data/wiki during conversion.'
-    ]
+    agentLog: { specialistId: specialist.id }
   })
 
   let logStatus: AgentSessionLogCloseStatus = 'succeeded'
 
   try {
-    await runWithTimeout(
-      () => session.prompt(buildConversionPrompt(specialist, source)),
-      options.timeoutMs ?? 5 * 60 * 1000,
-      async () => session.abort()
-    )
+    await session.prompt(buildConversionPrompt(specialist, source))
   } catch (error) {
     logStatus = 'failed'
     if (error instanceof PiConversionError) {
@@ -182,10 +156,6 @@ async function assertPdfConversionPrerequisites(): Promise<void> {
   if (!(await commandExists('gemini'))) {
     throw new PiConversionError('CONVERSION_FAILED', 'GEMINI_CLI_UNAVAILABLE: gemini CLI is not available on PATH.')
   }
-
-  if (!(await commandExists('timeout'))) {
-    throw new PiConversionError('CONVERSION_FAILED', 'TIMEOUT_COMMAND_UNAVAILABLE: timeout command is not available on PATH.')
-  }
 }
 
 function commandExists(command: string): Promise<boolean> {
@@ -198,8 +168,8 @@ function commandExists(command: string): Promise<boolean> {
 
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
-  const inputPath = `/data/raw/${source.raw_path}`
-  const outputPath = `/data/raw/${markdownPath}`
+  const inputPath = `raw/${source.raw_path}`
+  const outputPath = `raw/${markdownPath}`
 
   if (/\.pdf$/i.test(source.raw_path)) {
     return `Convert exactly one uploaded PDF source into Markdown.
@@ -214,7 +184,7 @@ Rules:
 2. The pdf_to_markdown tool is responsible for creating ${outputPath}.
 3. Do not read, edit, write, or manually convert the PDF with file tools.
 4. If pdf_to_markdown fails, fail clearly and do not attempt fallback conversion.
-5. Do not modify /data/wiki or any file other than ${outputPath}.
+5. Do not modify wiki/ or any file other than ${outputPath}.
 6. End after the tool reports successful conversion metadata.
 `
   }
@@ -233,7 +203,7 @@ Rules:
 4. For XLSX, write each sheet as a Markdown heading followed by faithful Markdown tables. If the available tools cannot read the workbook, fail clearly instead of inventing content.
 5. For HTML/HTM, preserve headings, paragraphs, links, lists, and tables as Markdown.
 6. For TXT, preserve text structure and article references.
-7. Do not modify /data/wiki or any file other than ${outputPath}.
+7. Do not modify wiki/ or any file other than ${outputPath}.
 8. End after the Markdown file has been written.
 `
 }
@@ -359,34 +329,6 @@ function toConversionErrorCode(error: unknown): string {
   return error instanceof PiConversionError ? error.code : 'CONVERSION_FAILED'
 }
 
-async function runWithTimeout(
-  operation: () => Promise<void>,
-  timeoutMs: number,
-  onTimeout: () => Promise<void>
-): Promise<void> {
-  let timeout: NodeJS.Timeout | undefined
-  let timedOut = false
-
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    timeout = setTimeout(() => {
-      timedOut = true
-      reject(new PiConversionError('CONVERSION_FAILED', `Pi conversion exceeded ${timeoutMs}ms.`))
-    }, timeoutMs)
-  })
-
-  try {
-    await Promise.race([operation(), timeoutPromise])
-  } catch (error) {
-    if (timedOut) {
-      await onTimeout().catch(() => undefined)
-    }
-    throw error
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  }
-}
 
 function isPiConversionEnabled(option: boolean | undefined): boolean {
   return option ?? process.env.UJIMU_PI_CONVERSION_ENABLED === 'true'

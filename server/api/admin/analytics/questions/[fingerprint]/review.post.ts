@@ -7,22 +7,18 @@ const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
-  try {
-    const admin = requireAdmin(database, event)
-    const fingerprint = readFingerprint(getRouterParam(event, 'fingerprint'))
-    const body = await readBody(event, { strict: true }).catch(() => undefined)
-    const specialistId = readSpecialistId(body)
-    const reviewed = markQuestionCandidateReviewed(database, {
-      specialistId,
-      fingerprint,
-      adminUserId: admin.user.id,
-      adminContact: admin.adminContact
-    })
+  const admin = requireAdmin(database, event)
+  const fingerprint = readFingerprint(getRouterParam(event, 'fingerprint'))
+  const body = await readBody(event, { strict: true }).catch(() => undefined)
+  const specialistId = readSpecialistId(body)
+  const reviewed = markQuestionCandidateReviewed(database, {
+    specialistId,
+    fingerprint,
+    adminUserId: admin.user.id,
+    adminContact: admin.adminContact
+  })
 
-    return { reviewed: true, candidate: reviewed }
-  } finally {
-    database.close()
-  }
+  return { reviewed: true, candidate: reviewed }
 })
 
 function readFingerprint(value: string | undefined): string {

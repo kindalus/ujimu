@@ -39,7 +39,10 @@ describe('initializeDatabase', () => {
       { version: '0010_corporate_accounts' },
       { version: '0011_company_quota_subject' },
       { version: '0012_company_admin_audit_events' },
-      { version: '0013_specialist_initialization_jobs' }
+      { version: '0013_specialist_initialization_jobs' },
+      { version: '0014_otp_request_throttling' },
+      { version: '0015_user_session_epoch' },
+      { version: '0016_visitor_events_daily_dedupe' }
     ])
   })
 
@@ -56,6 +59,54 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(13)
+    expect(count.count).toBe(16)
+  })
+
+  it('opens connections in WAL mode with a busy timeout so writers never block readers', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-db-'))
+    const dbPath = join(dataDir, 'db', 'ujimu.sqlite')
+
+    const database = await initializeDatabase({ dataDir, dbPath })
+    const journalMode = database.prepare('PRAGMA journal_mode').get() as { journal_mode: string }
+    const busyTimeout = database.prepare('PRAGMA busy_timeout').get() as { timeout: number }
+    const synchronous = database.prepare('PRAGMA synchronous').get() as { synchronous: number }
+    database.close()
+
+    expect(journalMode.journal_mode).toBe('wal')
+    expect(busyTimeout.timeout).toBe(5000)
+    expect(synchronous.synchronous).toBe(1)
+  })
+
+  it('reuses one shared connection when no explicit path is given, and isolates explicit ones', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-db-'))
+    const previousDataDir = process.env.UJIMU_DATA_DIR
+    const previousDbPath = process.env.UJIMU_DB_PATH
+    process.env.UJIMU_DATA_DIR = dataDir
+    delete process.env.UJIMU_DB_PATH
+
+    try {
+      const first = await initializeDatabase()
+      const second = await initializeDatabase()
+      expect(second).toBe(first)
+
+      const explicit = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
+      expect(explicit).not.toBe(first)
+      explicit.close()
+
+      // Closing an explicitly opened connection must not disturb the shared one.
+      expect(await initializeDatabase()).toBe(first)
+      expect(first.prepare('SELECT COUNT(*) as count FROM schema_migrations').get()).toMatchObject({ count: 16 })
+    } finally {
+      restoreEnv('UJIMU_DATA_DIR', previousDataDir)
+      restoreEnv('UJIMU_DB_PATH', previousDbPath)
+    }
   })
 })
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name]
+    return
+  }
+  process.env[name] = value
+}

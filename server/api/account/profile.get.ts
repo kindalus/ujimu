@@ -5,27 +5,23 @@ import { getActiveCompanyForUser, listUserCompanies } from '../../utils/companie
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     return { authenticated: false, verifiedEmails: [], companies: [], activeCompany: null }
   }
 
-  const database = await initializeDatabase()
-  try {
-    const user = getPublicSessionUser(database, session.userId)
-    if (!user) {
-      return { authenticated: false, verifiedEmails: [], companies: [], activeCompany: null }
-    }
+  const user = getPublicSessionUser(database, session.userId)
+  if (!user) {
+    return { authenticated: false, verifiedEmails: [], companies: [], activeCompany: null }
+  }
 
-    return {
-      authenticated: true,
-      user,
-      verifiedEmails: getVerifiedEmails(database, session.userId),
-      companies: listUserCompanies(database, session.userId),
-      activeCompany: getActiveCompanyForUser(database, session.userId)
-    }
-  } finally {
-    database.close()
+  return {
+    authenticated: true,
+    user,
+    verifiedEmails: getVerifiedEmails(database, session.userId),
+    companies: listUserCompanies(database, session.userId),
+    activeCompany: getActiveCompanyForUser(database, session.userId)
   }
 })
 

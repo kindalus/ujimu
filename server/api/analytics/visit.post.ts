@@ -5,16 +5,12 @@ import { recordVisit, resolveVisitorIdentity } from '../../utils/analytics/visit
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
-  try {
-    const visitor = resolveVisitorIdentity(event)
-    const session = readSessionFromEvent(event)
-    recordVisit(database, {
-      visitorId: visitor.visitorId,
-      ...(session ? { userId: session.userId } : {})
-    })
+  const visitor = resolveVisitorIdentity(event)
+  const session = readSessionFromEvent(event, database)
+  recordVisit(database, {
+    visitorId: visitor.visitorId,
+    ...(session ? { userId: session.userId } : {})
+  })
 
-    return { visited: true }
-  } finally {
-    database.close()
-  }
+  return { visited: true }
 })

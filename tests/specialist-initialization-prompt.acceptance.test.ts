@@ -4,11 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 
-const createUjimuFileToolsMock = vi.hoisted(() => vi.fn(async (_cwd: string, tools: string[]) => tools))
 const createUjimuPiSessionMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../server/utils/pi/session', () => ({
-  createUjimuFileTools: createUjimuFileToolsMock,
   createUjimuPiSession: createUjimuPiSessionMock
 }))
 
@@ -29,18 +27,14 @@ describe('specialist initialization prompt acceptance', () => {
     const { createPiSdkSpecialistInitializationRunner } = await import('../server/utils/specialists/initialization')
     const specialist = specialistRuntimeFixture()
 
-    await createPiSdkSpecialistInitializationRunner().initializeSpecialist(specialist, { timeoutMs: 1000 })
+    await createPiSdkSpecialistInitializationRunner().initializeSpecialist(specialist)
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
-    expect(sessionOptions.cwd).toBe(specialist.paths.root)
-    expect(sessionOptions.fileSystemPolicy).toEqual({
-      root: specialist.paths.root,
-      read: { directories: ['.'] },
-      write: { directories: ['wiki'], files: ['AGENTS.md'] },
-      list: { directories: ['.'] }
-    })
+    expect(sessionOptions).toMatchObject({ cwd: specialist.paths.root, task: 'initialization' })
+    expect(sessionOptions).not.toHaveProperty('fileSystemPolicy')
+    expect(sessionOptions).not.toHaveProperty('tools')
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
-    expect(prompts[0]).toBe(`Initialize a new Ujimu specialist LLM Wiki workspace. Use the information below to create the wiki structure. Choose sensible wiki conventions from the selected LLM Wiki preset, but do not invent source facts or legal content. Include the chat response protocol below in AGENTS.md so consultation chat sessions can follow it later.
+    expect(prompts[0]).toBe(`Initialize a new Ujimu specialist LLM Wiki workspace. Use the information below to create the wiki structure. Choose sensible wiki conventions from the selected LLM Wiki preset, but do not invent source facts or legal content. Include the chat response guidance below in AGENTS.md so consultation chat sessions can follow it later.
 
 Specialist:
 - id: perito-fintech
@@ -55,21 +49,21 @@ Create these required files:
 - wiki/index.md
 - wiki/log.md
 
+In AGENTS.md, state that this specialist wiki is governed by the \`llm-wiki\` skill and its OKF-backed raw/ -> converted/ -> wiki contract.
+
 ---
 Assume the following persona:
 You are a Ujimu specialist consultation assistant. Answer as a careful domain specialist, using only this specialist wiki as your source of truth. If the wiki does not contain enough evidence, say that the current context is insufficient instead of guessing.
 ---
 
-Chat response protocol:
-This protocol applies only when answering user consultation questions, not during wiki initialization or source ingestion.
+Chat response guidance:
+This guidance applies only when answering user consultation questions, not during wiki initialization or source ingestion.
 
-1. Emit NDJSON only: one JSON object per line, no code fence, no prose outside JSON.
-2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required NDJSON output structure.
-3. When the wiki supports the answer, emit one citations event before any answer chunk:
+1. Answer normally from this specialist wiki and do not guess when the wiki lacks evidence.
+2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required output structure.
+3. If useful citations are available, optionally emit them as JSON lines in this shape:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-4. Then emit answer chunks:
-   {"type":"delta","text":"..."}
-5. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
+4. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
 `)
   })
 
@@ -114,14 +108,14 @@ This protocol applies only when answering user consultation questions, not durin
     const { createPiSdkSpecialistInitializationRunner } = await import('../server/utils/specialists/initialization')
     const specialist = specialistRuntimeFixture('Responder como consultor fiscal angolano.')
 
-    await createPiSdkSpecialistInitializationRunner().initializeSpecialist(specialist, { timeoutMs: 1000 })
+    await createPiSdkSpecialistInitializationRunner().initializeSpecialist(specialist)
 
     expect(prompts[0]).toContain(`---
 Assume the following persona:
 Responder como consultor fiscal angolano.
 ---
 
-Chat response protocol:`)
+Chat response guidance:`)
   })
 })
 

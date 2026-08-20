@@ -8,28 +8,24 @@ import { getSpecialistById } from '../../../../../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
-  try {
-    const admin = requireAdmin(database, event)
-    const specialistId = getRequiredSpecialistId(event)
-    const specialist = await getSpecialistById(specialistId)
-    if (!specialist) {
-      throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
-    }
-
-    const state = await scanSpecialistRawSources(specialist)
-    const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
-    const counts = countSources(sources)
-    recordAdminAuditEvent(database, {
-      admin,
-      action: 'sources_reloaded',
-      specialistId,
-      metadata: { counts }
-    })
-
-    return { sources, counts }
-  } finally {
-    database.close()
+  const admin = requireAdmin(database, event)
+  const specialistId = getRequiredSpecialistId(event)
+  const specialist = await getSpecialistById(specialistId)
+  if (!specialist) {
+    throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
   }
+
+  const state = await scanSpecialistRawSources(specialist)
+  const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
+  const counts = countSources(sources)
+  recordAdminAuditEvent(database, {
+    admin,
+    action: 'sources_reloaded',
+    specialistId,
+    metadata: { counts }
+  })
+
+  return { sources, counts }
 })
 
 function getRequiredSpecialistId(event: Parameters<typeof getRouterParam>[0]): string {

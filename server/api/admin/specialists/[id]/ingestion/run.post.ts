@@ -12,57 +12,53 @@ const disabledMessage = 'A ingestão automática não está activa neste ambient
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
+  const admin = requireAdmin(database, event)
+  const specialistId = getRequiredSpecialistId(event)
+  const specialist = await getSpecialistById(specialistId)
+  if (!specialist) {
+    throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
+  }
+
   try {
-    const admin = requireAdmin(database, event)
-    const specialistId = getRequiredSpecialistId(event)
-    const specialist = await getSpecialistById(specialistId)
-    if (!specialist) {
-      throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
-    }
-
-    try {
-      if (process.env.UJIMU_PI_INGESTION_ENABLED === 'true') {
-        const state = await scanSpecialistRawSources(specialist)
-        const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
-        const counts = countSources(sources)
-        const job = enqueueSpecialistIngestionJob(database, { specialistId })
-        recordAdminAuditEvent(database, {
-          admin,
-          action: 'ingestion_started',
-          specialistId,
-          metadata: { job_id: job.id, status: job.status }
-        })
-        scheduleDueBackgroundJobs()
-        setResponseStatus(event, 202)
-        return { job, sources, counts }
-      }
-
-      const state = await runPendingIngestion(specialist)
+    if (process.env.UJIMU_PI_INGESTION_ENABLED === 'true') {
+      const state = await scanSpecialistRawSources(specialist)
       const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
       const counts = countSources(sources)
+      const job = enqueueSpecialistIngestionJob(database, { specialistId })
       recordAdminAuditEvent(database, {
         admin,
-        action: 'ingestion_completed',
+        action: 'ingestion_started',
         specialistId,
-        metadata: { counts }
+        metadata: { job_id: job.id, status: job.status }
       })
-      return { sources, counts }
-    } catch (error) {
-      if (error instanceof PiIngestionDisabledError) {
-        recordAdminAuditEvent(database, {
-          admin,
-          action: 'ingestion_skipped_disabled',
-          specialistId,
-          metadata: { error_code: error.code }
-        })
-        setResponseStatus(event, 409)
-        return { error: { code: error.code, message: disabledMessage } }
-      }
-
-      throw error
+      scheduleDueBackgroundJobs()
+      setResponseStatus(event, 202)
+      return { job, sources, counts }
     }
-  } finally {
-    database.close()
+
+    const state = await runPendingIngestion(specialist)
+    const sources = Object.values(state.sources).sort((left, right) => left.raw_path.localeCompare(right.raw_path))
+    const counts = countSources(sources)
+    recordAdminAuditEvent(database, {
+      admin,
+      action: 'ingestion_completed',
+      specialistId,
+      metadata: { counts }
+    })
+    return { sources, counts }
+  } catch (error) {
+    if (error instanceof PiIngestionDisabledError) {
+      recordAdminAuditEvent(database, {
+        admin,
+        action: 'ingestion_skipped_disabled',
+        specialistId,
+        metadata: { error_code: error.code }
+      })
+      setResponseStatus(event, 409)
+      return { error: { code: error.code, message: disabledMessage } }
+    }
+
+    throw error
   }
 })
 

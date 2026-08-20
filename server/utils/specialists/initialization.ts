@@ -1,9 +1,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
-import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
+import { createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from './schema'
-
-export const DEFAULT_PI_INITIALIZATION_TIMEOUT_MS = 10 * 60 * 1000
 
 export interface SpecialistInitializationRunner {
   initializeSpecialist(
@@ -12,13 +10,11 @@ export interface SpecialistInitializationRunner {
   ): Promise<void>
 }
 
-export interface SpecialistInitializationRunnerOptions {
-  timeoutMs?: number
-}
+export interface SpecialistInitializationRunnerOptions {}
 
 export class SpecialistInitializationError extends Error {
   constructor(
-    public readonly code: 'PI_TIMEOUT' | 'PI_EXECUTION_FAILED' | 'WIKI_INITIALIZATION_OUTPUT_MISSING',
+    public readonly code: 'PI_EXECUTION_FAILED' | 'WIKI_INITIALIZATION_OUTPUT_MISSING',
     message: string
   ) {
     super(message)
@@ -63,32 +59,21 @@ export async function assertSpecialistInitializedWorkspace(specialist: Specialis
 
 async function runPiSdkSpecialistInitialization(
   specialist: SpecialistRuntime,
-  options: SpecialistInitializationRunnerOptions
+  _options: SpecialistInitializationRunnerOptions
 ): Promise<void> {
   const cwd = specialist.paths.root
   const { session, agentLog } = await createUjimuPiSession({
     cwd,
     task: 'initialization',
     modelEnvPrefix: 'UJIMU_PI_INITIALIZATION',
-    tools: await createUjimuFileTools(cwd, ['read', 'write', 'edit', 'grep', 'find', 'ls']),
-    fileSystemPolicy: {
-      root: cwd,
-      read: { directories: ['.'] },
-      write: { directories: ['wiki'], files: ['AGENTS.md'] },
-      list: { directories: ['.'] }
-    },
     agentLog: { specialistId: specialist.id }
   })
   let logStatus: AgentSessionLogCloseStatus = 'succeeded'
 
   try {
-    await runWithTimeout(
-      () => session.prompt(buildInitializationPrompt(specialist)),
-      options.timeoutMs ?? DEFAULT_PI_INITIALIZATION_TIMEOUT_MS,
-      async () => session.abort()
-    )
+    await session.prompt(buildInitializationPrompt(specialist))
   } catch (error) {
-    logStatus = error instanceof SpecialistInitializationError && error.code === 'PI_TIMEOUT' ? 'aborted' : 'failed'
+    logStatus = 'failed'
     if (error instanceof SpecialistInitializationError) {
       throw error
     }
@@ -106,7 +91,7 @@ async function runPiSdkSpecialistInitialization(
 function buildInitializationPrompt(specialist: SpecialistRuntime): string {
   const persona = specialist.system_prompt.trim() || 'You are a Ujimu specialist consultation assistant. Answer as a careful domain specialist, using only this specialist wiki as your source of truth. If the wiki does not contain enough evidence, say that the current context is insufficient instead of guessing.'
 
-  return `Initialize a new Ujimu specialist LLM Wiki workspace. Use the information below to create the wiki structure. Choose sensible wiki conventions from the selected LLM Wiki preset, but do not invent source facts or legal content. Include the chat response protocol below in AGENTS.md so consultation chat sessions can follow it later.
+  return `Initialize a new Ujimu specialist LLM Wiki workspace. Use the information below to create the wiki structure. Choose sensible wiki conventions from the selected LLM Wiki preset, but do not invent source facts or legal content. Include the chat response guidance below in AGENTS.md so consultation chat sessions can follow it later.
 
 Specialist:
 - id: ${specialist.id}
@@ -121,49 +106,20 @@ Create these required files:
 - wiki/index.md
 - wiki/log.md
 
+In AGENTS.md, state that this specialist wiki is governed by the \`llm-wiki\` skill and its OKF-backed raw/ -> converted/ -> wiki contract.
+
 ---
 Assume the following persona:
 ${persona}
 ---
 
-Chat response protocol:
-This protocol applies only when answering user consultation questions, not during wiki initialization or source ingestion.
+Chat response guidance:
+This guidance applies only when answering user consultation questions, not during wiki initialization or source ingestion.
 
-1. Emit NDJSON only: one JSON object per line, no code fence, no prose outside JSON.
-2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required NDJSON output structure.
-3. When the wiki supports the answer, emit one citations event before any answer chunk:
+1. Answer normally from this specialist wiki and do not guess when the wiki lacks evidence.
+2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required output structure.
+3. If useful citations are available, optionally emit them as JSON lines in this shape:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-4. Then emit answer chunks:
-   {"type":"delta","text":"..."}
-5. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
+4. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
 `
-}
-
-async function runWithTimeout(
-  operation: () => Promise<void>,
-  timeoutMs: number,
-  onTimeout: () => Promise<void>
-): Promise<void> {
-  let timeout: NodeJS.Timeout | undefined
-  let timedOut = false
-
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    timeout = setTimeout(() => {
-      timedOut = true
-      reject(new SpecialistInitializationError('PI_TIMEOUT', `Pi specialist initialization exceeded ${timeoutMs}ms.`))
-    }, timeoutMs)
-  })
-
-  try {
-    await Promise.race([operation(), timeoutPromise])
-  } catch (error) {
-    if (timedOut) {
-      await onTimeout().catch(() => undefined)
-    }
-    throw error
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  }
 }

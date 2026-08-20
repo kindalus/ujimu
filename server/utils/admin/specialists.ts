@@ -140,9 +140,10 @@ export function isAllowedRawSourceFileName(fileName: string): boolean {
 }
 
 export function isCompatibleRawSourceContentType(fileName: string, contentType: string | undefined): boolean {
+  // An omitted content type used to pass the check, which let a client skip it entirely.
   const normalizedContentType = contentType?.split(';', 1)[0]?.trim().toLowerCase()
   if (!normalizedContentType) {
-    return true
+    return false
   }
 
   return COMPATIBLE_UPLOAD_CONTENT_TYPES[extname(fileName).toLowerCase()]?.has(normalizedContentType) ?? false

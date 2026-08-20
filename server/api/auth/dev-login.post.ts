@@ -40,8 +40,6 @@ export default defineEventHandler(async (event) => {
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

@@ -6,33 +6,29 @@ import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../../
 import { getSpecialistById } from '../../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
 
   const conversationId = readConversationId(getRouterParam(event, 'conversationId'))
-  const database = await initializeDatabase()
 
-  try {
-    const conversation = getConversation(database, {
-      userId: session.userId,
-      conversationId
-    })
+  const conversation = getConversation(database, {
+    userId: session.userId,
+    conversationId
+  })
 
-    if (!conversation) {
-      throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
-    }
-
-    const specialist = await getSpecialistById(conversation.specialistId)
-    if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
-      throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
-    }
-
-    return { conversation }
-  } finally {
-    database.close()
+  if (!conversation) {
+    throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
   }
+
+  const specialist = await getSpecialistById(conversation.specialistId)
+  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
+    throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
+  }
+
+  return { conversation }
 })
 
 function readConversationId(value: string | undefined): string {

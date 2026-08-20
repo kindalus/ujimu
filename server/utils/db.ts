@@ -494,17 +494,78 @@ const MIGRATIONS: Migration[] = [
         ON background_jobs (type, specialist_id)
         WHERE status IN ('queued', 'running');
     `
+  },
+  {
+    version: '0014_otp_request_throttling',
+    sql: `
+      ALTER TABLE otp_challenges ADD COLUMN request_ip_hash TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_otp_challenges_contact_time
+        ON otp_challenges (channel, contact, created_at);
+
+      CREATE INDEX IF NOT EXISTS idx_otp_challenges_ip_time
+        ON otp_challenges (request_ip_hash, created_at);
+    `
+  },
+  {
+    version: '0015_user_session_epoch',
+    sql: `
+      ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    version: '0016_visitor_events_daily_dedupe',
+    sql: `
+      ALTER TABLE visitor_events ADD COLUMN day TEXT NOT NULL DEFAULT '';
+      UPDATE visitor_events SET day = substr(occurred_at, 1, 10);
+
+      DELETE FROM visitor_events
+      WHERE id NOT IN (
+        SELECT MIN(id) FROM visitor_events
+        GROUP BY visitor_id, COALESCE(user_id, ''), day
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_visitor_events_daily_identity
+        ON visitor_events (visitor_id, COALESCE(user_id, ''), day);
+    `
   }
 ]
 
-export async function initializeDatabase(options: InitializeDatabaseOptions = {}): Promise<DatabaseSync> {
-  const appConfig = resolveAppConfig({ env: process.env })
-  const dbPath = options.dbPath ?? appConfig.dbPath
-  const dbDir = dirname(dbPath)
+const sharedDatabases = new Map<string, Promise<DatabaseSync>>()
 
-  await mkdir(dbDir, { recursive: true })
+/**
+ * Callers that pass an explicit `dbPath` always get their own connection and own its lifetime.
+ * Callers that do not (every request handler) share one process-wide connection per resolved
+ * path, so migrations run once and prepared statements stay compiled.
+ */
+export async function initializeDatabase(options: InitializeDatabaseOptions = {}): Promise<DatabaseSync> {
+  if (options.dbPath) {
+    return openDatabase(options.dbPath)
+  }
+
+  const dbPath = resolveAppConfig({ env: process.env }).dbPath
+  const existing = sharedDatabases.get(dbPath)
+  if (existing) {
+    return existing
+  }
+
+  const opening = openDatabase(dbPath).catch((error: unknown) => {
+    sharedDatabases.delete(dbPath)
+    throw error
+  })
+  sharedDatabases.set(dbPath, opening)
+  return opening
+}
+
+async function openDatabase(dbPath: string): Promise<DatabaseSync> {
+  await mkdir(dirname(dbPath), { recursive: true })
 
   const database = new DatabaseSync(dbPath)
+  // WAL keeps readers from blocking on writers; busy_timeout turns lock contention between the
+  // request connection and the background worker into a short wait instead of SQLITE_BUSY.
+  database.exec('PRAGMA journal_mode = WAL')
+  database.exec('PRAGMA synchronous = NORMAL')
+  database.exec('PRAGMA busy_timeout = 5000')
   database.exec(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS schema_migrations (

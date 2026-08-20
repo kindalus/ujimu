@@ -5,10 +5,6 @@ import { initializeDatabase } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
-  try {
-    requireAdmin(database, event)
-    return { companies: await listAdminCompaniesPayload(database) }
-  } finally {
-    database.close()
-  }
+  requireAdmin(database, event)
+  return { companies: await listAdminCompaniesPayload(database) }
 })

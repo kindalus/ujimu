@@ -1,7 +1,14 @@
-import { access, mkdir, writeFile } from 'node:fs/promises'
+import { access, lstat, mkdir, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { StoredRawSource } from './types'
+
+/**
+ * Upload filenames reach the conversion agent's prompt, so they must not be able to carry
+ * instructions. Letters, digits, spaces and a few punctuation marks cover real document names
+ * while excluding newlines, backticks, and the `@` that the agent CLI reads as a file reference.
+ */
+const RAW_FILENAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._()-]{0,149}$/u
 
 export interface StoreRawSourceInput {
   fileName: string
@@ -11,7 +18,11 @@ export interface StoreRawSourceInput {
 
 export class RawSourceStorageError extends Error {
   constructor(
-    public readonly code: 'INVALID_RAW_FILENAME' | 'RAW_SOURCE_ALREADY_EXISTS' | 'GENERATED_MARKDOWN_ARTIFACT',
+    public readonly code:
+      | 'INVALID_RAW_FILENAME'
+      | 'INVALID_RAW_SOURCE_TARGET'
+      | 'RAW_SOURCE_ALREADY_EXISTS'
+      | 'GENERATED_MARKDOWN_ARTIFACT',
     message: string
   ) {
     super(message)
@@ -34,9 +45,23 @@ export async function storeRawSource(
       `Raw source filename "${relativePath}" already exists.`
     )
   }
+  await assertNotSymlink(absolutePath)
   await writeFile(absolutePath, input.content)
 
   return { relativePath, absolutePath, replaced }
+}
+
+/**
+ * Writing through a symlink planted in raw/ would let an upload overwrite a file outside it.
+ */
+async function assertNotSymlink(absolutePath: string): Promise<void> {
+  const stats = await lstat(absolutePath).catch(() => undefined)
+  if (stats?.isSymbolicLink()) {
+    throw new RawSourceStorageError(
+      'INVALID_RAW_SOURCE_TARGET',
+      `Raw source path "${absolutePath}" is a symbolic link.`
+    )
+  }
 }
 
 function sanitizeRawFileName(fileName: string): string {
@@ -49,7 +74,8 @@ function sanitizeRawFileName(fileName: string): string {
     trimmed.includes('\\') ||
     trimmed === '.' ||
     trimmed === '..' ||
-    basename(trimmed) !== trimmed
+    basename(trimmed) !== trimmed ||
+    !RAW_FILENAME_PATTERN.test(trimmed)
   ) {
     throw new RawSourceStorageError('INVALID_RAW_FILENAME', `Invalid raw source filename "${fileName}".`)
   }

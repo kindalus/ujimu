@@ -246,6 +246,58 @@ describe('subscriptions, payments, and advertising acceptance', () => {
     expect(tooManyMembers.status).toBe(400)
   })
 
+  it('refuses corporate checkouts that bind to an existing company the buyer does not administer', async () => {
+    const { dataDir } = await createTempBillingData()
+    await seedUser(dataDir, 'owner-user')
+    await seedUserEmail(dataDir, 'owner-user', 'owner@example.com')
+    await seedUser(dataDir, 'attacker-user')
+    await seedUserEmail(dataDir, 'attacker-user', 'attacker@example.com')
+    const fetchBilling = createBillingFetch(dataDir, { webhookSecret: 'billing-secret' })
+
+    const owned = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        headers: sessionHeaders('owner-user'),
+        body: { ...corporateCheckoutPayload(), adminEmails: [], memberEmails: [] }
+      })
+    )
+    expect(owned.status).toBe(201)
+    const ownedBody = await owned.json() as { company: { id: string } }
+
+    const hijack = await fetchBilling(
+      jsonRequest('http://local/api/billing/corporate/checkout', {
+        method: 'POST',
+        headers: sessionHeaders('attacker-user'),
+        body: {
+          ...corporateCheckoutPayload(),
+          name: 'Empresa Tomada',
+          seats: 1,
+          adminEmails: [],
+          memberEmails: []
+        }
+      })
+    )
+    expect(hijack.status).toBe(403)
+    await expect(hijack.json()).resolves.toMatchObject({ data: { code: 'COMPANY_ADMIN_REQUIRED' } })
+
+    const ownerStatus = await fetchBilling(
+      new Request('http://local/api/billing/status', { headers: sessionHeaders('owner-user') })
+    )
+    await expect(ownerStatus.json()).resolves.toMatchObject({
+      corporate: {
+        subscribed: true,
+        companies: [expect.objectContaining({ id: ownedBody.company.id, role: 'admin', seats: 10 })]
+      }
+    })
+
+    const attackerStatus = await fetchBilling(
+      new Request('http://local/api/billing/status', { headers: sessionHeaders('attacker-user') })
+    )
+    await expect(attackerStatus.json()).resolves.toMatchObject({
+      corporate: { subscribed: false, companies: [] }
+    })
+  })
+
   it('stacks renewals, expires without grace, warns near expiry, and resolves subscribed quota subjects', async () => {
     const database = await createTempDatabase()
     seedUserInDatabase(database, 'billing-user')
@@ -394,8 +446,7 @@ function createBillingFetch(
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'billing-test-session-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'billing-test-session-secret'
     })}`
   })
 }

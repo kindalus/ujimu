@@ -5,7 +5,7 @@ import {
   readBody,
   setResponseStatus
 } from 'h3'
-import { getPublicSessionUser, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
+import { getPublicSessionUser, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
 import { readSessionFromEvent, setSessionCookie } from '../../../utils/auth/session'
 import { initializeDatabase } from '../../../utils/db'
 
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
   try {
-    const currentSession = readSessionFromEvent(event)
+    const currentSession = readSessionFromEvent(event, database)
     const result = await verifyOtp(database, parseOtpVerifyBody(body), {
       currentUserId: currentSession?.userId
     })
@@ -36,6 +36,14 @@ export default defineEventHandler(async (event) => {
       }
     }
   } catch (error) {
+    if (error instanceof OtpRateLimitError) {
+      throw createError({
+        statusCode: 429,
+        statusMessage: error.message,
+        data: { code: error.code }
+      })
+    }
+
     if (error instanceof OtpValidationError || error instanceof OtpVerificationError) {
       throw createError({
         statusCode: 400,
@@ -45,8 +53,6 @@ export default defineEventHandler(async (event) => {
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

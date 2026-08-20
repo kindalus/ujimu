@@ -255,8 +255,7 @@ function createAccessFetch(dataDir: string, options: { adminContacts?: string } 
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'specialist-access-test-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'specialist-access-test-secret'
     })}`
   })
 }

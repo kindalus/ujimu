@@ -24,7 +24,6 @@ const KNOWN_ERROR_CODES = new Set([
   'GEMINI_CLI_UNAVAILABLE',
   'GEMINI_CLI_AUTH_FAILED',
   'GEMINI_CONVERSION_FAILED',
-  'TIMEOUT_COMMAND_UNAVAILABLE',
   'PDF_TOOL_INVALID_OUTPUT'
 ])
 
@@ -32,7 +31,7 @@ export function createPdfToMarkdownTool(options: CreatePdfToMarkdownToolOptions)
   return {
     name: PDF_TO_MARKDOWN_TOOL_NAME,
     label: 'PDF to Markdown',
-    description: 'Convert one PDF under raw/ into faithful Markdown using Gemini CLI. Only available to the Ujimu conversion agent.',
+    description: 'Convert one PDF under raw/ into faithful Markdown using Gemini CLI.',
     parameters: {
       type: 'object',
       properties: {

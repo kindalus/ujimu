@@ -9,7 +9,8 @@ import {
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({
       statusCode: 401,
@@ -20,7 +21,6 @@ export default defineEventHandler(async (event) => {
 
   const body = await readJsonBody(event)
   const input = parseCheckoutBody(body)
-  const database = await initializeDatabase()
 
   try {
     const checkout = createBillingCheckout(database, {
@@ -36,8 +36,6 @@ export default defineEventHandler(async (event) => {
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

@@ -30,8 +30,8 @@ Each line is one sanitized JSON object. Logs may include event category, event n
 
 Configure these outside source control:
 
-- `UJIMU_SESSION_SECRET` — recommended for durable JWT session validation across restarts.
-- `UJIMU_OTP_PEPPER` — recommended for durable OTP verification across restarts.
+- `UJIMU_SESSION_SECRET` — required for readiness. Signs session cookies and the anonymous quota cookie, and keeps both valid across restarts.
+- `UJIMU_OTP_PEPPER` — required for readiness. Keeps OTP verification working across restarts.
 - `UJIMU_BILLING_WEBHOOK_SECRET` — required only when billing webhook confirmation is enabled; live Appy Pay and Stripe/VISA integrations are post-launch.
 - `UJIMU_ADMIN_CONTACTS` — required to grant the single `admin` role.
 - `UJIMU_PASSKEYS_ENABLED` — set to `true` to expose passkey registration and login.
@@ -72,19 +72,37 @@ Versioned Ujimu Pi resources live under `config/pi/`: product skills, extensions
 
 Keep real `auth.json` files out of Git. If a local environment previously used `.pi/auth.json`, copy the credentials to `<UJIMU_CONFIG_DIR>/auth.json`. Pi `auth.json` environment references must use explicit `$ENV_VAR` interpolation, for example `"key": "$OPENROUTER_API_KEY"`; a bare uppercase value is treated as a literal key by current Pi releases.
 
-### Pi file-tool sandboxing
+Ujimu exposes a closed bundle of three product skills from `config/pi/skills/`:
 
-Ujimu wraps Pi file tools with a virtual `/data` mount plus a realpath-based allowlist before exposing them to conversion, ingestion, or chat sessions. The model sees specialist files as `/data/...`; host paths are not shown in prompts or expected tool inputs.
+- `llm-wiki` builds and maintains the auditable OKF-backed specialist wiki across the `raw/`, `converted/`, and `wiki/` layers.
+- `unslop` removes generic AI-writing patterns and keeps generated prose direct and natural. Specialist initialization requires each generated `AGENTS.md` to invoke it before the final consultation answer without changing grounded facts, legal meaning, citations, or output structure.
+- `research` defines a primary-source-first research workflow that records cited findings in a repository Markdown file. Loading this skill does not add a background-agent executor to Ujimu; that capability remains outside the current runtime.
 
-- Chat sessions may read/search/list only `/data/wiki/` and cannot write files.
-- Ingestion sessions may read `/data/raw/`, `/data/converted/`, `/data/wiki/`, `AGENTS.md`, and `ingest/state.json`; they may write `/data/converted/`, `/data/wiki/`, and `.ujimu/ingestion-manifest.json`.
-- Legacy conversion sessions may read only the selected `/data/raw/` source and write only its derived Markdown output.
-- Paths outside `/data`, including `/config`, `/bundle`, host absolute paths, home-relative paths, resource-prefixed paths, `..` escapes, and symlink escapes are reported as not found.
-- Permission-denied errors are reserved for existing `/data` paths that are real specialist resources but outside the session allowlist, such as a conversion session trying to write `/data/wiki/`.
-- `bash` remains unavailable to Ujimu Pi sessions.
-- Ujimu Pi sessions load only bundled Ujimu skills from `config/pi/skills`; user-global skills such as `~/.agents/skills` are intentionally not exposed.
+The Pi resource loader disables implicit skill discovery and then loads this directory explicitly. Global or user-installed skills are therefore not available to Ujimu sessions and cannot override a bundled skill through a name collision.
 
-This is an application-level guard. For a stronger production isolation boundary, run the process or tool execution inside a container, VM, or equivalent sandbox with only the required specialist directory mounted.
+The bundled `llm-wiki` skill is an external, generated copy under `config/pi/skills/llm-wiki/` and is intentionally ignored by Git. `npm run dev`, `npm test`, `npm run typecheck`, and `npm run build` run `npm run skills:sync` first, copying the skill only when it is missing. Refresh the local copy explicitly with:
+
+```bash
+npm run skills:update
+```
+
+By default the updater clones `https://github.com/kindalus/skills.git` and copies `skills/llm-wiki`. Use `UJIMU_LLM_WIKI_SOURCE_DIR` for a local checkout, or pin a branch, tag, or commit with `UJIMU_LLM_WIKI_REF` for reproducible builds.
+
+The `unslop` and `research` snapshots are versioned because their confirmed official source is the local global skill installation and no remote distribution source exists. To refresh them, review the upstream changes and copy the complete directories, including auxiliary files:
+
+```bash
+rm -rf config/pi/skills/unslop config/pi/skills/research
+cp -R ~/.agents/skills/unslop config/pi/skills/unslop
+cp -R ~/.agents/skills/research config/pi/skills/research
+```
+
+### Pi agent workspace and tools
+
+Ujimu now uses the Pi agent directly instead of wrapping file tools with a virtual `/data` mount or per-task allowlist. Each Pi session runs with its real current working directory set to the selected specialist root directory. Prompts and manifests refer to real relative paths such as `raw/`, `converted/`, `wiki/`, `AGENTS.md`, and `ingest/state.json`.
+
+Pi sessions enable the default file/shell tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`) plus Ujimu project custom tools such as `pdf_to_markdown`. Ujimu loads its explicit skill bundle from `config/pi/skills`, bundled extensions from `config/pi/extensions`, and mutable configuration from `<UJIMU_CONFIG_DIR>`; it does not discover skills from global agent directories.
+
+If production needs a stronger isolation boundary, provide it outside the Pi harness, for example by running the application or tool execution in a container, VM, or equivalent runtime with the intended specialist directory mounted as the workspace.
 
 ### Agent-owned conversion during ingestion
 
@@ -97,7 +115,6 @@ The legacy DOCX/PDF conversion utilities and `/conversion/run` endpoint remain f
 Manual PDF conversion through the legacy `pdf_to_markdown` tool depends on the Gemini CLI in the production/container runtime:
 
 - `gemini` must be installed and available on `PATH`.
-- `timeout` must be available on `PATH` in the container runtime; the script uses `timeout 600s` per PDF.
 - `GEMINI_API_KEY` must be set in the environment or secret manager.
 - `GEMINI_API_KEY` is sensitive and must not be written to `<UJIMU_CONFIG_DIR>/settings.json`, prompts, operational logs, or versioned files.
 
@@ -105,7 +122,6 @@ Manual smoke test in a configured non-production environment:
 
 ```bash
 command -v gemini
-command -v timeout
 test -n "$GEMINI_API_KEY"
 cd /path/to/specialist-root
 /path/to/ujimu/config/pi/tools/pdf_to_markdown.sh raw/small-sample.pdf
@@ -120,7 +136,7 @@ Run this smoke path only in a configured non-production environment with `<UJIMU
 1. Upload a small official source through the admin console.
 2. Click `Executar ingestão` and confirm that the ingestion agent creates or updates `converted/<original filename>.md`, then updates `wiki/`.
 3. Confirm that the wiki source pages trace to both the original uploaded file and the converted file, while chat citations still reference the original uploaded file.
-4. Ask a scoped chat question and confirm that the response streams only after validated citations are available.
+4. Ask a scoped chat question and confirm that the response streams. If the agent emits well-formed citations, confirm that the UI shows them; if citations are missing or malformed, confirm that the answer still renders without citation entries.
 5. Review admin audit events and specialist-local agent logs; do not log source contents, prompts, answers, or secrets outside the intended agent-session log.
 
 ## SQLite backup
@@ -161,7 +177,7 @@ Build the default local image:
 scripts/container/build.sh
 ```
 
-Default image tag: `localhost/ujimu:latest`. Override with `UJIMU_IMAGE` when needed.
+Default image tag: `localhost/ujimu:latest`. Override with `UJIMU_IMAGE` when needed. The Podman build excludes the local generated `config/pi/skills/llm-wiki/` copy from the build context and lets `npm run build` sync it inside the build stage. Pass `UJIMU_LLM_WIKI_REF`, `UJIMU_LLM_WIKI_REPO`, or `UJIMU_LLM_WIKI_SUBDIR` to `scripts/container/build.sh` to pin the external skill source used by the image.
 
 Profile defaults:
 

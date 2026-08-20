@@ -4,9 +4,9 @@ import { verifyPasskeyRegistration } from '../../../../utils/auth/passkeys'
 import { initializeDatabase } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const session = requireSession(event)
-  const body = await readPasskeyJsonBody(event)
   const database = await initializeDatabase()
+  const session = requireSession(event, database)
+  const body = await readPasskeyJsonBody(event)
   try {
     const result = await verifyPasskeyRegistration(database, {
       userId: session.userId,
@@ -18,7 +18,5 @@ export default defineEventHandler(async (event) => {
     return result
   } catch (error) {
     mapPasskeyError(error)
-  } finally {
-    database.close()
   }
 })

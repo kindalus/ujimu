@@ -12,7 +12,5 @@ export default defineEventHandler(async (event) => {
     })
   } catch (error) {
     mapPasskeyError(error)
-  } finally {
-    database.close()
   }
 })

@@ -1,18 +1,17 @@
 import { existsSync } from 'node:fs'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { join } from 'node:path'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
-import { createSandboxedFileTools, type UjimuPiFileSystemPolicy } from './sandboxed-tools'
 
 export type PiTaskName = AgentSessionLogTask | 'chat'
+export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
+
+const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
 
 export interface CreateUjimuPiSessionOptions {
   cwd: string
   task: PiTaskName
-  tools: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
-  fileSystemPolicy: UjimuPiFileSystemPolicy
-  appendSystemPromptOverride?: () => string[]
   modelEnvPrefix?: string
   agentLog?: {
     dataDir?: string
@@ -28,56 +27,44 @@ export interface CreateUjimuPiSessionResult {
 
 export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions): Promise<CreateUjimuPiSessionResult> {
   const {
-    AuthStorage,
     createAgentSession,
     DefaultResourceLoader,
-    ModelRegistry,
+    ModelRuntime,
     SessionManager,
     SettingsManager
   } = await import('@earendil-works/pi-coding-agent')
 
   const configDir = await ensureUjimuPiConfigDir()
   const bundledPiDir = resolveUjimuPiBundleDir()
-  const authStorage = AuthStorage.create(join(configDir, 'auth.json'))
-  const modelRegistry = ModelRegistry.create(authStorage, join(configDir, 'models.json'))
+  const modelRuntime = await ModelRuntime.create({
+    authPath: join(configDir, 'auth.json'),
+    modelsPath: join(configDir, 'models.json')
+  })
   const settingsManager = SettingsManager.create(options.cwd, configDir)
   const loader = new DefaultResourceLoader({
     cwd: options.cwd,
-    agentDir: bundledPiDir,
+    agentDir: configDir,
     settingsManager,
     additionalSkillPaths: [join(bundledPiDir, 'skills')],
-    noContextFiles: true,
-    noExtensions: true,
-    noPromptTemplates: true,
-    noSkills: true,
-    noThemes: true,
-    skillsOverride: (base: any) => ({
-      ...base,
-      skills: base.skills.map((skill: any) => ({
-        ...skill,
-        filePath: toVirtualBundlePath(skill.filePath, bundledPiDir)
-      }))
-    }),
-    appendSystemPromptOverride: options.appendSystemPromptOverride
+    additionalExtensionPaths: [join(bundledPiDir, 'extensions')],
+    noSkills: true
   })
   await loader.reload()
 
-  const selectedModel = await resolveTaskModel(modelRegistry, settingsManager, options.modelEnvPrefix)
-  const sandboxedFileTools = await createSandboxedFileTools(options.fileSystemPolicy, options.tools)
-  const customTools = [...sandboxedFileTools, ...createUjimuCustomToolsForTask(options.task, options.cwd)]
-  const enabledTools = createUjimuPiEnabledToolNames(options.tools, customTools)
+  const selectedModel = await resolveTaskModel(modelRuntime, settingsManager, options.modelEnvPrefix)
+  const customTools = createUjimuCustomToolsForTask(options.task, options.cwd)
+  const enabledTools = createUjimuPiEnabledToolNames(customTools)
 
   const result = await createAgentSession({
-    cwd: '/data',
+    cwd: options.cwd,
     resourceLoader: loader,
     tools: enabledTools,
     customTools,
-    sessionManager: SessionManager.inMemory('/data'),
+    sessionManager: SessionManager.inMemory(options.cwd),
     settingsManager,
-    authStorage,
-    modelRegistry,
+    modelRuntime,
     ...(selectedModel ? { model: selectedModel as any } : {})
-  } as any)
+  })
 
   const sessionContext = {
     task: options.task,
@@ -99,14 +86,6 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
   }
 
   return { ...result, ...(agentLog ? { agentLog } : {}) }
-}
-
-function toVirtualBundlePath(filePath: string, bundleRoot: string): string {
-  const relativePath = relative(bundleRoot, filePath)
-  if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
-    return '/bundle'
-  }
-  return `/bundle/${relativePath.split(sep).join('/')}`
 }
 
 interface PiDebugContext {
@@ -234,33 +213,19 @@ function redactSensitiveText(value: string): string {
     .replace(/\b(?:sk|pk|rk|or)-[A-Za-z0-9_-]{16,}\b/g, '[redacted-key]')
 }
 
-export function createUjimuFileTools(
-  _cwd: string,
-  toolNames: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>
-): Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'> {
-  return toolNames
-}
-
-export function createUjimuPiEnabledToolNames(
-  fileTools: Array<'read' | 'write' | 'edit' | 'grep' | 'find' | 'ls'>,
-  customTools: Array<{ name?: unknown }>
-): string[] {
+export function createUjimuPiEnabledToolNames(customTools: Array<{ name?: unknown }> = []): string[] {
   return [...new Set([
-    ...fileTools,
+    ...UJIMU_PI_DEFAULT_TOOL_NAMES,
     ...customTools.map((tool) => tool.name).filter((name): name is string => typeof name === 'string' && name.length > 0)
   ])]
 }
 
-export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
-  if (task !== 'conversion') {
-    return []
-  }
-
+export function createUjimuCustomToolsForTask(_task: PiTaskName, cwd = process.cwd()): any[] {
   return [createPdfToMarkdownTool({ cwd })]
 }
 
 async function resolveTaskModel(
-  modelRegistry: any,
+  modelRuntime: any,
   settingsManager: any,
   modelEnvPrefix: string | undefined
 ): Promise<unknown | undefined> {
@@ -272,7 +237,7 @@ async function resolveTaskModel(
       throw new Error(`${modelEnvPrefix}_PROVIDER and ${modelEnvPrefix}_MODEL must be set together.`)
     }
 
-    return resolveConfiguredModel(modelRegistry, overrideProvider, overrideModel)
+    return resolveConfiguredModel(modelRuntime, overrideProvider, overrideModel)
   }
 
   const defaultProvider = settingsManager.getDefaultProvider?.()
@@ -281,16 +246,16 @@ async function resolveTaskModel(
     return undefined
   }
 
-  return resolveConfiguredModel(modelRegistry, defaultProvider, defaultModel)
+  return resolveConfiguredModel(modelRuntime, defaultProvider, defaultModel)
 }
 
-function resolveConfiguredModel(modelRegistry: any, provider: string, model: string): unknown {
-  const resolved = modelRegistry.find(provider, model)
+function resolveConfiguredModel(modelRuntime: any, provider: string, model: string): unknown {
+  const resolved = modelRuntime.getModel(provider, model)
   if (!resolved) {
     throw new Error(`Configured Pi model ${provider}/${model} is not available in the Ujimu Pi agent models.json or built-in models.`)
   }
 
-  if (!modelRegistry.hasConfiguredAuth(resolved)) {
+  if (!modelRuntime.hasConfiguredAuth(provider)) {
     throw new Error(`Configured Pi model ${provider}/${model} has no configured authentication.`)
   }
 

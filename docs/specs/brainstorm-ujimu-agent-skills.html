@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Brainstorming — Skills do agente Ujimu</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+    :root { --bg:#090b10; --panel:#11151d; --text:#f4f6f8; --muted:#a6adbb; --accent:#f6c744; --line:#28303d; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 80% 10%,#29230f 0,transparent 34%),var(--bg); color:var(--text); font-family:'Manrope',sans-serif; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:8vh 14vw; position:relative; }
+    .slide.active { display:flex; animation:enter .24s ease-out; }
+    .content { width:100%; max-width:1180px; }
+    h1,h2 { font-family:'Space Grotesk',sans-serif; letter-spacing:-.035em; }
+    h1 { font-size:clamp(2.8rem,6vw,5.8rem); line-height:.98; max-width:900px; }
+    h2 { font-size:clamp(2rem,4vw,3.7rem); margin-bottom:2rem; }
+    p,li { color:var(--muted); font-size:clamp(1rem,1.45vw,1.3rem); line-height:1.6; }
+    .accent { color:var(--accent); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .card { background:color-mix(in srgb,var(--panel) 92%,transparent); border:1px solid var(--line); border-radius:.75rem; padding:1.4rem; }
+    .card strong { display:block; color:var(--text); font-size:1.1rem; margin-bottom:.45rem; }
+    .tag { display:inline-block; color:#171205; background:var(--accent); border-radius:999px; padding:.35rem .75rem; font-weight:700; font-size:.78rem; letter-spacing:.05em; text-transform:uppercase; }
+    code { color:#ffe394; background:#1b1a14; border:1px solid #3b3520; border-radius:.35rem; padding:.12rem .35rem; }
+    .counter { position:fixed; right:2.4rem; bottom:2rem; color:#737c8d; font-size:.85rem; }
+    .progress { position:fixed; left:0; bottom:0; height:3px; background:var(--accent); transition:width .2s ease; }
+    .kicker { color:var(--accent); font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.78rem; }
+    @keyframes enter { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+    @media (max-width:900px) { .slide{padding:7vh 8vw}.grid{grid-template-columns:1fr} }
+    @media print { body{overflow:visible}.slide{display:flex;break-after:page}.counter,.progress{display:none} }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="content"><span class="tag">Brainstorming aprovado · iteração 3</span><h1 class="mt-6">Skills do agente <span class="accent">Ujimu</span></h1><p class="mt-7 max-w-3xl">Actualizar a skill <code>llm-wiki</code>, incorporar <code>unslop</code> e <code>research</code>, e garantir que o runtime usa as cópias do produto.</p></div></section>
+
+  <section class="slide"><div class="content"><p class="kicker">Problema</p><h2>Como garantir um conjunto pequeno e previsível?</h2><div class="grid"><div class="card"><strong>Objectivo</strong><p>Dar ao Ujimu as três skills pedidas sem depender das skills pessoais existentes no servidor.</p></div><div class="card"><strong>Valor</strong><p>Respostas mais consistentes, investigação baseada em fontes e manutenção correcta da wiki.</p></div><div class="card"><strong>Utilizador</strong><p>O agente de consulta, inicialização e ingestão executado dentro da aplicação Ujimu.</p></div><div class="card"><strong>Sucesso</strong><p>O loader encontra exactamente <code>llm-wiki</code>, <code>unslop</code> e <code>research</code> nas cópias do Ujimu.</p></div></div></div></section>
+
+  <section class="slide"><div class="content"><p class="kicker">Estado observado</p><h2>O runtime local está contaminado por skills globais</h2><ul class="space-y-3"><li>O <code>AGENTS.md</code> da especialidade é lido e entra no system prompt.</li><li>Foram descobertas 45 skills globais; 42 aparecem no system prompt.</li><li>A <code>llm-wiki</code> global vence a cópia do Ujimu por colisão de nome.</li><li>A versão global e a cópia actual de <code>llm-wiki</code> têm o mesmo SHA-256.</li><li><code>unslop</code> e <code>research</code> não existem no repositório externo actualmente sincronizado.</li></ul></div></section>
+
+  <section class="slide"><div class="content"><p class="kicker">Direcções avaliadas</p><h2>Três caminhos, um claramente mais seguro</h2><div class="grid"><div class="card"><strong class="accent">A · Incorporar e isolar</strong><p>Copiar as duas skills globais, manter <code>llm-wiki</code> sincronizada e desactivar descoberta implícita. Menor alteração e comportamento determinístico.</p></div><div class="card"><strong>B · Apenas copiar</strong><p>As três skills ficam disponíveis, mas as skills globais continuam a entrar e a colisão de <code>llm-wiki</code> mantém-se.</p></div><div class="card"><strong>C · Registo externo multi-fonte</strong><p>Criar sincronização configurável para vários repositórios. Resolve distribuição futura, mas excede o pedido actual.</p></div><div class="card"><strong>Recomendação</strong><p>Direcção A. É a única que garante que as cópias do produto são realmente as usadas.</p></div></div></div></section>
+
+  <section class="slide"><div class="content"><p class="kicker">Âmbito proposto</p><h2>A mudança mínima que fecha o problema</h2><div class="grid"><div class="card"><strong>Incluído</strong><p>Copiar <code>unslop</code> e <code>research</code>; confirmar <code>llm-wiki</code>; carregar apenas o directório de skills do bundle; testar nomes e caminhos efectivos.</p></div><div class="card"><strong>Excluído</strong><p>Alterar o conteúdo das skills, criar um marketplace, executar investigação externa em produção ou redesenhar os prompts de consulta.</p></div><div class="card"><strong>Risco</strong><p><code>research</code> pede um agente de fundo, capacidade que o runtime Ujimu não expõe explicitamente. A skill pode ficar disponível sem conseguir executar esse ramo.</p></div><div class="card"><strong>Assunção</strong><p>“Versão global” significa os ficheiros em <code>~/.agents/skills/</code> deste ambiente, usados como fonte da cópia.</p></div></div></div></section>
+
+  <section class="slide"><div class="content"><p class="kicker">Decisão aprovada</p><h2>Bundle fechado de três skills</h2><p class="max-w-4xl">O Ujimu carregará <strong class="text-white">apenas</strong> <code>llm-wiki</code>, <code>unslop</code> e <code>research</code>, bloqueando a descoberta automática das restantes skills globais.</p><div class="grid mt-8"><div class="card"><strong>Fonte confirmada</strong><p>Não existe outra fonte oficial para <code>unslop</code> e <code>research</code>. As versões em <code>~/.agents/skills/</code> são a origem canónica desta incorporação.</p></div><div class="card"><strong>Arquitectura confirmada</strong><p><code>llm-wiki</code> mantém a sincronização externa; <code>unslop</code> e <code>research</code> ficam versionadas no bundle; <code>noSkills: true</code> bloqueia descoberta implícita.</p></div></div></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div><div class="progress" id="progress"></div>
+  <script>
+    const slides=[...document.querySelectorAll('.slide')]; let idx=0;
+    const current=document.getElementById('current'); const total=document.getElementById('total'); const progress=document.getElementById('progress'); total.textContent=slides.length;
+    function go(next){slides[idx].classList.remove('active');idx=Math.max(0,Math.min(next,slides.length-1));slides[idx].classList.add('active');current.textContent=idx+1;progress.style.width=`${((idx+1)/slides.length)*100}%`;}
+    document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(idx+1)}if(e.key==='ArrowLeft')go(idx-1)});
+    document.addEventListener('click',e=>go(e.clientX>innerWidth/2?idx+1:idx-1)); go(0);
+  </script>
+</body>
+</html>

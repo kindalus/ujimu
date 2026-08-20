@@ -3,16 +3,12 @@ import { requireAuthenticatedUser, requireCompanyMember, toCompanyDetailPayload 
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const companyId = getRouterParam(event, 'id')
   if (!companyId) {
     throw createError({ statusCode: 404, statusMessage: 'Company not found' })
   }
 
-  const database = await initializeDatabase()
-  try {
-    return toCompanyDetailPayload(requireCompanyMember(database, userId, companyId))
-  } finally {
-    database.close()
-  }
+  return toCompanyDetailPayload(requireCompanyMember(database, userId, companyId))
 })

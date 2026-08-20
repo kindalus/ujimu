@@ -52,7 +52,7 @@ describe('state-driven citations and minimal chat envelope acceptance', () => {
     await expect(getCitationEvidence(specialist)).resolves.toEqual([])
   })
 
-  it('builds a minimal chat prompt without specialist metadata, citation allowlists, persona, or protocol', () => {
+  it('builds a minimal chat prompt with optional citation metadata and no specialist persona', () => {
     const specialist = createPromptSpecialist('Use the customs classification output format.')
     const prompt = buildChatPrompt({
       specialist,
@@ -60,15 +60,16 @@ describe('state-driven citations and minimal chat envelope acceptance', () => {
       citationEvidence: [{ sourceTitle: 'Pauta Aduaneira', sourceFile: 'raw/pauta.md', articleRefs: ['ARTIGO 1.º'] }]
     })
 
-    expect(prompt).toContain('Answer the user question using this specialist workspace')
+    expect(prompt).toContain('Answer the user question using this specialist workspace.')
+    expect(prompt).toContain('The current working directory is the specialist root. Use the available tools normally.')
+    expect(prompt).toContain('missing or malformed citations will simply be omitted by Ujimu')
+    expect(prompt).toContain('Known citation metadata, if useful:')
+    expect(prompt).toContain('{"sourceTitle":"Pauta Aduaneira","sourceFile":"raw/pauta.md","articleRefs":["ARTIGO 1.º"]}')
+    expect(prompt).toContain('{"type":"citation"')
     expect(prompt).toContain('User question:')
     expect(prompt).not.toContain('Selected specialist:')
-    expect(prompt).not.toContain('Backend citation allowlist')
-    expect(prompt).not.toContain('{"type":"delta","text":"..."}')
     expect(prompt).not.toContain('Specialist system prompt')
     expect(prompt).not.toContain('Use the customs classification output format.')
-    expect(prompt).not.toContain('Do not answer from general model knowledge')
-    expect(prompt).not.toContain('Every substantive answer')
   })
 })
 

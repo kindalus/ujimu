@@ -10,9 +10,6 @@ const createAgentSessionLoggerMock = vi.hoisted(() => vi.fn(async () => ({
   writeEvent: vi.fn(),
   close: vi.fn(async () => undefined)
 })))
-const createSandboxedFileToolsMock = vi.hoisted(() => vi.fn(async (_policy: unknown, tools: string[]) =>
-  tools.map((name) => ({ name }))
-))
 const createAgentSessionMock = vi.hoisted(() => vi.fn(async () => ({
   session: {
     subscribe: vi.fn(() => vi.fn()),
@@ -24,10 +21,6 @@ vi.mock('../server/utils/agents/logs', () => ({
   createAgentSessionLogger: createAgentSessionLoggerMock
 }))
 
-vi.mock('../server/utils/pi/sandboxed-tools', () => ({
-  createSandboxedFileTools: createSandboxedFileToolsMock
-}))
-
 vi.mock('../server/utils/pi/paths', () => ({
   ensureUjimuPiConfigDir: vi.fn(async () => '/tmp/ujimu-config'),
   resolveUjimuPiBundleDir: vi.fn(() => '/tmp/ujimu-bundle'),
@@ -35,10 +28,9 @@ vi.mock('../server/utils/pi/paths', () => ({
 }))
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
-  AuthStorage: { create: vi.fn(() => ({})) },
-  ModelRegistry: {
-    create: vi.fn(() => ({
-      find: vi.fn(() => ({ provider: 'test', id: 'model' })),
+  ModelRuntime: {
+    create: vi.fn(async () => ({
+      getModel: vi.fn(() => ({ provider: 'test', id: 'model' })),
       hasConfiguredAuth: vi.fn(() => true)
     }))
   },
@@ -59,25 +51,26 @@ describe('Ujimu Pi session logging acceptance', () => {
   beforeEach(() => {
     writeSessionCreatedMock.mockClear()
     createAgentSessionLoggerMock.mockClear()
-    createSandboxedFileToolsMock.mockClear()
     createAgentSessionMock.mockClear()
   })
 
-  it('logs each active file tool once when sandboxed tools replace the built-ins', async () => {
+  it('logs all default Pi tools plus Ujimu custom tools for the specialist-root session', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-session-log-'))
     const { createUjimuPiSession } = await import('../server/utils/pi/session')
 
     await createUjimuPiSession({
       cwd: root,
       task: 'ingestion',
-      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
-      fileSystemPolicy: { root },
       agentLog: { specialistId: 'iva' }
     })
 
+    expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: root,
+      tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown']
+    }))
     expect(writeSessionCreatedMock).toHaveBeenCalledWith({
       task: 'ingestion',
-      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
+      tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown'],
       model: 'configured'
     })
   })

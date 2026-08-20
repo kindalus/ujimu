@@ -1,18 +1,18 @@
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatCitation } from '../server/utils/chat/types'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 
-const createUjimuFileToolsMock = vi.hoisted(() => vi.fn(async (_cwd: string, tools: string[]) => tools))
 const createUjimuPiSessionMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../server/utils/pi/session', () => ({
-  createUjimuFileTools: createUjimuFileToolsMock,
   createUjimuPiSession: createUjimuPiSessionMock
 }))
 
 describe('Pi chat runtime prompt acceptance', () => {
   beforeEach(() => {
-    createUjimuFileToolsMock.mockClear()
     createUjimuPiSessionMock.mockReset()
   })
 
@@ -20,7 +20,7 @@ describe('Pi chat runtime prompt acceptance', () => {
     vi.useRealTimers()
   })
 
-  it('uses the specialist wiki workspace without injecting specialist metadata, allowlists, or extra system prompt', async () => {
+  it('uses the specialist root directly and lets Pi answer with optional citations', async () => {
     const prompts: string[] = []
     let subscriber: ((event: unknown) => void) | undefined
     createUjimuPiSessionMock.mockResolvedValue({
@@ -65,26 +65,62 @@ describe('Pi chat runtime prompt acceptance', () => {
     }
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
-    expect(sessionOptions.cwd).toBe('/tmp/ujimu/specialties/iva')
-    expect(sessionOptions.fileSystemPolicy).toEqual({
-      root: '/tmp/ujimu/specialties/iva',
-      read: { directories: ['wiki', 'raw'], files: ['AGENTS.md'] },
-      write: { directories: [] },
-      list: { directories: ['wiki', 'raw'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw'] }
-    })
+    expect(sessionOptions).toMatchObject({ cwd: '/tmp/ujimu/specialties/iva', task: 'chat' })
+    expect(sessionOptions).not.toHaveProperty('fileSystemPolicy')
+    expect(sessionOptions).not.toHaveProperty('tools')
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
-    expect(prompts[0]).toBe(`Answer the user question using this specialist workspace.
-
-User question:
-O que diz o Artigo 1.º?
-
-Conversation context:
-(none)
-`)
-    expect(prompts[0]).not.toContain('Backend citation allowlist')
+    expect(prompts[0]).toContain('Answer the user question using this specialist workspace.')
+    expect(prompts[0]).toContain('The current working directory is the specialist root. Use the available tools normally.')
+    expect(prompts[0]).toContain('missing or malformed citations will simply be omitted by Ujimu')
+    expect(prompts[0]).toContain('{"sourceTitle":"Código do IVA","sourceFile":"raw/codigo-iva.original.md","articleRefs":["Artigo 1.º"]}')
+    expect(prompts[0]).toContain('{"type":"citations"')
+    expect(prompts[0]).toContain('User question:\nO que diz o Artigo 1.º?')
     expect(prompts[0]).not.toContain('Selected specialist')
-    expect(prompts[0]).not.toContain('Technical protocol')
-    expect(prompts[0]).not.toContain('/data')
+    expect(prompts[0]).not.toContain('Specialist system prompt')
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
+  it('streams plain text when citations are required but the model emits no valid citations', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-chat-fallback-'))
+    await mkdir(join(root, 'wiki'), { recursive: true })
+    await writeFile(join(root, 'wiki', 'duracao-tempo-trabalho.md'), `# Duração do tempo de trabalho
+
+## Período normal
+
+A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 95.º, com limites diários e semanais que devem ser confirmados no texto legal aplicável.
+`)
+
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async () => {
+          subscriber?.({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_delta', delta: 'Resposta sem citação e fora do protocolo.' }
+          })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => {
+            subscriber = undefined
+          }
+        }),
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiChatRunner } = await import('../server/utils/chat/pi-runner')
+    const run = await createPiChatRunner().run({
+      specialist: specialistRuntimeFixture({ root }),
+      question: 'Qual é a duração normal do período de trabalho?',
+      citationEvidence: citationEvidenceFixture()
+    })
+
+    const events = await collectRunnerEvents(run.events!)
+
+    expect(events).not.toContainEqual(expect.objectContaining({ type: 'citation' }))
+    expect(events).toContainEqual({ type: 'delta', text: 'Resposta sem citação e fora do protocolo.' })
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
@@ -125,14 +161,12 @@ Conversation context:
       events.push(event)
     }
 
-    expect(events).toContainEqual({ type: 'delta', text: '**Assunto:** Convocatória\n\nExmo. Senhor,' })
+    expect(joinDeltas(events)).toBe('**Assunto:** Convocatória\n\nExmo. Senhor,')
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
 
-  it('keeps an active Pi chat alive when session events continue before the idle timeout', async () => {
+  it('does not abort an active Pi chat while it is producing events', async () => {
     vi.useFakeTimers()
-    const previousTimeout = process.env.UJIMU_PI_CHAT_TIMEOUT_MS
-    process.env.UJIMU_PI_CHAT_TIMEOUT_MS = '50'
 
     const abort = vi.fn(async () => undefined)
     let subscriber: ((event: unknown) => void) | undefined
@@ -183,7 +217,7 @@ Conversation context:
       expect(events).toContainEqual({ type: 'delta', text: 'O Artigo 1.º define o âmbito.' })
       expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
     } finally {
-      restoreEnv('UJIMU_PI_CHAT_TIMEOUT_MS', previousTimeout)
+      vi.useRealTimers()
     }
   })
 
@@ -297,7 +331,8 @@ Conversation context:
   })
 })
 
-function specialistRuntimeFixture(options: { citationsRequired?: boolean } = {}): SpecialistRuntime {
+function specialistRuntimeFixture(options: { citationsRequired?: boolean; root?: string } = {}): SpecialistRuntime {
+  const root = options.root ?? '/tmp/ujimu/specialties/iva'
   return {
     id: 'iva',
     name: 'Legislação de IVA',
@@ -309,13 +344,13 @@ function specialistRuntimeFixture(options: { citationsRequired?: boolean } = {})
     status: 'active',
     company_id: null,
     paths: {
-      root: '/tmp/ujimu/specialties/iva',
-      config: '/tmp/ujimu/specialties/iva/specialist.yaml',
-      raw: '/tmp/ujimu/specialties/iva/raw',
-      converted: '/tmp/ujimu/specialties/iva/converted',
-      wiki: '/tmp/ujimu/specialties/iva/wiki',
-      ingest: '/tmp/ujimu/specialties/iva/ingest',
-      ingestState: '/tmp/ujimu/specialties/iva/ingest/state.json'
+      root,
+      config: `${root}/specialist.yaml`,
+      raw: `${root}/raw`,
+      converted: `${root}/converted`,
+      wiki: `${root}/wiki`,
+      ingest: `${root}/ingest`,
+      ingestState: `${root}/ingest/state.json`
     }
   }
 }
@@ -332,14 +367,15 @@ async function collectRunnerEvents(events: AsyncIterable<unknown>): Promise<unkn
   return collected
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function joinDeltas(events: unknown[]): string {
+  return events
+    .filter((event): event is { type: 'delta'; text: string } =>
+      Boolean(event) && typeof event === 'object' && (event as { type?: unknown }).type === 'delta'
+    )
+    .map((event) => event.text)
+    .join('')
 }
 
-function restoreEnv(key: string, value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[key]
-  } else {
-    process.env[key] = value
-  }
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

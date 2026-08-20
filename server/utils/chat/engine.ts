@@ -25,16 +25,9 @@ import type {
   ChatCitation,
   ChatConversationContextMessage,
   ChatEngineRunner,
-  ChatGroundingFailureReason,
   ChatRunnerStreamEvent,
   ChatStreamEvent
 } from './types'
-
-const MISSING_CITATION_EVIDENCE_MESSAGE =
-  'Não consigo responder com segurança porque esta especialidade exige citações, mas ainda não há fontes citáveis validadas no estado de ingestão. Motivo: nenhuma fonte ingerida tem metadados de citação utilizáveis. Para responder, carregue ou reingira uma fonte oficial relevante, como o diploma, regulamento, instrução administrativa ou artigo aplicável à pergunta.'
-
-const MISSING_REQUIRED_CITATIONS_MESSAGE =
-  'A resposta foi bloqueada porque esta especialidade exige citações, mas o agente não apresentou uma citação válida antes da resposta. Motivo: sem uma fonte citável validada, o Ujimu não pode apresentar esta resposta como fundamentada. Tente novamente ou reveja a ingestão das fontes desta especialidade.'
 
 const STREAM_ERROR_MESSAGE =
   'Ocorreu um erro ao preparar a resposta. Tente novamente dentro de alguns minutos.'
@@ -148,15 +141,6 @@ export async function createChatEventStreamForSpecialist(
 
   const citationEvidence = await getCitationEvidence(specialist)
 
-  if (specialist.citations_required && citationEvidence.length === 0) {
-    return fallbackStream(
-      MISSING_CITATION_EVIDENCE_MESSAGE,
-      historyPersistence,
-      buildAnalyticsPersistence('insufficient_context'),
-      'missing_citation_evidence'
-    )
-  }
-
   const runner = options.runner ?? createDefaultChatRunner(isPiChatEnabled(options.piChatEnabled))
   const runnerInput = {
     specialist,
@@ -170,8 +154,7 @@ export async function createChatEventStreamForSpecialist(
     runner,
     runnerInput,
     history: historyPersistence,
-    answeredAnalytics: buildAnalyticsPersistence('answered'),
-    insufficientAnalytics: buildAnalyticsPersistence('insufficient_context')
+    answeredAnalytics: buildAnalyticsPersistence('answered')
   })
 
   function buildAnalyticsPersistence(outcome: QuestionAnalyticsOutcome): StreamAnalyticsPersistence | undefined {
@@ -245,7 +228,6 @@ function streamChatWithRunner(input: {
   runnerInput: Parameters<ChatEngineRunner['run']>[0]
   history?: StreamHistoryPersistence
   answeredAnalytics?: StreamAnalyticsPersistence
-  insufficientAnalytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   return (async function* () {
     const result = await input.runner.run(input.runnerInput)
@@ -253,25 +235,13 @@ function streamChatWithRunner(input: {
     if (result.events) {
       yield* streamRunnerEventResult({
         events: result.events,
-        citationsRequired: input.runnerInput.specialist.citations_required,
         history: input.history,
-        answeredAnalytics: input.answeredAnalytics,
-        insufficientAnalytics: input.insufficientAnalytics
+        answeredAnalytics: input.answeredAnalytics
       })
       return
     }
 
     const citations = normalizeCitations(result.citations)
-
-    if (input.runnerInput.specialist.citations_required && result.grounded && citations.length === 0) {
-      yield* fallbackStream(
-        MISSING_REQUIRED_CITATIONS_MESSAGE,
-        input.history,
-        input.insufficientAnalytics,
-        'missing_required_citations'
-      )
-      return
-    }
 
     yield* streamRunnerResult({
       grounded: result.grounded,
@@ -281,22 +251,6 @@ function streamChatWithRunner(input: {
       analytics: result.grounded ? input.answeredAnalytics : undefined
     })
   })()
-}
-
-function fallbackStream(
-  message: string,
-  history?: StreamHistoryPersistence,
-  analytics?: StreamAnalyticsPersistence,
-  reason?: ChatGroundingFailureReason
-): AsyncIterable<ChatStreamEvent> {
-  return streamRunnerResult({
-    grounded: false,
-    citations: [],
-    deltas: toAsyncDeltas([message]),
-    history,
-    analytics,
-    ...(reason ? { ungroundedReason: reason } : {})
-  })
 }
 
 interface StreamHistoryPersistence {
@@ -325,16 +279,12 @@ interface StreamAnalyticsPersistence {
 
 async function* streamRunnerEventResult(input: {
   events: AsyncIterable<ChatRunnerStreamEvent>
-  citationsRequired: boolean
   history?: StreamHistoryPersistence
   answeredAnalytics?: StreamAnalyticsPersistence
-  insufficientAnalytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
-  const bufferedDeltas: string[] = []
   const receivedCitations: ChatCitation[] = []
   let citations: ChatCitation[] = []
-  let citationsValidated = false
   let sawDone = false
   let grounded = false
   let totalTokens: number | undefined
@@ -349,24 +299,12 @@ async function* streamRunnerEventResult(input: {
       if (event.type === 'citation') {
         receivedCitations.push(event.citation)
         citations = normalizeCitations(receivedCitations)
-        citationsValidated = citations.length > 0
-
-        if (citationsValidated && bufferedDeltas.length > 0) {
-          for (const text of bufferedDeltas.splice(0)) {
-            answer += text
-            yield { type: 'delta', text }
-          }
-        }
         continue
       }
 
       if (event.type === 'delta') {
-        if (!input.citationsRequired || citationsValidated) {
-          answer += event.text
-          yield { type: 'delta', text: event.text }
-        } else {
-          bufferedDeltas.push(event.text)
-        }
+        answer += event.text
+        yield { type: 'delta', text: event.text }
         continue
       }
 
@@ -384,31 +322,7 @@ async function* streamRunnerEventResult(input: {
       throw new Error('Runner stream ended without a done event.')
     }
 
-    if (grounded && input.citationsRequired && !citationsValidated) {
-      yield* fallbackStream(
-        MISSING_REQUIRED_CITATIONS_MESSAGE,
-        input.history,
-        input.insufficientAnalytics,
-        'missing_required_citations'
-      )
-      return
-    }
-
-    if (!grounded && input.citationsRequired && !citationsValidated && bufferedDeltas.length === 0 && answer.trim().length === 0) {
-      yield* fallbackStream(
-        MISSING_REQUIRED_CITATIONS_MESSAGE,
-        input.history,
-        input.insufficientAnalytics,
-        'missing_required_citations'
-      )
-      return
-    }
-
     if (!grounded) {
-      for (const text of bufferedDeltas) {
-        answer += text
-        yield { type: 'delta', text }
-      }
       citations = []
     }
 
@@ -467,7 +381,6 @@ async function* streamRunnerResult(input: {
   deltas: AsyncIterable<string>
   history?: StreamHistoryPersistence
   analytics?: StreamAnalyticsPersistence
-  ungroundedReason?: ChatGroundingFailureReason
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
 
@@ -484,8 +397,7 @@ async function* streamRunnerResult(input: {
       grounded: input.grounded,
       citations: input.citations,
       history: input.history,
-      analytics: input.analytics,
-      ...(input.ungroundedReason ? { ungroundedReason: input.ungroundedReason } : {})
+      analytics: input.analytics
     })
   } catch {
     yield { type: 'error', code: 'CHAT_STREAM_FAILED', message: STREAM_ERROR_MESSAGE }
@@ -500,7 +412,6 @@ async function* completeStreamResult(input: {
   totalTokens?: number
   history?: StreamHistoryPersistence
   analytics?: StreamAnalyticsPersistence
-  ungroundedReason?: ChatGroundingFailureReason
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
     yield { type: 'citation', citation }
@@ -555,8 +466,7 @@ async function* completeStreamResult(input: {
 
   yield {
     type: 'done',
-    grounded: input.grounded,
-    ...(!input.grounded && input.ungroundedReason ? { reason: input.ungroundedReason } : {})
+    grounded: input.grounded
   }
 }
 

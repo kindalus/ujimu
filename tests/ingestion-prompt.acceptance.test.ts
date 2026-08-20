@@ -5,11 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { IngestionManifest, IngestionSourceRecord } from '../server/utils/ingestion/types'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 
-const createUjimuFileToolsMock = vi.hoisted(() => vi.fn(async (_cwd: string, tools: string[]) => tools))
 const createUjimuPiSessionMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../server/utils/pi/session', () => ({
-  createUjimuFileTools: createUjimuFileToolsMock,
   createUjimuPiSession: createUjimuPiSessionMock
 }))
 
@@ -67,21 +65,21 @@ describe('Pi ingestion prompt acceptance', () => {
 
     const { createPiSdkIngestionRunner } = await import('../server/utils/ingestion/pi-runner')
 
-    await createPiSdkIngestionRunner().ingestSources!(specialist, [source], { timeoutMs: 1000 })
+    await createPiSdkIngestionRunner().ingestSources!(specialist, [source])
 
     expect(prompts).toEqual([`Use the llm-wiki skill to process pending Ujimu specialist sources in batch/no-discussion mode.
 
 Follow the llm-wiki contract exactly:
-- Convert raw sources from /data/raw into /data/converted before ingesting.
-- Ingest only from /data/converted into /data/wiki.
-- Never modify, rename, or delete files in /data/raw.
-- Keep /data/wiki OKF-compliant and update its index and log.
+- Convert raw sources from raw/ into converted/ before ingesting.
+- Ingest only from converted/ into wiki/.
+- Never modify, rename, or delete files in raw/.
+- Keep wiki/ OKF-compliant and update its index and log.
 
-Read /data/AGENTS.md and /data/ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 
-Write a complete Ujimu ingestion manifest to /data/.ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
+Write a complete Ujimu ingestion manifest to .ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 
-/data/.ujimu/ingestion-manifest.json specification:
+.ujimu/ingestion-manifest.json specification:
 {
   "version": 2,
   "specialist_id": "iva",
@@ -111,13 +109,10 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
     expect(prompts[0]).not.toContain(source.checksum)
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
+    expect(sessionOptions).toMatchObject({ cwd: specialist.paths.root, task: 'ingestion' })
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
-    expect(sessionOptions.fileSystemPolicy).toEqual({
-      root: specialist.paths.root,
-      read: { directories: ['wiki', 'raw', 'converted'], files: ['AGENTS.md', 'ingest/state.json'] },
-      write: { directories: ['wiki', 'converted'], files: ['.ujimu/ingestion-manifest.json'] },
-      list: { directories: ['wiki', 'raw', 'converted'], virtualRootEntries: ['AGENTS.md', 'wiki', 'raw', 'converted'] }
-    })
+    expect(sessionOptions).not.toHaveProperty('fileSystemPolicy')
+    expect(sessionOptions).not.toHaveProperty('tools')
   })
 })
 

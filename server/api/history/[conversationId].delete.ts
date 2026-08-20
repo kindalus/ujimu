@@ -4,28 +4,24 @@ import { initializeDatabase } from '../../utils/db'
 import { deleteConversation } from '../../utils/history/repository'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
 
   const conversationId = readConversationId(getRouterParam(event, 'conversationId'))
-  const database = await initializeDatabase()
 
-  try {
-    const deleted = deleteConversation(database, {
-      userId: session.userId,
-      conversationId
-    })
+  const deleted = deleteConversation(database, {
+    userId: session.userId,
+    conversationId
+  })
 
-    if (!deleted) {
-      throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
-    }
-
-    return { deleted: true }
-  } finally {
-    database.close()
+  if (!deleted) {
+    throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
   }
+
+  return { deleted: true }
 })
 
 function readConversationId(value: string | undefined): string {

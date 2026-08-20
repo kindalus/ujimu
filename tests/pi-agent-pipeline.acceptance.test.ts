@@ -230,7 +230,7 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(audit.find((event) => event.action === 'conversion_run')?.metadata_json).not.toContain('Artigo 1.º')
   })
 
-  it('accepts consultation citations without filtering them against backend-provided evidence', async () => {
+  it('does not reject formatted consultation citations that are not backed by ingestion evidence', async () => {
     const { specialist, specialtiesRoot } = await createTempSpecialist('iva')
     await storeRawSource(specialist, {
       fileName: 'codigo-iva.md',
@@ -309,10 +309,11 @@ describe('three Pi agent pipeline acceptance', () => {
       for (const skill of skills.skills) {
         expect(skill.filePath).toBe(join(bundleDir, 'skills', skill.name, 'SKILL.md'))
       }
+      expect(skills.diagnostics).toEqual([])
       expect(extensions.errors).toEqual([])
       expect(trackedPi.stdout.trim()).toBe('')
       await expect(readFile(join(configDir, 'auth.json'), 'utf8')).resolves.toContain('$OPENROUTER_API_KEY')
-      await expect(readFile(join(configDir, 'models.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
+      await expect(readFile(join(configDir, 'models.json'), 'utf8')).resolves.toContain('gemini-3.5-flash')
       await expect(readFile(join(configDir, 'settings.json'), 'utf8')).resolves.toContain('moonshotai/kimi-k2.6')
       await expect(readFile('.gitignore', 'utf8')).resolves.toContain('config/pi/auth.json')
       await expect(readFile('.gitignore', 'utf8')).resolves.toContain('.pi/')
@@ -548,8 +549,7 @@ function jsonRequest(url: string, options: { method?: string; body?: unknown } =
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'admin-test-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'admin-test-secret'
     })}`
   })
 }

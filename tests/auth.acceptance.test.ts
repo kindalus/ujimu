@@ -7,7 +7,11 @@ import { initializeDatabase } from '../server/utils/db'
 import {
   GENERIC_OTP_FAILURE_MESSAGE,
   GENERIC_OTP_REQUEST_MESSAGE,
+  OTP_CONTACT_FAILURE_LIMIT,
+  OTP_CONTACT_REQUEST_LIMIT,
+  OTP_IP_REQUEST_LIMIT,
   OtpDeliveryError,
+  OtpRateLimitError,
   OtpValidationError,
   getActiveOtpChallengeCount,
   requestOtp,
@@ -21,11 +25,15 @@ describe('OTP authentication acceptance', () => {
   it('signs a new user in with a verified email OTP and exposes a registered quota subject', async () => {
     const database = await createTempDatabase()
     const provider = fakeProvider()
+    // Anchored to the real clock: the issued session has to still be valid when the quota
+    // subject is resolved without an explicit `now`.
+    const requestedAt = new Date()
+    const verifiedAt = new Date(requestedAt.getTime() + 3 * 60 * 1000)
 
     const requested = await requestOtp(
       database,
       { channel: 'email', contact: ' USER@Example.COM ' },
-      { provider, now: new Date('2026-05-16T12:00:00.000Z'), generateCode: () => '123456', pepper: 'pepper' }
+      { provider, now: requestedAt, generateCode: () => '123456', pepper: 'pepper' }
     )
 
     expect(requested).toEqual({ message: GENERIC_OTP_REQUEST_MESSAGE })
@@ -40,7 +48,7 @@ describe('OTP authentication acceptance', () => {
       database,
       { channel: 'email', contact: 'user@example.com', code: '123456' },
       {
-        now: new Date('2026-05-16T12:03:00.000Z'),
+        now: verifiedAt,
         pepper: 'pepper',
         sessionSecret: 'session-secret'
       }
@@ -48,7 +56,7 @@ describe('OTP authentication acceptance', () => {
 
     expect(verified.user.displayContact).toBe('user@example.com')
     const session = verifySessionToken(verified.sessionToken, {
-      now: new Date('2026-05-16T12:03:00.000Z'),
+      now: verifiedAt,
       sessionSecret: 'session-secret'
     })
     expect(session).toMatchObject({ userId: verified.user.id, authMethod: 'otp' })
@@ -215,6 +223,136 @@ describe('OTP authentication acceptance', () => {
     ])
     database.close()
   })
+
+  it('throttles repeated OTP requests for the same contact', async () => {
+    const database = await createTempDatabase()
+    const provider = fakeProvider()
+    const contact = { channel: 'email' as const, contact: 'flood@example.com' }
+
+    for (let attempt = 0; attempt < OTP_CONTACT_REQUEST_LIMIT; attempt += 1) {
+      await requestOtp(database, contact, {
+        provider,
+        pepper: 'pepper',
+        now: new Date(`2026-05-16T12:0${attempt}:00.000Z`)
+      })
+    }
+
+    await expect(
+      requestOtp(database, contact, {
+        provider,
+        pepper: 'pepper',
+        now: new Date('2026-05-16T12:09:00.000Z')
+      })
+    ).rejects.toBeInstanceOf(OtpRateLimitError)
+
+    // The victim's newest code must survive a throttled request rather than being invalidated.
+    expect(getActiveOtpChallengeCount(database, contact)).toBe(1)
+    expect(provider.deliverOtp).toHaveBeenCalledTimes(OTP_CONTACT_REQUEST_LIMIT)
+
+    // Once the window has passed, requests are accepted again.
+    await expect(
+      requestOtp(database, contact, {
+        provider,
+        pepper: 'pepper',
+        now: new Date('2026-05-16T13:00:00.000Z')
+      })
+    ).resolves.toMatchObject({ message: GENERIC_OTP_REQUEST_MESSAGE })
+
+    database.close()
+  })
+
+  it('throttles OTP requests coming from one IP across many contacts', async () => {
+    const database = await createTempDatabase()
+    const provider = fakeProvider()
+
+    for (let attempt = 0; attempt < OTP_IP_REQUEST_LIMIT; attempt += 1) {
+      await requestOtp(
+        database,
+        { channel: 'email', contact: `victim${attempt}@example.com` },
+        { provider, pepper: 'pepper', requestIp: '203.0.113.7', now: new Date('2026-05-16T12:00:00.000Z') }
+      )
+    }
+
+    await expect(
+      requestOtp(
+        database,
+        { channel: 'email', contact: 'victim-last@example.com' },
+        { provider, pepper: 'pepper', requestIp: '203.0.113.7', now: new Date('2026-05-16T12:05:00.000Z') }
+      )
+    ).rejects.toBeInstanceOf(OtpRateLimitError)
+
+    // A different IP is unaffected.
+    await expect(
+      requestOtp(
+        database,
+        { channel: 'email', contact: 'other@example.com' },
+        { provider, pepper: 'pepper', requestIp: '198.51.100.9', now: new Date('2026-05-16T12:05:00.000Z') }
+      )
+    ).resolves.toMatchObject({ message: GENERIC_OTP_REQUEST_MESSAGE })
+
+    database.close()
+  })
+
+  it('stops code brute-forcing that cycles fresh challenges for the same contact', async () => {
+    const database = await createTempDatabase()
+    const provider = fakeProvider()
+    const contact = { channel: 'email' as const, contact: 'brute@example.com' }
+
+    // Each fresh request resets the per-challenge attempt counter, so the cumulative
+    // failure budget for the contact is what has to stop this.
+    let requests = 0
+    let failures = 0
+    for (let round = 0; round < OTP_CONTACT_REQUEST_LIMIT; round += 1) {
+      await requestOtp(database, contact, {
+        provider,
+        pepper: 'pepper',
+        generateCode: () => '111111',
+        now: new Date(`2026-05-16T12:0${round}:00.000Z`)
+      })
+      requests += 1
+
+      for (let guess = 0; guess < 5; guess += 1) {
+        try {
+          await verifyOtp(
+            database,
+            { ...contact, code: '000000' },
+            { pepper: 'pepper', now: new Date(`2026-05-16T12:0${round}:30.000Z`) }
+          )
+        } catch (error) {
+          failures += 1
+          if (error instanceof OtpRateLimitError) {
+            expect(failures).toBeLessThanOrEqual(OTP_CONTACT_FAILURE_LIMIT + 1)
+            expect(requests).toBeLessThanOrEqual(OTP_CONTACT_REQUEST_LIMIT)
+            database.close()
+            return
+          }
+        }
+      }
+    }
+
+    throw new Error('expected cumulative OTP failures to be rate limited')
+  })
+
+  it('purges OTP challenges that are long past their expiry', async () => {
+    const database = await createTempDatabase()
+    const provider = fakeProvider()
+
+    await requestOtp(
+      database,
+      { channel: 'email', contact: 'stale@example.com' },
+      { provider, pepper: 'pepper', now: new Date('2026-05-01T12:00:00.000Z') }
+    )
+    expect(countOtpChallengeRows(database)).toBe(1)
+
+    await requestOtp(
+      database,
+      { channel: 'email', contact: 'fresh@example.com' },
+      { provider, pepper: 'pepper', now: new Date('2026-05-16T12:00:00.000Z') }
+    )
+
+    expect(countOtpChallengeRows(database)).toBe(1)
+    database.close()
+  })
 })
 
 async function createTempDatabase(): Promise<DatabaseSync> {
@@ -233,6 +371,10 @@ function readStoredOtpHash(database: DatabaseSync): string {
     code_hash: string
   }
   return row.code_hash
+}
+
+function countOtpChallengeRows(database: DatabaseSync): number {
+  return (database.prepare('SELECT COUNT(*) AS count FROM otp_challenges').get() as { count: number }).count
 }
 
 function readIdentityContacts(database: DatabaseSync, userId: string): string[] {

@@ -6,28 +6,24 @@ import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../../
 import { getSpecialistById } from '../../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
-  const session = readSessionFromEvent(event)
+  const database = await initializeDatabase()
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
 
   const specialistId = readSpecialistId(getQuery(event).specialistId)
-  const database = await initializeDatabase()
 
-  try {
-    const specialist = await getSpecialistById(specialistId)
-    if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
-      throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
-    }
+  const specialist = await getSpecialistById(specialistId)
+  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
+    throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
+  }
 
-    return {
-      conversations: listConversations(database, {
-        userId: session.userId,
-        specialistId
-      })
-    }
-  } finally {
-    database.close()
+  return {
+    conversations: listConversations(database, {
+      userId: session.userId,
+      specialistId
+    })
   }
 })
 

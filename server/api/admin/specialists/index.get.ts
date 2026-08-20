@@ -6,15 +6,11 @@ import { getSpecialistRegistry } from '../../../utils/specialists/registry'
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
-  try {
-    requireAdmin(database, event)
-    const snapshot = await getSpecialistRegistry()
-    return {
-      specialists: await Promise.all(snapshot.specialists.map(toAdminSpecialistPayload)),
-      errors: snapshot.errors,
-      failed_initializations: await listFailedInitializationPayloads(database)
-    }
-  } finally {
-    database.close()
+  requireAdmin(database, event)
+  const snapshot = await getSpecialistRegistry()
+  return {
+    specialists: await Promise.all(snapshot.specialists.map(toAdminSpecialistPayload)),
+    errors: snapshot.errors,
+    failed_initializations: await listFailedInitializationPayloads(database)
   }
 })

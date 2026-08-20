@@ -1,8 +1,9 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { getCookie, setCookie, type H3Event } from 'h3'
+import type { DatabaseSync } from 'node:sqlite'
 
 export const SESSION_COOKIE_NAME = 'ujimu_session'
-export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 90
+export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30
 
 export type SessionAuthMethod = 'otp' | 'passkey' | 'unknown'
 
@@ -11,12 +12,14 @@ export interface SessionClaims {
   issuedAt: Date
   expiresAt: Date
   authMethod: SessionAuthMethod
+  epoch: number
 }
 
 export interface SessionOptions {
   now?: Date
   sessionSecret?: string
   authMethod?: Exclude<SessionAuthMethod, 'unknown'>
+  epoch?: number
 }
 
 export interface SessionCookieOptions extends SessionOptions {
@@ -35,6 +38,7 @@ export function createSessionToken(userId: string, options: SessionOptions = {})
     iat: issuedAt,
     exp: expiresAt,
     typ: 'session',
+    epc: options.epoch ?? 0,
     ...(options.authMethod ? { authMethod: options.authMethod } : {})
   }
   const encodedHeader = base64UrlEncode(JSON.stringify(header))
@@ -64,6 +68,7 @@ export function verifySessionToken(
     iat: number
     exp: number
     typ: string
+    epc: number
     authMethod: SessionAuthMethod
   }> | undefined
   if (!payload || payload.typ !== 'session' || !payload.sub || !payload.iat || !payload.exp) {
@@ -81,12 +86,39 @@ export function verifySessionToken(
     expiresAt: new Date(payload.exp * 1000),
     authMethod: payload.authMethod === 'otp' || payload.authMethod === 'passkey'
       ? payload.authMethod
-      : 'unknown'
+      : 'unknown',
+    epoch: typeof payload.epc === 'number' ? payload.epc : 0
   }
 }
 
-export function readSessionFromEvent(event: H3Event, options: SessionOptions = {}): SessionClaims | undefined {
-  return verifySessionToken(getCookie(event, SESSION_COOKIE_NAME), options)
+/**
+ * A valid signature is not enough: the token also has to carry the user's current session epoch.
+ * Logging out (or removing a passkey) bumps that epoch, which is what makes older tokens stop
+ * working instead of staying valid until they expire.
+ */
+export function readSessionFromEvent(
+  event: H3Event,
+  database: DatabaseSync,
+  options: SessionOptions = {}
+): SessionClaims | undefined {
+  const claims = verifySessionToken(getCookie(event, SESSION_COOKIE_NAME), options)
+  if (!claims) return undefined
+
+  // Users with no stored row have no revocations to honour; callers that need a real user still
+  // check separately. Anything else must match the epoch the token was minted with.
+  return claims.epoch === (readSessionEpoch(database, claims.userId) ?? 0) ? claims : undefined
+}
+
+export function readSessionEpoch(database: DatabaseSync, userId: string): number | undefined {
+  const row = database
+    .prepare('SELECT session_epoch FROM users WHERE id = ?')
+    .get(userId) as { session_epoch: number } | undefined
+
+  return row?.session_epoch
+}
+
+export function revokeUserSessions(database: DatabaseSync, userId: string): void {
+  database.prepare('UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?').run(userId)
 }
 
 export function setSessionCookie(event: H3Event, token: string, options: SessionCookieOptions = {}): void {

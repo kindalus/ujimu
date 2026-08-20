@@ -16,7 +16,7 @@ export interface RequiredAdminSession {
 }
 
 export function getAdminSession(database: DatabaseSync, event: H3Event): AdminSessionInfo {
-  const session = readSessionFromEvent(event)
+  const session = readSessionFromEvent(event, database)
   if (!session) {
     return { authenticated: false, admin: false }
   }

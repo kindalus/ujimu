@@ -230,9 +230,17 @@ export function createCorporateBillingCheckout(
   const amountCents = CORPORATE_QUARTERLY_PLAN.amount.cents * seats
   const providerReference = `mock-corporate-${paymentId}`
 
+  const boundCompany = getCompanyByNif(database, input.company.nif)
+  if (boundCompany && !isCompanyAdminEmail(database, boundCompany.id, buyerEmail)) {
+    throw new BillingValidationError(
+      'COMPANY_ADMIN_REQUIRED',
+      'Only an administrator of the company registered with this NIF can renew its subscription.'
+    )
+  }
+
   database.exec('BEGIN')
   try {
-    const existingCompany = getCompanyByNif(database, input.company.nif)
+    const existingCompany = boundCompany
     const company = existingCompany
       ? updateCompany(database, existingCompany.id, { ...input.company, now })
       : createCompany(database, { ...input.company, now })
@@ -535,6 +543,12 @@ function getPrimaryVerifiedEmail(database: DatabaseSync, userId: string): string
     .get(userId) as { contact: string } | undefined
 
   return row?.contact.trim().toLowerCase()
+}
+
+function isCompanyAdminEmail(database: DatabaseSync, companyId: string, email: string): boolean {
+  return listCompanyMemberships(database, companyId).some(
+    (membership) => membership.role === 'admin' && membership.email === email
+  )
 }
 
 function readPositiveSeats(value: number): number {

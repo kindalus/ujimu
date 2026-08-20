@@ -22,32 +22,31 @@ interface ReadinessChecks {
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
-  try {
-    requireAdmin(database, event)
-    const config = resolveAppConfig({ env: process.env })
-    const passkeyReadiness = getPasskeyReadiness(process.env)
-    const checks: ReadinessChecks = {
-      database: canQueryDatabase(database),
-      dataDirectoryWritable: await canWriteToDirectory(config.dataDir),
-      operationalLogsWritable: await canWriteToDirectory(getOperationalLogDirectory(config.dataDir)),
-      migrationsApplied: getAppliedMigrationCount(database),
-      billingWebhookSecretConfigured: Boolean(process.env.UJIMU_BILLING_WEBHOOK_SECRET),
-      sessionSecretConfigured: Boolean(process.env.UJIMU_SESSION_SECRET),
-      otpPepperConfigured: Boolean(process.env.UJIMU_OTP_PEPPER),
-      passkeysEnabled: passkeyReadiness.passkeysEnabled,
-      passkeysConfigured: passkeyReadiness.passkeysConfigured
-    }
+  requireAdmin(database, event)
+  const config = resolveAppConfig({ env: process.env })
+  const passkeyReadiness = getPasskeyReadiness(process.env)
+  const checks: ReadinessChecks = {
+    database: canQueryDatabase(database),
+    dataDirectoryWritable: await canWriteToDirectory(config.dataDir),
+    operationalLogsWritable: await canWriteToDirectory(getOperationalLogDirectory(config.dataDir)),
+    migrationsApplied: getAppliedMigrationCount(database),
+    billingWebhookSecretConfigured: Boolean(process.env.UJIMU_BILLING_WEBHOOK_SECRET),
+    sessionSecretConfigured: Boolean(process.env.UJIMU_SESSION_SECRET),
+    otpPepperConfigured: Boolean(process.env.UJIMU_OTP_PEPPER),
+    passkeysEnabled: passkeyReadiness.passkeysEnabled,
+    passkeysConfigured: passkeyReadiness.passkeysConfigured
+  }
 
-    return {
-      ok: checks.database &&
-        checks.dataDirectoryWritable &&
-        checks.operationalLogsWritable &&
-        checks.migrationsApplied > 0 &&
-        checks.billingWebhookSecretConfigured,
-      checks
-    }
-  } finally {
-    database.close()
+  return {
+    ok: checks.database &&
+      checks.dataDirectoryWritable &&
+      checks.operationalLogsWritable &&
+      checks.migrationsApplied > 0 &&
+      checks.billingWebhookSecretConfigured &&
+      // Without these two, every restart silently invalidates all sessions and pending OTPs.
+      checks.sessionSecretConfigured &&
+      checks.otpPepperConfigured,
+    checks
   }
 })
 

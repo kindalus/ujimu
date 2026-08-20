@@ -99,8 +99,6 @@ interface ChatCitation {
   articleRefs: string[]
 }
 
-type ChatGroundingFailureReason = 'missing_citation_evidence' | 'missing_required_citations'
-
 type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'heartbeat' }
@@ -115,7 +113,7 @@ type ChatStreamEvent =
       title: string
       titleStatus: 'generated' | 'pending'
     }
-  | { type: 'done'; grounded: boolean; reason?: ChatGroundingFailureReason }
+  | { type: 'done'; grounded: boolean }
   | { type: 'error'; code: string; message: string }
 
 interface ChatMessage {
@@ -124,7 +122,6 @@ interface ChatMessage {
   text: string
   citations: ChatCitation[]
   grounded?: boolean
-  groundingReason?: ChatGroundingFailureReason
   historyMessageId?: string
   responseMetrics?: ChatResponseMetrics
   status: 'streaming' | 'done' | 'error'
@@ -470,17 +467,7 @@ function renderAssistantMessageHtml(message: ChatUiMessage): string {
   return renderMarkdownToSafeHtml(text)
 }
 
-function groundingNotice(message: ChatUiMessage): string {
-  if (message.status !== 'done' || message.grounded !== false) return ''
-
-  if (message.groundingReason === 'missing_citation_evidence') {
-    return 'Sem fontes citáveis: esta especialidade exige citações, mas ainda não há fontes ingeridas com citações validadas.'
-  }
-
-  if (message.groundingReason === 'missing_required_citations') {
-    return 'Citações obrigatórias em falta: o agente não apresentou fontes validadas para esta resposta.'
-  }
-
+function groundingNotice(_message: ChatUiMessage): string {
   return ''
 }
 
@@ -842,7 +829,6 @@ function handleChatEventLine(
 
   if (event.type === 'done') {
     assistantMessage.grounded = event.grounded
-    assistantMessage.groundingReason = event.reason
     assistantMessage.statusMessage = undefined
     if (assistantMessage.status !== 'error') {
       const totalTokens = assistantMessage.responseMetrics?.totalTokens

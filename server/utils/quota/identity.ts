@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { getCookie, setCookie, type H3Event } from 'h3'
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../auth/session'
+import { readSignedCookieValue, signCookieValue } from '../security/signed-cookie'
 import type { QuotaSubject } from './policy'
 
 export const ANONYMOUS_QUOTA_COOKIE_NAME = 'ujimu_anon_id'
@@ -21,6 +22,7 @@ export interface AnonymousQuotaCookieToSet {
 export interface ResolveAnonymousIdentityOptions {
   generateId?: () => string
   isProduction?: boolean
+  sessionSecret?: string
 }
 
 export interface ResolvedAnonymousIdentity {
@@ -71,7 +73,7 @@ export function resolveAnonymousIdentity(
   existingCookie: string | undefined,
   options: ResolveAnonymousIdentityOptions = {}
 ): ResolvedAnonymousIdentity {
-  const existingId = existingCookie?.trim()
+  const existingId = readSignedCookieValue(existingCookie, options.sessionSecret)
 
   if (existingId) {
     return {
@@ -85,7 +87,7 @@ export function resolveAnonymousIdentity(
     subject: { type: 'anonymous', id },
     cookieToSet: {
       name: ANONYMOUS_QUOTA_COOKIE_NAME,
-      value: id,
+      value: signCookieValue(id, options.sessionSecret),
       options: {
         httpOnly: true,
         sameSite: 'lax',

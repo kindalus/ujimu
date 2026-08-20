@@ -20,8 +20,6 @@ export interface ChatMetricsEvent {
   totalTokens?: number
 }
 
-export type ChatGroundingFailureReason = 'missing_citation_evidence' | 'missing_required_citations'
-
 export type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'heartbeat' }
@@ -29,7 +27,7 @@ export type ChatStreamEvent =
   | { type: 'citation'; citation: ChatCitation }
   | ChatMetricsEvent
   | ChatHistoryEvent
-  | { type: 'done'; grounded: boolean; reason?: ChatGroundingFailureReason }
+  | { type: 'done'; grounded: boolean }
   | { type: 'error'; code: string; message: string }
 
 export type ChatRunnerStreamEvent =

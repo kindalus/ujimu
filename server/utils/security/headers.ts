@@ -22,6 +22,11 @@ export function createSecurityHeaders(env: Record<string, string | undefined> = 
     'cross-origin-opener-policy': 'same-origin',
     'cross-origin-resource-policy': 'same-origin',
     'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-    'content-security-policy': csp
+    'content-security-policy': csp,
+    // Only in production: sending HSTS over plain http during local development would pin
+    // localhost to https in the browser and break the dev server.
+    ...(env.NODE_ENV === 'production'
+      ? { 'strict-transport-security': 'max-age=63072000; includeSubDomains' }
+      : {})
   }
 }

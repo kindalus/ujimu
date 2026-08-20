@@ -6,10 +6,6 @@ import { initializeDatabase } from '../../utils/db'
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
-  try {
-    const session = readSessionFromEvent(event)
-    return getBillingStatus(database, { userId: session?.userId })
-  } finally {
-    database.close()
-  }
+  const session = readSessionFromEvent(event, database)
+  return getBillingStatus(database, { userId: session?.userId })
 })

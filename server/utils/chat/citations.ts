@@ -28,10 +28,20 @@ export function sourceToChatCitation(source: IngestionSourceRecord): ChatCitatio
   }
 }
 
-export function normalizeChatCitation(citation: ChatCitation): ChatCitation | undefined {
-  const sourceTitle = truncate(citation.sourceTitle.trim(), MAX_CITATION_TEXT_LENGTH)
-  const sourceFile = citation.sourceFile?.trim()
-  const articleRefs = citation.articleRefs
+export function normalizeChatCitation(citation: unknown): ChatCitation | undefined {
+  if (!citation || typeof citation !== 'object') {
+    return undefined
+  }
+
+  const candidate = citation as Partial<ChatCitation>
+  if (typeof candidate.sourceTitle !== 'string' || !Array.isArray(candidate.articleRefs)) {
+    return undefined
+  }
+
+  const sourceTitle = truncate(candidate.sourceTitle.trim(), MAX_CITATION_TEXT_LENGTH)
+  const sourceFile = typeof candidate.sourceFile === 'string' ? candidate.sourceFile.trim() : undefined
+  const articleRefs = candidate.articleRefs
+    .filter((articleRef): articleRef is string => typeof articleRef === 'string')
     .map((articleRef) => truncate(articleRef.trim(), MAX_CITATION_TEXT_LENGTH))
     .filter(Boolean)
     .slice(0, MAX_ARTICLE_REFS)

@@ -4,18 +4,16 @@ import { mapCompanyError, readRequiredJsonBody, requireAuthenticatedUser } from 
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const userId = requireAuthenticatedUser(event)
+  const database = await initializeDatabase()
+  const userId = requireAuthenticatedUser(event, database)
   const body = await readRequiredJsonBody(event)
   const companyId = parseCompanyId(body)
-  const database = await initializeDatabase()
 
   try {
     setActiveCompanyForUser(database, { userId, companyId })
     return { activeCompany: getActiveCompanyForUser(database, userId) }
   } catch (error) {
     mapCompanyError(error)
-  } finally {
-    database.close()
   }
 })
 

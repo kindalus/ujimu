@@ -3,6 +3,7 @@ import { recordAdminAuditEvent } from '../../../../utils/admin/audit'
 import { requireAdmin } from '../../../../utils/admin/guards'
 import { canUploadRawSources, isAllowedRawSourceFileName, isCompatibleRawSourceContentType } from '../../../../utils/admin/specialists'
 import { initializeDatabase } from '../../../../utils/db'
+import { assertMaxRequestBytes, assertSameOriginRequest, MAX_UPLOAD_BYTES } from '../../../../utils/security/request-guards'
 import { scanSpecialistRawSources } from '../../../../utils/ingestion/detect'
 import { RawSourceStorageError, storeRawSource } from '../../../../utils/ingestion/storage'
 import { getSpecialistById } from '../../../../utils/specialists/registry'
@@ -25,6 +26,10 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
+
+    assertSameOriginRequest(event)
+
+    assertMaxRequestBytes(event, MAX_UPLOAD_BYTES)
 
     const file = await readUploadFile(event)
     if (!isAllowedRawSourceFileName(file.filename)) {
@@ -61,8 +66,6 @@ export default defineEventHandler(async (event) => {
     }
 
     throw error
-  } finally {
-    database.close()
   }
 })
 

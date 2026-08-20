@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { getPublicSessionUser } from './otp'
-import { createSessionToken, type SessionClaims } from './session'
+import { createSessionToken, readSessionEpoch, type SessionClaims } from './session'
 import {
   bytesToBase64Url,
   createSimpleWebAuthnAdapter,
@@ -365,7 +365,8 @@ export async function verifyPasskeyAuthentication(
     sessionToken: createSessionToken(credential.user_id, {
       now,
       sessionSecret: options.sessionSecret,
-      authMethod: 'passkey'
+      authMethod: 'passkey',
+      epoch: readSessionEpoch(database, credential.user_id) ?? 0
     })
   }
 }
@@ -397,16 +398,21 @@ export function deletePasskeyCredential(
   return { deleted: true }
 }
 
+/**
+ * The IP is observed by the server, the visitor cookie is supplied by the client. Keying on the
+ * cookie first would let an attacker reset the limit by sending a fresh id on every request, so
+ * the IP takes precedence and the cookie is only a fallback when no IP is available.
+ */
 export function normalizePasskeyRateLimitSubject(input: {
   visitorId?: string
   ip?: string
 }): PasskeyRateLimitSubject {
-  if (input.visitorId?.trim()) {
-    return { type: 'visitor', id: input.visitorId.trim() }
-  }
-
   if (input.ip?.trim()) {
     return { type: 'ip', id: createHash('sha256').update(input.ip.trim()).digest('hex') }
+  }
+
+  if (input.visitorId?.trim()) {
+    return { type: 'visitor', id: input.visitorId.trim() }
   }
 
   return { type: 'unknown', id: 'unknown' }

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { createSessionToken } from './session'
+import { createSessionToken, readSessionEpoch } from './session'
 import { getPublicSessionUser, normalizeOtpContact, type AuthenticatedUser, type OtpChannel } from './otp'
 
 export interface DevLoginInput {
@@ -65,7 +65,11 @@ export function devLogin(
 
   return {
     user: getPublicSessionUser(database, user.id) ?? user,
-    sessionToken: createSessionToken(user.id, { now, sessionSecret: options.sessionSecret })
+    sessionToken: createSessionToken(user.id, {
+      now,
+      sessionSecret: options.sessionSecret,
+      epoch: readSessionEpoch(database, user.id) ?? 0
+    })
   }
 }
 

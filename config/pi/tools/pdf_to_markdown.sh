@@ -40,10 +40,6 @@ if ! command -v gemini >/dev/null 2>&1; then
   fail "GEMINI_CLI_UNAVAILABLE" "gemini CLI is not available on PATH."
 fi
 
-if ! command -v timeout >/dev/null 2>&1; then
-  fail "TIMEOUT_COMMAND_UNAVAILABLE" "timeout command is not available on PATH."
-fi
-
 if [ ! -d raw ]; then
   fail "INVALID_PDF_INPUT" "raw/ directory does not exist in the current specialist root."
 fi
@@ -106,7 +102,7 @@ cleanup() {
 trap cleanup EXIT
 
 set +e
-timeout 600s gemini -y -p "$prompt" > /dev/null 2>"$stderr_tmp"
+gemini -y -p "$prompt" > /dev/null 2>"$stderr_tmp"
 gemini_status=$?
 set -e
 

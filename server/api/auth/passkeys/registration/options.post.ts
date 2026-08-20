@@ -4,8 +4,8 @@ import { createPasskeyRegistrationOptions } from '../../../../utils/auth/passkey
 import { initializeDatabase } from '../../../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const session = requireSession(event)
   const database = await initializeDatabase()
+  const session = requireSession(event, database)
   try {
     return await createPasskeyRegistrationOptions(database, {
       userId: session.userId,
@@ -14,7 +14,5 @@ export default defineEventHandler(async (event) => {
     })
   } catch (error) {
     mapPasskeyError(error)
-  } finally {
-    database.close()
   }
 })

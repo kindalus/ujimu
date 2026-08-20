@@ -39,6 +39,12 @@ describe('security, operations, and observability acceptance', () => {
     expect(createSecurityHeaders({ NODE_ENV: 'production' })['content-security-policy']).not.toContain('worker-src')
   })
 
+  it('sends HSTS only in production, so local http development is not pinned to https', () => {
+    expect(createSecurityHeaders({ NODE_ENV: 'production' })['strict-transport-security'])
+      .toBe('max-age=63072000; includeSubDomains')
+    expect(createSecurityHeaders({ NODE_ENV: 'development' })).not.toHaveProperty('strict-transport-security')
+  })
+
   it('writes daily JSONL operational events with sanitized metadata only', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-ops-logs-'))
 
@@ -134,7 +140,9 @@ describe('security, operations, and observability acceptance', () => {
         database: true,
         dataDirectoryWritable: true,
         operationalLogsWritable: true,
-        billingWebhookSecretConfigured: true
+        billingWebhookSecretConfigured: true,
+        sessionSecretConfigured: true,
+        otpPepperConfigured: true
       }
     })
     expect(typeof body.checks.migrationsApplied).toBe('number')
@@ -208,10 +216,12 @@ function createOpsFetch(dataDir: string): (request: Request) => Promise<Response
     const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
     const previousAdminContacts = process.env.UJIMU_ADMIN_CONTACTS
     const previousBillingSecret = process.env.UJIMU_BILLING_WEBHOOK_SECRET
+    const previousOtpPepper = process.env.UJIMU_OTP_PEPPER
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'readyz-session-secret'
     process.env.UJIMU_ADMIN_CONTACTS = 'admin@example.com'
     process.env.UJIMU_BILLING_WEBHOOK_SECRET = 'readyz-billing-secret'
+    process.env.UJIMU_OTP_PEPPER = 'readyz-otp-pepper'
 
     try {
       return await fetch(request)
@@ -220,6 +230,7 @@ function createOpsFetch(dataDir: string): (request: Request) => Promise<Response
       restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
       restoreEnv('UJIMU_ADMIN_CONTACTS', previousAdminContacts)
       restoreEnv('UJIMU_BILLING_WEBHOOK_SECRET', previousBillingSecret)
+      restoreEnv('UJIMU_OTP_PEPPER', previousOtpPepper)
     }
   }
 }
@@ -227,8 +238,7 @@ function createOpsFetch(dataDir: string): (request: Request) => Promise<Response
 function sessionHeaders(userId: string): Headers {
   return new Headers({
     cookie: `ujimu_session=${createSessionToken(userId, {
-      sessionSecret: 'readyz-session-secret',
-      now: new Date('2026-05-16T12:00:00.000Z')
+      sessionSecret: 'readyz-session-secret'
     })}`
   })
 }

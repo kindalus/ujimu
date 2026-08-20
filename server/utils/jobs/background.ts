@@ -327,16 +327,12 @@ async function rollbackSpecialistInitialization(dataDir: string, specialistId: s
 
 async function runScheduledBackgroundJobs(dataDir: string | undefined): Promise<void> {
   const database = await initializeDatabase()
-  try {
-    await runDueBackgroundJobs({
-      database,
-      ...(dataDir ? { dataDir } : {}),
-      piConversionEnabled: process.env.UJIMU_PI_CONVERSION_ENABLED === 'true',
-      piIngestionEnabled: process.env.UJIMU_PI_INGESTION_ENABLED === 'true'
-    })
-  } finally {
-    database.close()
-  }
+  await runDueBackgroundJobs({
+    database,
+    ...(dataDir ? { dataDir } : {}),
+    piConversionEnabled: process.env.UJIMU_PI_CONVERSION_ENABLED === 'true',
+    piIngestionEnabled: process.env.UJIMU_PI_INGESTION_ENABLED === 'true'
+  })
 }
 
 function createJobError(code: string, message: string): Error & { code: string } {
