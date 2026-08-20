@@ -299,15 +299,16 @@ describe('three Pi agent pipeline acceptance', () => {
       await loader.reload()
       const skills = loader.getSkills()
       const extensions = loader.getExtensions()
-      const llmWiki = skills.skills.find((skill) => skill.name === 'llm-wiki')
       const trackedPi = await execFileAsync('git', ['ls-files', '.pi'])
 
       expect(defaultConfigDir).toMatch(/\.config\/ujimu$/)
       expect(bundleDir).toBe(join(process.cwd(), 'config', 'pi'))
       expect(bundleDir).not.toBe(join(process.cwd(), '.pi'))
       expect(seededConfigDir).toBe(configDir)
-      expect(llmWiki?.filePath).toBe(join(bundleDir, 'skills', 'llm-wiki', 'SKILL.md'))
-      expect(skills.skills.map((skill) => skill.name)).toEqual(['llm-wiki'])
+      expect(skills.skills.map((skill) => skill.name).sort()).toEqual(['llm-wiki', 'research', 'unslop'])
+      for (const skill of skills.skills) {
+        expect(skill.filePath).toBe(join(bundleDir, 'skills', skill.name, 'SKILL.md'))
+      }
       expect(extensions.errors).toEqual([])
       expect(trackedPi.stdout.trim()).toBe('')
       await expect(readFile(join(configDir, 'auth.json'), 'utf8')).resolves.toContain('$OPENROUTER_API_KEY')

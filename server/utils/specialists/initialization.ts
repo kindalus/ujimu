@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import { createUjimuFileTools, createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from './schema'
@@ -49,6 +49,15 @@ export async function assertSpecialistInitializedWorkspace(specialist: Specialis
         `Specialist initialization did not create required file ${file}.`
       )
     }
+  }
+
+  const agentsPath = specialist.paths.root + '/AGENTS.md'
+  const agentsContent = await readFile(agentsPath, 'utf8')
+  if (!/\bunslop\b/iu.test(agentsContent)) {
+    throw new SpecialistInitializationError(
+      'WIKI_INITIALIZATION_OUTPUT_MISSING',
+      `Specialist initialization did not include the required unslop instruction in ${agentsPath}.`
+    )
   }
 }
 
@@ -121,11 +130,12 @@ Chat response protocol:
 This protocol applies only when answering user consultation questions, not during wiki initialization or source ingestion.
 
 1. Emit NDJSON only: one JSON object per line, no code fence, no prose outside JSON.
-2. When the wiki supports the answer, emit one citations event before any answer chunk:
+2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required NDJSON output structure.
+3. When the wiki supports the answer, emit one citations event before any answer chunk:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-3. Then emit answer chunks:
+4. Then emit answer chunks:
    {"type":"delta","text":"..."}
-4. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
+5. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
 `
 }
 

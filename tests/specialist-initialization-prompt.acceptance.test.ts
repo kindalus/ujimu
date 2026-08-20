@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 
@@ -61,12 +64,38 @@ Chat response protocol:
 This protocol applies only when answering user consultation questions, not during wiki initialization or source ingestion.
 
 1. Emit NDJSON only: one JSON object per line, no code fence, no prose outside JSON.
-2. When the wiki supports the answer, emit one citations event before any answer chunk:
+2. Before emitting the final consultation answer, read and apply the \`unslop\` skill to improve the writing. This style pass must not change grounded facts, legal meaning, citations, or the required NDJSON output structure.
+3. When the wiki supports the answer, emit one citations event before any answer chunk:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-3. Then emit answer chunks:
+4. Then emit answer chunks:
    {"type":"delta","text":"..."}
-4. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
+5. If the wiki does not contain enough evidence, emit only answer chunks explaining that the current context is insufficient; do not guess and do not emit citations.
 `)
+  })
+
+  it('rejects an initialized workspace whose AGENTS.md omits the required unslop instruction', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-unslop-validation-'))
+    const wiki = join(root, 'wiki')
+    await mkdir(wiki, { recursive: true })
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist context\n')
+    await writeFile(join(wiki, 'index.md'), '# Index\n')
+    await writeFile(join(wiki, 'log.md'), '# Log\n')
+    const specialist = {
+      ...specialistRuntimeFixture(),
+      paths: {
+        ...specialistRuntimeFixture().paths,
+        root,
+        wiki
+      }
+    }
+    const { assertSpecialistInitializedWorkspace } = await import('../server/utils/specialists/initialization')
+
+    await expect(assertSpecialistInitializedWorkspace(specialist)).rejects.toMatchObject({
+      code: 'WIKI_INITIALIZATION_OUTPUT_MISSING'
+    })
+
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist context\n\nRead and apply the `unslop` skill before the final answer.\n')
+    await expect(assertSpecialistInitializedWorkspace(specialist)).resolves.toBeUndefined()
   })
 
   it('writes the specialist system prompt as a one-time initialization persona before the chat protocol', async () => {
