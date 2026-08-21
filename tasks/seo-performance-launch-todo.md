@@ -5,7 +5,7 @@
 - [x] Brainstorm approved.
 - [x] Architecture approved.
 - [x] Slice refined.
-- [ ] Grill decisions locked.
+- [x] Grill decisions locked.
 - [ ] Acceptance tests fail for missing behaviour.
 - [ ] Approved visual assets created.
 - [ ] SSR metadata and crawl endpoints implemented.
