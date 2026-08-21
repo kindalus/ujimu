@@ -104,12 +104,12 @@ Known non-blocking warnings:
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
-| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
+| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `idea-refined` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–50 verified; Slices 51–52 planned`
+Status: `Slices 49–50 verified; Slice 51 idea-refined; Slice 52 planned`
 
 Approved originating decks:
 
@@ -192,6 +192,19 @@ Implementation and verification:
 - Focused tests passed, followed by `npm test` (231 tests), `npm run typecheck`, `npm run build`, and `npm audit` with zero findings.
 - Browser verification used an isolated development container: all controls rendered, a title edit persisted through PATCH 200, and the console remained clean.
 - Production was redeployed at commit `9079c39`; the anonymous API returns title/description fallback while the production YAML remains unchanged.
+
+## Slice 51 — Public specialist pages
+
+Status: `idea-refined`
+
+Refinement decisions:
+
+- Add SSR pages at `/especialidades/:id` backed by a dedicated anonymous public endpoint.
+- Render approved editorial fields as plain text with title/description fallback; omit empty optional sections.
+- Add specialist-specific title, description, canonical, Open Graph, and `WebPage` JSON-LD while retaining the global social image.
+- Expand the sitemap from the anonymous specialist registry only and add a discoverable route from the consultation experience.
+- Make the CTA return to `/?specialist=:id` and pre-select that specialist after the public list loads.
+- Return 404 for missing, suspended, or company-restricted specialists without revealing why access failed.
 
 ## Progressive account launch extension
 
