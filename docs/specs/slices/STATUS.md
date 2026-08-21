@@ -98,13 +98,13 @@ Known non-blocking warnings:
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
 | 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
-| 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `idea-refined` | — | Double anonymous and registered free-tier quotas. |
-| 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `idea-refined` | — | Enable SendGrid email and Twilio SMS only when configured. |
-| 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `idea-refined` | — | Hide and block subscription/company features behind default-off flags. |
+| 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `grilled` | — | Double anonymous and registered free-tier quotas. |
+| 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `grilled` | — | Enable SendGrid email and Twilio SMS only when configured. |
+| 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `grilled` | — | Hide and block subscription/company features behind default-off flags. |
 
 ## Progressive account launch extension
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
@@ -119,7 +119,7 @@ Planned order:
 
 ## Slice 46 — Doubled free quotas
 
-Status: `idea-refined`
+Status: `grilled`
 
 Refinement decisions:
 
@@ -128,9 +128,15 @@ Refinement decisions:
 - Preserve subscribed, company, and admin policies.
 - Update visible quota copy without making the values configurable.
 
+Grill decisions:
+
+- Keep quota values as backend constants and preserve timezone windows and counting semantics.
+- Test both policy values and the allow-then-deny boundary.
+- Update static copy even where a later feature flag temporarily hides the page.
+
 ## Slice 47 — Configured OTP channels
 
-Status: `idea-refined`
+Status: `grilled`
 
 Refinement decisions:
 
@@ -141,6 +147,14 @@ Refinement decisions:
 - Block new OTP/passkey login when no OTP channel is configured while preserving valid sessions and in-progress OTP verification.
 - Use native `fetch` against fixed official HTTPS endpoints; add no SDK dependency.
 
+Grill decisions:
+
+- SendGrid requires API key and sender email; sender name defaults to `Ujimu`.
+- Twilio requires Account SID, Auth Token, and sender phone number.
+- Use a 10-second timeout, reject redirects, accept any 2xx, and never parse or expose provider error bodies.
+- Fake delivery exposes both channels only outside production.
+- Keep OTP verification available for already-issued challenges; block new OTP and passkey login when no channel is configured.
+
 Official sources:
 
 - https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
@@ -149,7 +163,7 @@ Official sources:
 
 ## Slice 48 — Launch feature flags
 
-Status: `idea-refined`
+Status: `grilled`
 
 Refinement decisions:
 
@@ -158,6 +172,14 @@ Refinement decisions:
 - Use Nuxt server middleware to block disabled page/API prefixes before route handlers.
 - Hide links, calls to action, and company selectors when their feature is disabled.
 - Preserve all billing/company code and data for later activation.
+
+Grill decisions:
+
+- Match exact route segments so unrelated paths are not blocked.
+- When subscriptions are disabled, do not upgrade quota subjects or remove ads from free accounts.
+- When companies are disabled, do not grant corporate quota or private-specialist access.
+- Reject company assignment through admin specialist endpoints while disabled.
+- Keep persisted subscriptions and companies dormant rather than deleting them.
 
 Official source:
 
