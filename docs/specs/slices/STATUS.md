@@ -105,11 +105,11 @@ Known non-blocking warnings:
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
-| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
+| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `idea-refined` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–51 verified; Slice 52 planned`
+Status: `Slices 49–51 verified; Slice 52 idea-refined`
 
 Approved originating decks:
 
@@ -228,6 +228,26 @@ Implementation and verification:
 - Focused tests passed, followed by `npm test` (235 tests), `npm run typecheck`, `npm run build`, and `npm audit` with zero findings.
 - Production browser verification confirmed the page, canonical, 200 responses, clean console, CTA navigation, query pre-selection, and home link back to the specialist page.
 - Production was redeployed at commit `f7e6319`; sitemap discovery and 404 failure paths were confirmed externally.
+
+## Slice 52 — Measured loading performance
+
+Status: `idea-refined`
+
+Production baseline:
+
+- Chrome trace on `https://ujimu.com/`: LCP 262 ms, TTFB 170 ms, render delay 92 ms, CLS 0, no CrUX field data yet.
+- Mobile Lighthouse: SEO 100, Best Practices 100, Accessibility 96.
+- Initial request graph used HTTP/1.1 for the document, 13 script/style assets, and API calls; Chrome raised the Modern HTTP insight.
+- The initial client flow requested development-auth and admin-session endpoints even though neither result changed the anonymous home UI.
+- The manifest chain reached 686 ms but had no estimated FCP/LCP saving; the 6 ms render-blocking stylesheet also had zero estimated saving.
+
+Refinement decisions:
+
+- Keep the already-good rendering path; do not add SSR complexity or alter CSS based on zero-savings insights.
+- Render `LazyAuthModal` only when authentication is opened, removing its initial feature/dev-auth work and chunk from the closed state.
+- Remove the unused anonymous admin-session probe and the unused `adminAvailable` drawer prop.
+- Enable HTTP/2 in the production Nginx TLS server and verify Chrome no longer reports static assets over HTTP/1.1.
+- Re-run the same production trace and Lighthouse audit; keep changes only if Core Web Vitals do not regress and request/protocol evidence improves.
 
 ## Progressive account launch extension
 
