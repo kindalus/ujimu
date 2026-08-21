@@ -12,7 +12,11 @@ const siteUrl = (typeof runtimeConfig.public.siteUrl === 'string'
 const socialImagePath = '/ujimu-social.png'
 const socialImageUrl = `${siteUrl}${socialImagePath}`
 const canonicalUrl = computed(() => new URL(route.path, `${siteUrl}/`).toString())
-const robots = computed(() => route.path === '/' ? 'index, follow' : 'noindex, nofollow')
+const robots = computed(() =>
+  route.path === '/' || route.path.startsWith('/especialidades/')
+    ? 'index, follow'
+    : 'noindex, nofollow'
+)
 const title = 'Ujimu — Consulte especialistas com fontes oficiais'
 const description = 'Consulte especialistas de IA sobre legislação angolana. Receba respostas fundamentadas em fontes oficiais, com citações verificáveis.'
 

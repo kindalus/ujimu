@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   buildInlineAdStreamItems,
   countCompletedAssistantResponses,
@@ -170,6 +171,7 @@ const chatInputMaxRows = 5
 const specialistDescriptionPreviewLimit = 256
 let idCounter = 0
 
+const route = useRoute()
 const specialists = ref<PublicSpecialist[]>([])
 const specialistsPending = ref(true)
 const specialistsError = ref(false)
@@ -545,6 +547,10 @@ async function loadSpecialists(): Promise<void> {
 
     const payload = (await response.json()) as SpecialistsResponse
     specialists.value = payload.specialists
+    const requestedSpecialistId = typeof route.query.specialist === 'string' ? route.query.specialist : ''
+    if (requestedSpecialistId && specialists.value.some((specialist) => specialist.id === requestedSpecialistId)) {
+      selectSpecialist(requestedSpecialistId)
+    }
   } catch {
     specialistsError.value = true
   } finally {
@@ -998,6 +1004,7 @@ function createId(prefix: string): string {
               <span class="spec-chip-letter spec-chip-letter--xl">{{ selectedSpecialist.name.slice(0, 1) }}</span>
               <h1 id="page-title" class="empty-title">{{ selectedSpecialist.name }}</h1>
               <p class="empty-sub">{{ selectedSpecialist.description }}. Respostas fundamentadas nas fontes oficiais desta especialidade.</p>
+              <NuxtLink class="btn btn--ghost btn--xs" :to="`/especialidades/${selectedSpecialist.id}`">Conhecer esta especialidade</NuxtLink>
               <div class="sugg-row">
                 <button class="sugg" type="button" @click="question = 'Quais são as principais obrigações?'">Quais são as principais obrigações?</button>
                 <button class="sugg" type="button" @click="question = 'Que documentos suportam esta resposta?'">Que documentos suportam esta resposta?</button>
