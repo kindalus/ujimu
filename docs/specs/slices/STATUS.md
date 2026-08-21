@@ -104,12 +104,12 @@ Known non-blocking warnings:
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
-| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `idea-refined` | — | Render public specialist pages and a dynamic public sitemap. |
+| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `grilled` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–50 verified; Slice 51 idea-refined; Slice 52 planned`
+Status: `Slices 49–50 verified; Slice 51 grilled; Slice 52 planned`
 
 Approved originating decks:
 
@@ -195,7 +195,7 @@ Implementation and verification:
 
 ## Slice 51 — Public specialist pages
 
-Status: `idea-refined`
+Status: `grilled`
 
 Refinement decisions:
 
@@ -205,6 +205,16 @@ Refinement decisions:
 - Expand the sitemap from the anonymous specialist registry only and add a discoverable route from the consultation experience.
 - Make the CTA return to `/?specialist=:id` and pre-select that specialist after the public list loads.
 - Return 404 for missing, suspended, or company-restricted specialists without revealing why access failed.
+
+Grill decisions:
+
+- Use `GET /api/public/specialists/:id` as the only page-data seam and resolve it through `getPublicSpecialists()` with the default anonymous subject.
+- Permit indexing only for `/` and `/especialidades/:id`; failed routes still return HTTP 404.
+- Keep sitemap output to canonical HTTPS URLs without `lastmod` because no reliable editorial-update timestamp exists.
+- XML-escape sitemap values even though specialist IDs are validated slugs.
+- Render all editorial values through Vue interpolation; do not use `v-html` or Markdown.
+- Use the global social image and the specialist title/description for page metadata; omit fabricated ratings, FAQs, source counts, and legal claims.
+- Make the home-page query selection conditional on an actually available public specialist.
 
 ## Progressive account launch extension
 
