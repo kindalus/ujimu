@@ -9,6 +9,7 @@ const originalEnv = { ...process.env }
 
 afterEach(() => {
   process.env = { ...originalEnv }
+  vi.unstubAllGlobals()
 })
 
 describe('configured OTP provider availability acceptance', () => {
@@ -40,6 +41,131 @@ describe('configured OTP provider availability acceptance', () => {
       NODE_ENV: 'development',
       UJIMU_AUTH_FAKE_DELIVERY_ENABLED: 'true'
     })).toEqual({ otpChannels: ['email', 'phone'] })
+  })
+
+  it('uses one fail-closed provider selector and exposes only SMS for complete Verify configuration', async () => {
+    const { getOtpDeliveryCapabilities } = await import('../server/utils/notifications/provider')
+    const verifyEnv = {
+      NODE_ENV: 'production',
+      UJIMU_OTP_PROVIDER: 'twilio-verify',
+      UJIMU_TWILIO_ACCOUNT_SID: `AC${'a'.repeat(32)}`,
+      UJIMU_TWILIO_AUTH_TOKEN: 'twilio-token',
+      UJIMU_TWILIO_VERIFY_SERVICE_SID: `VA${'b'.repeat(32)}`,
+      UJIMU_SENDGRID_API_KEY: 'ignored-sendgrid-key',
+      UJIMU_SENDGRID_FROM_EMAIL: 'ignored@example.com',
+      UJIMU_TWILIO_FROM_PHONE: '+15551234567'
+    }
+
+    expect(getOtpDeliveryCapabilities(verifyEnv)).toEqual({ otpChannels: ['phone'] })
+    expect(getOtpDeliveryCapabilities({ ...verifyEnv, UJIMU_TWILIO_VERIFY_SERVICE_SID: '' })).toEqual({ otpChannels: [] })
+    expect(getOtpDeliveryCapabilities({ ...verifyEnv, UJIMU_OTP_PROVIDER: 'disabled' })).toEqual({ otpChannels: [] })
+    expect(getOtpDeliveryCapabilities({ ...verifyEnv, UJIMU_OTP_PROVIDER: 'typo' })).toEqual({ otpChannels: [] })
+  })
+
+  it('starts a phone verification through the configured Twilio Verify Service SID', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-request-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'pending' }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' }
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const handler = (await import('../server/api/auth/otp/request.post')).default
+    const response = await postJson(handler, '/api/auth/otp/request', {
+      channel: 'phone',
+      contact: '+244 923 456 789'
+    })
+
+    expect(response.status).toBe(200)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [url, options] = fetchMock.mock.calls[0]!
+    expect(url).toBe(`https://verify.twilio.com/v2/Services/VA${'b'.repeat(32)}/Verifications`)
+    expect(options).toMatchObject({
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        authorization: `Basic ${Buffer.from(`AC${'a'.repeat(32)}:twilio-token`).toString('base64')}`,
+        'content-type': 'application/x-www-form-urlencoded'
+      }
+    })
+    expect(Object.fromEntries(new URLSearchParams(String(options?.body)))).toEqual({
+      To: '+244923456789',
+      Channel: 'sms'
+    })
+    expect(String(options?.body)).not.toContain('From')
+    expect(options?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('creates a session only after Twilio Verify approves the code', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-approved-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'approved' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const requestHandler = (await import('../server/api/auth/otp/request.post')).default
+    const verifyHandler = (await import('../server/api/auth/otp/verify.post')).default
+    expect((await postJson(requestHandler, '/api/auth/otp/request', {
+      channel: 'phone', contact: '+244923456789'
+    })).status).toBe(200)
+
+    const verifyResponse = await postJson(verifyHandler, '/api/auth/otp/verify', {
+      channel: 'phone', contact: '+244923456789', code: '123456'
+    })
+    expect(verifyResponse.status).toBe(200)
+    expect(await verifyResponse.json()).toMatchObject({
+      authenticated: true,
+      user: { displayContact: '+244923456789' }
+    })
+    expect(verifyResponse.headers.get('set-cookie')).toContain('ujimu_session=')
+
+    const [url, options] = fetchMock.mock.calls[1]!
+    expect(url).toBe(`https://verify.twilio.com/v2/Services/VA${'b'.repeat(32)}/VerificationCheck`)
+    expect(Object.fromEntries(new URLSearchParams(String(options?.body)))).toEqual({
+      To: '+244923456789',
+      Code: '123456'
+    })
+  })
+
+  it('rejects non-approved Verify checks without creating a session', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-rejected-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const requestHandler = (await import('../server/api/auth/otp/request.post')).default
+    const verifyHandler = (await import('../server/api/auth/otp/verify.post')).default
+    await postJson(requestHandler, '/api/auth/otp/request', { channel: 'phone', contact: '+244923456789' })
+    const response = await postJson(verifyHandler, '/api/auth/otp/verify', {
+      channel: 'phone', contact: '+244923456789', code: '000000'
+    })
+    const text = await response.text()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(response.status).toBe(400)
+    expect(text).toContain('Código inválido ou expirado.')
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('returns generic errors for malformed Verify responses', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-errors-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn(async () => new Response('provider-secret-detail', { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const handler = (await import('../server/api/auth/otp/request.post')).default
+    const response = await postJson(handler, '/api/auth/otp/request', {
+      channel: 'phone', contact: '+244923456789'
+    })
+    const text = await response.text()
+
+    expect(response.status).toBe(503)
+    expect(text).toContain('OTP_DELIVERY_FAILED')
+    expect(text).not.toContain('provider-secret-detail')
   })
 
   it('sends email OTP through the documented SendGrid Mail Send request', async () => {
@@ -212,3 +338,31 @@ describe('configured OTP provider availability acceptance', () => {
     expect(response.status).toBe(503)
   })
 })
+
+function configureVerifyEnv(dataDir: string): void {
+  process.env.NODE_ENV = 'production'
+  process.env.UJIMU_DATA_DIR = dataDir
+  process.env.UJIMU_DB_PATH = join(dataDir, 'db', 'ujimu.sqlite')
+  process.env.UJIMU_OTP_PROVIDER = 'twilio-verify'
+  process.env.UJIMU_TWILIO_ACCOUNT_SID = `AC${'a'.repeat(32)}`
+  process.env.UJIMU_TWILIO_AUTH_TOKEN = 'twilio-token'
+  process.env.UJIMU_TWILIO_VERIFY_SERVICE_SID = `VA${'b'.repeat(32)}`
+  process.env.UJIMU_SESSION_SECRET = 'test-session-secret'
+  process.env.UJIMU_OTP_PEPPER = 'test-otp-pepper'
+}
+
+async function postJson(
+  handler: Parameters<ReturnType<typeof createRouter>['post']>[1],
+  path: string,
+  body: unknown
+): Promise<Response> {
+  const app = createApp()
+  const router = createRouter()
+  router.post(path, handler)
+  app.use(router)
+  return toWebHandler(app)(new Request(`http://local${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  }))
+}

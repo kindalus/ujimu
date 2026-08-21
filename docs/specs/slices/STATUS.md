@@ -106,11 +106,11 @@ Known non-blocking warnings:
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
-| 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `grilled` | — | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
+| 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `acceptance-tested` | — | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 
 ## Twilio Verify OTP extension
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -123,6 +123,10 @@ Confirmed TDD seams:
 2. `POST /api/auth/otp/request` for Verify submission and provider failures.
 3. `POST /api/auth/otp/verify` for approval, rejection, expiry, malformed responses, and session creation.
 4. The same OTP routes in `direct` mode for backwards compatibility.
+
+Acceptance-test RED:
+
+- `npm test -- tests/otp-provider-availability.acceptance.test.ts --reporter=verbose` — failed as expected because the selector still exposed direct channels and Verify requests returned 503 without calling the Verify API.
 
 ## SEO and performance launch extension
 
