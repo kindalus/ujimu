@@ -107,6 +107,29 @@ Known non-blocking warnings:
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
+| 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `idea-refined` | — | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
+| 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `planned` | — | Edit display name and manage verified primary/secondary contacts safely. |
+
+## Account usage, profile, and admin navigation extension
+
+Status: `in-progress`
+
+Approved originating decks:
+
+- [`../brainstorm-account-usage-profile-admin-navigation.html`](../brainstorm-account-usage-profile-admin-navigation.html)
+- [`../account-usage-profile-admin-navigation-architecture.html`](../account-usage-profile-admin-navigation-architecture.html)
+
+Planned order:
+
+1. Slice 54 establishes canonical quota/session state, anonymous-event attribution, and role-aware navigation.
+2. Slice 55 adds the profile data model and verified-contact lifecycle after Slice 54 is fully green.
+
+Slice 54 proposed TDD seams awaiting explicit confirmation:
+
+1. `GET /api/auth/session?timezone=…` before and after quota consumption.
+2. OTP, passkey, and development login for idempotent anonymous-event attribution.
+3. `POST /api/chat` followed by session refresh for the visible count.
+4. Drawer and admin shell rendering for anonymous, registered, and admin states.
 
 ## Twilio Verify OTP extension
 
