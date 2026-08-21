@@ -51,7 +51,15 @@ describe('transactional specialist initialization acceptance', () => {
       dataDir,
       initializationRunner: {
         async initializeSpecialist(specialist) {
-          await writeFile(join(specialist.paths.root, 'AGENTS.md'), '# Legislação de IVA wiki\n\nRead and apply the `unslop` skill before the final answer.\n')
+          await writeFile(join(specialist.paths.root, 'AGENTS.md'), `# Legislação de IVA wiki
+
+This workspace is governed by the \`llm-wiki\` skill.
+Treat this specialist wiki as the only source of truth.
+If the wiki lacks sufficient evidence, do not guess.
+Cite the original document title and relevant articles.
+Do not expose physical or internal file paths to the user.
+Before the final answer, read and apply the \`unslop\` skill.
+`)
           await writeFile(join(specialist.paths.wiki, 'index.md'), '# Índice\n')
           await writeFile(join(specialist.paths.wiki, 'log.md'), '# Log\n')
         }

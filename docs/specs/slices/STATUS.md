@@ -96,11 +96,11 @@ Known non-blocking warnings:
 | 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `verified` | 2026-06-16 | Chat input auto-grows up to five lines, then scrolls internally. |
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
-| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `grilled` | — | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
+| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `acceptance-tested` | — | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
 
 ## Slice 45 — llm-wiki-owned specialist AGENTS.md
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Originating brainstorm and architecture:
 
@@ -126,6 +126,10 @@ Acceptance-test plan:
 - Update the public initialization-runner acceptance test to require explicit `llm-wiki` ownership, `AGENTS.md` schema selection, Ujimu consultation rules, and the unchanged optional NDJSON protocol.
 - Prove that incomplete `AGENTS.md` files are rejected and a complete contract is accepted.
 - Keep the transactional initialization fixture aligned with the strengthened contract.
+
+Acceptance-test RED:
+
+- `npm test -- tests/specialist-initialization-prompt.acceptance.test.ts tests/specialist-initialization.acceptance.test.ts --reporter=verbose` — failed as expected because the prompt did not explicitly delegate the scaffold to `llm-wiki` and validation accepted missing Ujimu rules.
 
 ## Slice 44 — Agent-owned conversion and ingestion
 
