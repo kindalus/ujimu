@@ -192,6 +192,10 @@ mv "$UJIMU_DATA_DIR/db/ujimu-restored.sqlite" "$UJIMU_DATA_DIR/db/ujimu.sqlite"
 
 Restart the app and check `/healthz` plus `/api/admin/ops/readyz`.
 
+## Production reverse proxy
+
+The public `https://ujimu.com` deployment terminates TLS in Nginx and proxies to the Podman container on `127.0.0.1:3010`. Keep the upstream bound to loopback, preserve streaming with `proxy_buffering off` on `/api/chat`, enable Gzip for text assets, and enable HTTP/2 in the TLS server with `http2 on;`. Validate every change with `nginx -t` before reloading Nginx.
+
 ## Podman container deployment
 
 Ujimu provides a single Podman-compatible image with production and test profiles. The same image is configured at runtime by env files and host volume mappings.

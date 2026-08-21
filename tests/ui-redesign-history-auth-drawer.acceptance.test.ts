@@ -25,7 +25,8 @@ describe('UI redesign history and auth drawer acceptance', () => {
     const page = await readFile('pages/index.vue', 'utf8')
     const authModal = await readFile('components/AuthModal.vue', 'utf8')
 
-    expect(page).toContain('<AuthModal')
+    expect(page).toContain('<LazyAuthModal')
+    expect(page).toContain('v-if="authPanelOpen"')
     expect(page).toContain('v-model:open="authPanelOpen"')
     expect(authModal).toContain('<UModal')
     expect(authModal).toContain('class="auth-modal"')

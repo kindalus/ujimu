@@ -3,14 +3,12 @@ import { ref } from 'vue'
 
 const props = withDefaults(defineProps<{
   isAuthenticated?: boolean
-  adminAvailable?: boolean
   accountLoginAvailable?: boolean
   subscriptionsEnabled?: boolean
   userLabel?: string
   openLabel?: string
 }>(), {
   isAuthenticated: false,
-  adminAvailable: false,
   accountLoginAvailable: false,
   subscriptionsEnabled: false,
   userLabel: '',

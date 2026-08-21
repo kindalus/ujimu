@@ -44,10 +44,6 @@ interface AuthSessionResponse {
   }
 }
 
-interface AdminSessionResponse extends AuthSessionResponse {
-  admin: boolean
-}
-
 interface BillingStatusResponse {
   authenticated: boolean
   subscribed: boolean
@@ -194,7 +190,6 @@ const copyErrorMessage = ref('')
 const isStreaming = ref(false)
 const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
-const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const otpChannels = ref<Array<'email' | 'phone'>>([])
 const subscriptionsEnabled = ref(false)
@@ -306,7 +301,6 @@ async function loadAuthSession(): Promise<void> {
   } catch {
     authSession.value = { authenticated: false }
   }
-  void loadAdminSession()
   void loadBillingStatus()
 }
 
@@ -325,29 +319,15 @@ async function loadBillingStatus(): Promise<void> {
   }
 }
 
-async function loadAdminSession(): Promise<void> {
-  try {
-    const response = await fetch('/api/admin/session')
-    const session = response.ok
-      ? ((await response.json()) as AdminSessionResponse)
-      : { authenticated: false, admin: false }
-    adminAvailable.value = Boolean(session.authenticated && session.admin)
-  } catch {
-    adminAvailable.value = false
-  }
-}
-
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
   authSession.value = session
   void loadHistory()
-  void loadAdminSession()
   void loadBillingStatus()
 }
 
 async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
   authSession.value = { authenticated: false }
-  adminAvailable.value = false
   historyConversations.value = []
   activeConversationId.value = ''
   activeConversationTitle.value = ''
@@ -927,7 +907,6 @@ function createId(prefix: string): string {
       <div class="topbar-left">
         <AppDrawer
           :is-authenticated="isAuthenticated"
-          :admin-available="adminAvailable"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
@@ -1194,7 +1173,8 @@ function createId(prefix: string): string {
       </div>
     </main>
 
-    <AuthModal
+    <LazyAuthModal
+      v-if="authPanelOpen"
       v-model:open="authPanelOpen"
       :auth-session="authSession"
       @authenticated="handleAuthenticatedSession"

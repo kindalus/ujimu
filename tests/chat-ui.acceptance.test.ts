@@ -29,7 +29,7 @@ describe('anonymous specialist chat UI acceptance', () => {
     expect(shellSources).toContain('/api/auth/otp/verify')
     expect(page).toContain('/api/auth/session')
     expect(page).toContain('/api/auth/logout')
-    expect(page).toContain('/api/admin/session')
+    expect(page).not.toContain('/api/admin/session')
     expect(shellSources).toContain('Administração')
     expect(page).toContain('/api/history?specialistId=')
     expect(page).toContain('/api/history/')

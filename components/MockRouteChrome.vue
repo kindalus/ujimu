@@ -7,10 +7,6 @@ interface AuthSessionResponse {
   user?: { id: string; displayContact: string }
 }
 
-interface AdminSessionResponse extends AuthSessionResponse {
-  admin: boolean
-}
-
 interface FeaturesResponse {
   otpChannels: Array<'email' | 'phone'>
   subscriptionsEnabled: boolean
@@ -19,7 +15,6 @@ interface FeaturesResponse {
 
 const route = useRoute()
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
-const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const otpChannels = ref<Array<'email' | 'phone'>>([])
 const subscriptionsEnabled = ref(false)
@@ -66,28 +61,15 @@ async function loadAuthSession(): Promise<void> {
   } catch {
     authSession.value = { authenticated: false }
   }
-  void loadAdminSession()
-}
-
-async function loadAdminSession(): Promise<void> {
-  try {
-    const response = await fetch('/api/admin/session')
-    const session = response.ok ? ((await response.json()) as AdminSessionResponse) : { authenticated: false, admin: false }
-    adminAvailable.value = Boolean(session.authenticated && session.admin)
-  } catch {
-    adminAvailable.value = false
-  }
 }
 
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
   authSession.value = session
-  void loadAdminSession()
 }
 
 async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
   authSession.value = { authenticated: false }
-  adminAvailable.value = false
   authPanelOpen.value = false
 }
 </script>
@@ -98,7 +80,6 @@ async function logout(): Promise<void> {
       <div class="topbar-left">
         <AppDrawer
           :is-authenticated="authSession.authenticated"
-          :admin-available="adminAvailable"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
@@ -142,7 +123,7 @@ async function logout(): Promise<void> {
       <slot />
     </main>
 
-    <AuthModal v-model:open="authPanelOpen" :auth-session="authSession" @authenticated="handleAuthenticatedSession" />
+    <LazyAuthModal v-if="authPanelOpen" v-model:open="authPanelOpen" :auth-session="authSession" @authenticated="handleAuthenticatedSession" />
   </div>
 </template>
 
