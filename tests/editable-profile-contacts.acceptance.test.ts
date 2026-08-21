@@ -10,6 +10,7 @@ import profilePatchHandler from '../server/api/account/profile.patch'
 import contactDeleteHandler from '../server/api/account/contacts/[id].delete'
 import contactPrimaryHandler from '../server/api/account/contacts/[id]/primary.put'
 import otpVerifyHandler from '../server/api/auth/otp/verify.post'
+import sessionHandler from '../server/api/auth/session.get'
 import { requestOtp } from '../server/utils/auth/otp'
 import { createSessionToken, SESSION_COOKIE_NAME } from '../server/utils/auth/session'
 import { initializeDatabase } from '../server/utils/db'
@@ -50,9 +51,16 @@ describe('editable profile and verified contacts acceptance', () => {
 
     response = await callHandler(profileGetHandler, '/api/account/profile', 'GET', undefined, cookie)
     await expect(response.json()).resolves.toMatchObject({ user: { displayName: 'Ana Manuel' } })
+    response = await callHandler(sessionHandler, '/api/auth/session', 'GET', undefined, cookie)
+    await expect(response.json()).resolves.toMatchObject({ user: { displayName: 'Ana Manuel' } })
 
-    const invalid = await callHandler(profilePatchHandler, '/api/account/profile', 'PATCH', { displayName: '<b>Ana</b>' }, cookie)
+    let invalid = await callHandler(profilePatchHandler, '/api/account/profile', 'PATCH', { displayName: '<b>Ana</b>' }, cookie)
     expect(invalid.status).toBe(400)
+    invalid = await callHandler(profilePatchHandler, '/api/account/profile', 'PATCH', { displayName: 'a'.repeat(101) }, cookie)
+    expect(invalid.status).toBe(400)
+    const cleared = await callHandler(profilePatchHandler, '/api/account/profile', 'PATCH', { displayName: '   ' }, cookie)
+    expect(cleared.status).toBe(200)
+    await expect(cleared.json()).resolves.toEqual({ displayName: null })
   })
 
   it('links an OTP-approved contact to the signed-in account and refuses another account contact', async () => {
@@ -80,6 +88,11 @@ describe('editable profile and verified contacts acceptance', () => {
       channel: 'email', contact: 'taken@example.com', code: '654321'
     }, sessionCookie(owner.id, 'passkey'))
     expect(conflict.status).toBe(409)
+    expect(conflict.headers.getSetCookie()).toEqual([])
+    const unchanged = await callHandler(profileGetHandler, '/api/account/profile', 'GET', undefined, sessionCookie(owner.id, 'passkey'))
+    expect((await unchanged.json()).contacts).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ contact: 'taken@example.com' })
+    ]))
   })
 
   it('requires recent OTP and safeguards the primary and last contacts', async () => {
@@ -88,6 +101,7 @@ describe('editable profile and verified contacts acceptance', () => {
       { channel: 'email', contact: 'owner@example.com', primary: true },
       { channel: 'phone', contact: '+244923000000', primary: false }
     ])
+    const other = seedUser(context.database, [{ channel: 'email', contact: 'other@example.com', primary: true }])
     context.database.close()
 
     const stale = sessionCookie(user.id, 'otp', new Date(Date.now() - 16 * 60 * 1000))
@@ -136,6 +150,15 @@ describe('editable profile and verified contacts acceptance', () => {
       recent
     )
     expect(cannotDeleteLast.status).toBe(409)
+
+    const cannotChangeOtherUser = await callHandler(
+      contactPrimaryHandler,
+      `/api/account/contacts/${other.identities[0]!.id}/primary`,
+      'PUT',
+      undefined,
+      recent
+    )
+    expect(cannotChangeOtherUser.status).toBe(404)
   })
 
   it('renders editable name and verified-contact controls in the profile page', async () => {
@@ -207,7 +230,9 @@ async function callHandler(
 ): Promise<Response> {
   const app = createApp()
   const router = createRouter()
-  const route = path.replace(/\/[^/]+\/primary$/, '/:id/primary').replace(/\/[^/]+$/, '/:id')
+  const route = path.includes('/contacts/')
+    ? (method === 'PUT' ? '/api/account/contacts/:id/primary' : '/api/account/contacts/:id')
+    : path
   if (method === 'GET') router.get(route, handler)
   if (method === 'POST') router.post(route, handler)
   if (method === 'PATCH') router.patch(route, handler)

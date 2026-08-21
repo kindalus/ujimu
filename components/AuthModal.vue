@@ -27,10 +27,11 @@ interface FeaturesResponse {
   otpChannels: Array<'email' | 'phone'>
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   authSession: AuthSessionResponse
-}>()
+  purpose?: 'login' | 'add-contact' | 'verify'
+}>(), { purpose: 'login' })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -68,7 +69,16 @@ const modalOpen = computed({
 })
 const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const passkeySignInAvailable = computed(
-  () => accountLoginAvailable.value && passkeysSupported.value && Boolean(props.authSession.passkeys?.passkeysEnabled && props.authSession.passkeys.passkeysConfigured)
+  () => props.purpose === 'login' && accountLoginAvailable.value && passkeysSupported.value && Boolean(props.authSession.passkeys?.passkeysEnabled && props.authSession.passkeys.passkeysConfigured)
+)
+const authTitle = computed(() => {
+  if (props.purpose === 'add-contact') return 'Adicionar contacto'
+  if (props.purpose === 'verify') return 'Confirmar identidade'
+  return 'Entrar na Ujimu'
+})
+const authSubtitle = computed(() => props.purpose === 'login'
+  ? 'Sem palavra-passe — enviamos-lhe um código de utilização única.'
+  : 'Enviaremos um código de utilização única para confirmar o contacto.'
 )
 
 async function detectPasskeySupport(): Promise<void> {
@@ -146,7 +156,9 @@ async function verifyOtpCode(): Promise<void> {
     })
 
     if (!response.ok) {
-      authError.value = 'Código inválido ou expirado.'
+      authError.value = response.status === 409
+        ? 'Este contacto já pertence a outra conta.'
+        : 'Código inválido ou expirado.'
       return
     }
 
@@ -284,8 +296,8 @@ function resetAndClose(): void {
       </div>
 
       <form v-if="authStep === 'request' && accountLoginAvailable" class="auth-form" @submit.prevent="requestOtpCode">
-        <h2 id="auth-title" class="modal-title">Entrar na Ujimu</h2>
-        <p class="modal-sub">Sem palavra-passe — enviamos-lhe um código de utilização única.</p>
+        <h2 id="auth-title" class="modal-title">{{ authTitle }}</h2>
+        <p class="modal-sub">{{ authSubtitle }}</p>
 
         <div v-if="passkeySignInAvailable" class="auth-actions">
           <button class="btn btn--ghost btn--block" type="button" :disabled="!passkeysSupported || passkeyPending" @click="signInWithPasskey">
@@ -299,12 +311,12 @@ function resetAndClose(): void {
           <button v-if="otpChannels.includes('phone')" class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'phone' }" type="button" @click="authChannel = 'phone'"><UjimuIcon name="phone" /> Telemóvel</button>
         </div>
 
-        <input id="auth-contact" v-model="authContact" class="field" :type="authChannel === 'email' ? 'email' : 'tel'" :placeholder="authChannel === 'email' ? 'o.seu@email.com' : '+244 9XX XXX XXX'" :disabled="authPending" />
+        <input id="auth-contact" v-model="authContact" name="contact" class="field" :type="authChannel === 'email' ? 'email' : 'tel'" :placeholder="authChannel === 'email' ? 'o.seu@email.com' : '+244 9XX XXX XXX'" :disabled="authPending" />
 
         <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
         <p v-if="authError" class="auth-error" role="alert">{{ authError }}</p>
 
-        <div v-if="devAuthAvailable && authContact.trim()" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
+        <div v-if="purpose === 'login' && devAuthAvailable && authContact.trim()" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
           <p><strong>Modo de desenvolvimento</strong></p>
           <p>Activo apenas em desenvolvimento com UJIMU_DEV_AUTH_ENABLED.</p>
           <button class="btn btn--ghost btn--block" type="button" :disabled="authPending || devAuthPending" @click="signInWithDevContact">
@@ -328,6 +340,7 @@ function resetAndClose(): void {
             v-for="index in 6"
             :key="index"
             class="otp-cell"
+            :name="`otp-digit-${index}`"
             inputmode="numeric"
             maxlength="1"
             :value="authCode[index - 1] || ''"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 interface AuthSessionResponse {
@@ -9,7 +9,7 @@ interface AuthSessionResponse {
     exempt: boolean
     daily: { limit: number; used: number; resetAt: string } | null
   }
-  user?: { id: string; displayContact: string }
+  user?: { id: string; displayName?: string | null; displayContact: string }
 }
 
 interface FeaturesResponse {
@@ -31,7 +31,7 @@ const adminNavItems = [
   { label: 'Ops', to: '/admin/ops' }
 ]
 
-const userInitial = computed(() => authSession.value.user?.displayContact?.slice(0, 1).toUpperCase() || 'U')
+const userInitial = computed(() => (authSession.value.user?.displayName || authSession.value.user?.displayContact)?.slice(0, 1).toUpperCase() || 'U')
 const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const isAdminRoute = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
 const quotaLabel = computed(() => {
@@ -49,6 +49,11 @@ function adminNavItemActive(path: string): boolean {
 onMounted(() => {
   void loadAuthSession()
   void loadFeatures()
+  window.addEventListener('ujimu:session-changed', loadAuthSession)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('ujimu:session-changed', loadAuthSession)
 })
 
 async function loadFeatures(): Promise<void> {
@@ -100,7 +105,7 @@ async function logout(): Promise<void> {
           :is-admin="authSession.admin"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
-          :user-label="authSession.user?.displayContact"
+          :user-label="authSession.user?.displayName || authSession.user?.displayContact"
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
           @logout="logout"
@@ -110,7 +115,7 @@ async function logout(): Promise<void> {
       <div class="topbar-right">
         <span class="quota-pill">{{ quotaLabel }}</span>
         <button v-if="!authSession.authenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
-        <span v-else-if="authSession.authenticated" class="avatar" :title="authSession.user?.displayContact">{{ userInitial }}</span>
+        <span v-else-if="authSession.authenticated" class="avatar" :title="authSession.user?.displayName || authSession.user?.displayContact">{{ userInitial }}</span>
       </div>
     </header>
 

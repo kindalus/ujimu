@@ -40,6 +40,7 @@ interface AuthSessionResponse {
   }
   user?: {
     id: string
+    displayName?: string | null
     displayContact: string
   }
   authMethod?: 'otp' | 'passkey' | 'unknown'
@@ -926,7 +927,7 @@ function createId(prefix: string): string {
           :is-admin="authSession.admin"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
-          :user-label="authSession.user?.displayContact"
+          :user-label="authSession.user?.displayName || authSession.user?.displayContact"
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
           @logout="logout"
@@ -969,7 +970,7 @@ function createId(prefix: string): string {
         <span v-else-if="subscriptionsEnabled && billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
         <span v-else class="quota-pill">{{ quotaLabel }}</span>
         <button v-if="!isAuthenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
-        <span v-else-if="isAuthenticated" class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
+        <span v-else-if="isAuthenticated" class="avatar" :title="authSession.user?.displayName || authSession.user?.displayContact">{{ (authSession.user?.displayName || authSession.user?.displayContact)?.slice(0, 1).toUpperCase() || 'U' }}</span>
       </div>
     </header>
 

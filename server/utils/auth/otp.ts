@@ -55,6 +55,7 @@ export interface VerifyOtpOptions {
 
 export interface AuthenticatedUser {
   id: string
+  displayName?: string | null
   displayContact: string
 }
 
@@ -80,6 +81,16 @@ export class OtpVerificationError extends Error {
   constructor() {
     super(GENERIC_OTP_FAILURE_MESSAGE)
     this.name = 'OtpVerificationError'
+  }
+}
+
+export class OtpIdentityConflictError extends Error {
+  public readonly statusCode = 409
+  public readonly code = 'OTP_IDENTITY_CONFLICT'
+
+  constructor() {
+    super('Este contacto já pertence a outra conta.')
+    this.name = 'OtpIdentityConflictError'
   }
 }
 
@@ -226,11 +237,17 @@ export async function verifyOtp(
     throw new OtpVerificationError()
   }
 
-  const user = upsertVerifiedIdentity(database, normalized, options.currentUserId, now)
+  let user: AuthenticatedUser
+  try {
+    user = upsertVerifiedIdentity(database, normalized, options.currentUserId, now)
+  } catch (error) {
+    if (error instanceof OtpIdentityConflictError) {
+      database.prepare('UPDATE otp_challenges SET used_at = ? WHERE id = ?').run(now.toISOString(), challenge.id)
+    }
+    throw error
+  }
 
-  database
-    .prepare('UPDATE otp_challenges SET used_at = ? WHERE id = ?')
-    .run(now.toISOString(), challenge.id)
+  database.prepare('UPDATE otp_challenges SET used_at = ? WHERE id = ?').run(now.toISOString(), challenge.id)
 
   return {
     user,
@@ -281,16 +298,16 @@ export function getActiveOtpChallengeCount(database: DatabaseSync, input: OtpReq
 export function getPublicSessionUser(database: DatabaseSync, userId: string): AuthenticatedUser | undefined {
   const row = database
     .prepare(`
-      SELECT users.id AS id, user_identities.contact AS displayContact
+      SELECT users.id AS id, users.display_name AS displayName, user_identities.contact AS displayContact
       FROM users
       JOIN user_identities ON user_identities.user_id = users.id
       WHERE users.id = ?
-      ORDER BY user_identities.verified_at ASC
+      ORDER BY user_identities.is_primary DESC, user_identities.verified_at ASC, user_identities.id ASC
       LIMIT 1
     `)
-    .get(userId) as { id: string; displayContact: string } | undefined
+    .get(userId) as { id: string; displayName: string | null; displayContact: string } | undefined
 
-  return row ? { id: row.id, displayContact: row.displayContact } : undefined
+  return row ? { id: row.id, displayName: row.displayName, displayContact: row.displayContact } : undefined
 }
 
 function getActiveChallenge(
@@ -333,15 +350,20 @@ function upsertVerifiedIdentity(
     .prepare('SELECT user_id FROM user_identities WHERE channel = ? AND contact = ?')
     .get(input.channel, input.contact) as { user_id: string } | undefined
 
+  if (existing && currentUserId && existing.user_id !== currentUserId) {
+    throw new OtpIdentityConflictError()
+  }
+
   const userId = existing?.user_id ?? currentUserId ?? createUser(database, now)
 
   if (!existing) {
+    const count = database.prepare('SELECT COUNT(*) AS count FROM user_identities WHERE user_id = ?').get(userId) as { count: number }
     database
       .prepare(`
-        INSERT INTO user_identities (id, user_id, channel, contact, verified_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO user_identities (id, user_id, channel, contact, verified_at, is_primary)
+        VALUES (?, ?, ?, ?, ?, ?)
       `)
-      .run(randomUUID(), userId, input.channel, input.contact, now.toISOString())
+      .run(randomUUID(), userId, input.channel, input.contact, now.toISOString(), count.count === 0 ? 1 : 0)
   }
 
   return {

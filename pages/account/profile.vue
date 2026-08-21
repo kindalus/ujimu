@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 interface AuthSessionResponse {
   authenticated: boolean
-  user?: { id: string; displayContact: string }
+  user?: { id: string; displayName?: string | null; displayContact: string }
   authMethod?: 'otp' | 'passkey' | 'unknown'
   recentOtpAuthenticated?: boolean
   passkeys?: {
@@ -26,21 +26,33 @@ interface UserCompany {
   active: boolean
 }
 
+interface ProfileContact {
+  id: string
+  channel: 'email' | 'phone'
+  contact: string
+  primary: boolean
+  verifiedAt: string
+}
+
 interface ProfileResponse {
   authenticated: boolean
-  user?: { id: string; displayContact: string }
+  user?: { id: string; displayName?: string | null; displayContact: string }
+  contacts: ProfileContact[]
   verifiedEmails: string[]
   companies: UserCompany[]
   activeCompany: UserCompany | null
 }
 
-const profile = ref<ProfileResponse>({ authenticated: false, verifiedEmails: [], companies: [], activeCompany: null })
+const emptyProfile = (): ProfileResponse => ({ authenticated: false, contacts: [], verifiedEmails: [], companies: [], activeCompany: null })
+const profile = ref<ProfileResponse>(emptyProfile())
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const authPanelOpen = ref(false)
+const authPanelPurpose = ref<'login' | 'add-contact' | 'verify'>('login')
 const otpChannels = ref<Array<'email' | 'phone'>>([])
 const subscriptionsEnabled = ref(false)
 const companiesEnabled = ref(false)
 const selectedCompanyId = ref('')
+const displayName = ref('')
 const loading = ref(true)
 const pending = ref(false)
 const feedback = ref('')
@@ -48,17 +60,12 @@ const errorMessage = ref('')
 
 const displayContact = computed(() => profile.value.user?.displayContact ?? '')
 const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
-const userInitial = computed(() => displayContact.value.slice(0, 1).toUpperCase() || 'U')
+const userInitial = computed(() => (profile.value.user?.displayName || displayContact.value).slice(0, 1).toUpperCase() || 'U')
 const isEmailContact = computed(() => displayContact.value.includes('@'))
 const planLabel = computed(() => {
   if (companiesEnabled.value && profile.value.activeCompany) return `Empresa — ${profile.value.activeCompany.name}`
   return 'Gratuito'
 })
-const verifiedContactList = computed(() => {
-  if (profile.value.verifiedEmails.length > 0) return profile.value.verifiedEmails
-  return displayContact.value ? [displayContact.value] : []
-})
-
 onMounted(() => {
   void loadProfile()
   void loadFeatures()
@@ -84,17 +91,86 @@ async function loadProfile(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   try {
-    const response = await fetch('/api/account/profile')
-    profile.value = response.ok
-      ? ((await response.json()) as ProfileResponse)
-      : { authenticated: false, verifiedEmails: [], companies: [], activeCompany: null }
-    authSession.value = { authenticated: profile.value.authenticated, user: profile.value.user }
+    const [profileResponse, sessionResponse] = await Promise.all([
+      fetch('/api/account/profile'),
+      fetch('/api/auth/session')
+    ])
+    profile.value = profileResponse.ok ? ((await profileResponse.json()) as ProfileResponse) : emptyProfile()
+    authSession.value = sessionResponse.ok
+      ? ((await sessionResponse.json()) as AuthSessionResponse)
+      : { authenticated: profile.value.authenticated, user: profile.value.user }
     selectedCompanyId.value = profile.value.activeCompany?.id ?? ''
+    displayName.value = profile.value.user?.displayName ?? ''
   } catch {
     errorMessage.value = 'Não foi possível carregar o perfil.'
     authSession.value = { authenticated: false }
   } finally {
     loading.value = false
+  }
+}
+
+async function saveDisplayName(): Promise<void> {
+  pending.value = true
+  feedback.value = ''
+  errorMessage.value = ''
+  try {
+    const response = await fetch('/api/account/profile', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ displayName: displayName.value })
+    })
+    if (!response.ok) {
+      errorMessage.value = 'Indique um nome válido com até 100 caracteres.'
+      return
+    }
+    feedback.value = 'Nome actualizado.'
+    notifySessionChanged()
+    await loadProfile()
+  } catch {
+    errorMessage.value = 'Não foi possível actualizar o nome.'
+  } finally {
+    pending.value = false
+  }
+}
+
+function openAuth(purpose: 'login' | 'add-contact' | 'verify'): void {
+  authPanelPurpose.value = purpose
+  authPanelOpen.value = true
+}
+
+async function makePrimary(contact: ProfileContact): Promise<void> {
+  await mutateContact(`/api/account/contacts/${encodeURIComponent(contact.id)}/primary`, 'PUT', 'Contacto principal actualizado.')
+}
+
+async function deleteContact(contact: ProfileContact): Promise<void> {
+  if (!window.confirm(`Remover o contacto ${contact.contact}?`)) return
+  await mutateContact(`/api/account/contacts/${encodeURIComponent(contact.id)}`, 'DELETE', 'Contacto removido.')
+}
+
+async function mutateContact(path: string, method: 'PUT' | 'DELETE', successMessage: string): Promise<void> {
+  pending.value = true
+  feedback.value = ''
+  errorMessage.value = ''
+  try {
+    const response = await fetch(path, { method })
+    if (response.status === 403) {
+      errorMessage.value = 'Confirme primeiro a sua identidade com um código OTP recente.'
+      openAuth('verify')
+      return
+    }
+    if (!response.ok) {
+      errorMessage.value = response.status === 409
+        ? 'Esta operação deixaria a conta sem um contacto de entrada válido.'
+        : 'Não foi possível actualizar o contacto.'
+      return
+    }
+    feedback.value = successMessage
+    notifySessionChanged()
+    await loadProfile()
+  } catch {
+    errorMessage.value = 'Não foi possível actualizar o contacto.'
+  } finally {
+    pending.value = false
   }
 }
 
@@ -121,8 +197,18 @@ async function saveActiveCompany(): Promise<void> {
   }
 }
 
+function notifySessionChanged(): void {
+  window.dispatchEvent(new CustomEvent('ujimu:session-changed'))
+}
+
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
   authSession.value = session
+  notifySessionChanged()
+  feedback.value = authPanelPurpose.value === 'add-contact'
+    ? 'Contacto verificado e adicionado.'
+    : authPanelPurpose.value === 'verify'
+      ? 'Identidade confirmada. Pode repetir a operação.'
+      : ''
   void loadProfile()
 }
 </script>
@@ -138,7 +224,7 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
     <p class="subpage-sub" style="margin-top: 0">Inicie sessão para gerir o seu perfil.</p>
     <div class="adm-row-actions" style="justify-content: center">
       <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
-      <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
+      <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="openAuth('login')">Entrar por OTP</button>
     </div>
   </main>
 
@@ -153,24 +239,17 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
       </div>
     </div>
 
-    <div class="adm-card">
+    <form class="adm-card" @submit.prevent="saveDisplayName">
       <h2 class="adm-card-title">Dados pessoais</h2>
-      <div class="adm-formgrid">
-        <label class="adm-field">
-          <span class="adm-field-label">Nome</span>
-          <input class="field" value="" placeholder="O seu nome" readonly />
-        </label>
-        <label class="adm-field">
-          <span class="adm-field-label">{{ isEmailContact ? 'Email' : 'Telemóvel' }}</span>
-          <input class="field" :value="displayContact" readonly />
-        </label>
-      </div>
       <label class="adm-field">
-        <span class="adm-field-label">{{ isEmailContact ? 'Telemóvel · opcional' : 'Email · opcional' }}</span>
-        <input class="field" :type="isEmailContact ? 'tel' : 'email'" :placeholder="isEmailContact ? '9XX XXX XXX' : 'nome@exemplo.co.ao'" readonly />
+        <span class="adm-field-label">Nome</span>
+        <input id="profile-display-name" v-model="displayName" name="displayName" class="field" maxlength="100" placeholder="O seu nome" :disabled="pending" />
       </label>
-      <p class="adm-foot-note">Para alterar o contacto de entrada será pedido um código OTP enviado para o novo contacto. O contacto alternativo é opcional e pode ser usado para OTP.</p>
-    </div>
+      <div class="adm-row-actions">
+        <button class="btn btn--primary btn--xs" type="submit" :disabled="pending">Guardar nome</button>
+      </div>
+      <p class="adm-foot-note">O nome serve apenas para personalizar a conta; não altera a autenticação nem os privilégios.</p>
+    </form>
 
     <div v-if="subscriptionsEnabled || companiesEnabled" class="adm-card">
       <div class="adm-card-toprow">
@@ -218,16 +297,28 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
             <span class="badge badge--ok"><span class="badge-dot" />Activo</span>
           </div>
         </div>
-        <div class="adm-src">
+        <div v-for="contact in profile.contacts" :key="contact.id" class="adm-src">
           <div class="adm-src-row">
             <div class="adm-src-meta">
-              <span class="adm-src-name">Contactos verificados</span>
-              <span class="adm-src-sub">{{ verifiedContactList.join(' · ') }}</span>
+              <span class="adm-src-name">{{ contact.contact }}</span>
+              <span class="adm-src-sub">{{ contact.channel === 'email' ? 'Email verificado' : 'Telemóvel verificado' }}</span>
             </div>
-            <NuxtLink class="btn btn--ghost btn--xs" to="/account/security">Gerir passkeys</NuxtLink>
+            <span v-if="contact.primary" class="badge badge--ok"><span class="badge-dot" />Principal</span>
+            <div v-else class="adm-row-actions">
+              <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="makePrimary(contact)">Tornar principal</button>
+              <button class="btn btn--danger btn--xs" type="button" :disabled="pending" @click="deleteContact(contact)">Remover</button>
+            </div>
           </div>
         </div>
       </div>
+      <div class="adm-row-actions">
+        <button v-if="accountLoginAvailable" class="btn btn--ghost btn--xs" type="button" @click="openAuth('add-contact')">Adicionar contacto</button>
+        <NuxtLink class="btn btn--ghost btn--xs" to="/account/security">Gerir passkeys</NuxtLink>
+      </div>
+      <p class="adm-foot-note">
+        Mudar o contacto principal ou remover um contacto exige OTP nos últimos 15 minutos.
+        <span v-if="authSession.recentOtpAuthenticated"> A confirmação recente está activa.</span>
+      </p>
     </div>
 
     <div class="adm-card adm-dangerzone">
@@ -244,7 +335,7 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
     <p v-if="errorMessage" class="adm-src-error" role="alert">{{ errorMessage }}</p>
   </main>
 
-  <AuthModal v-model:open="authPanelOpen" :auth-session="authSession" @authenticated="handleAuthenticatedSession" />
+  <AuthModal v-model:open="authPanelOpen" :auth-session="authSession" :purpose="authPanelPurpose" @authenticated="handleAuthenticatedSession" />
 </template>
 
 <style scoped>

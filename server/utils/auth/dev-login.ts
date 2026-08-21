@@ -115,8 +115,8 @@ function upsertDevIdentity(
   if (!existing) {
     database
       .prepare(`
-        INSERT INTO user_identities (id, user_id, channel, contact, verified_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO user_identities (id, user_id, channel, contact, verified_at, is_primary)
+        VALUES (?, ?, ?, ?, ?, 1)
       `)
       .run(randomUUID(), userId, input.channel, input.contact, now.toISOString())
   }

@@ -542,6 +542,31 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_request_event_attributions_user
         ON request_event_user_attributions (user_id, request_event_id);
     `
+  },
+  {
+    version: '0018_editable_profile_contacts',
+    sql: `
+      ALTER TABLE users ADD COLUMN display_name TEXT;
+      ALTER TABLE user_identities ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1));
+
+      UPDATE user_identities
+      SET is_primary = 1
+      WHERE id IN (
+        SELECT identity.id
+        FROM user_identities AS identity
+        WHERE identity.id = (
+          SELECT oldest.id
+          FROM user_identities AS oldest
+          WHERE oldest.user_id = identity.user_id
+          ORDER BY oldest.verified_at ASC, oldest.id ASC
+          LIMIT 1
+        )
+      );
+
+      CREATE UNIQUE INDEX idx_user_identities_one_primary
+        ON user_identities (user_id)
+        WHERE is_primary = 1;
+    `
   }
 ]
 

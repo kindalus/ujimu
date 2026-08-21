@@ -5,7 +5,7 @@ import {
   readBody,
   setResponseStatus
 } from 'h3'
-import { getPublicSessionUser, OtpDeliveryError, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
+import { getPublicSessionUser, OtpDeliveryError, OtpIdentityConflictError, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
 import { completeLogin } from '../../../utils/auth/login'
 import { readSessionFromEvent } from '../../../utils/auth/session'
 import { initializeDatabase } from '../../../utils/db'
@@ -38,10 +38,9 @@ export default defineEventHandler(async (event) => {
 
     return {
       authenticated: true,
-      user: {
-        id: publicUser.id,
-        displayContact: publicUser.displayContact
-      }
+      authMethod: 'otp' as const,
+      recentOtpAuthenticated: true,
+      user: publicUser
     }
   } catch (error) {
     if (error instanceof OtpRateLimitError) {
@@ -56,6 +55,14 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 400,
         statusMessage: error.message,
+        data: { code: error.code }
+      })
+    }
+
+    if (error instanceof OtpIdentityConflictError) {
+      throw createError({
+        statusCode: 409,
+        message: error.message,
         data: { code: error.code }
       })
     }
