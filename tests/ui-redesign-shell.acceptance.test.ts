@@ -5,6 +5,13 @@ import { describe, expect, it } from 'vitest'
 const drawerComponentPath = 'components/AppDrawer.vue'
 
 describe('UI redesign shell and drawer acceptance', () => {
+  it('uses an 18px root and preserves the app-to-root type scale', async () => {
+    const css = await readFile('assets/css/main.css', 'utf8')
+
+    expect(css).toMatch(/html\s*\{[^}]*font-size:\s*18px/)
+    expect(css).toMatch(/\.app\s*\{[^}]*font-size:\s*0\.9375rem/)
+  })
+
   it('uses the prototype fixed scrim/aside drawer instead of a generic Nuxt UI drawer', async () => {
     expect(existsSync(drawerComponentPath), 'components/AppDrawer.vue must exist for the shared drawer').toBe(true)
     if (!existsSync(drawerComponentPath)) return
