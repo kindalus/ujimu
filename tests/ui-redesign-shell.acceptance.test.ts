@@ -55,7 +55,7 @@ describe('UI redesign shell and drawer acceptance', () => {
     expect(page).toContain('class="quota-pill"')
     expect(page).toContain('/subscription')
     expect(routeChrome).toContain('<AppDrawer')
-    expect(routeChrome).toContain('0/{{ authSession.authenticated ? 20 : 5 }} hoje')
+    expect(routeChrome).toContain('0/{{ authSession.authenticated ? 40 : 10 }} hoje')
     expect(routeChrome).not.toContain('Consulta</span>')
     expect(page).not.toContain('/admin/specialists')
     expect(page).not.toContain('/admin/analytics')

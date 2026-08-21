@@ -33,12 +33,12 @@ import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 describe('quota and request limit acceptance', () => {
   it('resolves the effective policy for anonymous, registered, and subscribed subjects', () => {
     expect(resolveQuotaPolicy({ subjectType: 'anonymous' })).toEqual({
-      dailyLimit: 5,
-      weeklyLimit: 20
+      dailyLimit: 10,
+      weeklyLimit: 40
     })
     expect(resolveQuotaPolicy({ subjectType: 'registered' })).toEqual({
-      dailyLimit: 20,
-      weeklyLimit: 100
+      dailyLimit: 40,
+      weeklyLimit: 200
     })
     expect(resolveQuotaPolicy({ subjectType: 'subscribed' }, { subscribedWeeklyLimit: 7500 })).toEqual({
       dailyLimit: null,
@@ -120,7 +120,7 @@ describe('quota and request limit acceptance', () => {
     const database = await createTempDatabase()
     const now = new Date('2026-05-16T12:00:00.000Z')
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       const decision = evaluateAndRecordQuota(database, {
         subject: { type: 'anonymous', id: 'anon-daily' },
         specialistId: 'iva',
@@ -144,11 +144,11 @@ describe('quota and request limit acceptance', () => {
     expect(denied.error).toMatchObject({
       code: 'QUOTA_EXCEEDED',
       limits: {
-        daily: { limit: 5, used: 5, resetAt: '2026-05-16T23:00:00.000Z' }
+        daily: { limit: 10, used: 10, resetAt: '2026-05-16T23:00:00.000Z' }
       }
     })
     expect(denied.error.limits).not.toHaveProperty('weekly')
-    expect(getRequestEventCount(database)).toBe(6)
+    expect(getRequestEventCount(database)).toBe(11)
     expect(getDeniedEventCount(database)).toBe(1)
     database.close()
   })
@@ -158,7 +158,7 @@ describe('quota and request limit acceptance', () => {
     const subject = { type: 'anonymous' as const, id: 'anon-weekly' }
 
     for (let day = 0; day < 4; day += 1) {
-      for (let request = 0; request < 5; request += 1) {
+      for (let request = 0; request < 10; request += 1) {
         const decision = evaluateAndRecordQuota(database, {
           subject,
           specialistId: 'iva',
@@ -181,8 +181,8 @@ describe('quota and request limit acceptance', () => {
       throw new Error('Expected daily and weekly quotas to be denied')
     }
     expect(denied.error.limits).toEqual({
-      daily: { limit: 5, used: 5, resetAt: '2026-05-14T23:00:00.000Z' },
-      weekly: { limit: 20, used: 20, resetAt: '2026-05-17T23:00:00.000Z' }
+      daily: { limit: 10, used: 10, resetAt: '2026-05-14T23:00:00.000Z' },
+      weekly: { limit: 40, used: 40, resetAt: '2026-05-17T23:00:00.000Z' }
     })
     database.close()
   })
@@ -334,7 +334,7 @@ describe('quota and request limit acceptance', () => {
     const runner = fakeRunner()
     const now = new Date('2026-05-16T12:00:00.000Z')
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       evaluateAndRecordQuota(database, {
         subject: { type: 'anonymous', id: 'anon-chat' },
         specialistId: 'iva',

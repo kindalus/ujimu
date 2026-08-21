@@ -9,6 +9,8 @@ describe('billing and advertising UI acceptance', () => {
     expect(subscriptionPage).toContain('/api/billing/checkout')
     expect(subscriptionPage).toContain('Subscrição')
     expect(subscriptionPage).toContain('50 000,00 AOA')
+    expect(subscriptionPage).toContain('10 pedidos/dia · 40/semana (anónimo)')
+    expect(subscriptionPage).toContain('40 pedidos/dia · 200/semana (com sessão)')
     expect(subscriptionPage).toContain('class="plans plans--three"')
     expect(subscriptionPage).toContain('Subscrever')
     expect(subscriptionPage).not.toContain('class="pay-method"')
