@@ -20,14 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 44 agent-owned conversion and ingestion:
+Latest full verification after Slice 45 llm-wiki-owned specialist AGENTS.md:
 
-- `npm test` — passed, 195 tests
+- `npm test` — passed, 212 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `@earendil-works/pi-coding-agent`, `nuxt`, `vite`, `protobufjs`, `undici`, and `ws`; dependency remediation is outside Slice 44.
+- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `@earendil-works/pi-coding-agent`, `nuxt`, `vite`, `protobufjs`, `undici`, and `ws`; dependency remediation is outside Slice 45.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools browser check — not rerun for Slice 44 because the change is backend/ops pipeline behaviour with no new browser UI surface.
+- Chrome DevTools browser check — not rerun for Slice 45 because the change affects backend specialist initialization and has no browser UI surface.
+- Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
 - Real Pi TXT pipeline smoke test, 2026-05-20 — passed in a non-production temporary data directory using a temporary agent configuration with `openrouter/google/gemini-2.5-flash`: admin specialist creation, TXT upload, Pi conversion, Pi ingestion, and grounded chat with a citation to `raw/lei-smoke.txt`.
@@ -96,11 +97,11 @@ Known non-blocking warnings:
 | 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `verified` | 2026-06-16 | Chat input auto-grows up to five lines, then scrolls internally. |
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
-| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `acceptance-tested` | — | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
+| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
 
 ## Slice 45 — llm-wiki-owned specialist AGENTS.md
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Originating brainstorm and architecture:
 
@@ -130,6 +131,20 @@ Acceptance-test plan:
 Acceptance-test RED:
 
 - `npm test -- tests/specialist-initialization-prompt.acceptance.test.ts tests/specialist-initialization.acceptance.test.ts --reporter=verbose` — failed as expected because the prompt did not explicitly delegate the scaffold to `llm-wiki` and validation accepted missing Ujimu rules.
+
+Implementation:
+
+- Updated the initialization prompt to invoke `llm-wiki`, select the configured preset, choose `AGENTS.md` as schema, and treat the pre-created empty `wiki/` directory as initialization mode.
+- Added the canonical Ujimu consultation block with wiki-only grounding, insufficient-evidence handling, original-title/article citations, internal-path protection, `unslop`, optional NDJSON, and plain-text compatibility.
+- Strengthened output validation to reject any missing mandatory consultation rule while preserving the existing error and rollback path.
+
+Verification:
+
+- Focused RED then GREEN cycle passed, 6 tests.
+- `npm test` — passed, 212 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings.
+- Real Pi initialization smoke test — passed in a temporary workspace with the configured OpenRouter model; the generated files and consultation contract passed backend validation.
 
 ## Slice 44 — Agent-owned conversion and ingestion
 
