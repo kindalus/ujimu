@@ -109,11 +109,11 @@ Known non-blocking warnings:
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
-| 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `grilled` | — | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
+| 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `acceptance-tested` | — | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 
 ## Persistent Pi chat sessions
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -135,6 +135,10 @@ Grill decisions confirmed by the user on 2026-08-21:
 - Use a per-session pending journal to reconcile SQLite and JSONL after failures or restarts.
 - Enforce access expiry exactly at 24 hours/30 days, reconcile at startup, and physically clean expired sessions hourly.
 - Treat permanent branch removal as absence from SQLite and all application-accessible session files; verify with sentinel content.
+
+Acceptance-test RED:
+
+- `npm test -- tests/persistent-pi-chat-sessions.acceptance.test.ts --reporter=verbose` failed because the persistent chat session store did not exist.
 
 ## Account usage, profile, and admin navigation extension
 
