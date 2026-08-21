@@ -103,13 +103,13 @@ Known non-blocking warnings:
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
-| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `planned` | — | Add administrable editorial SEO fields per specialist. |
+| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `grilled` | — | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slice 49 verified; Slices 50–52 planned`
+Status: `Slice 49 verified; Slice 50 grilled; Slices 51–52 planned`
 
 Approved originating decks:
 
@@ -158,6 +158,26 @@ Implementation and verification:
 - Added canonical-site configuration to container environment examples and operational checks to the runbook.
 - Focused tests passed, followed by `npm test` (228 tests), `npm run typecheck`, `npm run build`, `npm audit`, and registry signature verification.
 - Production was redeployed at commit `d304f52`; browser and raw WhatsApp-user-agent checks confirmed metadata in initial HTML, all assets returned 200, Gzip remained active, and the console stayed clean.
+
+## Slice 50 — Specialist editorial SEO
+
+Status: `grilled`
+
+Refinement decisions:
+
+- Add an optional nested `seo` mapping to `specialist.yaml`: `title`, `description`, `introduction`, `topics`, `limitations`, and `call_to_action`.
+- Keep existing specialist files valid without migration; empty editorial values remain absent when YAML is written.
+- Resolve public title and description through fallback to existing `name` and `description`; do not invent fallback text for the other fields.
+- Expose only normalized editorial text in public/admin payloads and never expose prompts or internal paths through the SEO object.
+- Edit the fields on the existing admin specialist detail page; creation may use empty defaults and be completed after initialization.
+
+Grill decisions:
+
+- Limit title to 70 characters, description to 180, introduction to 1,200, limitations to 600, CTA to 160, and at most 12 unique topics of 100 characters each.
+- Trim text, reject non-string values and over-limit content, and normalize missing fields to empty values without rewriting files on load.
+- Serialize the `seo` mapping only when at least one editorial field is non-empty.
+- Audit only `seo` as a changed field; never place editorial content itself in audit metadata.
+- Preserve the current public specialist list contract while adding one `seo` object with safe title/description fallback.
 
 ## Progressive account launch extension
 
