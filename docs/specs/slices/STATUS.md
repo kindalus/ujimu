@@ -108,7 +108,7 @@ Known non-blocking warnings:
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
-| 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `idea-refined` | — | Edit display name and manage verified primary/secondary contacts safely. |
+| 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `grilled` | — | Edit display name and manage verified primary/secondary contacts safely. |
 
 ## Account usage, profile, and admin navigation extension
 
@@ -124,7 +124,7 @@ Planned order:
 1. Slice 54 establishes canonical quota/session state, anonymous-event attribution, and role-aware navigation.
 2. Slice 55 adds the profile data model and verified-contact lifecycle after Slice 54 is fully green.
 
-Slice 55 proposed TDD seams awaiting explicit confirmation:
+Slice 55 TDD seams confirmed by the user on 2026-08-21:
 
 1. `GET/PATCH /api/account/profile` for profile reads and display-name edits.
 2. Authenticated OTP verification for adding a new contact and rejecting contacts owned by another account.
