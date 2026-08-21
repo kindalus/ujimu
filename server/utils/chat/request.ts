@@ -6,11 +6,11 @@ export interface ValidatedChatRequest {
   replaceFromMessageId?: string
 }
 
-export type ChatRequestErrorCode = 'INVALID_CHAT_REQUEST' | 'SPECIALIST_NOT_FOUND' | 'HISTORY_NOT_FOUND'
+export type ChatRequestErrorCode = 'INVALID_CHAT_REQUEST' | 'SPECIALIST_NOT_FOUND' | 'HISTORY_NOT_FOUND' | 'CONVERSATION_BUSY'
 
 export class ChatRequestError extends Error {
   constructor(
-    public readonly statusCode: 400 | 404,
+    public readonly statusCode: 400 | 404 | 409,
     public readonly code: ChatRequestErrorCode,
     message: string
   ) {

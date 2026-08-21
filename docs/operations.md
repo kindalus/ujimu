@@ -140,6 +140,22 @@ Pi sessions enable the default file/shell tools (`read`, `bash`, `edit`, `write`
 
 If production needs a stronger isolation boundary, provide it outside the Pi harness, for example by running the application or tool execution in a container, VM, or equivalent runtime with the intended specialist directory mounted as the workspace.
 
+### Persistent consultation sessions
+
+Consultation context is stored separately from the canonical SQLite history under:
+
+```text
+<UJIMU_DATA_DIR>/pi/chat-sessions/
+  anonymous/<specialist-id>/<session-id>/
+  registered/<specialist-id>/<conversation-id>/
+```
+
+Each conversation directory is private to the application user and contains the active Pi JSONL, non-content metadata, and a temporary recovery journal only while a turn is pending. Treat the whole tree as sensitive because JSONL files contain user questions, generated answers, and tool context. Never expose this directory through Nginx or include its paths in API responses or logs.
+
+Anonymous sessions become inaccessible after 24 hours without a committed turn. Registered sessions become inaccessible after 30 days; their visible SQLite history remains and is used to reconstruct a less rich Pi session when the conversation resumes. Startup reconciliation handles interrupted turns, and an hourly in-process cleanup removes expired directories. Explicit conversation deletion removes its registered JSONL before deleting SQLite history. Specialist deletion removes all anonymous and registered session directories for that specialist.
+
+SQLite remains sufficient for product-history recovery. Backing up the Pi session tree is optional: omitting it loses native tool and compaction context but not registered conversation history. If it is backed up, apply the same access controls as the SQLite backup.
+
 ### Agent-owned conversion during ingestion
 
 The normal source-processing path is now owned by the `llm-wiki` skill inside the ingestion agent session. The agent converts each pending source from `raw/` to `converted/<raw relative path>.md`, then ingests only from `converted/` into the OKF-compliant `wiki/`. Ujimu validates the resulting manifest, converted file paths/hashes, wiki page paths, and citation shape before updating `ingest/state.json`; it does not validate conversion fidelity or source content.

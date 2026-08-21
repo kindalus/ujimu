@@ -13,6 +13,7 @@ export interface CreateUjimuPiSessionOptions {
   cwd: string
   task: PiTaskName
   modelEnvPrefix?: string
+  sessionManager?: any
   agentLog?: {
     dataDir?: string
     specialistId: string
@@ -60,7 +61,7 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     resourceLoader: loader,
     tools: enabledTools,
     customTools,
-    sessionManager: SessionManager.inMemory(options.cwd),
+    sessionManager: options.sessionManager ?? SessionManager.inMemory(options.cwd),
     settingsManager,
     modelRuntime,
     ...(selectedModel ? { model: selectedModel as any } : {})

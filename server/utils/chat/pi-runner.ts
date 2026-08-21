@@ -43,7 +43,8 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   const cwd = input.specialist.paths.root
   const { session } = await createUjimuPiSession({
     cwd,
-    task: 'chat'
+    task: 'chat',
+    ...(input.piSessionManager ? { sessionManager: input.piSessionManager } : {})
   })
 
   const queue = new AsyncEventQueue<ChatRunnerStreamEvent>()

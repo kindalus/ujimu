@@ -115,6 +115,7 @@ type ChatStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
   | { type: 'metrics'; totalTokens?: number }
+  | { type: 'conversation'; conversationId: string }
   | {
       type: 'history'
       conversationId: string
@@ -337,7 +338,11 @@ async function loadBillingStatus(): Promise<void> {
 }
 
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
+  const wasAnonymousConversation = !authSession.value.authenticated && Boolean(activeConversationId.value)
   authSession.value = session
+  if (wasAnonymousConversation && session.authenticated) {
+    startNewConversation()
+  }
   void loadAuthSession()
 }
 
@@ -849,6 +854,11 @@ function handleChatEventLine(
     return
   }
 
+  if (event.type === 'conversation') {
+    activeConversationId.value = event.conversationId
+    return
+  }
+
   if (event.type === 'history') {
     activeConversationId.value = event.conversationId
     activeConversationTitle.value = event.title
@@ -884,7 +894,7 @@ function parseChatEvent(line: string): ChatStreamEvent | undefined {
 
   try {
     const parsed = JSON.parse(line) as ChatStreamEvent
-    if (['status', 'heartbeat', 'delta', 'citation', 'metrics', 'history', 'done', 'error'].includes(parsed.type)) {
+    if (['status', 'heartbeat', 'delta', 'citation', 'metrics', 'conversation', 'history', 'done', 'error'].includes(parsed.type)) {
       return parsed
     }
   } catch {

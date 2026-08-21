@@ -20,12 +20,18 @@ export interface ChatMetricsEvent {
   totalTokens?: number
 }
 
+export interface ChatConversationEvent {
+  type: 'conversation'
+  conversationId: string
+}
+
 export type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
   | ChatMetricsEvent
+  | ChatConversationEvent
   | ChatHistoryEvent
   | { type: 'done'; grounded: boolean }
   | { type: 'error'; code: string; message: string }
@@ -49,6 +55,7 @@ export interface ChatRunnerInput {
   clientTimezone?: string
   citationEvidence: ChatCitation[]
   conversationContext?: ChatConversationContextMessage[]
+  piSessionManager?: any
 }
 
 export interface ChatEngineRun {

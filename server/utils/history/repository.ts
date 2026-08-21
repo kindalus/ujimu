@@ -20,7 +20,10 @@ export interface PersistCompletedHistoryTurnInput {
   specialistId: string
   specialistName: string
   conversationId?: string
+  createConversationIfMissing?: boolean
   replaceFromMessageId?: string
+  userPiEntryId?: string
+  assistantPiEntryId?: string
   question: string
   answer: string
   grounded: boolean
@@ -67,6 +70,10 @@ export interface ConversationContextMessage {
   content: string
 }
 
+export interface PiConversationMessage extends ConversationContextMessage {
+  piEntryId?: string
+}
+
 const DEFAULT_TITLE_TIMEOUT_MS = 5000
 const DEFAULT_HISTORY_LIMIT = 20
 const FIRST_CONTEXT_MESSAGES = 5
@@ -82,7 +89,7 @@ export async function persistCompletedHistoryTurn(
     ? getConversationSummary(database, { userId: input.userId, conversationId: input.conversationId })
     : undefined
 
-  if (input.conversationId && !existingConversation) {
+  if (input.conversationId && !existingConversation && !input.createConversationIfMissing) {
     throw new HistoryRepositoryError('Conversation was not found.', 'HISTORY_NOT_FOUND')
   }
 
@@ -94,7 +101,7 @@ export async function persistCompletedHistoryTurn(
     ? { title: existingConversation.title, titleStatus: existingConversation.titleStatus }
     : await resolveInitialTitle(input)
 
-  const conversationId = existingConversation?.id ?? randomUUID()
+  const conversationId = existingConversation?.id ?? input.conversationId ?? randomUUID()
   const userMessageId = randomUUID()
   const assistantMessageId = randomUUID()
 
@@ -135,6 +142,7 @@ export async function persistCompletedHistoryTurn(
       content: input.question,
       messageOrder: nextOrder,
       grounded: undefined,
+      piEntryId: input.userPiEntryId,
       createdAt: nowIso
     })
     insertMessage(database, {
@@ -144,6 +152,7 @@ export async function persistCompletedHistoryTurn(
       content: input.answer,
       messageOrder: nextOrder + 1,
       grounded: input.grounded,
+      piEntryId: input.assistantPiEntryId,
       createdAt: nowIso
     })
     insertCitations(database, assistantMessageId, input.citations)
@@ -231,6 +240,115 @@ export function deleteConversation(
 
 export function deleteConversationsForSpecialist(database: DatabaseSync, specialistId: string): void {
   database.prepare('DELETE FROM conversations WHERE specialist_id = ?').run(specialistId)
+}
+
+export function listConversationMessagesForPi(
+  database: DatabaseSync,
+  input: { userId: string; conversationId: string; beforeMessageId?: string }
+): PiConversationMessage[] {
+  const summary = getConversationSummary(database, input)
+  if (!summary) return []
+
+  const beforeOrder = input.beforeMessageId
+    ? readMessageOrder(database, { conversationId: summary.id, messageId: input.beforeMessageId })
+    : undefined
+
+  return (database
+    .prepare(`
+      SELECT id, role, content, pi_entry_id
+      FROM conversation_messages
+      WHERE conversation_id = ?
+        AND (? IS NULL OR message_order < ?)
+      ORDER BY message_order ASC
+    `)
+    .all(summary.id, beforeOrder ?? null, beforeOrder ?? null) as Array<{
+      id: string
+      role: HistoryMessageRole
+      content: string
+      pi_entry_id: string | null
+    }>).map((row) => ({
+      id: row.id,
+      role: row.role,
+      content: row.content,
+      ...(row.pi_entry_id ? { piEntryId: row.pi_entry_id } : {})
+    }))
+}
+
+export function getEditableMessagePiEntryId(
+  database: DatabaseSync,
+  input: { userId: string; conversationId: string; messageId: string }
+): string | undefined {
+  const summary = getConversationSummary(database, input)
+  if (!summary) return undefined
+  const row = database
+    .prepare(`
+      SELECT pi_entry_id
+      FROM conversation_messages
+      WHERE conversation_id = ? AND id = ? AND role = 'user'
+      LIMIT 1
+    `)
+    .get(summary.id, input.messageId) as { pi_entry_id: string | null } | undefined
+  return row?.pi_entry_id ?? undefined
+}
+
+export function updateConversationPiEntryMappings(
+  database: DatabaseSync,
+  input: {
+    userId: string
+    conversationId: string
+    mappings: Array<{ messageId: string; piEntryId: string }>
+  }
+): void {
+  const summary = getConversationSummary(database, input)
+  if (!summary) throw new HistoryRepositoryError('Conversation was not found.', 'HISTORY_NOT_FOUND')
+  const update = database.prepare(`
+    UPDATE conversation_messages
+    SET pi_entry_id = ?
+    WHERE id = ? AND conversation_id = ?
+  `)
+  database.exec('BEGIN')
+  try {
+    for (const mapping of input.mappings) {
+      update.run(mapping.piEntryId, mapping.messageId, summary.id)
+    }
+    database.exec('COMMIT')
+  } catch (error) {
+    database.exec('ROLLBACK')
+    throw error
+  }
+}
+
+export function hasConversationPiEntryPair(
+  database: DatabaseSync,
+  input: {
+    userId: string
+    conversationId: string
+    userPiEntryId: string
+    assistantPiEntryId: string
+  }
+): boolean {
+  const summary = getConversationSummary(database, input)
+  return summary
+    ? hasConversationPiEntryPairById(database, { ...input, conversationId: summary.id })
+    : false
+}
+
+export function hasConversationPiEntryPairById(
+  database: DatabaseSync,
+  input: {
+    conversationId: string
+    userPiEntryId: string
+    assistantPiEntryId: string
+  }
+): boolean {
+  const row = database
+    .prepare(`
+      SELECT COUNT(*) AS count
+      FROM conversation_messages
+      WHERE conversation_id = ? AND pi_entry_id IN (?, ?)
+    `)
+    .get(input.conversationId, input.userPiEntryId, input.assistantPiEntryId) as { count: number }
+  return row.count === 2
 }
 
 export function buildConversationContext(
@@ -385,6 +503,7 @@ function insertMessage(
     content: string
     messageOrder: number
     grounded: boolean | undefined
+    piEntryId?: string
     createdAt: string
   }
 ): void {
@@ -397,8 +516,9 @@ function insertMessage(
         content,
         message_order,
         grounded,
+        pi_entry_id,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
       input.id,
@@ -407,6 +527,7 @@ function insertMessage(
       input.content,
       input.messageOrder,
       input.grounded === undefined ? null : input.grounded ? 1 : 0,
+      input.piEntryId ?? null,
       input.createdAt
     )
 }

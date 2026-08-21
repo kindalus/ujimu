@@ -567,6 +567,15 @@ const MIGRATIONS: Migration[] = [
         ON user_identities (user_id)
         WHERE is_primary = 1;
     `
+  },
+  {
+    version: '0019_persistent_pi_chat_sessions',
+    sql: `
+      ALTER TABLE conversation_messages ADD COLUMN pi_entry_id TEXT;
+
+      CREATE INDEX idx_conversation_messages_pi_entry
+        ON conversation_messages (conversation_id, pi_entry_id);
+    `
   }
 ]
 

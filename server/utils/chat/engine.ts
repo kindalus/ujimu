@@ -9,12 +9,23 @@ import { recordQuestionAnalyticsEvent, type QuestionAnalyticsOutcome } from '../
 import {
   buildConversationContext,
   getConversationSummary,
+  getEditableMessagePiEntryId,
+  hasConversationPiEntryPair,
+  listConversationMessagesForPi,
   persistCompletedHistoryTurn,
+  updateConversationPiEntryMappings,
   type ConversationTitleRunner
 } from '../history/repository'
 import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
+import {
+  ChatConversationBusyError,
+  ChatConversationExpiredError,
+  ChatConversationUnauthorizedError,
+  openChatSessionTurn,
+  type ChatSessionTurn
+} from './session-store'
 import {
   ChatRequestError,
   specialistNotFound,
@@ -60,6 +71,10 @@ export interface CreateChatEventStreamOptions extends SpecialistPathOptions {
   quota?: ChatQuotaOptions
   history?: ChatHistoryOptions
   analytics?: ChatAnalyticsOptions
+  persistentChatSessions?: boolean
+  chatSessionDataDir?: string
+  chatSessionSecret?: string
+  chatSessionNow?: Date
 }
 
 export async function createChatEventStreamFromBody(
@@ -97,65 +112,89 @@ export async function createChatEventStreamForSpecialist(
   input: ValidatedChatRequest,
   options: CreateChatEventStreamOptions = {}
 ): Promise<AsyncIterable<ChatStreamEvent>> {
-  if (options.quota) {
-    assertQuotaAllowedWithFallback(options.quota.database, {
-      primary: {
-        subject: options.quota.subject,
-        specialistId: specialist.id,
-        userTimezone: input.clientTimezone,
-        occurredAt: options.quota.occurredAt
-      },
-      fallback: options.quota.fallbackSubject
-        ? {
-            subject: options.quota.fallbackSubject,
-            specialistId: specialist.id,
-            userTimezone: input.clientTimezone,
-            occurredAt: options.quota.occurredAt
-          }
-        : undefined
-    })
-  }
-
   const historyUserId = resolveHistoryUserId(options.history)
-  const conversationContext = historyUserId
-    ? buildRunnerConversationContext(options.history?.database, {
-        userId: historyUserId,
-        conversationId: input.conversationId,
-        beforeMessageId: input.replaceFromMessageId
+  const piChatEnabled = isPiChatEnabled(options.piChatEnabled)
+  const persistentChatSessions = options.persistentChatSessions ?? !options.runner
+  const chatSession = persistentChatSessions && piChatEnabled
+    ? await preparePersistentChatSession(specialist, input, options, historyUserId)
+    : undefined
+
+  try {
+    if (options.quota) {
+      assertQuotaAllowedWithFallback(options.quota.database, {
+        primary: {
+          subject: options.quota.subject,
+          specialistId: specialist.id,
+          userTimezone: input.clientTimezone,
+          occurredAt: options.quota.occurredAt
+        },
+        fallback: options.quota.fallbackSubject
+          ? {
+              subject: options.quota.fallbackSubject,
+              specialistId: specialist.id,
+              userTimezone: input.clientTimezone,
+              occurredAt: options.quota.occurredAt
+            }
+          : undefined
       })
-    : undefined
-  const historyPersistence = historyUserId
-    ? {
-        database: options.history!.database,
+    }
+
+    if (chatSession && historyUserId && chatSession.rehydratedMappings.length > 0) {
+      updateConversationPiEntryMappings(options.history!.database, {
         userId: historyUserId,
-        specialistId: specialist.id,
-        specialistName: specialist.name,
-        conversationId: input.conversationId,
-        replaceFromMessageId: input.replaceFromMessageId,
-        question: input.question,
-        titleRunner: options.history!.titleRunner,
-        titleTimeoutMs: options.history!.titleTimeoutMs,
-        now: options.history!.now
-      }
-    : undefined
+        conversationId: chatSession.internalConversationId,
+        mappings: chatSession.rehydratedMappings
+      })
+    }
 
-  const citationEvidence = await getCitationEvidence(specialist)
+    const conversationContext = !chatSession && historyUserId
+      ? buildRunnerConversationContext(options.history?.database, {
+          userId: historyUserId,
+          conversationId: input.conversationId,
+          beforeMessageId: input.replaceFromMessageId
+        })
+      : undefined
+    const historyPersistence = historyUserId
+      ? {
+          database: options.history!.database,
+          userId: historyUserId,
+          specialistId: specialist.id,
+          specialistName: specialist.name,
+          conversationId: chatSession?.internalConversationId ?? input.conversationId,
+          createConversationIfMissing: Boolean(chatSession && !input.conversationId),
+          replaceFromMessageId: input.replaceFromMessageId,
+          question: input.question,
+          titleRunner: options.history!.titleRunner,
+          titleTimeoutMs: options.history!.titleTimeoutMs,
+          now: options.history!.now
+        }
+      : undefined
 
-  const runner = options.runner ?? createDefaultChatRunner(isPiChatEnabled(options.piChatEnabled))
-  const runnerInput = {
-    specialist,
-    question: input.question,
-    ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
-    citationEvidence,
-    ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {})
+    const citationEvidence = await getCitationEvidence(specialist)
+    await chatSession?.beginTurn()
+
+    const runner = options.runner ?? createDefaultChatRunner(piChatEnabled)
+    const runnerInput = {
+      specialist,
+      question: input.question,
+      ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
+      citationEvidence,
+      ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {}),
+      ...(chatSession ? { piSessionManager: chatSession.manager } : {})
+    }
+
+    return streamChatWithRunner({
+      runner,
+      runnerInput,
+      history: historyPersistence,
+      chatSession,
+      answeredAnalytics: buildAnalyticsPersistence('answered')
+    })
+  } catch (error) {
+    await chatSession?.rollback().catch(() => undefined)
+    chatSession?.release()
+    throw error
   }
-
-  return streamChatWithRunner({
-    runner,
-    runnerInput,
-    history: historyPersistence,
-    answeredAnalytics: buildAnalyticsPersistence('answered')
-  })
 
   function buildAnalyticsPersistence(outcome: QuestionAnalyticsOutcome): StreamAnalyticsPersistence | undefined {
     if (!options.analytics) return undefined
@@ -170,6 +209,63 @@ export async function createChatEventStreamForSpecialist(
       userId: options.analytics.userId,
       now: options.analytics.now
     }
+  }
+}
+
+async function preparePersistentChatSession(
+  specialist: SpecialistRuntime,
+  input: ValidatedChatRequest,
+  options: CreateChatEventStreamOptions,
+  historyUserId: string | undefined
+): Promise<ChatSessionTurn> {
+  const database = options.history?.database
+  const replaceFromPiEntryId = historyUserId && database && input.conversationId && input.replaceFromMessageId
+    ? getEditableMessagePiEntryId(database, {
+        userId: historyUserId,
+        conversationId: input.conversationId,
+        messageId: input.replaceFromMessageId
+      })
+    : undefined
+
+  try {
+    return await openChatSessionTurn({
+      cwd: specialist.paths.root,
+      ...(options.chatSessionDataDir ? { dataDir: options.chatSessionDataDir } : {}),
+      ...(options.chatSessionSecret ? { secret: options.chatSessionSecret } : {}),
+      ...(options.chatSessionNow ? { now: options.chatSessionNow } : {}),
+      specialistId: specialist.id,
+      identity: historyUserId ? { type: 'registered', userId: historyUserId } : { type: 'anonymous' },
+      ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+      ...(replaceFromPiEntryId ? { replaceFromPiEntryId } : {}),
+      ...(input.replaceFromMessageId && !replaceFromPiEntryId ? { reconstructFromHistory: true } : {}),
+      ...(historyUserId && database && input.conversationId
+        ? {
+            loadRehydrationMessages: () => listConversationMessagesForPi(database, {
+              userId: historyUserId,
+              conversationId: input.conversationId!,
+              beforeMessageId: input.replaceFromMessageId
+            })
+          }
+        : {}),
+      ...(historyUserId && database && input.conversationId
+        ? {
+            isPersistedEntryPair: (entryIds: { userPiEntryId: string; assistantPiEntryId: string }) =>
+              hasConversationPiEntryPair(database, {
+                userId: historyUserId,
+                conversationId: input.conversationId!,
+                ...entryIds
+              })
+          }
+        : {})
+    })
+  } catch (error) {
+    if (error instanceof ChatConversationBusyError) {
+      throw new ChatRequestError(409, 'CONVERSATION_BUSY', 'Conversation already has an active request.')
+    }
+    if (error instanceof ChatConversationExpiredError || error instanceof ChatConversationUnauthorizedError) {
+      throw new ChatRequestError(404, 'HISTORY_NOT_FOUND', 'Conversation was not found.')
+    }
+    throw error
   }
 }
 
@@ -227,29 +323,37 @@ function streamChatWithRunner(input: {
   runner: ChatEngineRunner
   runnerInput: Parameters<ChatEngineRunner['run']>[0]
   history?: StreamHistoryPersistence
+  chatSession?: ChatSessionTurn
   answeredAnalytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   return (async function* () {
-    const result = await input.runner.run(input.runnerInput)
+    try {
+      const result = await input.runner.run(input.runnerInput)
 
-    if (result.events) {
-      yield* streamRunnerEventResult({
-        events: result.events,
+      if (result.events) {
+        yield* streamRunnerEventResult({
+          events: result.events,
+          history: input.history,
+          chatSession: input.chatSession,
+          answeredAnalytics: input.answeredAnalytics
+        })
+        return
+      }
+
+      const citations = normalizeCitations(result.citations)
+
+      yield* streamRunnerResult({
+        grounded: result.grounded,
+        citations: result.grounded ? citations : [],
+        deltas: result.deltas,
         history: input.history,
-        answeredAnalytics: input.answeredAnalytics
+        chatSession: input.chatSession,
+        analytics: result.grounded ? input.answeredAnalytics : undefined
       })
-      return
+    } finally {
+      await input.chatSession?.rollback().catch(() => undefined)
+      input.chatSession?.release()
     }
-
-    const citations = normalizeCitations(result.citations)
-
-    yield* streamRunnerResult({
-      grounded: result.grounded,
-      citations: result.grounded ? citations : [],
-      deltas: result.deltas,
-      history: input.history,
-      analytics: result.grounded ? input.answeredAnalytics : undefined
-    })
   })()
 }
 
@@ -259,6 +363,7 @@ interface StreamHistoryPersistence {
   specialistId: string
   specialistName: string
   conversationId?: string
+  createConversationIfMissing?: boolean
   replaceFromMessageId?: string
   question: string
   titleRunner?: ConversationTitleRunner
@@ -280,6 +385,7 @@ interface StreamAnalyticsPersistence {
 async function* streamRunnerEventResult(input: {
   events: AsyncIterable<ChatRunnerStreamEvent>
   history?: StreamHistoryPersistence
+  chatSession?: ChatSessionTurn
   answeredAnalytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
@@ -332,6 +438,7 @@ async function* streamRunnerEventResult(input: {
       citations: grounded ? citations : [],
       ...(totalTokens ? { totalTokens } : {}),
       history: input.history,
+      chatSession: input.chatSession,
       analytics: grounded ? input.answeredAnalytics : undefined
     })
   } catch {
@@ -380,6 +487,7 @@ async function* streamRunnerResult(input: {
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
   history?: StreamHistoryPersistence
+  chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
@@ -397,6 +505,7 @@ async function* streamRunnerResult(input: {
       grounded: input.grounded,
       citations: input.citations,
       history: input.history,
+      chatSession: input.chatSession,
       analytics: input.analytics
     })
   } catch {
@@ -411,6 +520,7 @@ async function* completeStreamResult(input: {
   citations: ChatCitation[]
   totalTokens?: number
   history?: StreamHistoryPersistence
+  chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
@@ -418,6 +528,9 @@ async function* completeStreamResult(input: {
   }
 
   let persisted: Awaited<ReturnType<typeof persistCompletedHistoryTurn>> | undefined
+  const piEntryIds = input.chatSession
+    ? await input.chatSession.captureCompletedEntryIds({ now: input.history?.now })
+    : undefined
 
   if (input.history) {
     persisted = await persistCompletedHistoryTurn(input.history.database, {
@@ -425,7 +538,12 @@ async function* completeStreamResult(input: {
       specialistId: input.history.specialistId,
       specialistName: input.history.specialistName,
       ...(input.history.conversationId ? { conversationId: input.history.conversationId } : {}),
+      ...(input.history.createConversationIfMissing ? { createConversationIfMissing: true } : {}),
       ...(input.history.replaceFromMessageId ? { replaceFromMessageId: input.history.replaceFromMessageId } : {}),
+      ...(piEntryIds ? {
+        userPiEntryId: piEntryIds.userPiEntryId,
+        assistantPiEntryId: piEntryIds.assistantPiEntryId
+      } : {}),
       question: input.history.question,
       answer: input.answer,
       grounded: input.grounded,
@@ -434,7 +552,13 @@ async function* completeStreamResult(input: {
       ...(input.history.titleRunner ? { titleRunner: input.history.titleRunner } : {}),
       ...(input.history.titleTimeoutMs !== undefined ? { titleTimeoutMs: input.history.titleTimeoutMs } : {})
     })
+  }
 
+  const sessionCommit = input.chatSession
+    ? await input.chatSession.commit({ now: input.history?.now })
+    : undefined
+
+  if (persisted) {
     yield {
       type: 'history',
       conversationId: persisted.conversationId,
@@ -443,6 +567,10 @@ async function* completeStreamResult(input: {
       title: persisted.title,
       titleStatus: persisted.titleStatus
     }
+  }
+
+  if (sessionCommit) {
+    yield { type: 'conversation', conversationId: sessionCommit.conversationId }
   }
 
   if (input.analytics) {

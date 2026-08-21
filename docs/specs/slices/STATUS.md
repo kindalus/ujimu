@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 53 Twilio Verify SMS OTP:
+Latest full verification after Slice 56 persistent Pi chat sessions:
 
-- `npm test` — passed, 245 tests
+- `npm test` — passed, 269 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
@@ -109,11 +109,11 @@ Known non-blocking warnings:
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
-| 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `acceptance-tested` | — | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
+| 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 
 ## Persistent Pi chat sessions
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Approved originating decks:
 
@@ -139,6 +139,15 @@ Grill decisions confirmed by the user on 2026-08-21:
 Acceptance-test RED:
 
 - `npm test -- tests/persistent-pi-chat-sessions.acceptance.test.ts --reporter=verbose` failed because the persistent chat session store did not exist.
+
+Implementation and verification:
+
+- Added one private Pi JSONL directory per anonymous or registered conversation, signed anonymous authority, process-local concurrency rejection, append-only checkpoints, pending journals, startup reconciliation, exact access expiry, and hourly cleanup.
+- Added migration `0019_persistent_pi_chat_sessions`, SQLite-to-Pi entry mappings, live Pi branching for edits, SQLite reconstruction after expiry, and coordinated conversation/specialist deletion.
+- Added the common NDJSON `conversation` event and kept anonymous identifiers only in page memory; authentication starts a fresh consultation instead of crossing identity boundaries.
+- `npm test` passed 269 tests; typecheck, production build, dependency audit, and signature audit passed.
+- Real Pi smoke verification passed with the configured OpenRouter model: three related anonymous questions shared one JSONL across a server restart, with one session file and preserved tool context.
+- Chrome DevTools verification passed: the second browser request contained the signed conversation identifier, the response used the prior answer, both requests returned 200, and the console had no errors or warnings.
 
 ## Account usage, profile, and admin navigation extension
 

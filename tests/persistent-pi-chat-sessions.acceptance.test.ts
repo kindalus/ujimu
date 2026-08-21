@@ -3,6 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdtemp } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
+import { createChatEventStreamForSpecialist } from '../server/utils/chat/engine'
+import type { ChatEngineRunner, ChatStreamEvent } from '../server/utils/chat/types'
+import { initializeDatabase } from '../server/utils/db'
+import type { SpecialistRuntime } from '../server/utils/specialists/schema'
 import {
   ChatConversationBusyError,
   ChatConversationExpiredError,
@@ -10,6 +14,7 @@ import {
   cleanupExpiredChatSessions,
   deleteChatSession,
   openChatSessionTurn,
+  reconcilePendingChatSessions,
   resolveChatSessionDirectory
 } from '../server/utils/chat/session-store'
 
@@ -18,6 +23,192 @@ const SPECIALIST_ID = 'iva'
 const BASE_TIME = new Date('2026-08-21T10:00:00.000Z')
 
 describe('persistent Pi chat sessions acceptance', () => {
+  it('emits a committed anonymous conversation identifier and uses it on the next HTTP stream', async () => {
+    const fixture = await createFixture()
+    const contexts: string[] = []
+    const specialist = testSpecialist(fixture.specialistDir)
+    const runner = persistentFakeRunner(contexts)
+
+    const firstEvents = await collectEvents(await createChatEventStreamForSpecialist(
+      specialist,
+      { specialistId: SPECIALIST_ID, question: 'primeira pergunta' },
+      {
+        runner,
+        piChatEnabled: true,
+        persistentChatSessions: true,
+        chatSessionDataDir: fixture.dataDir,
+        chatSessionSecret: SECRET,
+        chatSessionNow: BASE_TIME
+      }
+    ))
+    const conversation = firstEvents.find((event) => event.type === 'conversation')
+    expect(firstEvents.map((event) => event.type)).toEqual(['delta', 'conversation', 'done'])
+    expect(conversation).toMatchObject({ type: 'conversation', conversationId: expect.any(String) })
+
+    const conversationId = conversation && conversation.type === 'conversation' ? conversation.conversationId : ''
+    const secondEvents = await collectEvents(await createChatEventStreamForSpecialist(
+      specialist,
+      { specialistId: SPECIALIST_ID, question: 'segunda pergunta', conversationId },
+      {
+        runner,
+        piChatEnabled: true,
+        persistentChatSessions: true,
+        chatSessionDataDir: fixture.dataDir,
+        chatSessionSecret: SECRET,
+        chatSessionNow: new Date(BASE_TIME.getTime() + 1_000)
+      }
+    ))
+
+    expect(secondEvents.map((event) => event.type)).toEqual(['delta', 'conversation', 'done'])
+    expect(contexts[1]).toContain('primeira pergunta')
+    expect(contexts[1]).toContain('resposta: primeira pergunta')
+  })
+
+  it('persists registered Pi entry mappings before emitting history and conversation events', async () => {
+    const fixture = await createFixture()
+    const database = await initializeDatabase({ dbPath: join(fixture.dataDir, 'db', 'ujimu.sqlite') })
+    database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('user-a', BASE_TIME.toISOString())
+    const contexts: string[] = []
+    const runner = persistentFakeRunner(contexts)
+
+    try {
+      const firstEvents = await collectEvents(await createChatEventStreamForSpecialist(
+        testSpecialist(fixture.specialistDir),
+        { specialistId: SPECIALIST_ID, question: 'pergunta registada' },
+        {
+          runner,
+          piChatEnabled: true,
+          persistentChatSessions: true,
+          chatSessionDataDir: fixture.dataDir,
+          chatSessionSecret: SECRET,
+          chatSessionNow: BASE_TIME,
+          history: { database, subject: { type: 'registered', id: 'user-a' }, now: BASE_TIME }
+        }
+      ))
+
+      expect(firstEvents.map((event) => event.type)).toEqual(['delta', 'history', 'conversation', 'done'])
+      const history = firstEvents.find((event) => event.type === 'history')
+      const conversation = firstEvents.find((event) => event.type === 'conversation')
+      expect(history && history.type === 'history' ? history.conversationId : '').toBe(
+        conversation && conversation.type === 'conversation' ? conversation.conversationId : 'missing'
+      )
+      expect(database.prepare(`
+        SELECT role, pi_entry_id
+        FROM conversation_messages
+        ORDER BY message_order
+      `).all()).toEqual([
+        { role: 'user', pi_entry_id: expect.any(String) },
+        { role: 'assistant', pi_entry_id: expect.any(String) }
+      ])
+    } finally {
+      database.close()
+    }
+  })
+
+  it('edits a live registered session through its Pi branch and removes the replaced continuation', async () => {
+    const fixture = await createFixture()
+    const database = await initializeDatabase({ dbPath: join(fixture.dataDir, 'db', 'ujimu.sqlite') })
+    database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('user-a', BASE_TIME.toISOString())
+    const specialist = testSpecialist(fixture.specialistDir)
+    const runner = persistentFakeRunner([])
+    const common = {
+      runner,
+      piChatEnabled: true,
+      persistentChatSessions: true,
+      chatSessionDataDir: fixture.dataDir,
+      chatSessionSecret: SECRET
+    }
+
+    try {
+      const first = await collectEvents(await createChatEventStreamForSpecialist(
+        specialist,
+        { specialistId: SPECIALIST_ID, question: 'pergunta mantida' },
+        { ...common, history: { database, subject: { type: 'registered', id: 'user-a' }, now: BASE_TIME } }
+      ))
+      const firstHistory = first.find((event) => event.type === 'history')
+      const conversationId = firstHistory && firstHistory.type === 'history' ? firstHistory.conversationId : ''
+
+      const second = await collectEvents(await createChatEventStreamForSpecialist(
+        specialist,
+        { specialistId: SPECIALIST_ID, question: 'SENTINELA_CONTINUACAO_SUBSTITUIDA', conversationId },
+        { ...common, history: { database, subject: { type: 'registered', id: 'user-a' }, now: new Date(BASE_TIME.getTime() + 1_000) } }
+      ))
+      const secondHistory = second.find((event) => event.type === 'history')
+      const replaceFromMessageId = secondHistory && secondHistory.type === 'history' ? secondHistory.userMessageId : ''
+
+      await collectEvents(await createChatEventStreamForSpecialist(
+        specialist,
+        {
+          specialistId: SPECIALIST_ID,
+          question: 'pergunta corrigida',
+          conversationId,
+          replaceFromMessageId
+        },
+        { ...common, history: { database, subject: { type: 'registered', id: 'user-a' }, now: new Date(BASE_TIME.getTime() + 2_000) } }
+      ))
+
+      const databaseText = JSON.stringify(database.prepare(`
+        SELECT content FROM conversation_messages WHERE conversation_id = ? ORDER BY message_order
+      `).all(conversationId))
+      const sessionText = await readDirectoryText(resolveChatSessionDirectory({
+        dataDir: fixture.dataDir,
+        identityType: 'registered',
+        specialistId: SPECIALIST_ID,
+        internalConversationId: conversationId
+      }))
+      expect(databaseText).toContain('pergunta mantida')
+      expect(databaseText).toContain('pergunta corrigida')
+      expect(databaseText).not.toContain('SENTINELA_CONTINUACAO_SUBSTITUIDA')
+      expect(sessionText).not.toContain('SENTINELA_CONTINUACAO_SUBSTITUIDA')
+    } finally {
+      database.close()
+    }
+  })
+
+  it('rejects a concurrent HTTP turn before consuming a second quota event', async () => {
+    const fixture = await createFixture()
+    const database = await initializeDatabase({ dbPath: join(fixture.dataDir, 'db', 'ujimu.sqlite') })
+    database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('user-a', BASE_TIME.toISOString())
+    const specialist = testSpecialist(fixture.specialistDir)
+    const runner = persistentFakeRunner([])
+    const base = {
+      runner,
+      piChatEnabled: true,
+      persistentChatSessions: true,
+      chatSessionDataDir: fixture.dataDir,
+      chatSessionSecret: SECRET,
+      history: { database, subject: { type: 'registered' as const, id: 'user-a' }, now: BASE_TIME }
+    }
+
+    try {
+      const initial = await collectEvents(await createChatEventStreamForSpecialist(
+        specialist,
+        { specialistId: SPECIALIST_ID, question: 'inicial' },
+        base
+      ))
+      const history = initial.find((event) => event.type === 'history')
+      const conversationId = history && history.type === 'history' ? history.conversationId : ''
+      const first = await createChatEventStreamForSpecialist(
+        specialist,
+        { specialistId: SPECIALIST_ID, question: 'pedido aceite', conversationId, clientTimezone: 'UTC' },
+        { ...base, quota: { database, subject: { type: 'registered', id: 'user-a' }, occurredAt: BASE_TIME } }
+      )
+
+      await expect(createChatEventStreamForSpecialist(
+        specialist,
+        { specialistId: SPECIALIST_ID, question: 'pedido concorrente', conversationId, clientTimezone: 'UTC' },
+        { ...base, quota: { database, subject: { type: 'registered', id: 'user-a' }, occurredAt: BASE_TIME } }
+      )).rejects.toMatchObject({ statusCode: 409, code: 'CONVERSATION_BUSY' })
+
+      expect(database.prepare(`
+        SELECT COUNT(*) AS count FROM request_events WHERE subject_id = 'user-a'
+      `).get()).toMatchObject({ count: 1 })
+      await collectEvents(first)
+    } finally {
+      database.close()
+    }
+  })
+
   it('continues one anonymous Pi session with an opaque signed identifier', async () => {
     const fixture = await createFixture()
     const first = await openChatSessionTurn({
@@ -115,6 +306,70 @@ describe('persistent Pi chat sessions acceptance', () => {
     first.release()
   })
 
+  it('reconciles a pending journal after restart from the SQLite entry-pair decision', async () => {
+    const fixture = await createFixture()
+    const pending = await openChatSessionTurn({
+      dataDir: fixture.dataDir,
+      cwd: fixture.specialistDir,
+      specialistId: SPECIALIST_ID,
+      identity: { type: 'registered', userId: 'user-a' },
+      conversationId: 'conversation-a',
+      now: BASE_TIME,
+      secret: SECRET
+    })
+    await pending.beginTurn()
+    const ids = appendPiTurn(pending.manager, 'turno confirmado no SQLite', 'resposta confirmada no SQLite')
+    await pending.captureCompletedEntryIds({ now: BASE_TIME })
+    pending.release()
+
+    await expect(reconcilePendingChatSessions({
+      dataDir: fixture.dataDir,
+      isPersistedEntryPair: (candidate) => candidate.userPiEntryId === ids.userPiEntryId
+        && candidate.assistantPiEntryId === ids.assistantPiEntryId
+    })).resolves.toEqual({ reconciled: 1 })
+
+    const recovered = await openChatSessionTurn({
+      dataDir: fixture.dataDir,
+      cwd: fixture.specialistDir,
+      specialistId: SPECIALIST_ID,
+      identity: { type: 'registered', userId: 'user-a' },
+      conversationId: 'conversation-a',
+      now: new Date(BASE_TIME.getTime() + 1_000),
+      secret: SECRET
+    })
+    expect(JSON.stringify(recovered.manager.buildSessionContext())).toContain('turno confirmado no SQLite')
+    await recovered.rollback()
+    recovered.release()
+
+    const abandoned = await openChatSessionTurn({
+      dataDir: fixture.dataDir,
+      cwd: fixture.specialistDir,
+      specialistId: SPECIALIST_ID,
+      identity: { type: 'registered', userId: 'user-a' },
+      conversationId: 'conversation-a',
+      now: new Date(BASE_TIME.getTime() + 2_000),
+      secret: SECRET
+    })
+    await abandoned.beginTurn()
+    appendPiTurn(abandoned.manager, 'SENTINELA_JORNAL_SEM_SQLITE', 'deve reverter')
+    await abandoned.captureCompletedEntryIds()
+    abandoned.release()
+
+    const rolledBack = await openChatSessionTurn({
+      dataDir: fixture.dataDir,
+      cwd: fixture.specialistDir,
+      specialistId: SPECIALIST_ID,
+      identity: { type: 'registered', userId: 'user-a' },
+      conversationId: 'conversation-a',
+      now: new Date(BASE_TIME.getTime() + 3_000),
+      secret: SECRET,
+      isPersistedEntryPair: () => false
+    })
+    expect(JSON.stringify(rolledBack.manager.buildSessionContext())).not.toContain('SENTINELA_JORNAL_SEM_SQLITE')
+    await rolledBack.rollback()
+    rolledBack.release()
+  })
+
   it('rolls back an incomplete append-only turn to its checkpoint', async () => {
     const fixture = await createFixture()
     const initial = await openChatSessionTurn({
@@ -170,7 +425,7 @@ describe('persistent Pi chat sessions acceptance', () => {
       secret: SECRET
     })).rejects.toBeInstanceOf(ChatConversationExpiredError)
 
-    await expect(openChatSessionTurn({
+    const resumed = await openChatSessionTurn({
       dataDir: fixture.dataDir,
       cwd: fixture.specialistDir,
       specialistId: SPECIALIST_ID,
@@ -182,7 +437,31 @@ describe('persistent Pi chat sessions acceptance', () => {
         { id: 'message-1', role: 'user', content: 'histórico SQLite' },
         { id: 'message-2', role: 'assistant', content: 'resposta SQLite' }
       ]
-    })).resolves.toMatchObject({ reconstructed: true })
+    })
+    expect(resumed.reconstructed).toBe(true)
+    expect(JSON.stringify(resumed.manager.buildSessionContext())).toContain('histórico SQLite')
+    await resumed.beginTurn()
+    appendPiTurn(resumed.manager, 'SENTINELA_FALHA_APOS_RECONSTRUCAO', 'não deve persistir')
+    await resumed.rollback()
+    resumed.release()
+
+    const reconstructedAgain = await openChatSessionTurn({
+      dataDir: fixture.dataDir,
+      cwd: fixture.specialistDir,
+      specialistId: SPECIALIST_ID,
+      identity: { type: 'registered', userId: 'user-a' },
+      conversationId: registered.conversationId,
+      now: new Date(BASE_TIME.getTime() + 30 * 24 * 60 * 60 * 1000 + 1_000),
+      secret: SECRET,
+      rehydrationMessages: [
+        { id: 'message-1', role: 'user', content: 'histórico SQLite' },
+        { id: 'message-2', role: 'assistant', content: 'resposta SQLite' }
+      ]
+    })
+    expect(JSON.stringify(reconstructedAgain.manager.buildSessionContext())).toContain('histórico SQLite')
+    expect(JSON.stringify(reconstructedAgain.manager.buildSessionContext())).not.toContain('SENTINELA_FALHA_APOS_RECONSTRUCAO')
+    await reconstructedAgain.rollback()
+    reconstructedAgain.release()
 
     const cleanup = await cleanupExpiredChatSessions({
       dataDir: fixture.dataDir,
@@ -335,6 +614,50 @@ async function committedTurn(
   const internalConversationId = turn.internalConversationId
   turn.release()
   return { conversationId: committed.conversationId, internalConversationId }
+}
+
+function testSpecialist(root: string): SpecialistRuntime {
+  return {
+    id: SPECIALIST_ID,
+    name: 'IVA',
+    description: 'IVA',
+    wiki_type: 'legislation-regulatory',
+    system_prompt: '',
+    citations_required: true,
+    streaming_enabled: true,
+    status: 'active',
+    company_id: null,
+    seo: { title: '', description: '', introduction: '', topics: [], limitations: '', call_to_action: '' },
+    paths: {
+      root,
+      config: join(root, 'specialist.yaml'),
+      raw: join(root, 'raw'),
+      converted: join(root, 'converted'),
+      wiki: join(root, 'wiki'),
+      ingest: join(root, 'ingest'),
+      ingestState: join(root, 'ingest', 'state.json')
+    }
+  }
+}
+
+function persistentFakeRunner(contexts: string[]): ChatEngineRunner {
+  return {
+    async run(input) {
+      contexts.push(JSON.stringify(input.piSessionManager?.buildSessionContext() ?? {}))
+      appendPiTurn(input.piSessionManager, input.question, `resposta: ${input.question}`)
+      return {
+        grounded: true,
+        citations: [],
+        deltas: (async function* () { yield `resposta: ${input.question}` })()
+      }
+    }
+  }
+}
+
+async function collectEvents(stream: AsyncIterable<ChatStreamEvent>): Promise<ChatStreamEvent[]> {
+  const events: ChatStreamEvent[] = []
+  for await (const event of stream) events.push(event)
+  return events
 }
 
 async function readDirectoryText(directory: string): Promise<string> {
