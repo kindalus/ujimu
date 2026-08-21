@@ -102,6 +102,39 @@ Known non-blocking warnings:
 | 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
+| 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `idea-refined` | — | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
+| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `planned` | — | Add administrable editorial SEO fields per specialist. |
+| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
+| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
+
+## SEO and performance launch extension
+
+Status: `idea-refined`
+
+Approved originating decks:
+
+- [`../brainstorm-seo-performance-launch.html`](../brainstorm-seo-performance-launch.html)
+- [`../seo-performance-launch-architecture.html`](../seo-performance-launch-architecture.html)
+
+Planned order:
+
+1. Slice 49 fixes the already-public site's identity and social sharing immediately.
+2. Slice 50 adds approved editorial metadata to specialist configuration and administration.
+3. Slice 51 publishes SSR specialist pages and expands the sitemap safely.
+4. Slice 52 measures production loading and keeps only demonstrated improvements.
+
+## Slice 49 — Public SEO identity
+
+Status: `idea-refined`
+
+Refinement decisions:
+
+- Use Nuxt and Nitro native APIs without adding an SEO package.
+- Render the approved title, description, canonical, Open Graph, Twitter Cards, language, and basic JSON-LD in server HTML.
+- Create an original 1200 × 630 social image, favicon, Apple icon, and web manifest in the existing black, white, and Angola-yellow identity.
+- Publish `robots.txt` and an initial home-only sitemap; specialist URLs arrive in Slice 51.
+- Apply `noindex` headers to private, operational, and API routes.
+- Treat the rendered HTTP response as the acceptance seam for browser and WhatsApp behaviour.
 
 ## Progressive account launch extension
 
