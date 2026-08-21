@@ -329,6 +329,92 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
     expect(events).toContainEqual({ type: 'delta', text: 'O Artigo 1.º define o âmbito.' })
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
   })
+
+  it('does not duplicate an answer emitted as plain text and structured deltas', async () => {
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async () => {
+          subscriber?.({
+            type: 'message_update',
+            assistantMessageEvent: {
+              type: 'text_delta',
+              delta: [
+                'O limite semanal normal de trabalho é de 44 horas.',
+                JSON.stringify({
+                  type: 'citations',
+                  citations: [{ sourceTitle: 'Lei Geral do Trabalho', sourceFile: 'raw/lei.md', articleRefs: ['Artigo 148.º'] }]
+                }),
+                JSON.stringify({ type: 'delta', text: 'O limite semanal normal de trabalho é de 44 horas.' })
+              ].join('\n')
+            }
+          })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => {
+            subscriber = undefined
+          }
+        }),
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiChatRunner } = await import('../server/utils/chat/pi-runner')
+    const run = await createPiChatRunner().run({
+      specialist: specialistRuntimeFixture(),
+      question: 'Qual é o limite semanal normal de trabalho?',
+      citationEvidence: citationEvidenceFixture()
+    })
+    const events = await collectRunnerEvents(run.events!)
+
+    expect(joinDeltas(events).trim()).toBe('O limite semanal normal de trabalho é de 44 horas.')
+    expect(events.filter((event) => (event as { type?: unknown })?.type === 'citation')).toHaveLength(1)
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+  })
+
+  it('fails without exposing the user prompt when the Pi assistant ends with an error', async () => {
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async (prompt: string) => {
+          const userMessage = { role: 'user', content: [{ type: 'text', text: prompt }] }
+          const assistantMessage = {
+            role: 'assistant',
+            content: [],
+            stopReason: 'error',
+            errorMessage: 'Provider request failed.'
+          }
+          subscriber?.({ type: 'message_end', message: userMessage })
+          subscriber?.({ type: 'message_end', message: assistantMessage })
+          subscriber?.({ type: 'agent_end', messages: [userMessage, assistantMessage] })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => {
+            subscriber = undefined
+          }
+        }),
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiChatRunner } = await import('../server/utils/chat/pi-runner')
+    const run = await createPiChatRunner().run({
+      specialist: specialistRuntimeFixture(),
+      question: 'Pergunta que não pode ser exposta como resposta.',
+      citationEvidence: citationEvidenceFixture()
+    })
+    const iterator = run.events![Symbol.asyncIterator]()
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'status', message: 'A consultar as fontes desta especialidade…' },
+      done: false
+    })
+    await expect(iterator.next()).rejects.toThrow('Provider request failed.')
+  })
 })
 
 function specialistRuntimeFixture(options: { citationsRequired?: boolean; root?: string } = {}): SpecialistRuntime {

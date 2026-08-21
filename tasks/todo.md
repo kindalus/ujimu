@@ -67,4 +67,4 @@
 - [x] Build passes.
 - [x] Final code-quality review passes.
 
-The complete suite has 206 passing tests and three known, unrelated failures because test subscriptions expired on 2026-08-16.
+The complete suite has 212 passing tests after extending active test subscriptions through 2026-12-12 and adding chat-stream regression coverage.

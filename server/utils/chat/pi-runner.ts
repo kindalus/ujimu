@@ -53,6 +53,7 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   let promptFinished = false
   let sawTerminalEvent = false
   let emittedAssistantOutput = false
+  let assistantFailure: Error | undefined
   let pendingDoneEvent: Extract<ChatRunnerStreamEvent, { type: 'done' }> | undefined
 
   const parser = createPiOutputParser((event) => {
@@ -87,12 +88,15 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
     }
 
     if (event?.type === 'message_end') {
+      if (event.message?.role !== 'assistant') return
+      assistantFailure = extractAssistantFailure(event.message)
       finalAssistantText = extractAssistantText(event.message) || finalAssistantText
       finalTotalTokens = extractTotalTokens(event.message) ?? finalTotalTokens
       return
     }
 
     if (event?.type === 'agent_end') {
+      assistantFailure = extractLatestAssistantFailure(event.messages)
       finalAssistantText = extractLatestAssistantText(event.messages) || finalAssistantText
       finalTotalTokens = extractLatestAssistantTotalTokens(event.messages) ?? finalTotalTokens
     }
@@ -100,6 +104,8 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
 
   void session.prompt(buildChatPrompt(input))
     .then(() => {
+      if (assistantFailure) throw assistantFailure
+
       if (!rawAssistantText && finalAssistantText) {
         parser.push(finalAssistantText)
       }
@@ -207,6 +213,24 @@ function createPiOutputParser(enqueue: (event: ChatRunnerStreamEvent) => void): 
   flush(): void
 } {
   let buffer = ''
+  let textMode: 'plain' | 'structured' | undefined
+  let primaryText = ''
+  let deferredText = ''
+
+  const enqueueText = (mode: 'plain' | 'structured', text: string) => {
+    if (!textMode) {
+      if (!text.trim()) return
+      textMode = mode
+    }
+
+    if (mode === textMode) {
+      primaryText += text
+      enqueue({ type: 'delta', text })
+      return
+    }
+
+    deferredText += text
+  }
 
   return {
     push(chunk: string) {
@@ -214,29 +238,40 @@ function createPiOutputParser(enqueue: (event: ChatRunnerStreamEvent) => void): 
       const lines = buffer.split(/\r?\n/u)
       buffer = lines.pop() ?? ''
       for (const line of lines) {
-        parsePiOutputLine(line, true, enqueue)
+        parsePiOutputLine(line, true, enqueue, enqueueText)
       }
     },
     flush() {
       if (buffer.length > 0) {
-        parsePiOutputLine(buffer, false, enqueue)
+        parsePiOutputLine(buffer, false, enqueue, enqueueText)
+      }
+      if (
+        deferredText.trim() &&
+        normalizeOutputText(deferredText) !== normalizeOutputText(primaryText)
+      ) {
+        enqueue({ type: 'delta', text: deferredText })
       }
       buffer = ''
     }
   }
 }
 
-function parsePiOutputLine(line: string, hadTrailingNewline: boolean, enqueue: (event: ChatRunnerStreamEvent) => void): void {
+function parsePiOutputLine(
+  line: string,
+  hadTrailingNewline: boolean,
+  enqueue: (event: ChatRunnerStreamEvent) => void,
+  enqueueText: (mode: 'plain' | 'structured', text: string) => void
+): void {
   const trimmed = line.trim()
   if (!trimmed) {
-    if (hadTrailingNewline || line.length > 0) enqueue({ type: 'delta', text: hadTrailingNewline ? `${line}\n` : line })
+    if (hadTrailingNewline || line.length > 0) enqueueText('plain', hadTrailingNewline ? `${line}\n` : line)
     return
   }
 
   const event = parseJsonLine(trimmed)
   if (!event || typeof event !== 'object') {
     if (/^[\[{]/u.test(trimmed)) return
-    enqueue({ type: 'delta', text: hadTrailingNewline ? `${line}\n` : line })
+    enqueueText('plain', hadTrailingNewline ? `${line}\n` : line)
     return
   }
 
@@ -253,7 +288,7 @@ function parsePiOutputLine(line: string, hadTrailingNewline: boolean, enqueue: (
   }
 
   if (event.type === 'delta' && typeof event.text === 'string') {
-    enqueue({ type: 'delta', text: event.text })
+    enqueueText('structured', event.text)
     return
   }
 
@@ -270,6 +305,10 @@ function parsePiOutputLine(line: string, hadTrailingNewline: boolean, enqueue: (
   if (event.type === 'done') {
     enqueue({ type: 'done', grounded: event.grounded !== false })
   }
+}
+
+function normalizeOutputText(text: string): string {
+  return text.trim().replace(/\s+/gu, ' ')
 }
 
 export function buildChatPrompt(input: ChatRunnerInput): string {
@@ -344,6 +383,24 @@ function extractLatestAssistantText(messages: unknown): string {
   }
 
   return ''
+}
+
+function extractAssistantFailure(message: unknown): Error | undefined {
+  const assistant = message as { role?: unknown; stopReason?: unknown; errorMessage?: unknown }
+  if (assistant?.role !== 'assistant' || assistant.stopReason !== 'error') return undefined
+  return new Error(typeof assistant.errorMessage === 'string' ? assistant.errorMessage : 'Pi assistant failed.')
+}
+
+function extractLatestAssistantFailure(messages: unknown): Error | undefined {
+  if (!Array.isArray(messages)) return undefined
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if ((messages[index] as { role?: unknown })?.role === 'assistant') {
+      return extractAssistantFailure(messages[index])
+    }
+  }
+
+  return undefined
 }
 
 function extractTotalTokens(message: unknown): number | undefined {

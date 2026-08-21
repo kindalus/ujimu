@@ -8,4 +8,4 @@
 - [x] Run 15 focused tests, typecheck, and build.
 - [x] Repeat the DeepSeek specialist consultation and verify an `unslop/SKILL.md` read.
 
-The complete suite has 207 passing tests and three known, unrelated failures because test subscriptions expired on 2026-08-16.
+The complete suite has 212 passing tests after extending active test subscriptions through 2026-12-12 and adding chat-stream regression coverage.
