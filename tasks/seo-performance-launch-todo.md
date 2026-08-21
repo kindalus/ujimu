@@ -7,10 +7,10 @@
 - [x] Slice refined.
 - [x] Grill decisions locked.
 - [x] Acceptance tests fail for missing behaviour.
-- [ ] Approved visual assets created.
-- [ ] SSR metadata and crawl endpoints implemented.
-- [ ] Full verification passes.
-- [ ] Production redeployed and externally verified.
+- [x] Approved visual assets created.
+- [x] SSR metadata and crawl endpoints implemented.
+- [x] Full verification passes.
+- [x] Production redeployed and externally verified.
 
 ## Later slices
 

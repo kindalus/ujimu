@@ -20,15 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after the post-Slice 48 dependency security update:
+Latest full verification after Slice 49 public SEO identity:
 
-- `npm test` — passed, 225 tests
+- `npm test` — passed, 228 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
 - `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools browser check, 2026-08-21 — passed after the dependency update: home, specialist selection, and OTP dialog rendered correctly; expected API requests returned 200; no console errors or warnings. The earlier production-mode anonymous feature-flag checks also remain covered.
+- Chrome DevTools production browser check, 2026-08-21 — passed at `https://ujimu.com`: approved page title, `pt-AO`, favicon, canonical, and Open Graph image were present; the specialist loaded; expected requests returned 200; no console errors or warnings.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
@@ -102,14 +102,14 @@ Known non-blocking warnings:
 | 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
-| 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `acceptance-tested` | — | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
+| 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `planned` | — | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `acceptance-tested`
+Status: `Slice 49 verified; Slices 50–52 planned`
 
 Approved originating decks:
 
@@ -125,7 +125,7 @@ Planned order:
 
 ## Slice 49 — Public SEO identity
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Refinement decisions:
 
@@ -149,6 +149,15 @@ Grill decisions:
 Acceptance-test RED:
 
 - `npm test -- tests/public-seo-identity.acceptance.test.ts --reporter=verbose` — failed as expected because the SSR metadata, launch assets, crawl routes, and noindex headers were absent.
+
+Implementation and verification:
+
+- Added SSR title, description, robots policy, canonical, Open Graph, Twitter Cards, `pt-AO`, and trusted `WebSite`/`Organization` JSON-LD.
+- Added the approved 1200 × 630 social PNG, SVG/PNG favicons, Apple icon, and manifest.
+- Added home-only sitemap and robots routes plus `X-Robots-Tag` middleware for private and API routes.
+- Added canonical-site configuration to container environment examples and operational checks to the runbook.
+- Focused tests passed, followed by `npm test` (228 tests), `npm run typecheck`, `npm run build`, `npm audit`, and registry signature verification.
+- Production was redeployed at commit `d304f52`; browser and raw WhatsApp-user-agent checks confirmed metadata in initial HTML, all assets returned 200, Gzip remained active, and the console stayed clean.
 
 ## Progressive account launch extension
 
