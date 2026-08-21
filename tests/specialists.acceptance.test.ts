@@ -161,7 +161,15 @@ describe('specialist registry acceptance', () => {
       description: 'Especialista sobre legislação de IVA.',
       wiki_type: 'legislation-regulatory',
       citations_required: true,
-      streaming_enabled: true
+      streaming_enabled: true,
+      seo: {
+        title: 'Legislação de IVA',
+        description: 'Especialista sobre legislação de IVA.',
+        introduction: '',
+        topics: [],
+        limitations: '',
+        call_to_action: ''
+      }
     })
     expect(publicSpecialist).not.toHaveProperty('system_prompt')
     expect(publicSpecialist).not.toHaveProperty('paths')

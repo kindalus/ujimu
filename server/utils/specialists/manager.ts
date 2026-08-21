@@ -7,6 +7,7 @@ import {
   type NormalizedSpecialistConfig,
   type SpecialistConfig,
   type SpecialistRuntime,
+  type SpecialistSeoConfig,
   assertValidSpecialistId,
   validateSpecialistConfig
 } from './schema'
@@ -19,7 +20,7 @@ export interface SpecialistManagerOptions extends SpecialistPathOptions {
 export type EditSpecialistInput = Partial<Pick<
   NormalizedSpecialistConfig,
   'name' | 'description' | 'system_prompt' | 'citations_required' | 'streaming_enabled' | 'status' | 'company_id'
->>
+>> & { seo?: SpecialistSeoConfig }
 
 export interface DeleteSpecialistResult {
   trashPath: string
@@ -78,7 +79,11 @@ export async function editSpecialist(
   }
 
   const existing = validateSpecialistConfig(parse(await readFile(paths.config, 'utf8')), specialistId)
-  const updated = validateSpecialistConfig({ ...existing, ...input }, specialistId)
+  const updated = validateSpecialistConfig({
+    ...existing,
+    ...input,
+    seo: input.seo ? { ...existing.seo, ...input.seo } : existing.seo
+  }, specialistId)
   const tempPath = `${paths.config}.tmp`
   await writeFile(tempPath, stringifySpecialistConfig(updated))
   await rename(tempPath, paths.config)
@@ -131,10 +136,26 @@ function stringifySpecialistConfig(config: NormalizedSpecialistConfig): string {
       citations_required: config.citations_required,
       streaming_enabled: config.streaming_enabled,
       status: config.status,
-      ...(config.company_id ? { company_id: config.company_id } : {})
+      ...(config.company_id ? { company_id: config.company_id } : {}),
+      ...(hasSpecialistSeo(config.seo) ? { seo: compactSpecialistSeo(config.seo) } : {})
     },
     { lineWidth: 0 }
   )
+}
+
+function hasSpecialistSeo(seo: NormalizedSpecialistConfig['seo']): boolean {
+  return Boolean(seo.title || seo.description || seo.introduction || seo.topics.length || seo.limitations || seo.call_to_action)
+}
+
+function compactSpecialistSeo(seo: NormalizedSpecialistConfig['seo']): SpecialistSeoConfig {
+  return {
+    ...(seo.title ? { title: seo.title } : {}),
+    ...(seo.description ? { description: seo.description } : {}),
+    ...(seo.introduction ? { introduction: seo.introduction } : {}),
+    ...(seo.topics.length ? { topics: seo.topics } : {}),
+    ...(seo.limitations ? { limitations: seo.limitations } : {}),
+    ...(seo.call_to_action ? { call_to_action: seo.call_to_action } : {})
+  }
 }
 
 async function moveSpecialistToTrash(

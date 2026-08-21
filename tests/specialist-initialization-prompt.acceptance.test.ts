@@ -138,6 +138,7 @@ function specialistRuntimeFixture(systemPrompt = ''): SpecialistRuntime {
     streaming_enabled: true,
     status: 'initializing',
     company_id: null,
+    seo: { title: '', description: '', introduction: '', topics: [], limitations: '', call_to_action: '' },
     paths: {
       root: '/tmp/ujimu/specialties/perito-fintech',
       config: '/tmp/ujimu/specialties/perito-fintech/specialist.yaml',

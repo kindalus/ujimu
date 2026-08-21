@@ -44,6 +44,15 @@ export interface AgentSessionLogSummary {
   started_at: string
 }
 
+export interface AdminSpecialistSeo {
+  title: string
+  description: string
+  introduction: string
+  topics: string[]
+  limitations: string
+  call_to_action: string
+}
+
 export interface AdminSpecialist {
   id: string
   name: string
@@ -54,6 +63,7 @@ export interface AdminSpecialist {
   streaming_enabled: boolean
   status: 'initializing' | 'awaiting_sources' | 'ingesting' | 'active' | 'suspended' | 'failed'
   company_id: string | null
+  seo: AdminSpecialistSeo
   sources: IngestionSource[]
   agent_logs: AgentSessionLogSummary[]
 }
@@ -178,7 +188,15 @@ export function createEmptySpecialistForm() {
     citations_required: true,
     streaming_enabled: true,
     status: 'active' as const,
-    company_id: ''
+    company_id: '',
+    seo: {
+      title: '',
+      description: '',
+      introduction: '',
+      topics: [] as string[],
+      limitations: '',
+      call_to_action: ''
+    }
   }
 }
 

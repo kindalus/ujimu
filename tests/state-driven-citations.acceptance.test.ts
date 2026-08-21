@@ -100,6 +100,7 @@ function createPromptSpecialist(systemPrompt: string): SpecialistRuntime {
     streaming_enabled: true,
     status: 'active',
     company_id: null,
+    seo: { title: '', description: '', introduction: '', topics: [], limitations: '', call_to_action: '' },
     paths: {
       root: '/tmp/pauta-aduaneira',
       config: '/tmp/pauta-aduaneira/specialist.yaml',

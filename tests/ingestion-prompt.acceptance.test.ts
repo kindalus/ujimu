@@ -127,6 +127,7 @@ function specialistRuntimeFixture(root: string): SpecialistRuntime {
     streaming_enabled: true,
     status: 'active',
     company_id: null,
+    seo: { title: '', description: '', introduction: '', topics: [], limitations: '', call_to_action: '' },
     paths: {
       root,
       config: join(root, 'specialist.yaml'),

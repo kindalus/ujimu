@@ -7,9 +7,9 @@ import { initializeDatabase } from '../../../utils/db'
 import { resolveLaunchFeatures } from '../../../utils/features'
 import { editSpecialist, SpecialistOperationError, type EditSpecialistInput } from '../../../utils/specialists/manager'
 import { getSpecialistById } from '../../../utils/specialists/registry'
-import { SpecialistConfigError } from '../../../utils/specialists/schema'
+import { SpecialistConfigError, type SpecialistSeoConfig } from '../../../utils/specialists/schema'
 
-const mutableFields = ['name', 'description', 'system_prompt', 'citations_required', 'streaming_enabled', 'status', 'company_id'] as const
+const mutableFields = ['name', 'description', 'system_prompt', 'citations_required', 'streaming_enabled', 'status', 'company_id', 'seo'] as const
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
@@ -87,6 +87,14 @@ function parseEditInput(body: unknown): EditSpecialistInput {
   for (const field of mutableFields) {
     if (!(field in record)) continue
     const value = record[field]
+    if (field === 'seo') {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw createError({ statusCode: 400, statusMessage: `Invalid field ${field}` })
+      }
+      input.seo = value as SpecialistSeoConfig
+      continue
+    }
+
     if (field === 'citations_required' || field === 'streaming_enabled') {
       if (typeof value !== 'boolean') {
         throw createError({ statusCode: 400, statusMessage: `Invalid field ${field}` })

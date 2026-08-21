@@ -1,6 +1,6 @@
 import { extname, join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import type { SpecialistRuntime, SpecialistStatus } from '../specialists/schema'
+import type { NormalizedSpecialistSeoConfig, SpecialistRuntime, SpecialistStatus } from '../specialists/schema'
 import { readIngestionState } from '../ingestion/state'
 import { listAgentSessionLogs, type AgentSessionLogSummary } from '../agents/logs'
 import { resolveAppConfig } from '../config'
@@ -42,6 +42,7 @@ export interface AdminSpecialistPayload {
   streaming_enabled: boolean
   status: SpecialistStatus
   company_id: string | null
+  seo: NormalizedSpecialistSeoConfig
   sources: IngestionSourceRecord[]
   agent_logs: AgentSessionLogSummary[]
 }
@@ -76,6 +77,7 @@ export async function toAdminSpecialistPayload(
     streaming_enabled: specialist.streaming_enabled,
     status: specialist.status,
     company_id: specialist.company_id,
+    seo: specialist.seo,
     sources: await readSpecialistSources(specialist),
     agent_logs: await listAgentSessionLogs(specialist.paths.root, specialist.id)
   }

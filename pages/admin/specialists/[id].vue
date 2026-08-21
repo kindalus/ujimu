@@ -29,7 +29,15 @@ const editForm = ref({
   citations_required: true,
   streaming_enabled: true,
   status: 'active' as AdminSpecialist['status'],
-  company_id: ''
+  company_id: '',
+  seo: {
+    title: '',
+    description: '',
+    introduction: '',
+    topics: '',
+    limitations: '',
+    call_to_action: ''
+  }
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const confirmDeleteOpen = ref(false)
@@ -106,7 +114,11 @@ function syncEditForm(): void {
     citations_required: specialist.value.citations_required,
     streaming_enabled: specialist.value.streaming_enabled,
     status: specialist.value.status,
-    company_id: specialist.value.company_id ?? ''
+    company_id: specialist.value.company_id ?? '',
+    seo: {
+      ...specialist.value.seo,
+      topics: specialist.value.seo.topics.join('\n')
+    }
   }
 }
 
@@ -114,11 +126,17 @@ async function updateSpecialist(): Promise<void> {
   if (!specialist.value || pending.value) return
 
   await runAdminAction(async () => {
-    const { status, company_id, ...editableFields } = editForm.value
+    const { status, company_id, seo, ...editableFields } = editForm.value
     const companyFields = companiesEnabled.value ? { company_id } : {}
+    const seoFields = {
+      seo: {
+        ...seo,
+        topics: seo.topics.split('\n').map((topic) => topic.trim()).filter(Boolean)
+      }
+    }
     const body = status === 'active' || status === 'suspended'
-      ? { ...editableFields, status, ...companyFields }
-      : { ...editableFields, ...companyFields }
+      ? { ...editableFields, ...seoFields, status, ...companyFields }
+      : { ...editableFields, ...seoFields, ...companyFields }
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -467,6 +485,36 @@ function canIngestSource(source: IngestionSource): boolean {
           <span class="switch" :class="{ 'switch--on': editForm.streaming_enabled }"><span class="switch-knob" /></span>
         </button>
       </div>
+    </div>
+
+    <div class="adm-card">
+      <h2 class="adm-card-title">Página pública</h2>
+      <p class="adm-card-note">Conteúdo editorial indexável da especialidade. Sem título ou meta-descrição próprios, são usados o nome e a descrição gerais.</p>
+      <label class="adm-field">
+        <span class="adm-field-label">Título SEO</span>
+        <input v-model="editForm.seo.title" class="field" maxlength="70" :disabled="pending" @change="updateSpecialist" />
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Meta-descrição</span>
+        <textarea v-model="editForm.seo.description" class="field" rows="2" maxlength="180" :disabled="pending" @change="updateSpecialist"></textarea>
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Introdução pública</span>
+        <textarea v-model="editForm.seo.introduction" class="field adm-prompt" rows="5" maxlength="1200" :disabled="pending" @change="updateSpecialist"></textarea>
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Temas abrangidos</span>
+        <textarea v-model="editForm.seo.topics" class="field" rows="5" :disabled="pending" placeholder="Um tema por linha" @change="updateSpecialist"></textarea>
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Limites da especialidade</span>
+        <textarea v-model="editForm.seo.limitations" class="field" rows="3" maxlength="600" :disabled="pending" @change="updateSpecialist"></textarea>
+      </label>
+      <label class="adm-field">
+        <span class="adm-field-label">Chamada para consulta</span>
+        <input v-model="editForm.seo.call_to_action" class="field" maxlength="160" :disabled="pending" @change="updateSpecialist" />
+      </label>
+      <p class="adm-foot-note">Texto simples, sem HTML. Pode indicar até 12 temas, um por linha.</p>
     </div>
 
     <div class="adm-card">

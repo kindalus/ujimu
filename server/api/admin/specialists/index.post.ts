@@ -71,7 +71,8 @@ function parseSpecialistConfig(body: unknown): SpecialistConfig {
     citations_required: record.citations_required,
     streaming_enabled: record.streaming_enabled,
     status: record.status,
-    company_id: record.company_id
+    company_id: record.company_id,
+    seo: record.seo
   } as SpecialistConfig
 }
 
