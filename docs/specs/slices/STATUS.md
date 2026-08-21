@@ -20,15 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 51 public specialist pages:
+Latest full verification after Slice 52 measured loading performance:
 
-- `npm test` — passed, 235 tests
+- `npm test` — passed, 237 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
 - `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools production browser check, 2026-08-21 — passed at `https://ujimu.com`: approved page title, `pt-AO`, favicon, canonical, and Open Graph image were present; the specialist loaded; expected requests returned 200; no console errors or warnings.
+- Chrome DevTools production browser and performance check, 2026-08-21 — passed at `https://ujimu.com`: SEO 100, Best Practices 100, LCP 237 ms, TTFB 173 ms, CLS 0, HTTP/2, four initial API calls, and no console errors or warnings.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
@@ -105,11 +105,11 @@ Known non-blocking warnings:
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
-| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `acceptance-tested` | — | Measure and improve initial loading performance. |
+| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–51 verified; Slice 52 acceptance-tested`
+Status: `verified`
 
 Approved originating decks:
 
@@ -231,7 +231,7 @@ Implementation and verification:
 
 ## Slice 52 — Measured loading performance
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Production baseline:
 
@@ -261,6 +261,17 @@ Grill decisions:
 Acceptance-test RED:
 
 - `npm test -- tests/loading-performance.acceptance.test.ts --reporter=verbose` — failed as expected because both shells mounted the eager auth modal and requested the unused admin session.
+
+Implementation and verification:
+
+- Replaced eager shell authentication with conditional `LazyAuthModal` rendering and removed the unused shell-level admin-session request/prop.
+- Enabled HTTP/2 on the existing Ujimu Nginx TLS server after a successful configuration test; ALPN negotiated `h2`.
+- Focused tests passed, followed by `npm test` (237 tests), `npm run typecheck`, `npm run build`, and `npm audit` with zero findings.
+- Production initial API calls fell from six to four; initial script requests fell from thirteen to eleven. The auth chunk and dev/features calls now load only when the login modal opens.
+- A fresh isolated production trace removed the Modern HTTP insight and measured LCP 237 ms, TTFB 173 ms, render delay 65 ms, and CLS 0, compared with the 262/170/92/0 baseline. LCP stayed far inside the 2.5 s budget.
+- Mobile Lighthouse remained SEO 100 and Best Practices 100; Accessibility remained 96 with the pre-existing contrast and label-name findings.
+- Rejected attempts remain documented: manifest and render-blocking CSS changes were not made because Chrome estimated zero FCP/LCP saving; SSR complexity was not introduced because the baseline already met the target.
+- Production was redeployed at commit `c0e2555`; an isolated browser confirmed four initial API calls, deferred auth loading on click, and a clean console.
 
 ## Progressive account launch extension
 
