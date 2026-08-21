@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 50 specialist editorial SEO:
+Latest full verification after Slice 51 public specialist pages:
 
-- `npm test` — passed, 231 tests
+- `npm test` — passed, 235 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
@@ -104,12 +104,12 @@ Known non-blocking warnings:
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
-| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `acceptance-tested` | — | Render public specialist pages and a dynamic public sitemap. |
+| 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–50 verified; Slice 51 acceptance-tested; Slice 52 planned`
+Status: `Slices 49–51 verified; Slice 52 planned`
 
 Approved originating decks:
 
@@ -195,7 +195,7 @@ Implementation and verification:
 
 ## Slice 51 — Public specialist pages
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Refinement decisions:
 
@@ -219,6 +219,15 @@ Grill decisions:
 Acceptance-test RED:
 
 - `npm test -- tests/public-specialist-pages.acceptance.test.ts --reporter=verbose` — failed as expected because the anonymous endpoint, SSR page, dynamic sitemap, index policy, and CTA selection were absent.
+
+Implementation and verification:
+
+- Added the anonymous-only specialist endpoint, SSR editorial page, specialist metadata/`WebPage` JSON-LD, dynamic sitemap, and index policy.
+- Added a consultation CTA that returns to the chat and pre-selects only a currently available public specialist.
+- Added direct HTTP coverage proving active public specialists return 200 while suspended, company-restricted, and missing IDs return the same 404.
+- Focused tests passed, followed by `npm test` (235 tests), `npm run typecheck`, `npm run build`, and `npm audit` with zero findings.
+- Production browser verification confirmed the page, canonical, 200 responses, clean console, CTA navigation, query pre-selection, and home link back to the specialist page.
+- Production was redeployed at commit `f7e6319`; sitemap discovery and 404 failure paths were confirmed externally.
 
 ## Progressive account launch extension
 

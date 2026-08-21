@@ -15,5 +15,5 @@
 ## Later slices
 
 - [x] Slice 50 — Specialist editorial SEO.
-- [ ] Slice 51 — Public specialist pages.
+- [x] Slice 51 — Public specialist pages.
 - [ ] Slice 52 — Measured loading performance.
