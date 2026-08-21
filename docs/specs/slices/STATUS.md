@@ -106,18 +106,18 @@ Known non-blocking warnings:
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
-| 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `idea-refined` | — | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
+| 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `grilled` | — | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 
 ## Twilio Verify OTP extension
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
 - [`../brainstorm-twilio-verify-otp.html`](../brainstorm-twilio-verify-otp.html)
 - [`../twilio-verify-otp-architecture.html`](../twilio-verify-otp-architecture.html)
 
-Proposed TDD seams awaiting explicit confirmation:
+Confirmed TDD seams:
 
 1. `GET /api/features` for provider capabilities.
 2. `POST /api/auth/otp/request` for Verify submission and provider failures.
