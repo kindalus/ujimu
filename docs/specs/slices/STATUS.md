@@ -98,7 +98,7 @@ Known non-blocking warnings:
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
 | 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
-| 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `acceptance-tested` | — | Double anonymous and registered free-tier quotas. |
+| 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `grilled` | — | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `grilled` | — | Hide and block subscription/company features behind default-off flags. |
 
@@ -119,7 +119,7 @@ Planned order:
 
 ## Slice 46 — Doubled free quotas
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Refinement decisions:
 
@@ -137,6 +137,12 @@ Grill decisions:
 Acceptance-test RED:
 
 - `npm test -- tests/quotas.acceptance.test.ts tests/ui-redesign-shell.acceptance.test.ts tests/billing-ui.acceptance.test.ts --reporter=verbose` — failed as expected because policy enforcement and visible copy still used the old limits.
+
+Implementation and verification:
+
+- Updated anonymous policy to 10/day and 40/week and registered policy to 40/day and 200/week.
+- Updated chat shell, shared route chrome, and subscription copy.
+- Focused tests passed, followed by `npm test` (212 tests), `npm run typecheck`, and `npm run build`.
 
 ## Slice 47 — Configured OTP channels
 

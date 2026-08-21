@@ -83,7 +83,7 @@ async function logout(): Promise<void> {
         <NuxtLink to="/" class="wordmark" aria-label="Ujimu">Ujimu<span class="wordmark-dot" /></NuxtLink>
       </div>
       <div class="topbar-right">
-        <span class="quota-pill">0/{{ authSession.authenticated ? 20 : 5 }} hoje</span>
+        <span class="quota-pill">0/{{ authSession.authenticated ? 40 : 10 }} hoje</span>
         <button v-if="!authSession.authenticated" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
         <span v-else class="avatar" :title="authSession.user?.displayContact">{{ userInitial }}</span>
       </div>

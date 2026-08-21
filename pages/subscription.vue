@@ -214,8 +214,8 @@ function formatDisplayDate(value: string | undefined): string {
         <span class="plan-name">Gratuito</span>
         <span class="plan-price">0 AOA</span>
         <ul class="plan-list">
-          <li>5 pedidos/dia · 20/semana (anónimo)</li>
-          <li>20 pedidos/dia · 100/semana (com sessão)</li>
+          <li>10 pedidos/dia · 40/semana (anónimo)</li>
+          <li>40 pedidos/dia · 200/semana (com sessão)</li>
           <li>Publicidade no fluxo da conversa</li>
           <li>Histórico por especialidade (com sessão)</li>
         </ul>

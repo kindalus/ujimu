@@ -933,7 +933,7 @@ function createId(prefix: string): string {
       </div>
       <div class="topbar-right">
         <span v-if="billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
-        <span v-else class="quota-pill">0/{{ isAuthenticated ? 20 : 5 }} hoje</span>
+        <span v-else class="quota-pill">0/{{ isAuthenticated ? 40 : 10 }} hoje</span>
         <button v-if="!isAuthenticated" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
         <span v-else class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
       </div>

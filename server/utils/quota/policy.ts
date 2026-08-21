@@ -26,11 +26,11 @@ export function resolveQuotaPolicy(
   options: ResolveQuotaPolicyOptions = {}
 ): QuotaPolicy {
   if (input.subjectType === 'anonymous') {
-    return { dailyLimit: 5, weeklyLimit: 20 }
+    return { dailyLimit: 10, weeklyLimit: 40 }
   }
 
   if (input.subjectType === 'registered') {
-    return { dailyLimit: 20, weeklyLimit: 100 }
+    return { dailyLimit: 40, weeklyLimit: 200 }
   }
 
   if (input.subjectType === 'company') {
