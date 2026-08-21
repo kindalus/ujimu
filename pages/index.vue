@@ -1003,7 +1003,7 @@ function createId(prefix: string): string {
             <template v-else>
               <span class="spec-chip-letter spec-chip-letter--xl">{{ selectedSpecialist.name.slice(0, 1) }}</span>
               <h1 id="page-title" class="empty-title">{{ selectedSpecialist.name }}</h1>
-              <p class="empty-sub">{{ selectedSpecialist.description }}. Respostas fundamentadas nas fontes oficiais desta especialidade.</p>
+              <p class="empty-sub">{{ selectedSpecialist.description }} Respostas fundamentadas nas fontes oficiais desta especialidade.</p>
               <NuxtLink class="btn btn--ghost btn--xs" :to="`/especialidades/${selectedSpecialist.id}`">Conhecer esta especialidade</NuxtLink>
               <div class="sugg-row">
                 <button class="sugg" type="button" @click="question = 'Quais são as principais obrigações?'">Quais são as principais obrigações?</button>
