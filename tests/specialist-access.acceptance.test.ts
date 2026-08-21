@@ -215,7 +215,7 @@ async function seedCompany(dataDir: string, input: { memberUserEmail: string }):
     companyId: company.id,
     seats: 10,
     currentPeriodStart: '2026-05-16T12:00:00.000Z',
-    currentPeriodEnd: '2026-08-16T12:00:00.000Z'
+    currentPeriodEnd: '2026-12-12T12:00:00.000Z'
   })
   replaceCompanyMemberships(database, {
     companyId: company.id,
