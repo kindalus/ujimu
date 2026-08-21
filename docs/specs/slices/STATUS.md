@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 49 public SEO identity:
+Latest full verification after Slice 50 specialist editorial SEO:
 
-- `npm test` — passed, 228 tests
+- `npm test` — passed, 231 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
 - `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
@@ -103,13 +103,13 @@ Known non-blocking warnings:
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
-| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `acceptance-tested` | — | Add administrable editorial SEO fields per specialist. |
+| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slice 49 verified; Slice 50 acceptance-tested; Slices 51–52 planned`
+Status: `Slices 49–50 verified; Slices 51–52 planned`
 
 Approved originating decks:
 
@@ -161,7 +161,7 @@ Implementation and verification:
 
 ## Slice 50 — Specialist editorial SEO
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Refinement decisions:
 
@@ -183,6 +183,15 @@ Grill decisions:
 Acceptance-test RED:
 
 - Focused specialist, admin API, and admin UI tests failed as expected because the normalized `seo` contract, YAML persistence, HTTP payloads, and editing controls were absent.
+
+Implementation and verification:
+
+- Added validated and normalized specialist SEO fields with safe public fallback and compact YAML persistence.
+- Added partial SEO edits, safe audit-field reporting, admin/public payloads, shared UI types, and the six editing controls on the specialist detail page.
+- Kept existing YAML valid and confirmed production did not rewrite the labour specialist automatically.
+- Focused tests passed, followed by `npm test` (231 tests), `npm run typecheck`, `npm run build`, and `npm audit` with zero findings.
+- Browser verification used an isolated development container: all controls rendered, a title edit persisted through PATCH 200, and the console remained clean.
+- Production was redeployed at commit `9079c39`; the anonymous API returns title/description fallback while the production YAML remains unchanged.
 
 ## Progressive account launch extension
 
