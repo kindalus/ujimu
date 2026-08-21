@@ -102,14 +102,14 @@ Known non-blocking warnings:
 | 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
-| 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `grilled` | — | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
+| 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `acceptance-tested` | — | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `planned` | — | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -125,7 +125,7 @@ Planned order:
 
 ## Slice 49 — Public SEO identity
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Refinement decisions:
 
@@ -145,6 +145,10 @@ Grill decisions:
 - Mark every current non-home page plus `/api/**` as `noindex`; Slice 51 will explicitly admit public specialist routes.
 - Use trusted static JSON-LD for `WebSite` and `Organization`, without ratings, legal claims, or generated content.
 - Verify through HTTP with browser and WhatsApp user agents, then redeploy through the tested production script.
+
+Acceptance-test RED:
+
+- `npm test -- tests/public-seo-identity.acceptance.test.ts --reporter=verbose` — failed as expected because the SSR metadata, launch assets, crawl routes, and noindex headers were absent.
 
 ## Progressive account launch extension
 
