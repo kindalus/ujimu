@@ -178,6 +178,7 @@ Grill decisions:
 - Serialize the `seo` mapping only when at least one editorial field is non-empty.
 - Audit only `seo` as a changed field; never place editorial content itself in audit metadata.
 - Preserve the current public specialist list contract while adding one `seo` object with safe title/description fallback.
+- Treat editorial values as plain text; future pages must render them through Vue escaping rather than `v-html` or Markdown.
 
 ## Progressive account launch extension
 
