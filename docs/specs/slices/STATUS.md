@@ -109,6 +109,32 @@ Known non-blocking warnings:
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
+| 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `grilled` | — | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
+
+## Persistent Pi chat sessions
+
+Status: `grilled`
+
+Approved originating decks:
+
+- [`../brainstorm-persistent-pi-chat-sessions.html`](../brainstorm-persistent-pi-chat-sessions.html)
+- [`../persistent-pi-chat-sessions-architecture.html`](../persistent-pi-chat-sessions-architecture.html)
+
+TDD seams confirmed by the user on 2026-08-21:
+
+1. Chat HTTP/NDJSON creation and continuation for anonymous and registered conversations.
+2. Authorization isolation across anonymous tokens, accounts, conversations, and specialists.
+3. Filesystem lifecycle for commit, rollback, restart continuity, and 24-hour/30-day retention.
+4. History HTTP editing for live/expired sessions and coordinated deletion.
+5. Real-browser retention of the anonymous identifier only while the page remains open.
+
+Grill decisions confirmed by the user on 2026-08-21:
+
+- Reject a concurrent request for the same conversation with `409 CONVERSATION_BUSY` before streaming, quota consumption, or analytics.
+- Emit the common `conversation` event only after Pi, SQLite when applicable, and JSONL are committed.
+- Use a per-session pending journal to reconcile SQLite and JSONL after failures or restarts.
+- Enforce access expiry exactly at 24 hours/30 days, reconcile at startup, and physically clean expired sessions hourly.
+- Treat permanent branch removal as absence from SQLite and all application-accessible session files; verify with sentinel content.
 
 ## Account usage, profile, and admin navigation extension
 
