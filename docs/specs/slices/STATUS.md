@@ -96,11 +96,11 @@ Known non-blocking warnings:
 | 42 | [`42-chat-input-autogrow.html`](./42-chat-input-autogrow.html) | `verified` | 2026-06-16 | Chat input auto-grows up to five lines, then scrolls internally. |
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
-| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `idea-refined` | — | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
+| 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `grilled` | — | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
 
 ## Slice 45 — llm-wiki-owned specialist AGENTS.md
 
-Status: `idea-refined`
+Status: `grilled`
 
 Originating brainstorm and architecture:
 
@@ -113,6 +113,13 @@ Refinement decisions:
 - Require `AGENTS.md` as the schema file produced by the skill.
 - Supply the specialist persona and canonical Ujimu consultation rules in that same prompt.
 - Preserve optional NDJSON citations and plain-text answers.
+
+Grill decisions:
+
+- Keep `sourceFile` as internal traceability metadata while forbidding user-facing physical or internal paths.
+- Validate canonical required rules with simple text matching rather than a Markdown parser.
+- Reuse `WIKI_INITIALIZATION_OUTPUT_MISSING` and the existing transactional rollback path.
+- Do not migrate existing specialist workspaces or alter chat, ingestion, APIs, or global system prompts.
 
 Acceptance-test plan:
 
