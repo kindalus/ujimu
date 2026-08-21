@@ -5,9 +5,10 @@ import {
   readBody,
   setResponseStatus
 } from 'h3'
-import { getPublicSessionUser, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
+import { getPublicSessionUser, OtpDeliveryError, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
 import { readSessionFromEvent, setSessionCookie } from '../../../utils/auth/session'
 import { initializeDatabase } from '../../../utils/db'
+import { createNotificationProviderFromEnv, getOtpDeliveryCapabilities } from '../../../utils/notifications/provider'
 
 export default defineEventHandler(async (event) => {
   const contentType = getRequestHeader(event, 'content-type') ?? ''
@@ -21,9 +22,15 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
   try {
+    const input = parseOtpVerifyBody(body)
+    if (!getOtpDeliveryCapabilities().otpChannels.includes(input.channel)) {
+      throw new OtpDeliveryError()
+    }
     const currentSession = readSessionFromEvent(event, database)
-    const result = await verifyOtp(database, parseOtpVerifyBody(body), {
-      currentUserId: currentSession?.userId
+    const provider = createNotificationProviderFromEnv()
+    const result = await verifyOtp(database, input, {
+      currentUserId: currentSession?.userId,
+      ...(provider.verifyOtp ? { verifyCode: provider.verifyOtp.bind(provider) } : {})
     })
     setSessionCookie(event, result.sessionToken)
     const publicUser = getPublicSessionUser(database, result.user.id) ?? result.user
@@ -50,6 +57,11 @@ export default defineEventHandler(async (event) => {
         statusMessage: error.message,
         data: { code: error.code }
       })
+    }
+
+    if (error instanceof OtpDeliveryError) {
+      setResponseStatus(event, 503)
+      return { error: { code: error.code, message: error.message } }
     }
 
     throw error

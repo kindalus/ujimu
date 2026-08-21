@@ -40,8 +40,10 @@ Configure these outside source control:
 
 - `UJIMU_SESSION_SECRET` — required for readiness. Signs session cookies and the anonymous quota cookie, and keeps both valid across restarts.
 - `UJIMU_OTP_PEPPER` — required for readiness. Keeps OTP verification working across restarts.
-- `UJIMU_SENDGRID_API_KEY` and `UJIMU_SENDGRID_FROM_EMAIL` — together enable email OTP delivery; `UJIMU_SENDGRID_FROM_NAME` defaults to `Ujimu`.
-- `UJIMU_TWILIO_ACCOUNT_SID`, `UJIMU_TWILIO_AUTH_TOKEN`, and `UJIMU_TWILIO_FROM_PHONE` — together enable SMS OTP delivery.
+- `UJIMU_OTP_PROVIDER` — global OTP provider: `direct`, `twilio-verify`, or `disabled`; omission means `direct`, while unknown values fail closed.
+- `UJIMU_SENDGRID_API_KEY` and `UJIMU_SENDGRID_FROM_EMAIL` — together enable email OTP delivery in `direct` mode; `UJIMU_SENDGRID_FROM_NAME` defaults to `Ujimu`.
+- `UJIMU_TWILIO_ACCOUNT_SID`, `UJIMU_TWILIO_AUTH_TOKEN`, and `UJIMU_TWILIO_FROM_PHONE` — together enable Twilio Messaging SMS OTP delivery in `direct` mode.
+- `UJIMU_TWILIO_VERIFY_SERVICE_SID` — required with Account SID and Auth Token in `twilio-verify` mode; it must identify an existing Verify Service and start with `VA`.
 - `UJIMU_SUBSCRIPTIONS_ENABLED` — defaults to `false`; set to `true` only when individual subscription pages, APIs, quota upgrades, and billing are ready for launch.
 - `UJIMU_COMPANIES_ENABLED` — defaults to `false`; set to `true` only when company pages, APIs, quota, and private-specialist access are ready for launch.
 - `UJIMU_BILLING_WEBHOOK_SECRET` — required for readiness only when `UJIMU_SUBSCRIPTIONS_ENABLED=true`; live Appy Pay and Stripe/VISA integrations are post-launch.
@@ -63,12 +65,21 @@ Configure these outside source control:
 
 ## OTP delivery configuration
 
-OTP channels are enabled independently. In production, incomplete SendGrid or Twilio configuration leaves that channel unavailable. When neither channel is configured, Ujimu exposes anonymous consultation only and hides new-login controls; already valid sessions remain accepted. OTP provider failures return a generic delivery error and never expose provider response bodies or credentials.
+`UJIMU_OTP_PROVIDER` selects one global mode:
 
-SendGrid uses the official Mail Send endpoint and Twilio uses the official Messages endpoint:
+- `direct` preserves the existing independent SendGrid email and Twilio Messaging SMS channels. It is also the default when the selector is absent.
+- `twilio-verify` exposes SMS only and requires a valid Account SID (`AC…`), Auth Token, and Verify Service SID (`VA…`). Create and configure that Verify Service in Twilio before deployment. Ujimu references it in `/v2/Services/{ServiceSid}/Verifications` and `/VerificationCheck`; it does not use `UJIMU_TWILIO_FROM_PHONE` in this mode.
+- `disabled` exposes no OTP channel. Unknown selector values also fail closed.
+
+Incomplete provider configuration leaves OTP unavailable. Ujimu then exposes anonymous consultation only and hides new-login controls; already valid sessions remain accepted. Provider failures and malformed responses return generic errors without exposing Twilio response bodies or credentials. Local contact/IP request limits and verification-attempt limits remain active alongside Twilio Verify protections.
+
+Official provider references:
 
 - https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
 - https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
+- https://www.twilio.com/docs/verify/sms
+- https://www.twilio.com/docs/verify/api/verification
+- https://www.twilio.com/docs/verify/api/verification-check
 
 ## Launch feature flags
 

@@ -8,7 +8,10 @@ export interface OtpDeliveryRequest {
 
 export interface NotificationProvider {
   deliverOtp(request: OtpDeliveryRequest): Promise<void>
+  verifyOtp?(request: OtpDeliveryRequest): Promise<boolean>
 }
+
+export type OtpProviderMode = 'direct' | 'twilio-verify' | 'disabled'
 
 export interface OtpDeliveryCapabilities {
   otpChannels: OtpDeliveryChannel[]
@@ -37,9 +40,23 @@ export class NotificationProviderDeliveryError extends Error {
   }
 }
 
+export function resolveOtpProviderMode(
+  env: Record<string, string | undefined> = process.env
+): OtpProviderMode {
+  const configured = env.UJIMU_OTP_PROVIDER?.trim()
+  if (!configured || configured === 'direct') return 'direct'
+  if (configured === 'twilio-verify') return 'twilio-verify'
+  return 'disabled'
+}
+
 export function getOtpDeliveryCapabilities(
   env: Record<string, string | undefined> = process.env
 ): OtpDeliveryCapabilities {
+  const mode = resolveOtpProviderMode(env)
+  if (mode === 'disabled') return { otpChannels: [] }
+  if (mode === 'twilio-verify') {
+    return { otpChannels: twilioVerifyConfig(env) ? ['phone'] : [] }
+  }
   if (fakeDeliveryEnabled(env)) {
     return { otpChannels: ['email', 'phone'] }
   }
@@ -54,15 +71,30 @@ export function createNotificationProviderFromEnv(
   env: Record<string, string | undefined> = process.env,
   options: NotificationProviderOptions = {}
 ): NotificationProvider {
-  if (fakeDeliveryEnabled(env)) {
-    return { async deliverOtp() {} }
-  }
-
-  const sendGrid = sendGridConfig(env)
-  const twilio = twilioConfig(env)
+  const mode = resolveOtpProviderMode(env)
   const fetchImpl = options.fetch ?? globalThis.fetch
   const timeoutMs = options.timeoutMs ?? 10_000
 
+  if (mode === 'twilio-verify') {
+    const verify = twilioVerifyConfig(env)
+    if (!verify) return unconfiguredProvider()
+    return {
+      async deliverOtp(request) {
+        if (request.channel !== 'phone') throw new NotificationProviderConfigurationError()
+        await startTwilioVerification(fetchImpl, verify, request.contact, timeoutMs)
+      },
+      async verifyOtp(request) {
+        if (request.channel !== 'phone') throw new NotificationProviderConfigurationError()
+        return checkTwilioVerification(fetchImpl, verify, request.contact, request.code, timeoutMs)
+      }
+    }
+  }
+
+  if (mode === 'disabled') return unconfiguredProvider()
+  if (fakeDeliveryEnabled(env)) return { async deliverOtp() {} }
+
+  const sendGrid = sendGridConfig(env)
+  const twilio = twilioConfig(env)
   return {
     async deliverOtp(request) {
       if (request.channel === 'email' && sendGrid) {
@@ -75,6 +107,14 @@ export function createNotificationProviderFromEnv(
         return
       }
 
+      throw new NotificationProviderConfigurationError()
+    }
+  }
+}
+
+function unconfiguredProvider(): NotificationProvider {
+  return {
+    async deliverOtp() {
       throw new NotificationProviderConfigurationError()
     }
   }
@@ -93,6 +133,20 @@ function sendGridConfig(env: Record<string, string | undefined>): {
   const fromEmail = env.UJIMU_SENDGRID_FROM_EMAIL?.trim()
   if (!apiKey || !fromEmail) return undefined
   return { apiKey, fromEmail, fromName: env.UJIMU_SENDGRID_FROM_NAME?.trim() || 'Ujimu' }
+}
+
+function twilioVerifyConfig(env: Record<string, string | undefined>): {
+  accountSid: string
+  authToken: string
+  serviceSid: string
+} | undefined {
+  const accountSid = env.UJIMU_TWILIO_ACCOUNT_SID?.trim()
+  const authToken = env.UJIMU_TWILIO_AUTH_TOKEN?.trim()
+  const serviceSid = env.UJIMU_TWILIO_VERIFY_SERVICE_SID?.trim()
+  if (!accountSid || !/^AC[0-9a-f]{32}$/i.test(accountSid) || !authToken || !serviceSid || !/^VA[0-9a-f]{32}$/i.test(serviceSid)) {
+    return undefined
+  }
+  return { accountSid, authToken, serviceSid }
 }
 
 function twilioConfig(env: Record<string, string | undefined>): {
@@ -155,6 +209,78 @@ async function sendWithTwilio(
       signal: AbortSignal.timeout(timeoutMs)
     }
   )
+}
+
+async function startTwilioVerification(
+  fetchImpl: typeof globalThis.fetch,
+  config: NonNullable<ReturnType<typeof twilioVerifyConfig>>,
+  contact: string,
+  timeoutMs: number
+): Promise<void> {
+  const response = await twilioVerifyRequest(fetchImpl, config, 'Verifications', {
+    To: contact,
+    Channel: 'sms'
+  }, timeoutMs)
+  const payload = await readProviderJson(response)
+  if (!response.ok || readVerifyStatus(payload) !== 'pending') {
+    throw new NotificationProviderDeliveryError()
+  }
+}
+
+async function checkTwilioVerification(
+  fetchImpl: typeof globalThis.fetch,
+  config: NonNullable<ReturnType<typeof twilioVerifyConfig>>,
+  contact: string,
+  code: string,
+  timeoutMs: number
+): Promise<boolean> {
+  const response = await twilioVerifyRequest(fetchImpl, config, 'VerificationCheck', {
+    To: contact,
+    Code: code
+  }, timeoutMs)
+  if (response.status === 400 || response.status === 404) return false
+  const status = readVerifyStatus(await readProviderJson(response))
+  if (!response.ok || !status) throw new NotificationProviderDeliveryError()
+  return status === 'approved'
+}
+
+async function twilioVerifyRequest(
+  fetchImpl: typeof globalThis.fetch,
+  config: NonNullable<ReturnType<typeof twilioVerifyConfig>>,
+  resource: 'Verifications' | 'VerificationCheck',
+  fields: Record<string, string>,
+  timeoutMs: number
+): Promise<Response> {
+  return fetchImpl(
+    `https://verify.twilio.com/v2/Services/${config.serviceSid}/${resource}`,
+    {
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64')}`,
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(fields).toString(),
+      signal: AbortSignal.timeout(timeoutMs)
+    }
+  ).catch(() => {
+    throw new NotificationProviderDeliveryError()
+  })
+}
+
+async function readProviderJson(response: Response): Promise<unknown> {
+  return response.json().catch(() => {
+    throw new NotificationProviderDeliveryError()
+  })
+}
+
+function readVerifyStatus(payload: unknown): string | undefined {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined
+  const status = (payload as { status?: unknown }).status
+  if (typeof status !== 'string') return undefined
+  return ['pending', 'approved', 'canceled', 'max_attempts_reached', 'deleted', 'failed', 'expired'].includes(status)
+    ? status
+    : undefined
 }
 
 async function sendRequest(

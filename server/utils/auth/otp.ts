@@ -50,6 +50,7 @@ export interface VerifyOtpOptions {
   pepper?: string
   sessionSecret?: string
   currentUserId?: string
+  verifyCode?: (request: { channel: OtpChannel; contact: string; code: string }) => Promise<boolean>
 }
 
 export interface AuthenticatedUser {
@@ -115,7 +116,9 @@ export async function requestOtp(
   assertRequestRateLimit(database, normalized, requestIpHash, now)
 
   const code = (options.generateCode ?? generateOtpCode)()
-  const codeHash = hashOtpCode(code, options.pepper)
+  const codeHash = options.provider.verifyOtp
+    ? randomBytes(32).toString('hex')
+    : hashOtpCode(code, options.pepper)
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS)
   const challengeId = randomUUID()
 
@@ -207,7 +210,16 @@ export async function verifyOtp(
     throw new OtpVerificationError()
   }
 
-  if (!matchesCodeHash(challenge.code_hash, hashOtpCode(code, options.pepper))) {
+  let verified: boolean
+  try {
+    verified = options.verifyCode
+      ? await options.verifyCode({ ...normalized, code })
+      : matchesCodeHash(challenge.code_hash, hashOtpCode(code, options.pepper))
+  } catch {
+    throw new OtpDeliveryError()
+  }
+
+  if (!verified) {
     database
       .prepare('UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?')
       .run(challenge.id)
