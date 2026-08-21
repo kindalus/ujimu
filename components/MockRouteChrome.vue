@@ -4,6 +4,11 @@ import { useRoute } from 'vue-router'
 
 interface AuthSessionResponse {
   authenticated: boolean
+  admin?: boolean
+  quota?: {
+    exempt: boolean
+    daily: { limit: number; used: number; resetAt: string } | null
+  }
   user?: { id: string; displayContact: string }
 }
 
@@ -29,6 +34,12 @@ const adminNavItems = [
 const userInitial = computed(() => authSession.value.user?.displayContact?.slice(0, 1).toUpperCase() || 'U')
 const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const isAdminRoute = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
+const quotaLabel = computed(() => {
+  const quota = authSession.value.quota
+  if (!quota) return 'Quota a carregar…'
+  if (authSession.value.admin || quota.exempt) return 'Administrador · sem limite'
+  return quota.daily ? `${quota.daily.used}/${quota.daily.limit} hoje` : 'Sem limite diário'
+})
 
 function adminNavItemActive(path: string): boolean {
   if (path === '/admin') return route.path === '/admin'
@@ -54,9 +65,13 @@ async function loadFeatures(): Promise<void> {
   }
 }
 
+function clientTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 async function loadAuthSession(): Promise<void> {
   try {
-    const response = await fetch('/api/auth/session')
+    const response = await fetch(`/api/auth/session?timezone=${encodeURIComponent(clientTimezone())}`)
     authSession.value = response.ok ? ((await response.json()) as AuthSessionResponse) : { authenticated: false }
   } catch {
     authSession.value = { authenticated: false }
@@ -65,12 +80,14 @@ async function loadAuthSession(): Promise<void> {
 
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
   authSession.value = session
+  void loadAuthSession()
 }
 
 async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
   authSession.value = { authenticated: false }
   authPanelOpen.value = false
+  void loadAuthSession()
 }
 </script>
 
@@ -80,6 +97,7 @@ async function logout(): Promise<void> {
       <div class="topbar-left">
         <AppDrawer
           :is-authenticated="authSession.authenticated"
+          :is-admin="authSession.admin"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
@@ -90,7 +108,7 @@ async function logout(): Promise<void> {
         <NuxtLink to="/" class="wordmark" aria-label="Ujimu">Ujimu<span class="wordmark-dot" /></NuxtLink>
       </div>
       <div class="topbar-right">
-        <span class="quota-pill">0/{{ authSession.authenticated ? 40 : 10 }} hoje</span>
+        <span class="quota-pill">{{ quotaLabel }}</span>
         <button v-if="!authSession.authenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
         <span v-else-if="authSession.authenticated" class="avatar" :title="authSession.user?.displayContact">{{ userInitial }}</span>
       </div>
@@ -98,7 +116,7 @@ async function logout(): Promise<void> {
 
     <main v-if="isAdminRoute" class="stage">
       <div class="adm">
-        <aside class="adm-nav" aria-label="Administração">
+        <aside v-if="authSession.admin" class="adm-nav" aria-label="Administração">
           <span class="adm-nav-label">/admin</span>
           <NuxtLink
             v-for="item in adminNavItems"

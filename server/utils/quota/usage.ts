@@ -25,6 +25,13 @@ export type QuotaDecision =
   | { allowed: true }
   | { allowed: false; error: QuotaExceededPayload }
 
+export interface QuotaUsage {
+  exempt: false
+  subjectType: QuotaSubject['type']
+  daily: { limit: number; used: number; resetAt: string } | null
+  weekly: { limit: number; used: number; resetAt: string }
+}
+
 const QUOTA_EXCEEDED_MESSAGE = 'Atingiu o limite de perguntas gratuitas. Crie uma conta para continuar.'
 
 export function evaluateAndRecordQuota(
@@ -131,6 +138,59 @@ export function assertQuotaAllowedWithFallback(database: DatabaseSync, input: Ev
   }
 }
 
+export function getQuotaUsage(
+  database: DatabaseSync,
+  input: {
+    subject: QuotaSubject
+    occurredAt?: Date
+    userTimezone?: string
+    subscribedWeeklyLimit?: number
+  }
+): QuotaUsage {
+  const occurredAt = input.occurredAt ?? new Date()
+  const timezone = normalizeTimezone(input.userTimezone)
+  const windows = resolveQuotaWindows(occurredAt, timezone)
+  const policy = resolveQuotaPolicy(
+    { subjectType: input.subject.type },
+    {
+      subscribedWeeklyLimit: input.subscribedWeeklyLimit,
+      companySeats: input.subject.type === 'company' ? input.subject.seats : undefined
+    }
+  )
+
+  return {
+    exempt: false,
+    subjectType: input.subject.type,
+    daily: policy.dailyLimit === null ? null : {
+      limit: policy.dailyLimit,
+      used: countEvents(database, input.subject, windows.daily.startAtUtc, windows.daily.resetAtUtc),
+      resetAt: windows.daily.resetAtUtc.toISOString()
+    },
+    weekly: {
+      limit: policy.weeklyLimit,
+      used: countEvents(database, input.subject, windows.weekly.startAtUtc, windows.weekly.resetAtUtc),
+      resetAt: windows.weekly.resetAtUtc.toISOString()
+    }
+  }
+}
+
+export function attributeAnonymousQuotaUsage(
+  database: DatabaseSync,
+  input: { anonymousId: string; userId: string; attributedAt?: Date }
+): number {
+  const result = database.prepare(`
+    INSERT OR IGNORE INTO request_event_user_attributions (
+      request_event_id,
+      user_id,
+      attributed_at
+    )
+    SELECT id, ?, ?
+    FROM request_events
+    WHERE subject_type = 'anonymous' AND subject_id = ?
+  `).run(input.userId, (input.attributedAt ?? new Date()).toISOString(), input.anonymousId)
+  return Number(result.changes)
+}
+
 export function getCompanyQuotaUsage(
   database: DatabaseSync,
   input: { companyId: string; occurredAt?: Date; userTimezone?: string; subscribedWeeklyLimit?: number }
@@ -171,17 +231,35 @@ function countEvents(
   startAtUtc: Date,
   resetAtUtc: Date
 ): number {
+  const includesAttributedAnonymous = subject.type === 'registered' || subject.type === 'subscribed'
   const row = database
     .prepare(`
       SELECT COUNT(*) AS count
       FROM request_events
-      WHERE subject_type = ?
-        AND subject_id = ?
-        AND counted = 1
+      WHERE counted = 1
         AND occurred_at_utc >= ?
         AND occurred_at_utc < ?
+        AND (
+          (subject_type = ? AND subject_id = ?)
+          OR (
+            ? = 1
+            AND subject_type = 'anonymous'
+            AND EXISTS (
+              SELECT 1
+              FROM request_event_user_attributions
+              WHERE request_event_id = request_events.id AND user_id = ?
+            )
+          )
+        )
     `)
-    .get(subject.type, subject.id, startAtUtc.toISOString(), resetAtUtc.toISOString()) as { count: number }
+    .get(
+      startAtUtc.toISOString(),
+      resetAtUtc.toISOString(),
+      subject.type,
+      subject.id,
+      includesAttributedAnonymous ? 1 : 0,
+      subject.id
+    ) as { count: number }
 
   return row.count
 }

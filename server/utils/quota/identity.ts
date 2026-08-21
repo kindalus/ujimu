@@ -49,12 +49,26 @@ export function resolveQuotaSubject(
     return subject
   }
 
+  return resolveAnonymousQuotaSubject(event, options)
+}
+
+export function resolveAnonymousQuotaSubject(
+  event: H3Event,
+  options: ResolveAnonymousIdentityOptions = {}
+): QuotaSubject {
   const identity = resolveAnonymousIdentity(getCookie(event, ANONYMOUS_QUOTA_COOKIE_NAME), options)
   if (identity.cookieToSet) {
     setCookie(event, identity.cookieToSet.name, identity.cookieToSet.value, identity.cookieToSet.options)
   }
-
   return identity.subject
+}
+
+export function readExistingAnonymousQuotaSubject(
+  event: H3Event,
+  sessionSecret?: string
+): QuotaSubject | undefined {
+  const id = readSignedCookieValue(getCookie(event, ANONYMOUS_QUOTA_COOKIE_NAME), sessionSecret)
+  return id ? { type: 'anonymous', id } : undefined
 }
 
 export function resolveQuotaSubjectFromCookies(

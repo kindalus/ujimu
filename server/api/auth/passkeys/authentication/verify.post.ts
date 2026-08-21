@@ -1,6 +1,6 @@
 import { createError, defineEventHandler } from 'h3'
 import { getRequestOrigin, mapPasskeyError, readPasskeyJsonBody, resolvePasskeySubject } from '../../../../utils/auth/passkey-http'
-import { setSessionCookie } from '../../../../utils/auth/session'
+import { completeLogin } from '../../../../utils/auth/login'
 import { verifyPasskeyAuthentication } from '../../../../utils/auth/passkeys'
 import { initializeDatabase } from '../../../../utils/db'
 import { getOtpDeliveryCapabilities } from '../../../../utils/notifications/provider'
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
       subject: resolvePasskeySubject(event),
       response: body
     })
-    setSessionCookie(event, result.sessionToken)
+    completeLogin(event, database, { userId: result.user.id, sessionToken: result.sessionToken })
     return {
       authenticated: true,
       user: result.user

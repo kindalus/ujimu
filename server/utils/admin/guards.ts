@@ -26,9 +26,7 @@ export function getAdminSession(database: DatabaseSync, event: H3Event): AdminSe
     return { authenticated: false, admin: false }
   }
 
-  const verifiedContacts = getVerifiedContactsForUser(database, user.id)
-  const adminContacts = parseAdminContacts(process.env.UJIMU_ADMIN_CONTACTS)
-  const adminContact = verifiedContacts.find((contact) => adminContacts.has(normalizeAdminContact(contact)))
+  const adminContact = findAdminContactForUser(database, user.id)
 
   return {
     authenticated: true,
@@ -53,6 +51,24 @@ export function requireAdmin(database: DatabaseSync, event: H3Event): RequiredAd
     user: session.user,
     adminContact: session.adminContact
   }
+}
+
+export function isAdminUser(
+  database: DatabaseSync,
+  userId: string,
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return Boolean(findAdminContactForUser(database, userId, env))
+}
+
+export function findAdminContactForUser(
+  database: DatabaseSync,
+  userId: string,
+  env: Record<string, string | undefined> = process.env
+): string | undefined {
+  const adminContacts = parseAdminContacts(env.UJIMU_ADMIN_CONTACTS)
+  return getVerifiedContactsForUser(database, userId)
+    .find((contact) => adminContacts.has(normalizeAdminContact(contact)))
 }
 
 export function getVerifiedContactsForUser(database: DatabaseSync, userId: string): string[] {

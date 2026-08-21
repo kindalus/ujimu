@@ -528,6 +528,20 @@ const MIGRATIONS: Migration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_visitor_events_daily_identity
         ON visitor_events (visitor_id, COALESCE(user_id, ''), day);
     `
+  },
+  {
+    version: '0017_anonymous_quota_attribution',
+    sql: `
+      CREATE TABLE request_event_user_attributions (
+        request_event_id TEXT NOT NULL REFERENCES request_events(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        attributed_at TEXT NOT NULL,
+        PRIMARY KEY (request_event_id, user_id)
+      );
+
+      CREATE INDEX idx_request_event_attributions_user
+        ON request_event_user_attributions (user_id, request_event_id);
+    `
   }
 ]
 

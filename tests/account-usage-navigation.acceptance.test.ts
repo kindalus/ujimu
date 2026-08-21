@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { createApp, createRouter, toWebHandler, type EventHandler } from 'h3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import devLoginHandler from '../server/api/auth/dev-login.post'
 import otpVerifyHandler from '../server/api/auth/otp/verify.post'
 import sessionHandler from '../server/api/auth/session.get'
 import { requestOtp } from '../server/utils/auth/otp'
@@ -53,12 +54,21 @@ describe('account usage and admin navigation acceptance', () => {
     expect(login.status).toBe(200)
     const sessionCookie = responseCookie(login, 'ujimu_session')
 
-    const registered = await getSession(context, `${anonymousCookie('anonymous-browser')}; ${sessionCookie}`)
+    let registered = await getSession(context, `${anonymousCookie('anonymous-browser')}; ${sessionCookie}`)
     await expect(registered.json()).resolves.toMatchObject({
       authenticated: true,
       admin: false,
       quota: { daily: { limit: 40, used: 1 }, weekly: { limit: 200, used: 1 } }
     })
+
+    const secondDatabase = await initializeDatabase({ dataDir: context.dataDir, dbPath: process.env.UJIMU_DB_PATH })
+    await seedOtpChallenge(secondDatabase, 'user@example.com', '222222')
+    secondDatabase.close()
+    const secondLogin = await postJson(otpVerifyHandler, '/api/auth/otp/verify', {
+      channel: 'email', contact: 'user@example.com', code: '222222'
+    }, anonymousCookie('anonymous-browser'))
+    registered = await getSession(context, `${anonymousCookie('anonymous-browser')}; ${responseCookie(secondLogin, 'ujimu_session')}`)
+    expect((await registered.json()).quota.daily.used).toBe(1)
 
     const anonymousAgain = await getSession(context, anonymousCookie('anonymous-browser'))
     await expect(anonymousAgain.json()).resolves.toMatchObject({
@@ -88,6 +98,28 @@ describe('account usage and admin navigation acceptance', () => {
 
     const anonymousAgain = await getSession(context, anonymousCookie('admin-browser'))
     await expect(anonymousAgain.json()).resolves.toMatchObject({ quota: { daily: { used: 1 } } })
+
+    delete process.env.UJIMU_ADMIN_CONTACTS
+    const noLongerAdmin = await getSession(context, `${anonymousCookie('admin-browser')}; ${responseCookie(login, 'ujimu_session')}`)
+    await expect(noLongerAdmin.json()).resolves.toMatchObject({
+      admin: false,
+      quota: { daily: { used: 0 } }
+    })
+  })
+
+  it('attributes anonymous usage through development login', async () => {
+    const context = await createContext('dev-attribution')
+    process.env.UJIMU_DEV_AUTH_ENABLED = 'true'
+    process.env.UJIMU_DEV_USER_CONTACTS = 'developer@example.com'
+    recordAnonymousQuestion(context.database, 'dev-browser')
+    context.database.close()
+
+    const login = await postJson(devLoginHandler, '/api/auth/dev-login', {
+      channel: 'email', contact: 'developer@example.com'
+    }, anonymousCookie('dev-browser'))
+    expect(login.status).toBe(200)
+    const session = await getSession(context, `${anonymousCookie('dev-browser')}; ${responseCookie(login, 'ujimu_session')}`)
+    await expect(session.json()).resolves.toMatchObject({ quota: { daily: { used: 1 } } })
   })
 
   it('uses the shared login completion path for OTP, passkey, and development login', async () => {

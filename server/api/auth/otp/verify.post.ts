@@ -6,7 +6,8 @@ import {
   setResponseStatus
 } from 'h3'
 import { getPublicSessionUser, OtpDeliveryError, OtpRateLimitError, OtpValidationError, OtpVerificationError, verifyOtp } from '../../../utils/auth/otp'
-import { readSessionFromEvent, setSessionCookie } from '../../../utils/auth/session'
+import { completeLogin } from '../../../utils/auth/login'
+import { readSessionFromEvent } from '../../../utils/auth/session'
 import { initializeDatabase } from '../../../utils/db'
 import { createNotificationProviderFromEnv, getOtpDeliveryCapabilities } from '../../../utils/notifications/provider'
 
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
       currentUserId: currentSession?.userId,
       ...(provider.verifyOtp ? { verifyCode: provider.verifyOtp.bind(provider) } : {})
     })
-    setSessionCookie(event, result.sessionToken)
+    completeLogin(event, database, { userId: result.user.id, sessionToken: result.sessionToken })
     const publicUser = getPublicSessionUser(database, result.user.id) ?? result.user
 
     return {

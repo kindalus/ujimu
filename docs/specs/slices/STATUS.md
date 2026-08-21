@@ -107,7 +107,7 @@ Known non-blocking warnings:
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
-| 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `acceptance-tested` | — | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
+| 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `planned` | — | Edit display name and manage verified primary/secondary contacts safely. |
 
 ## Account usage, profile, and admin navigation extension
@@ -134,6 +134,14 @@ Slice 54 confirmed TDD seams:
 Acceptance-test RED:
 
 - `npm test -- tests/account-usage-navigation.acceptance.test.ts --reporter=verbose` — all five tests failed as expected because session responses lacked quota/admin state, login routes did not attribute anonymous events, and the UI remained hard-coded.
+
+Implementation and verification:
+
+- Added idempotent event attribution without moving anonymous events, and applied it to OTP, passkey, and development login while exempting admins.
+- Enriched `/api/auth/session` with canonical quota/admin state and used it in both shells without restoring `/api/admin/session` to initial loading.
+- Replaced static counts and hid both drawer and internal admin navigation from non-admins.
+- `npm test` passed 251 tests; typecheck, build, and audit passed with zero findings.
+- Browser verification confirmed 0/10 for anonymous users, “Administrador · sem limite” after admin login, role-aware drawer links, successful network requests, and a clean console.
 
 ## Twilio Verify OTP extension
 

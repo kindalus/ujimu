@@ -2,7 +2,7 @@ import { createError, defineEventHandler, getRequestHeader, readBody } from 'h3'
 import { devLogin, DevLoginError } from '../../utils/auth/dev-login'
 import type { OtpChannel } from '../../utils/auth/otp'
 import { getPasskeyReadiness } from '../../utils/auth/passkeys'
-import { setSessionCookie } from '../../utils/auth/session'
+import { completeLogin } from '../../utils/auth/login'
 import { initializeDatabase } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const result = devLogin(database, parseDevLoginBody(body))
-    setSessionCookie(event, result.sessionToken)
+    completeLogin(event, database, { userId: result.user.id, sessionToken: result.sessionToken })
 
     return {
       authenticated: true,

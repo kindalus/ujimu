@@ -32,6 +32,12 @@ interface FeaturesResponse {
 
 interface AuthSessionResponse {
   authenticated: boolean
+  admin?: boolean
+  quota?: {
+    exempt: boolean
+    daily: { limit: number; used: number; resetAt: string } | null
+    weekly: { limit: number; used: number; resetAt: string } | null
+  }
   user?: {
     id: string
     displayContact: string
@@ -249,6 +255,12 @@ const canWriteQuestion = computed(
 )
 const canSubmitQuestion = computed(() => canWriteQuestion.value && question.value.trim().length > 0)
 const canUseHistory = computed(() => isAuthenticated.value && Boolean(selectedSpecialistId.value))
+const quotaLabel = computed(() => {
+  const quota = authSession.value.quota
+  if (!quota) return 'Quota a carregar…'
+  if (authSession.value.admin || quota.exempt) return 'Administrador · sem limite'
+  return quota.daily ? `${quota.daily.used}/${quota.daily.limit} hoje` : 'Sem limite diário'
+})
 const statusLabel = computed(() => {
   if (isStreaming.value) return 'A responder'
   if (selectedSpecialist.value) return 'Preparado'
@@ -289,9 +301,13 @@ async function loadFeatures(): Promise<void> {
   }
 }
 
+function clientTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 async function loadAuthSession(): Promise<void> {
   try {
-    const response = await fetch('/api/auth/session')
+    const response = await fetch(`/api/auth/session?timezone=${encodeURIComponent(clientTimezone())}`)
     authSession.value = response.ok
       ? ((await response.json()) as AuthSessionResponse)
       : { authenticated: false }
@@ -321,8 +337,7 @@ async function loadBillingStatus(): Promise<void> {
 
 function handleAuthenticatedSession(session: AuthSessionResponse): void {
   authSession.value = session
-  void loadHistory()
-  void loadBillingStatus()
+  void loadAuthSession()
 }
 
 async function logout(): Promise<void> {
@@ -333,7 +348,7 @@ async function logout(): Promise<void> {
   activeConversationTitle.value = ''
   authPanelOpen.value = false
   billingStatus.value = { ...defaultBillingStatus }
-  void loadBillingStatus()
+  void loadAuthSession()
 }
 
 async function loadHistory(): Promise<void> {
@@ -700,6 +715,7 @@ async function startQuestion(
       return
     }
 
+    void loadAuthSession()
     await readChatStream(response, reactiveAssistantMessage, reactiveUserMessage, responseStartedAt)
 
     if (previousMessages && reactiveAssistantMessage.status === 'error') {
@@ -907,6 +923,7 @@ function createId(prefix: string): string {
       <div class="topbar-left">
         <AppDrawer
           :is-authenticated="isAuthenticated"
+          :is-admin="authSession.admin"
           :account-login-available="accountLoginAvailable"
           :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
@@ -948,8 +965,9 @@ function createId(prefix: string): string {
         <span class="wordmark">Ujimu<span class="wordmark-dot" /></span>
       </div>
       <div class="topbar-right">
-        <span v-if="subscriptionsEnabled && billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
-        <span v-else class="quota-pill">0/{{ isAuthenticated ? 40 : 10 }} hoje</span>
+        <span v-if="authSession.admin" class="quota-pill quota-pill--sub"><UjimuIcon name="spark" /> {{ quotaLabel }}</span>
+        <span v-else-if="subscriptionsEnabled && billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
+        <span v-else class="quota-pill">{{ quotaLabel }}</span>
         <button v-if="!isAuthenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
         <span v-else-if="isAuthenticated" class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
       </div>
