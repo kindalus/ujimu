@@ -108,7 +108,7 @@ Known non-blocking warnings:
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
-| 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `grilled` | — | Edit display name and manage verified primary/secondary contacts safely. |
+| 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `acceptance-tested` | — | Edit display name and manage verified primary/secondary contacts safely. |
 
 ## Account usage, profile, and admin navigation extension
 
@@ -130,6 +130,10 @@ Slice 55 TDD seams confirmed by the user on 2026-08-21:
 2. Authenticated OTP verification for adding a new contact and rejecting contacts owned by another account.
 3. `PUT /api/account/contacts/:id/primary` and `DELETE /api/account/contacts/:id` with recent-OTP and last/primary-contact safeguards.
 4. The real profile page for editing, adding, selecting, and removing contacts.
+
+RED evidence:
+
+- `npm test -- tests/editable-profile-contacts.acceptance.test.ts --reporter=verbose` failed because the profile mutation and contact-management endpoints did not exist.
 
 Slice 54 confirmed TDD seams:
 
