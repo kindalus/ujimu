@@ -105,11 +105,11 @@ Known non-blocking warnings:
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
 | 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `verified` | 2026-08-21 | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
-| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `idea-refined` | — | Measure and improve initial loading performance. |
+| 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `grilled` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slices 49–51 verified; Slice 52 idea-refined`
+Status: `Slices 49–51 verified; Slice 52 grilled`
 
 Approved originating decks:
 
@@ -231,7 +231,7 @@ Implementation and verification:
 
 ## Slice 52 — Measured loading performance
 
-Status: `idea-refined`
+Status: `grilled`
 
 Production baseline:
 
@@ -248,6 +248,15 @@ Refinement decisions:
 - Remove the unused anonymous admin-session probe and the unused `adminAvailable` drawer prop.
 - Enable HTTP/2 in the production Nginx TLS server and verify Chrome no longer reports static assets over HTTP/1.1.
 - Re-run the same production trace and Lighthouse audit; keep changes only if Core Web Vitals do not regress and request/protocol evidence improves.
+
+Grill decisions:
+
+- Change both application shells to `LazyAuthModal v-if="authPanelOpen"`; authentication remains functionally identical once opened.
+- Remove `adminAvailable` and shell-level `/api/admin/session` calls because the prop has no renderer and every admin page performs its own authorization request.
+- Keep `/api/auth/session`, `/api/features`, `/api/specialists`, and visitor analytics because each still drives visible state or required measurement.
+- Add `http2 on;` only to the existing Ujimu TLS server, validate Nginx before reload, and leave unrelated virtual hosts untouched.
+- Reject the manifest and CSS changes suggested by the trace: both had zero estimated LCP/FCP savings.
+- Compare the same unthrottled production trace; require HTTP/2 evidence, fewer initial API calls, LCP below 2.5 s, CLS at most 0.1, and no console regression.
 
 ## Progressive account launch extension
 
