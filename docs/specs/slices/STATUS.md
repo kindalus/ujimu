@@ -103,13 +103,13 @@ Known non-blocking warnings:
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 | 49 | [`49-public-seo-identity.html`](./49-public-seo-identity.html) | `verified` | 2026-08-21 | Add immediate SSR identity, social previews, crawl policy, and launch assets. |
-| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `grilled` | — | Add administrable editorial SEO fields per specialist. |
+| 50 | [`50-specialist-editorial-seo.html`](./50-specialist-editorial-seo.html) | `acceptance-tested` | — | Add administrable editorial SEO fields per specialist. |
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `planned` | — | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `planned` | — | Measure and improve initial loading performance. |
 
 ## SEO and performance launch extension
 
-Status: `Slice 49 verified; Slice 50 grilled; Slices 51–52 planned`
+Status: `Slice 49 verified; Slice 50 acceptance-tested; Slices 51–52 planned`
 
 Approved originating decks:
 
@@ -161,7 +161,7 @@ Implementation and verification:
 
 ## Slice 50 — Specialist editorial SEO
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Refinement decisions:
 
@@ -179,6 +179,10 @@ Grill decisions:
 - Audit only `seo` as a changed field; never place editorial content itself in audit metadata.
 - Preserve the current public specialist list contract while adding one `seo` object with safe title/description fallback.
 - Treat editorial values as plain text; future pages must render them through Vue escaping rather than `v-html` or Markdown.
+
+Acceptance-test RED:
+
+- Focused specialist, admin API, and admin UI tests failed as expected because the normalized `seo` contract, YAML persistence, HTTP payloads, and editing controls were absent.
 
 ## Progressive account launch extension
 

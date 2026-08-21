@@ -86,6 +86,11 @@ describe('admin specialist management acceptance', () => {
           description: 'Especialista sobre legislação de IVA.',
           wiki_type: 'legislation-regulatory',
           system_prompt: 'Answer only from this specialist wiki.',
+          seo: {
+            title: 'IVA em Angola',
+            description: 'Consulte legislação de IVA com fontes oficiais.',
+            topics: ['Facturação', 'Deduções']
+          },
           citations_required: true,
           streaming_enabled: true
         }
@@ -93,12 +98,16 @@ describe('admin specialist management acceptance', () => {
     )
     expect(created.status).toBe(202)
     await expect(created.json()).resolves.toMatchObject({
-      specialist: { id: 'iva', status: 'initializing' },
+      specialist: {
+        id: 'iva',
+        status: 'initializing',
+        seo: { title: 'IVA em Angola', topics: ['Facturação', 'Deduções'] }
+      },
       job: { type: 'specialist_initialization', status: 'queued', specialist_id: 'iva' }
     })
-    await expect(readFile(join(specialtiesRoot, 'iva', 'specialist.yaml'), 'utf8')).resolves.toContain(
-      'id: iva'
-    )
+    const createdYaml = await readFile(join(specialtiesRoot, 'iva', 'specialist.yaml'), 'utf8')
+    expect(createdYaml).toContain('id: iva')
+    expect(createdYaml).toContain('seo:')
 
     const duplicate = await fetchAdmin(
       jsonRequest('http://local/api/admin/specialists', {
@@ -125,6 +134,10 @@ describe('admin specialist management acceptance', () => {
           name: 'IVA actualizado',
           description: 'Descrição actualizada.',
           system_prompt: 'Use apenas a wiki de IVA.',
+          seo: {
+            introduction: 'Conheça as regras essenciais do IVA angolano.',
+            call_to_action: 'Consultar especialista'
+          },
           citations_required: true,
           streaming_enabled: false,
           status: 'active'
@@ -132,8 +145,18 @@ describe('admin specialist management acceptance', () => {
       })
     )
     expect(updated.status).toBe(200)
-    const updatedBody = await updated.json() as { specialist: { name: string; streaming_enabled: boolean } }
-    expect(updatedBody.specialist).toMatchObject({ name: 'IVA actualizado', streaming_enabled: false })
+    const updatedBody = await updated.json() as {
+      specialist: { name: string; streaming_enabled: boolean; seo: { title: string; introduction: string; call_to_action: string } }
+    }
+    expect(updatedBody.specialist).toMatchObject({
+      name: 'IVA actualizado',
+      streaming_enabled: false,
+      seo: {
+        title: 'IVA em Angola',
+        introduction: 'Conheça as regras essenciais do IVA angolano.',
+        call_to_action: 'Consultar especialista'
+      }
+    })
 
     const immutableEdit = await fetchAdmin(
       jsonRequest('http://local/api/admin/specialists/iva', {
@@ -149,14 +172,22 @@ describe('admin specialist management acceptance', () => {
         headers: sessionHeaders('admin-user')
       })
     )
-    const listedBody = await listed.json() as { specialists: Array<{ id: string; system_prompt: string; sources: unknown[] }> }
+    const listedBody = await listed.json() as {
+      specialists: Array<{ id: string; system_prompt: string; seo: { title: string }; sources: unknown[] }>
+    }
     expect(listedBody.specialists[0]).toMatchObject({
       id: 'iva',
       system_prompt: 'Use apenas a wiki de IVA.',
+      seo: { title: 'IVA em Angola' },
       sources: []
     })
     expect(await getPublicSpecialists({ specialtiesRoot })).toEqual([
-      expect.objectContaining({ id: 'iva', name: 'IVA actualizado', streaming_enabled: false })
+      expect.objectContaining({
+        id: 'iva',
+        name: 'IVA actualizado',
+        streaming_enabled: false,
+        seo: expect.objectContaining({ title: 'IVA em Angola' })
+      })
     ])
 
     const audit = await readAuditEvents(dataDir)
