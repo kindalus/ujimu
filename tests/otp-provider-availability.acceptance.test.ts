@@ -65,7 +65,7 @@ describe('configured OTP provider availability acceptance', () => {
   it('starts a phone verification through the configured Twilio Verify Service SID', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-request-'))
     configureVerifyEnv(dataDir)
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'pending' }), {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ status: 'pending' }), {
       status: 201,
       headers: { 'content-type': 'application/json' }
     }))
@@ -97,9 +97,10 @@ describe('configured OTP provider availability acceptance', () => {
     expect(options?.signal).toBeInstanceOf(AbortSignal)
   })
 
-  it('creates a session only after Twilio Verify approves the code', async () => {
+  it('creates an administrator session only after Twilio Verify approves the code', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-approved-'))
     configureVerifyEnv(dataDir)
+    process.env.UJIMU_ADMIN_CONTACTS = '+244923456789'
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'approved' }), { status: 200 }))
@@ -119,7 +120,18 @@ describe('configured OTP provider availability acceptance', () => {
       authenticated: true,
       user: { displayContact: '+244923456789' }
     })
-    expect(verifyResponse.headers.get('set-cookie')).toContain('ujimu_session=')
+    const sessionCookie = verifyResponse.headers.get('set-cookie')
+    expect(sessionCookie).toContain('ujimu_session=')
+
+    const adminHandler = (await import('../server/api/admin/session.get')).default
+    const adminApp = createApp()
+    const adminRouter = createRouter()
+    adminRouter.get('/api/admin/session', adminHandler)
+    adminApp.use(adminRouter)
+    const adminResponse = await toWebHandler(adminApp)(new Request('http://local/api/admin/session', {
+      headers: { cookie: sessionCookie!.split(';', 1)[0]! }
+    }))
+    expect(await adminResponse.json()).toMatchObject({ authenticated: true, admin: true })
 
     const [url, options] = fetchMock.mock.calls[1]!
     expect(url).toBe(`https://verify.twilio.com/v2/Services/VA${'b'.repeat(32)}/VerificationCheck`)
@@ -151,6 +163,25 @@ describe('configured OTP provider availability acceptance', () => {
     expect(response.headers.get('set-cookie')).toBeNull()
   })
 
+  it('treats an expired Twilio verification as an invalid code', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-expired-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 404 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const requestHandler = (await import('../server/api/auth/otp/request.post')).default
+    const verifyHandler = (await import('../server/api/auth/otp/verify.post')).default
+    await postJson(requestHandler, '/api/auth/otp/request', { channel: 'phone', contact: '+244923456789' })
+    const response = await postJson(verifyHandler, '/api/auth/otp/verify', {
+      channel: 'phone', contact: '+244923456789', code: '123456'
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain('Código inválido ou expirado.')
+  })
+
   it('returns generic errors for malformed Verify responses', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-errors-'))
     configureVerifyEnv(dataDir)
@@ -166,6 +197,43 @@ describe('configured OTP provider availability acceptance', () => {
     expect(response.status).toBe(503)
     expect(text).toContain('OTP_DELIVERY_FAILED')
     expect(text).not.toContain('provider-secret-detail')
+  })
+
+  it('returns a generic provider error when a Verify check has an unknown status', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-check-errors-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pending' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'provider-secret-status' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const requestHandler = (await import('../server/api/auth/otp/request.post')).default
+    const verifyHandler = (await import('../server/api/auth/otp/verify.post')).default
+    await postJson(requestHandler, '/api/auth/otp/request', { channel: 'phone', contact: '+244923456789' })
+    const response = await postJson(verifyHandler, '/api/auth/otp/verify', {
+      channel: 'phone', contact: '+244923456789', code: '123456'
+    })
+    const text = await response.text()
+
+    expect(response.status).toBe(503)
+    expect(text).toContain('OTP_DELIVERY_FAILED')
+    expect(text).not.toContain('provider-secret-status')
+  })
+
+  it('returns a generic provider error when the Verify request times out', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-verify-timeout-'))
+    configureVerifyEnv(dataDir)
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => { throw new DOMException('timed out', 'TimeoutError') })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const handler = (await import('../server/api/auth/otp/request.post')).default
+    const response = await postJson(handler, '/api/auth/otp/request', {
+      channel: 'phone', contact: '+244923456789'
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.text()).toContain('OTP_DELIVERY_FAILED')
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('sends email OTP through the documented SendGrid Mail Send request', async () => {
@@ -242,10 +310,12 @@ describe('configured OTP provider availability acceptance', () => {
       .rejects.toMatchObject({ code: 'NOTIFICATION_PROVIDER_DELIVERY_FAILED', message: 'OTP delivery failed.' })
   })
 
-  it('exposes public OTP channels without exposing provider credentials', async () => {
-    process.env.UJIMU_SENDGRID_API_KEY = 'never-return-this-key'
-    process.env.UJIMU_SENDGRID_FROM_EMAIL = 'no-reply@example.com'
-    delete process.env.UJIMU_TWILIO_ACCOUNT_SID
+  it('exposes Verify SMS publicly without exposing provider credentials', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.UJIMU_OTP_PROVIDER = 'twilio-verify'
+    process.env.UJIMU_TWILIO_ACCOUNT_SID = `AC${'a'.repeat(32)}`
+    process.env.UJIMU_TWILIO_AUTH_TOKEN = 'never-return-this-token'
+    process.env.UJIMU_TWILIO_VERIFY_SERVICE_SID = `VA${'b'.repeat(32)}`
     const features = await import('../server/api/features.get').catch(() => undefined)
     expect(features?.default).toBeTypeOf('function')
     if (!features?.default) return
@@ -258,8 +328,9 @@ describe('configured OTP provider availability acceptance', () => {
     const text = await response.text()
 
     expect(response.status).toBe(200)
-    expect(JSON.parse(text)).toMatchObject({ otpChannels: ['email'] })
-    expect(text).not.toContain('never-return-this-key')
+    expect(JSON.parse(text)).toMatchObject({ otpChannels: ['phone'] })
+    expect(text).not.toContain('never-return-this-token')
+    expect(text).not.toContain(`VA${'b'.repeat(32)}`)
   })
 
   it('keeps OTP login controls hidden when no delivery channel is configured', async () => {
