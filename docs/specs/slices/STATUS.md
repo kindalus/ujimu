@@ -20,14 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 48 progressive account launch flags:
+Latest full verification after the post-Slice 48 dependency security update:
 
 - `npm test` — passed, 225 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit --audit-level=high` — failed with 9 upstream dependency advisories: 3 moderate, 5 high, and 1 critical. The critical advisory is in `@nuxt/devtools`; high advisories include `nuxt`, `vite`, `brace-expansion`, `nanoid`, and `shell-quote`. Dependency remediation remains a separate release-hardening task.
+- `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
+- `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools browser check, 2026-08-21 — passed on the test instance and a temporary production-mode anonymous container: 0/10 quota shown; unavailable login, subscription, and company controls absent; disabled routes returned 404; no console errors.
+- Chrome DevTools browser check, 2026-08-21 — passed after the dependency update: home, specialist selection, and OTP dialog rendered correctly; expected API requests returned 200; no console errors or warnings. The earlier production-mode anonymous feature-flag checks also remain covered.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
