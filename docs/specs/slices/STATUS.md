@@ -107,7 +107,7 @@ Known non-blocking warnings:
 | 51 | [`51-public-specialist-pages.html`](./51-public-specialist-pages.html) | `verified` | 2026-08-21 | Render public specialist pages and a dynamic public sitemap. |
 | 52 | [`52-measured-loading-performance.html`](./52-measured-loading-performance.html) | `verified` | 2026-08-21 | Measure and improve initial loading performance. |
 | 53 | [`53-twilio-verify-sms-otp.html`](./53-twilio-verify-sms-otp.html) | `verified` | 2026-08-21 | Use one global OTP provider selector and Twilio Verify for SMS request and confirmation. |
-| 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `grilled` | — | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
+| 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `acceptance-tested` | — | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `planned` | — | Edit display name and manage verified primary/secondary contacts safely. |
 
 ## Account usage, profile, and admin navigation extension
@@ -130,6 +130,10 @@ Slice 54 confirmed TDD seams:
 2. OTP, passkey, and development login for idempotent anonymous-event attribution.
 3. `POST /api/chat` followed by session refresh for the visible count.
 4. Drawer and admin shell rendering for anonymous, registered, and admin states.
+
+Acceptance-test RED:
+
+- `npm test -- tests/account-usage-navigation.acceptance.test.ts --reporter=verbose` — all five tests failed as expected because session responses lacked quota/admin state, login routes did not attribute anonymous events, and the UI remained hard-coded.
 
 ## Twilio Verify OTP extension
 
