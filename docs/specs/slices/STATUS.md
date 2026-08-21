@@ -98,6 +98,70 @@ Known non-blocking warnings:
 | 43 | [`43-chat-copy-question-response-metrics.html`](./43-chat-copy-question-response-metrics.html) | `verified` | 2026-06-16 | Copy user questions and show duration/tokens for the latest completed response without persisting metrics. |
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
 | 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
+| 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `idea-refined` | — | Double anonymous and registered free-tier quotas. |
+| 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `idea-refined` | — | Enable SendGrid email and Twilio SMS only when configured. |
+| 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `idea-refined` | — | Hide and block subscription/company features behind default-off flags. |
+
+## Progressive account launch extension
+
+Status: `idea-refined`
+
+Approved originating decks:
+
+- [`../brainstorm-progressive-account-launch.html`](../brainstorm-progressive-account-launch.html)
+- [`../progressive-account-launch-architecture.html`](../progressive-account-launch-architecture.html)
+
+Planned order:
+
+1. Slice 46 doubles anonymous and registered quotas.
+2. Slice 47 adds configured OTP channels and account-login availability.
+3. Slice 48 adds default-off launch flags for subscriptions and companies.
+
+## Slice 46 — Doubled free quotas
+
+Status: `idea-refined`
+
+Refinement decisions:
+
+- Change anonymous quotas from 5/day and 20/week to 10/day and 40/week.
+- Change registered quotas from 20/day and 100/week to 40/day and 200/week.
+- Preserve subscribed, company, and admin policies.
+- Update visible quota copy without making the values configurable.
+
+## Slice 47 — Configured OTP channels
+
+Status: `idea-refined`
+
+Refinement decisions:
+
+- Send email OTP through SendGrid and SMS OTP through Twilio.
+- Activate each channel independently only when its required environment variables are complete.
+- Keep `UJIMU_SENDGRID_FROM_NAME` optional and use `Ujimu` when absent.
+- Add a public capabilities endpoint for OTP channels and launch flags.
+- Block new OTP/passkey login when no OTP channel is configured while preserving valid sessions and in-progress OTP verification.
+- Use native `fetch` against fixed official HTTPS endpoints; add no SDK dependency.
+
+Official sources:
+
+- https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
+- https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
+- https://nodejs.org/api/globals.html#fetch
+
+## Slice 48 — Launch feature flags
+
+Status: `idea-refined`
+
+Refinement decisions:
+
+- Default `UJIMU_SUBSCRIPTIONS_ENABLED` and `UJIMU_COMPANIES_ENABLED` to false.
+- Publish feature availability through the capabilities endpoint.
+- Use Nuxt server middleware to block disabled page/API prefixes before route handlers.
+- Hide links, calls to action, and company selectors when their feature is disabled.
+- Preserve all billing/company code and data for later activation.
+
+Official source:
+
+- https://nuxt.com/docs/4.x/directory-structure/server#server-middleware
 
 ## Slice 45 — llm-wiki-owned specialist AGENTS.md
 
