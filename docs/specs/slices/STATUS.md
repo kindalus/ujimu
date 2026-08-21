@@ -20,14 +20,14 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 45 llm-wiki-owned specialist AGENTS.md:
+Latest full verification after Slice 48 progressive account launch flags:
 
-- `npm test` — passed, 212 tests
+- `npm test` — passed, 225 tests
 - `npm run typecheck` — passed
 - `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit --audit-level=high` — failed with upstream dependency advisories, including high-severity advisories in `@earendil-works/pi-coding-agent`, `nuxt`, `vite`, `protobufjs`, `undici`, and `ws`; dependency remediation is outside Slice 45.
+- `npm audit --audit-level=high` — failed with 9 upstream dependency advisories: 3 moderate, 5 high, and 1 critical. The critical advisory is in `@nuxt/devtools`; high advisories include `nuxt`, `vite`, `brace-expansion`, `nanoid`, and `shell-quote`. Dependency remediation remains a separate release-hardening task.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
-- Chrome DevTools browser check — not rerun for Slice 45 because the change affects backend specialist initialization and has no browser UI surface.
+- Chrome DevTools browser check, 2026-08-21 — passed on the test instance and a temporary production-mode anonymous container: 0/10 quota shown; unavailable login, subscription, and company controls absent; disabled routes returned 404; no console errors.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
 - `scripts/container/build.sh` — passed with Podman, built `localhost/ujimu:latest`
 - Container smoke test — passed: `gemini --version` returned `0.42.0`; `/healthz` returned `{ "ok": true, "service": "ujimu" }`
@@ -100,11 +100,11 @@ Known non-blocking warnings:
 | 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
 | 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
 | 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `verified` | 2026-08-21 | Enable SendGrid email and Twilio SMS only when configured. |
-| 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `acceptance-tested` | — | Hide and block subscription/company features behind default-off flags. |
+| 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `verified` | 2026-08-21 | Hide and block subscription/company features behind default-off flags. |
 
 ## Progressive account launch extension
 
-Status: `grilled`
+Status: `verified`
 
 Approved originating decks:
 
@@ -185,7 +185,7 @@ Implementation and verification:
 
 ## Slice 48 — Launch feature flags
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Refinement decisions:
 
@@ -210,6 +210,17 @@ Official source:
 Acceptance-test RED:
 
 - `npm test -- tests/launch-feature-flags.acceptance.test.ts --reporter=verbose` — failed as expected because public flags, route middleware, dormant tier logic, and conditional UI were absent.
+
+Implementation and verification:
+
+- Added strict default-off launch flags and published them through `GET /api/features`.
+- Added Nuxt server middleware that returns 404 for disabled subscription, billing, company, and company-admin route segments.
+- Kept disabled subscription/company records dormant: no quota elevation, ad removal, corporate quota, active-company context, or private-specialist access.
+- Hid subscription/company UI and blocked company assignment while disabled.
+- Made readiness secrets conditional on enabled OTP/subscription capabilities.
+- Fixed the anonymous header so absence of login no longer renders a placeholder account avatar.
+- Focused tests passed, followed by `npm test` (225 tests), `npm run typecheck`, and `npm run build`.
+- Browser verification passed on the test instance and a temporary production-mode anonymous container; disabled routes returned 404 and the console remained clean.
 
 ## Slice 45 — llm-wiki-owned specialist AGENTS.md
 

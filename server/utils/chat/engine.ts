@@ -84,7 +84,7 @@ export async function createChatEventStream(
   const accessDatabase = options.history?.database ?? options.quota?.database
   const accessUserId = resolveHistoryUserId(options.history)
     ?? (options.quota?.subject.type === 'anonymous' ? undefined : options.quota?.subject.id)
-  const accessSubject = resolveSpecialistAccessSubjectFromUser(accessDatabase, accessUserId)
+  const accessSubject = resolveSpecialistAccessSubjectFromUser(accessDatabase, accessUserId, { env: process.env })
   if (!canUseSpecialist(specialist, accessSubject)) {
     throw specialistNotFound(specialistId)
   }

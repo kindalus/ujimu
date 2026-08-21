@@ -4,6 +4,8 @@ import { defineEventHandler } from 'h3'
 import { requireAdmin } from '../../../utils/admin/guards'
 import { resolveAppConfig } from '../../../utils/config'
 import { getPasskeyReadiness } from '../../../utils/auth/passkeys'
+import { resolveLaunchFeatures } from '../../../utils/features'
+import { getOtpDeliveryCapabilities } from '../../../utils/notifications/provider'
 import { initializeDatabase } from '../../../utils/db'
 import { getOperationalLogDirectory } from '../../../utils/ops/logger'
 
@@ -15,6 +17,9 @@ interface ReadinessChecks {
   billingWebhookSecretConfigured: boolean
   sessionSecretConfigured: boolean
   otpPepperConfigured: boolean
+  otpChannelsConfigured: number
+  subscriptionsEnabled: boolean
+  companiesEnabled: boolean
   passkeysEnabled: boolean
   passkeysConfigured: boolean
 }
@@ -25,6 +30,8 @@ export default defineEventHandler(async (event) => {
   requireAdmin(database, event)
   const config = resolveAppConfig({ env: process.env })
   const passkeyReadiness = getPasskeyReadiness(process.env)
+  const launchFeatures = resolveLaunchFeatures(process.env)
+  const otpDelivery = getOtpDeliveryCapabilities(process.env)
   const checks: ReadinessChecks = {
     database: canQueryDatabase(database),
     dataDirectoryWritable: await canWriteToDirectory(config.dataDir),
@@ -33,6 +40,9 @@ export default defineEventHandler(async (event) => {
     billingWebhookSecretConfigured: Boolean(process.env.UJIMU_BILLING_WEBHOOK_SECRET),
     sessionSecretConfigured: Boolean(process.env.UJIMU_SESSION_SECRET),
     otpPepperConfigured: Boolean(process.env.UJIMU_OTP_PEPPER),
+    otpChannelsConfigured: otpDelivery.otpChannels.length,
+    subscriptionsEnabled: launchFeatures.subscriptionsEnabled,
+    companiesEnabled: launchFeatures.companiesEnabled,
     passkeysEnabled: passkeyReadiness.passkeysEnabled,
     passkeysConfigured: passkeyReadiness.passkeysConfigured
   }
@@ -42,10 +52,9 @@ export default defineEventHandler(async (event) => {
       checks.dataDirectoryWritable &&
       checks.operationalLogsWritable &&
       checks.migrationsApplied > 0 &&
-      checks.billingWebhookSecretConfigured &&
-      // Without these two, every restart silently invalidates all sessions and pending OTPs.
+      (!checks.subscriptionsEnabled || checks.billingWebhookSecretConfigured) &&
       checks.sessionSecretConfigured &&
-      checks.otpPepperConfigured,
+      (checks.otpChannelsConfigured === 0 || checks.otpPepperConfigured),
     checks
   }
 })

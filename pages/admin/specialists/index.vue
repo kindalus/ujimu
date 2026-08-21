@@ -19,6 +19,7 @@ const sessionPending = ref(true)
 const specialists = ref<AdminSpecialist[]>([])
 const failedInitializations = ref<AdminFailedInitialization[]>([])
 const companies = ref<AdminCompanySummary[]>([])
+const companiesEnabled = ref(false)
 const pending = ref(false)
 const creating = ref(false)
 const idTouched = ref(false)
@@ -35,12 +36,17 @@ onMounted(() => {
 async function loadAdminSession(): Promise<void> {
   sessionPending.value = true
   try {
+    const featuresResponse = await fetch('/api/features')
+    const features = featuresResponse.ok
+      ? (await featuresResponse.json()) as { companiesEnabled?: boolean }
+      : { companiesEnabled: false }
+    companiesEnabled.value = features.companiesEnabled === true
     const response = await fetch('/api/admin/session')
     session.value = response.ok
       ? ((await response.json()) as AdminSessionResponse)
       : { authenticated: false, admin: false }
     if (session.value.admin) {
-      await Promise.all([loadSpecialists(), loadCompanies()])
+      await Promise.all([loadSpecialists(), ...(companiesEnabled.value ? [loadCompanies()] : [])])
     }
   } catch {
     session.value = { authenticated: false, admin: false }
@@ -135,6 +141,7 @@ function companyName(companyId: string | null): string {
 }
 
 function accessLabel(specialist: AdminSpecialist): string {
+  if (!companiesEnabled.value) return specialist.company_id ? 'reservado' : 'público'
   return specialist.company_id ? `empresa: ${companyName(specialist.company_id)}` : 'público'
 }
 
@@ -243,7 +250,7 @@ function badgeClass(status: string): string {
             </label>
           </div>
 
-          <label class="adm-field">
+          <label v-if="companiesEnabled" class="adm-field">
             <span class="adm-field-label">Empresa</span>
             <select v-model="createForm.company_id" class="field" :disabled="pending">
               <option value="">Todos — disponível ao público</option>

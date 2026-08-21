@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const specialist = await getSpecialistById(conversation.specialistId)
-  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
+  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId, { env: process.env }))) {
     throw createError({ statusCode: 404, statusMessage: 'Conversation not found' })
   }
 

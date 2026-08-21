@@ -567,9 +567,11 @@ function createAdminFetch(
     const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
     const previousAdminContacts = process.env.UJIMU_ADMIN_CONTACTS
     const previousPiEnabled = process.env.UJIMU_PI_INGESTION_ENABLED
+    const previousCompaniesEnabled = process.env.UJIMU_COMPANIES_ENABLED
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'admin-test-secret'
     process.env.UJIMU_ADMIN_CONTACTS = adminContacts
+    process.env.UJIMU_COMPANIES_ENABLED = 'true'
     if (env.UJIMU_PI_INGESTION_ENABLED === undefined) {
       delete process.env.UJIMU_PI_INGESTION_ENABLED
     } else {
@@ -583,6 +585,7 @@ function createAdminFetch(
       restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
       restoreEnv('UJIMU_ADMIN_CONTACTS', previousAdminContacts)
       restoreEnv('UJIMU_PI_INGESTION_ENABLED', previousPiEnabled)
+      restoreEnv('UJIMU_COMPANIES_ENABLED', previousCompaniesEnabled)
     }
   }
 }

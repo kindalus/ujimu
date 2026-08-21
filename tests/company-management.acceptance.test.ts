@@ -150,13 +150,16 @@ function createCompanyFetch(dataDir: string): (request: Request) => Promise<Resp
   return async (request: Request) => {
     const previousDataDir = process.env.UJIMU_DATA_DIR
     const previousSessionSecret = process.env.UJIMU_SESSION_SECRET
+    const previousCompaniesEnabled = process.env.UJIMU_COMPANIES_ENABLED
     process.env.UJIMU_DATA_DIR = dataDir
     process.env.UJIMU_SESSION_SECRET = 'company-test-session-secret'
+    process.env.UJIMU_COMPANIES_ENABLED = 'true'
     try {
       return await fetch(request)
     } finally {
       restoreEnv('UJIMU_DATA_DIR', previousDataDir)
       restoreEnv('UJIMU_SESSION_SECRET', previousSessionSecret)
+      restoreEnv('UJIMU_COMPANIES_ENABLED', previousCompaniesEnabled)
     }
   }
 }

@@ -356,7 +356,8 @@ describe('subscriptions, payments, and advertising acceptance', () => {
 
     expect(
       resolveQuotaSubjectWithSubscription(database, { type: 'registered', id: 'billing-user' }, {
-        now: new Date('2026-11-10T12:00:00.000Z')
+        now: new Date('2026-11-10T12:00:00.000Z'),
+        env: { UJIMU_SUBSCRIPTIONS_ENABLED: 'true' }
       })
     ).toEqual({ type: 'subscribed', id: 'billing-user' })
 
@@ -372,7 +373,8 @@ describe('subscriptions, payments, and advertising acceptance', () => {
     })
     expect(
       resolveQuotaSubjectWithSubscription(database, { type: 'registered', id: 'billing-user' }, {
-        now: new Date('2026-11-16T12:00:00.000Z')
+        now: new Date('2026-11-16T12:00:00.000Z'),
+        env: { UJIMU_SUBSCRIPTIONS_ENABLED: 'true' }
       })
     ).toEqual({ type: 'registered', id: 'billing-user' })
 

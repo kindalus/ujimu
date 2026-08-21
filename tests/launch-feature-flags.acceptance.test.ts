@@ -61,6 +61,12 @@ describe('launch feature flags acceptance', () => {
       expect((await fetch(new Request(`http://local${path}`))).status, path).toBe(404)
     }
     expect((await fetch(new Request('http://local/api/features'))).status).toBe(200)
+
+    process.env.UJIMU_SUBSCRIPTIONS_ENABLED = 'true'
+    process.env.UJIMU_COMPANIES_ENABLED = 'true'
+    for (const path of ['/subscription', '/api/billing/status', '/companies', '/api/companies']) {
+      expect((await fetch(new Request(`http://local${path}`))).status, path).toBe(200)
+    }
   })
 
   it('preserves existing subscription and company behaviour only when the corresponding flag is true', async () => {

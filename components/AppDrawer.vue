@@ -5,12 +5,14 @@ const props = withDefaults(defineProps<{
   isAuthenticated?: boolean
   adminAvailable?: boolean
   accountLoginAvailable?: boolean
+  subscriptionsEnabled?: boolean
   userLabel?: string
   openLabel?: string
 }>(), {
   isAuthenticated: false,
   adminAvailable: false,
   accountLoginAvailable: false,
+  subscriptionsEnabled: false,
   userLabel: '',
   openLabel: 'Abrir menu'
 })
@@ -95,7 +97,7 @@ function logout(): void {
 
       <div class="drawer-foot">
         <NuxtLink v-if="isAuthenticated" class="drawer-foot-link" to="/account/profile" @click="closeTemporaryDrawer"><UjimuIcon name="user" /> O meu perfil</NuxtLink>
-        <NuxtLink class="drawer-foot-link" to="/subscription" @click="closeTemporaryDrawer"><UjimuIcon name="star" /> Subscrição</NuxtLink>
+        <NuxtLink v-if="subscriptionsEnabled" class="drawer-foot-link" to="/subscription" @click="closeTemporaryDrawer"><UjimuIcon name="star" /> Subscrição</NuxtLink>
         <NuxtLink class="drawer-foot-link" to="/admin" @click="closeTemporaryDrawer"><UjimuIcon name="spark" /> Administração <span class="drawer-foot-tag">/admin</span></NuxtLink>
         <div v-if="isAuthenticated" class="drawer-user">
           <span class="avatar avatar--sm">{{ props.userLabel?.slice(0, 1).toUpperCase() || 'U' }}</span>

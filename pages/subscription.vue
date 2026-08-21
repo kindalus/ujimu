@@ -42,6 +42,10 @@ interface BillingStatusResponse {
   }
 }
 
+interface FeaturesResponse {
+  companiesEnabled: boolean
+}
+
 interface BillingCheckoutResponse {
   checkout: {
     id: string
@@ -68,9 +72,11 @@ const billingPending = ref(false)
 const billingError = ref('')
 const billingMessage = ref('')
 const billingCheckoutPending = ref(false)
+const companiesEnabled = ref(false)
 
 onMounted(() => {
   void loadAuthSession()
+  void loadFeatures()
 })
 
 const isAuthenticated = computed(() => authSession.value.authenticated)
@@ -79,6 +85,16 @@ const billingPriceLabel = computed(() => {
   return formatted ? `${formatted} AOA` : fallbackBillingPriceLabel
 })
 const billingExpiryLabel = computed(() => formatDisplayDate(billingStatus.value.subscription?.expiresAt))
+
+async function loadFeatures(): Promise<void> {
+  try {
+    const response = await fetch('/api/features')
+    const payload = response.ok ? (await response.json()) as FeaturesResponse : { companiesEnabled: false }
+    companiesEnabled.value = payload.companiesEnabled === true
+  } catch {
+    companiesEnabled.value = false
+  }
+}
 
 async function loadAuthSession(): Promise<void> {
   try {
@@ -237,7 +253,7 @@ function formatDisplayDate(value: string | undefined): string {
         </button>
       </div>
 
-      <div class="plan">
+      <div v-if="companiesEnabled" class="plan">
         <span class="plan-name">Empresa</span>
         <span class="plan-price">Sob consulta<span class="plan-per">/trimestre</span></span>
         <ul class="plan-list">

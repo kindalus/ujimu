@@ -25,6 +25,8 @@ interface SpecialistsResponse {
 
 interface FeaturesResponse {
   otpChannels: Array<'email' | 'phone'>
+  subscriptionsEnabled: boolean
+  companiesEnabled: boolean
 }
 
 interface AuthSessionResponse {
@@ -193,6 +195,7 @@ const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const otpChannels = ref<Array<'email' | 'phone'>>([])
+const subscriptionsEnabled = ref(false)
 const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
 const inlineAdSchedule = ref<number[]>([])
 const activeChatAbortController = ref<AbortController | null>(null)
@@ -277,10 +280,15 @@ async function recordVisit(): Promise<void> {
 async function loadFeatures(): Promise<void> {
   try {
     const response = await fetch('/api/features')
-    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    const payload = response.ok
+      ? (await response.json()) as FeaturesResponse
+      : { otpChannels: [], subscriptionsEnabled: false, companiesEnabled: false }
     otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+    subscriptionsEnabled.value = payload.subscriptionsEnabled === true
+    if (subscriptionsEnabled.value) void loadBillingStatus()
   } catch {
     otpChannels.value = []
+    subscriptionsEnabled.value = false
   }
 }
 
@@ -301,6 +309,10 @@ async function loadAuthSession(): Promise<void> {
 }
 
 async function loadBillingStatus(): Promise<void> {
+  if (!subscriptionsEnabled.value) {
+    billingStatus.value = { ...defaultBillingStatus }
+    return
+  }
   try {
     const response = await fetch('/api/billing/status')
     billingStatus.value = response.ok
@@ -911,6 +923,7 @@ function createId(prefix: string): string {
           :is-authenticated="isAuthenticated"
           :admin-available="adminAvailable"
           :account-login-available="accountLoginAvailable"
+          :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
@@ -950,10 +963,10 @@ function createId(prefix: string): string {
         <span class="wordmark">Ujimu<span class="wordmark-dot" /></span>
       </div>
       <div class="topbar-right">
-        <span v-if="billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
+        <span v-if="subscriptionsEnabled && billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
         <span v-else class="quota-pill">0/{{ isAuthenticated ? 40 : 10 }} hoje</span>
         <button v-if="!isAuthenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
-        <span v-else class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
+        <span v-else-if="isAuthenticated" class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
       </div>
     </header>
 
@@ -1077,7 +1090,7 @@ function createId(prefix: string): string {
         </div>
       </div>
 
-      <div v-if="billingStatus.expiryWarning" class="chat-warnwrap">
+      <div v-if="subscriptionsEnabled && billingStatus.expiryWarning" class="chat-warnwrap">
         <div class="warnbar" role="alert">
           <UjimuIcon name="info" />
           <span>A sua subscrição termina em menos de uma semana. Renove para manter o acesso sem publicidade.</span>
@@ -1102,7 +1115,7 @@ function createId(prefix: string): string {
           <span>{{ accountLoginAvailable ? quotaError : 'Atingiu o limite de perguntas gratuitas. Volte depois da reposição da quota.' }}</span>
           <div class="quota-notice-row">
             <button v-if="accountLoginAvailable" class="btn btn--primary btn--xs" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
-            <NuxtLink class="btn btn--ghost btn--xs" to="/subscription">Ver subscrição</NuxtLink>
+            <NuxtLink v-if="subscriptionsEnabled" class="btn btn--ghost btn--xs" to="/subscription">Ver subscrição</NuxtLink>
           </div>
         </div>
 

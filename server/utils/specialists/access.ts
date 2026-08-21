@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { H3Event } from 'h3'
 import { readSessionFromEvent } from '../auth/session'
+import { resolveLaunchFeatures } from '../features'
 import { getActiveCompanyForUser } from '../companies/repository'
 import type { SpecialistRuntime } from './schema'
 
@@ -33,18 +34,21 @@ export function resolveSpecialistAccessSubject(database: DatabaseSync, event: H3
     return { type: 'anonymous' }
   }
 
-  return resolveSpecialistAccessSubjectFromUser(database, session.userId)
+  return resolveSpecialistAccessSubjectFromUser(database, session.userId, { env: process.env })
 }
 
 export function resolveSpecialistAccessSubjectFromUser(
   database: DatabaseSync | undefined,
-  userId: string | undefined
+  userId: string | undefined,
+  options: { env: Record<string, string | undefined> }
 ): SpecialistAccessSubject {
   if (!database || !userId || !userExists(database, userId)) {
     return { type: 'anonymous' }
   }
 
-  const activeCompany = getActiveCompanyForUser(database, userId)
+  const activeCompany = resolveLaunchFeatures(options.env).companiesEnabled
+    ? getActiveCompanyForUser(database, userId)
+    : undefined
   return {
     type: 'user',
     userId,

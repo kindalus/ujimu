@@ -4,6 +4,7 @@ import { requireAdmin } from '../../../utils/admin/guards'
 import { toAdminSpecialistPayload } from '../../../utils/admin/specialists'
 import { getCompany } from '../../../utils/companies/repository'
 import { initializeDatabase } from '../../../utils/db'
+import { resolveLaunchFeatures } from '../../../utils/features'
 import { enqueueSpecialistInitializationJob, scheduleDueBackgroundJobs } from '../../../utils/jobs/background'
 import { createSpecialist, rollbackSpecialistCreation, SpecialistOperationError } from '../../../utils/specialists/manager'
 import { SpecialistConfigError, type SpecialistConfig } from '../../../utils/specialists/schema'
@@ -75,6 +76,9 @@ function parseSpecialistConfig(body: unknown): SpecialistConfig {
 }
 
 function assertCompanyExistsWhenProvided(database: Awaited<ReturnType<typeof initializeDatabase>>, companyId: string | null | undefined): void {
+  if (companyId && !resolveLaunchFeatures(process.env).companiesEnabled) {
+    throw createError({ statusCode: 400, statusMessage: 'Companies are disabled', data: { code: 'FEATURE_DISABLED' } })
+  }
   if (companyId && !getCompany(database, companyId)) {
     throw createError({ statusCode: 400, statusMessage: 'Company not found', data: { code: 'COMPANY_NOT_FOUND' } })
   }

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createApp, createRouter, toWebHandler } from 'h3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSessionToken, verifySessionToken } from '../server/utils/auth/session'
 
 const originalEnv = { ...process.env }
 
@@ -136,9 +137,10 @@ describe('configured OTP provider availability acceptance', () => {
   })
 
   it('keeps OTP login controls hidden when no delivery channel is configured', async () => {
-    const [authModal, chatPage] = await Promise.all([
+    const [authModal, chatPage, routeChrome] = await Promise.all([
       readFile('components/AuthModal.vue', 'utf8'),
-      readFile('pages/index.vue', 'utf8')
+      readFile('pages/index.vue', 'utf8'),
+      readFile('components/MockRouteChrome.vue', 'utf8')
     ])
 
     expect(authModal).toContain("fetch('/api/features')")
@@ -146,6 +148,19 @@ describe('configured OTP provider availability acceptance', () => {
     expect(authModal).toContain("otpChannels.includes('phone')")
     expect(chatPage).toContain('accountLoginAvailable')
     expect(chatPage).toContain("fetch('/api/features')")
+    expect(chatPage).toContain('<span v-else-if="isAuthenticated" class="avatar"')
+    expect(routeChrome).toContain('<span v-else-if="authSession.authenticated" class="avatar"')
+  })
+
+  it('preserves already valid account sessions when no OTP channel is configured', () => {
+    const token = createSessionToken('existing-user', {
+      sessionSecret: 'existing-session-secret',
+      now: new Date('2026-08-21T12:00:00.000Z')
+    })
+    expect(verifySessionToken(token, {
+      sessionSecret: 'existing-session-secret',
+      now: new Date('2026-08-22T12:00:00.000Z')
+    })).toMatchObject({ userId: 'existing-user' })
   })
 
   it('blocks passkey login when no OTP delivery channel is configured', async () => {

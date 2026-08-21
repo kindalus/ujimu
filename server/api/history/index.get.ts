@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const specialistId = readSpecialistId(getQuery(event).specialistId)
 
   const specialist = await getSpecialistById(specialistId)
-  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId))) {
+  if (!specialist || !canUseSpecialist(specialist, resolveSpecialistAccessSubjectFromUser(database, session.userId, { env: process.env }))) {
     throw createError({ statusCode: 404, statusMessage: 'Specialist not found' })
   }
 

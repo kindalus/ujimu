@@ -21,6 +21,7 @@ const session = ref<AdminSessionResponse>({ authenticated: false, admin: false }
 const sessionPending = ref(true)
 const specialists = ref<AdminSpecialist[]>([])
 const companies = ref<AdminCompanySummary[]>([])
+const companiesEnabled = ref(false)
 const editForm = ref({
   name: '',
   description: '',
@@ -60,12 +61,17 @@ onMounted(() => {
 async function loadAdminSession(): Promise<void> {
   sessionPending.value = true
   try {
+    const featuresResponse = await fetch('/api/features')
+    const features = featuresResponse.ok
+      ? (await featuresResponse.json()) as { companiesEnabled?: boolean }
+      : { companiesEnabled: false }
+    companiesEnabled.value = features.companiesEnabled === true
     const response = await fetch('/api/admin/session')
     session.value = response.ok
       ? ((await response.json()) as AdminSessionResponse)
       : { authenticated: false, admin: false }
     if (session.value.admin) {
-      await Promise.all([loadSpecialists(), loadCompanies()])
+      await Promise.all([loadSpecialists(), ...(companiesEnabled.value ? [loadCompanies()] : [])])
     }
   } catch {
     session.value = { authenticated: false, admin: false }
@@ -108,10 +114,11 @@ async function updateSpecialist(): Promise<void> {
   if (!specialist.value || pending.value) return
 
   await runAdminAction(async () => {
-    const { status, ...editableFields } = editForm.value
+    const { status, company_id, ...editableFields } = editForm.value
+    const companyFields = companiesEnabled.value ? { company_id } : {}
     const body = status === 'active' || status === 'suspended'
-      ? editForm.value
-      : editableFields
+      ? { ...editableFields, status, ...companyFields }
+      : { ...editableFields, ...companyFields }
     const response = await fetch(`/api/admin/specialists/${encodeURIComponent(specialist.value!.id)}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -516,7 +523,7 @@ function canIngestSource(source: IngestionSource): boolean {
       </div>
     </div>
 
-    <div class="adm-card">
+    <div v-if="companiesEnabled" class="adm-card">
       <h2 class="adm-card-title">Acesso restrito por empresa</h2>
       <p class="adm-card-note">Reserve este especialista a uma única empresa com conta corporativa. Com «Todos», fica disponível ao público.</p>
       <label class="adm-field">

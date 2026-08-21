@@ -14,6 +14,8 @@ interface AuthSessionResponse {
 
 interface FeaturesResponse {
   otpChannels: Array<'email' | 'phone'>
+  subscriptionsEnabled: boolean
+  companiesEnabled: boolean
 }
 
 interface UserCompany {
@@ -36,6 +38,8 @@ const profile = ref<ProfileResponse>({ authenticated: false, verifiedEmails: [],
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const authPanelOpen = ref(false)
 const otpChannels = ref<Array<'email' | 'phone'>>([])
+const subscriptionsEnabled = ref(false)
+const companiesEnabled = ref(false)
 const selectedCompanyId = ref('')
 const loading = ref(true)
 const pending = ref(false)
@@ -47,7 +51,7 @@ const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const userInitial = computed(() => displayContact.value.slice(0, 1).toUpperCase() || 'U')
 const isEmailContact = computed(() => displayContact.value.includes('@'))
 const planLabel = computed(() => {
-  if (profile.value.activeCompany) return `Empresa — ${profile.value.activeCompany.name}`
+  if (companiesEnabled.value && profile.value.activeCompany) return `Empresa — ${profile.value.activeCompany.name}`
   return 'Gratuito'
 })
 const verifiedContactList = computed(() => {
@@ -63,10 +67,16 @@ onMounted(() => {
 async function loadFeatures(): Promise<void> {
   try {
     const response = await fetch('/api/features')
-    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    const payload = response.ok
+      ? (await response.json()) as FeaturesResponse
+      : { otpChannels: [], subscriptionsEnabled: false, companiesEnabled: false }
     otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+    subscriptionsEnabled.value = payload.subscriptionsEnabled === true
+    companiesEnabled.value = payload.companiesEnabled === true
   } catch {
     otpChannels.value = []
+    subscriptionsEnabled.value = false
+    companiesEnabled.value = false
   }
 }
 
@@ -162,15 +172,15 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
       <p class="adm-foot-note">Para alterar o contacto de entrada será pedido um código OTP enviado para o novo contacto. O contacto alternativo é opcional e pode ser usado para OTP.</p>
     </div>
 
-    <div class="adm-card">
+    <div v-if="subscriptionsEnabled || companiesEnabled" class="adm-card">
       <div class="adm-card-toprow">
         <div>
-          <h2 class="adm-card-title">Subscrição</h2>
+          <h2 class="adm-card-title">{{ subscriptionsEnabled ? 'Subscrição' : 'Empresa' }}</h2>
           <p class="adm-card-note">Plano actual: <strong>{{ planLabel }}</strong></p>
         </div>
-        <NuxtLink class="btn btn--ghost btn--xs" to="/subscription">Gerir</NuxtLink>
+        <NuxtLink v-if="subscriptionsEnabled" class="btn btn--ghost btn--xs" to="/subscription">Gerir</NuxtLink>
       </div>
-      <div v-if="profile.companies.length > 0" class="adm-srcs">
+      <div v-if="companiesEnabled && profile.companies.length > 0" class="adm-srcs">
         <div v-for="company in profile.companies" :key="company.id" class="adm-src">
           <div class="adm-src-row">
             <div class="adm-src-meta">
@@ -181,7 +191,7 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
           </div>
         </div>
       </div>
-      <label v-if="profile.companies.length > 0" class="adm-field">
+      <label v-if="companiesEnabled && profile.companies.length > 0" class="adm-field">
         <span class="adm-field-label">Empresa activa</span>
         <select v-model="selectedCompanyId" class="field" :disabled="pending">
           <option value="">Contexto individual</option>
@@ -190,10 +200,10 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
           </option>
         </select>
       </label>
-      <div v-if="profile.companies.length > 0" class="adm-row-actions">
+      <div v-if="companiesEnabled && profile.companies.length > 0" class="adm-row-actions">
         <button class="btn btn--primary btn--xs" type="button" :disabled="pending" @click="saveActiveCompany">Guardar empresa activa</button>
       </div>
-      <p v-if="profile.companies.length > 1" class="adm-foot-note">Pertence a {{ profile.companies.length }} empresas — só uma pode estar activa de cada vez. Escolha a empresa activa no menu lateral.</p>
+      <p v-if="companiesEnabled && profile.companies.length > 1" class="adm-foot-note">Pertence a {{ profile.companies.length }} empresas — só uma pode estar activa de cada vez. Escolha a empresa activa no menu lateral.</p>
     </div>
 
     <div class="adm-card">

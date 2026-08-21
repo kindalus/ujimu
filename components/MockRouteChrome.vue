@@ -13,6 +13,8 @@ interface AdminSessionResponse extends AuthSessionResponse {
 
 interface FeaturesResponse {
   otpChannels: Array<'email' | 'phone'>
+  subscriptionsEnabled: boolean
+  companiesEnabled: boolean
 }
 
 const route = useRoute()
@@ -20,6 +22,7 @@ const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
 const otpChannels = ref<Array<'email' | 'phone'>>([])
+const subscriptionsEnabled = ref(false)
 
 const adminNavItems = [
   { label: 'Painel', to: '/admin' },
@@ -45,10 +48,14 @@ onMounted(() => {
 async function loadFeatures(): Promise<void> {
   try {
     const response = await fetch('/api/features')
-    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    const payload = response.ok
+      ? (await response.json()) as FeaturesResponse
+      : { otpChannels: [], subscriptionsEnabled: false, companiesEnabled: false }
     otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+    subscriptionsEnabled.value = payload.subscriptionsEnabled === true
   } catch {
     otpChannels.value = []
+    subscriptionsEnabled.value = false
   }
 }
 
@@ -93,6 +100,7 @@ async function logout(): Promise<void> {
           :is-authenticated="authSession.authenticated"
           :admin-available="adminAvailable"
           :account-login-available="accountLoginAvailable"
+          :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayContact"
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
@@ -103,7 +111,7 @@ async function logout(): Promise<void> {
       <div class="topbar-right">
         <span class="quota-pill">0/{{ authSession.authenticated ? 40 : 10 }} hoje</span>
         <button v-if="!authSession.authenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
-        <span v-else class="avatar" :title="authSession.user?.displayContact">{{ userInitial }}</span>
+        <span v-else-if="authSession.authenticated" class="avatar" :title="authSession.user?.displayContact">{{ userInitial }}</span>
       </div>
     </header>
 

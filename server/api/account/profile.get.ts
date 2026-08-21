@@ -3,6 +3,7 @@ import { getPublicSessionUser } from '../../utils/auth/otp'
 import { readSessionFromEvent } from '../../utils/auth/session'
 import { getActiveCompanyForUser, listUserCompanies } from '../../utils/companies/repository'
 import { initializeDatabase } from '../../utils/db'
+import { resolveLaunchFeatures } from '../../utils/features'
 
 export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
@@ -16,12 +17,13 @@ export default defineEventHandler(async (event) => {
     return { authenticated: false, verifiedEmails: [], companies: [], activeCompany: null }
   }
 
+  const companiesEnabled = resolveLaunchFeatures(process.env).companiesEnabled
   return {
     authenticated: true,
     user,
     verifiedEmails: getVerifiedEmails(database, session.userId),
-    companies: listUserCompanies(database, session.userId),
-    activeCompany: getActiveCompanyForUser(database, session.userId)
+    companies: companiesEnabled ? listUserCompanies(database, session.userId) : [],
+    activeCompany: companiesEnabled ? getActiveCompanyForUser(database, session.userId) : null
   }
 })
 

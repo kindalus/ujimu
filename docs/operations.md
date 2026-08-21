@@ -14,7 +14,7 @@ Launch roadmap note: live payments are not part of the first launch scope. The f
   - Returns safe booleans and numeric counts only.
   - Does not expose filesystem paths, secret values, cookies, JWTs, OTPs, or provider credentials.
 
-Readiness checks include database access, data-directory write access, operational-log write access, applied migration count, and whether required secrets are configured.
+Readiness checks include database access, data-directory write access, operational-log write access, applied migration count, and secrets required by enabled features. Billing secrets are not required while subscriptions are disabled; the OTP pepper is not required while no OTP channel is configured.
 
 ## Operational logs
 
@@ -34,7 +34,9 @@ Configure these outside source control:
 - `UJIMU_OTP_PEPPER` — required for readiness. Keeps OTP verification working across restarts.
 - `UJIMU_SENDGRID_API_KEY` and `UJIMU_SENDGRID_FROM_EMAIL` — together enable email OTP delivery; `UJIMU_SENDGRID_FROM_NAME` defaults to `Ujimu`.
 - `UJIMU_TWILIO_ACCOUNT_SID`, `UJIMU_TWILIO_AUTH_TOKEN`, and `UJIMU_TWILIO_FROM_PHONE` — together enable SMS OTP delivery.
-- `UJIMU_BILLING_WEBHOOK_SECRET` — required only when billing webhook confirmation is enabled; live Appy Pay and Stripe/VISA integrations are post-launch.
+- `UJIMU_SUBSCRIPTIONS_ENABLED` — defaults to `false`; set to `true` only when individual subscription pages, APIs, quota upgrades, and billing are ready for launch.
+- `UJIMU_COMPANIES_ENABLED` — defaults to `false`; set to `true` only when company pages, APIs, quota, and private-specialist access are ready for launch.
+- `UJIMU_BILLING_WEBHOOK_SECRET` — required for readiness only when `UJIMU_SUBSCRIPTIONS_ENABLED=true`; live Appy Pay and Stripe/VISA integrations are post-launch.
 - `UJIMU_ADMIN_CONTACTS` — required to grant the single `admin` role.
 - `UJIMU_PASSKEYS_ENABLED` — set to `true` to expose passkey registration and login.
 - `UJIMU_PASSKEY_RP_ID` — WebAuthn relying-party ID; required in production when passkeys are enabled.
@@ -59,6 +61,10 @@ SendGrid uses the official Mail Send endpoint and Twilio uses the official Messa
 
 - https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
 - https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
+
+## Launch feature flags
+
+`UJIMU_SUBSCRIPTIONS_ENABLED` and `UJIMU_COMPANIES_ENABLED` are strict opt-in flags. Omitted values are treated as `false`. Disabled page and API routes return `404`, their links and controls are hidden, and existing billing/company records remain dormant. Enabling a flag restores the existing code path without migrating or deleting data.
 
 ## Passkey configuration
 

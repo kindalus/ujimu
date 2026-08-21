@@ -248,7 +248,8 @@ function createAccessFetch(dataDir: string, options: { adminContacts?: string } 
     UJIMU_DATA_DIR: dataDir,
     UJIMU_DB_PATH: join(dataDir, 'db', 'ujimu.sqlite'),
     UJIMU_SESSION_SECRET: 'specialist-access-test-secret',
-    UJIMU_ADMIN_CONTACTS: options.adminContacts ?? ''
+    UJIMU_ADMIN_CONTACTS: options.adminContacts ?? '',
+    UJIMU_COMPANIES_ENABLED: 'true'
   }, () => fetch(request))
 }
 

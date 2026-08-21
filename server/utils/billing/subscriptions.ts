@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { resolveLaunchFeatures } from '../features'
 import type { QuotaSubject } from '../quota/policy'
 import {
   CompanyValidationError,
@@ -474,9 +475,9 @@ export function getBillingStatus(
 export function resolveQuotaSubjectWithSubscription(
   database: DatabaseSync,
   subject: QuotaSubject,
-  options: { now?: Date } = {}
+  options: { now?: Date; env?: Record<string, string | undefined> } = {}
 ): QuotaSubject {
-  if (subject.type !== 'registered') {
+  if (!resolveLaunchFeatures(options.env).subscriptionsEnabled || subject.type !== 'registered') {
     return subject
   }
 

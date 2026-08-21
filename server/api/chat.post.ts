@@ -17,6 +17,7 @@ import { resolveQuotaSubjectWithSubscription } from '../utils/billing/subscripti
 import { getAdminSession } from '../utils/admin/guards'
 import { getActiveCompanyForUser } from '../utils/companies/repository'
 import { initializeDatabase } from '../utils/db'
+import { resolveLaunchFeatures } from '../utils/features'
 import { QuotaExceededError } from '../utils/quota/errors'
 import { resolveQuotaSubject } from '../utils/quota/identity'
 import { assertMaxRequestBytes, MAX_JSON_BODY_BYTES } from '../utils/security/request-guards'
@@ -46,9 +47,10 @@ export default defineEventHandler(async (event) => {
   try {
     const input = validateChatRequestBody(body)
     const baseSubject = resolveQuotaSubject(event)
-    const subject = resolveQuotaSubjectWithSubscription(database, baseSubject)
+    const features = resolveLaunchFeatures(process.env)
+    const subject = resolveQuotaSubjectWithSubscription(database, baseSubject, { env: process.env })
     const adminSession = getAdminSession(database, event)
-    const corporateSubject = subject.type === 'anonymous' || adminSession.admin
+    const corporateSubject = !features.companiesEnabled || subject.type === 'anonymous' || adminSession.admin
       ? null
       : resolveActiveCompanyQuotaSubject(database, subject.id)
     const visitor = resolveVisitorIdentity(event)
