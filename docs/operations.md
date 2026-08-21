@@ -16,6 +16,14 @@ Launch roadmap note: live payments are not part of the first launch scope. The f
 
 Readiness checks include database access, data-directory write access, operational-log write access, applied migration count, and secrets required by enabled features. Billing secrets are not required while subscriptions are disabled; the OTP pepper is not required while no OTP channel is configured.
 
+## Public SEO identity
+
+- Set `NUXT_PUBLIC_SITE_URL` to the canonical HTTPS origin; production uses `https://ujimu.com`.
+- Verify `/robots.txt`, `/sitemap.xml`, `/favicon.svg`, `/site.webmanifest`, and `/ujimu-social.png` after every public deployment.
+- Fetch `/` with a non-browser crawler user agent and confirm that title, description, canonical, Open Graph, and Twitter Card tags are present in the initial HTML.
+- Private and operational pages plus `/api/**` must return `X-Robots-Tag: noindex, nofollow`.
+- The social image is a 1200 × 630 PNG. Social platforms may cache older previews after a deployment even when the origin HTML is correct.
+
 ## Operational logs
 
 Operational logs are written as JSON Lines files under:

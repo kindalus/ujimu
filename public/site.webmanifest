@@ -1,0 +1,22 @@
+{
+  "name": "Ujimu",
+  "short_name": "Ujimu",
+  "description": "Consulte especialistas de IA sobre legislação angolana com respostas fundamentadas em fontes oficiais.",
+  "lang": "pt-AO",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131310",
+  "theme_color": "#131310",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}
