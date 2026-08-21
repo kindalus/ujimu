@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRequestHeader, readBody, setResponseStatus } from 'h3'
 import { OtpDeliveryError, OtpRateLimitError, OtpValidationError, requestOtp } from '../../../utils/auth/otp'
 import { initializeDatabase } from '../../../utils/db'
-import { createNotificationProviderFromEnv } from '../../../utils/notifications/provider'
+import { createNotificationProviderFromEnv, getOtpDeliveryCapabilities } from '../../../utils/notifications/provider'
 import { resolveTrustedClientIp } from '../../../utils/security/client-ip'
 
 export default defineEventHandler(async (event) => {
@@ -16,8 +16,12 @@ export default defineEventHandler(async (event) => {
   const database = await initializeDatabase()
 
   try {
+    const input = parseOtpRequestBody(body)
+    if (!getOtpDeliveryCapabilities().otpChannels.includes(input.channel)) {
+      throw new OtpDeliveryError()
+    }
     const requestIp = resolveTrustedClientIp(event)
-    return await requestOtp(database, parseOtpRequestBody(body), {
+    return await requestOtp(database, input, {
       provider: createNotificationProviderFromEnv(),
       ...(requestIp ? { requestIp } : {})
     })

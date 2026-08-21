@@ -1,10 +1,14 @@
-import { defineEventHandler } from 'h3'
+import { createError, defineEventHandler } from 'h3'
 import { getRequestOrigin, mapPasskeyError, readPasskeyJsonBody, resolvePasskeySubject } from '../../../../utils/auth/passkey-http'
 import { setSessionCookie } from '../../../../utils/auth/session'
 import { verifyPasskeyAuthentication } from '../../../../utils/auth/passkeys'
 import { initializeDatabase } from '../../../../utils/db'
+import { getOtpDeliveryCapabilities } from '../../../../utils/notifications/provider'
 
 export default defineEventHandler(async (event) => {
+  if (getOtpDeliveryCapabilities().otpChannels.length === 0) {
+    throw createError({ statusCode: 503, statusMessage: 'Account login unavailable' })
+  }
   const body = await readPasskeyJsonBody(event)
   const database = await initializeDatabase()
   try {

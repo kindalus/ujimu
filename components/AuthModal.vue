@@ -23,6 +23,10 @@ interface DevAuthStatusResponse {
   enabled: boolean
 }
 
+interface FeaturesResponse {
+  otpChannels: Array<'email' | 'phone'>
+}
+
 const props = defineProps<{
   open: boolean
   authSession: AuthSessionResponse
@@ -47,10 +51,12 @@ const passkeyPending = ref(false)
 const passkeyError = ref('')
 const devAuthAvailable = ref(false)
 const devAuthPending = ref(false)
+const otpChannels = ref<Array<'email' | 'phone'>>([])
 
 onMounted(() => {
   void detectPasskeySupport()
   void loadDevAuthStatus()
+  void loadFeatures()
 })
 
 const modalOpen = computed({
@@ -60,8 +66,9 @@ const modalOpen = computed({
     if (!value) resetAuthState()
   }
 })
+const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const passkeySignInAvailable = computed(
-  () => passkeysSupported.value && Boolean(props.authSession.passkeys?.passkeysEnabled && props.authSession.passkeys.passkeysConfigured)
+  () => accountLoginAvailable.value && passkeysSupported.value && Boolean(props.authSession.passkeys?.passkeysEnabled && props.authSession.passkeys.passkeysConfigured)
 )
 
 async function detectPasskeySupport(): Promise<void> {
@@ -70,6 +77,17 @@ async function detectPasskeySupport(): Promise<void> {
     passkeysSupported.value = browserSupportsWebAuthn()
   } catch {
     passkeysSupported.value = false
+  }
+}
+
+async function loadFeatures(): Promise<void> {
+  try {
+    const response = await fetch('/api/features')
+    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+    authChannel.value = otpChannels.value[0] ?? 'email'
+  } catch {
+    otpChannels.value = []
   }
 }
 
@@ -265,7 +283,7 @@ function resetAndClose(): void {
         <button class="iconbtn" type="button" aria-label="Fechar" @click="resetAndClose"><UjimuIcon name="close" /></button>
       </div>
 
-      <form v-if="authStep === 'request'" class="auth-form" @submit.prevent="requestOtpCode">
+      <form v-if="authStep === 'request' && accountLoginAvailable" class="auth-form" @submit.prevent="requestOtpCode">
         <h2 id="auth-title" class="modal-title">Entrar na Ujimu</h2>
         <p class="modal-sub">Sem palavra-passe — enviamos-lhe um código de utilização única.</p>
 
@@ -277,8 +295,8 @@ function resetAndClose(): void {
         <p v-if="passkeyError" class="auth-error" role="alert">{{ passkeyError }}</p>
 
         <div class="seg" role="group" aria-label="Canal de autenticação">
-          <button class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'email' }" type="button" @click="authChannel = 'email'"><UjimuIcon name="mail" /> Email</button>
-          <button class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'phone' }" type="button" @click="authChannel = 'phone'"><UjimuIcon name="phone" /> Telemóvel</button>
+          <button v-if="otpChannels.includes('email')" class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'email' }" type="button" @click="authChannel = 'email'"><UjimuIcon name="mail" /> Email</button>
+          <button v-if="otpChannels.includes('phone')" class="seg-opt" :class="{ 'seg-opt--on': authChannel === 'phone' }" type="button" @click="authChannel = 'phone'"><UjimuIcon name="phone" /> Telemóvel</button>
         </div>
 
         <input id="auth-contact" v-model="authContact" class="field" :type="authChannel === 'email' ? 'email' : 'tel'" :placeholder="authChannel === 'email' ? 'o.seu@email.com' : '+244 9XX XXX XXX'" :disabled="authPending" />
@@ -296,6 +314,11 @@ function resetAndClose(): void {
 
         <button class="btn btn--primary btn--block" type="submit" :disabled="authPending">{{ authPending ? 'A enviar…' : 'Enviar código' }}</button>
       </form>
+
+      <div v-else-if="authStep === 'request'" class="auth-form">
+        <h2 id="auth-title" class="modal-title">Contas temporariamente indisponíveis</h2>
+        <p class="modal-sub">Pode continuar a consultar como visitante.</p>
+      </div>
 
       <form v-else class="auth-form" @submit.prevent="verifyOtpCode">
         <h2 id="auth-title" class="modal-title">Introduza o código</h2>

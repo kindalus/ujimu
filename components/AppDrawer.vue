@@ -4,11 +4,13 @@ import { ref } from 'vue'
 const props = withDefaults(defineProps<{
   isAuthenticated?: boolean
   adminAvailable?: boolean
+  accountLoginAvailable?: boolean
   userLabel?: string
   openLabel?: string
 }>(), {
   isAuthenticated: false,
   adminAvailable: false,
+  accountLoginAvailable: false,
   userLabel: '',
   openLabel: 'Abrir menu'
 })
@@ -84,8 +86,8 @@ function logout(): void {
       <div class="drawer-scroll">
         <slot name="history" :close="closeTemporaryDrawer">
           <div v-if="!isAuthenticated" class="drawer-empty">
-            <p>O histórico de conversas fica disponível depois de iniciar sessão.</p>
-            <button class="btn btn--primary" type="button" @click="openAuth">Entrar por OTP</button>
+            <p>{{ accountLoginAvailable ? 'O histórico de conversas fica disponível depois de iniciar sessão.' : 'O histórico requer uma conta, temporariamente indisponível.' }}</p>
+            <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="openAuth">Entrar por OTP</button>
           </div>
           <div v-else class="drawer-empty"><p>Ainda não tem conversas guardadas.</p></div>
         </slot>
@@ -102,7 +104,7 @@ function logout(): void {
             <button class="drawer-user-out" type="button" title="Terminar sessão" @click="logout">Terminar sessão</button>
           </div>
         </div>
-        <button v-else class="drawer-foot-link" type="button" @click="openAuth"><UjimuIcon name="user" /> Iniciar sessão</button>
+        <button v-else-if="accountLoginAvailable" class="drawer-foot-link" type="button" @click="openAuth"><UjimuIcon name="user" /> Iniciar sessão</button>
       </div>
     </aside>
   </div>

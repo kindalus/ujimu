@@ -2,7 +2,7 @@
 
 This runbook captures the MVP operational checks required before production use. Keep secrets in environment variables or a secret manager; never commit `.env` files.
 
-Launch roadmap note: live payments are not part of the first launch scope. Appy Pay, Stripe/VISA, and SendGrid integrations are deferred until after launch. Before production launch, clarify the OTP/contact-delivery path if OTP authentication remains in launch scope without SendGrid.
+Launch roadmap note: live payments are not part of the first launch scope. The first deployment runs anonymously when no OTP delivery channel is configured; account login becomes available per channel when SendGrid email and/or Twilio SMS configuration is complete.
 
 ## Health and readiness
 
@@ -32,6 +32,8 @@ Configure these outside source control:
 
 - `UJIMU_SESSION_SECRET` — required for readiness. Signs session cookies and the anonymous quota cookie, and keeps both valid across restarts.
 - `UJIMU_OTP_PEPPER` — required for readiness. Keeps OTP verification working across restarts.
+- `UJIMU_SENDGRID_API_KEY` and `UJIMU_SENDGRID_FROM_EMAIL` — together enable email OTP delivery; `UJIMU_SENDGRID_FROM_NAME` defaults to `Ujimu`.
+- `UJIMU_TWILIO_ACCOUNT_SID`, `UJIMU_TWILIO_AUTH_TOKEN`, and `UJIMU_TWILIO_FROM_PHONE` — together enable SMS OTP delivery.
 - `UJIMU_BILLING_WEBHOOK_SECRET` — required only when billing webhook confirmation is enabled; live Appy Pay and Stripe/VISA integrations are post-launch.
 - `UJIMU_ADMIN_CONTACTS` — required to grant the single `admin` role.
 - `UJIMU_PASSKEYS_ENABLED` — set to `true` to expose passkey registration and login.
@@ -48,6 +50,15 @@ Configure these outside source control:
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
 - `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `<UJIMU_CONFIG_DIR>/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
+
+## OTP delivery configuration
+
+OTP channels are enabled independently. In production, incomplete SendGrid or Twilio configuration leaves that channel unavailable. When neither channel is configured, Ujimu exposes anonymous consultation only and hides new-login controls; already valid sessions remain accepted. OTP provider failures return a generic delivery error and never expose provider response bodies or credentials.
+
+SendGrid uses the official Mail Send endpoint and Twilio uses the official Messages endpoint:
+
+- https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
+- https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
 
 ## Passkey configuration
 

@@ -12,6 +12,10 @@ interface AuthSessionResponse {
   }
 }
 
+interface FeaturesResponse {
+  otpChannels: Array<'email' | 'phone'>
+}
+
 interface UserCompany {
   id: string
   name: string
@@ -31,6 +35,7 @@ interface ProfileResponse {
 const profile = ref<ProfileResponse>({ authenticated: false, verifiedEmails: [], companies: [], activeCompany: null })
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const authPanelOpen = ref(false)
+const otpChannels = ref<Array<'email' | 'phone'>>([])
 const selectedCompanyId = ref('')
 const loading = ref(true)
 const pending = ref(false)
@@ -38,6 +43,7 @@ const feedback = ref('')
 const errorMessage = ref('')
 
 const displayContact = computed(() => profile.value.user?.displayContact ?? '')
+const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const userInitial = computed(() => displayContact.value.slice(0, 1).toUpperCase() || 'U')
 const isEmailContact = computed(() => displayContact.value.includes('@'))
 const planLabel = computed(() => {
@@ -51,7 +57,18 @@ const verifiedContactList = computed(() => {
 
 onMounted(() => {
   void loadProfile()
+  void loadFeatures()
 })
+
+async function loadFeatures(): Promise<void> {
+  try {
+    const response = await fetch('/api/features')
+    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+  } catch {
+    otpChannels.value = []
+  }
+}
 
 async function loadProfile(): Promise<void> {
   loading.value = true
@@ -111,7 +128,7 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
     <p class="subpage-sub" style="margin-top: 0">Inicie sessão para gerir o seu perfil.</p>
     <div class="adm-row-actions" style="justify-content: center">
       <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
-      <button class="btn btn--primary" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
+      <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
     </div>
   </main>
 

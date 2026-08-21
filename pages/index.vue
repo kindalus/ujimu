@@ -23,6 +23,10 @@ interface SpecialistsResponse {
   specialists: PublicSpecialist[]
 }
 
+interface FeaturesResponse {
+  otpChannels: Array<'email' | 'phone'>
+}
+
 interface AuthSessionResponse {
   authenticated: boolean
   user?: {
@@ -188,6 +192,7 @@ const quotaError = ref('')
 const authSession = ref<AuthSessionResponse>({ authenticated: false })
 const adminAvailable = ref(false)
 const authPanelOpen = ref(false)
+const otpChannels = ref<Array<'email' | 'phone'>>([])
 const billingStatus = ref<BillingStatusResponse>({ ...defaultBillingStatus })
 const inlineAdSchedule = ref<number[]>([])
 const activeChatAbortController = ref<AbortController | null>(null)
@@ -197,6 +202,7 @@ onMounted(() => {
   void recordVisit()
   void loadSpecialists()
   void loadAuthSession()
+  void loadFeatures()
   void nextTick(resizeQuestionTextarea)
 })
 
@@ -237,6 +243,7 @@ const chatStatus = computed(() => {
 })
 const hasSpecialists = computed(() => specialists.value.length > 0)
 const isAuthenticated = computed(() => authSession.value.authenticated)
+const accountLoginAvailable = computed(() => otpChannels.value.length > 0)
 const canWriteQuestion = computed(
   () => Boolean(selectedSpecialist.value) && queuedQuestions.value.length < queueLimit
 )
@@ -265,6 +272,16 @@ watch(question, () => {
 
 async function recordVisit(): Promise<void> {
   await fetch('/api/analytics/visit', { method: 'POST' }).catch(() => undefined)
+}
+
+async function loadFeatures(): Promise<void> {
+  try {
+    const response = await fetch('/api/features')
+    const payload = response.ok ? (await response.json()) as FeaturesResponse : { otpChannels: [] }
+    otpChannels.value = payload.otpChannels.filter((channel) => channel === 'email' || channel === 'phone')
+  } catch {
+    otpChannels.value = []
+  }
 }
 
 async function loadAuthSession(): Promise<void> {
@@ -893,6 +910,7 @@ function createId(prefix: string): string {
         <AppDrawer
           :is-authenticated="isAuthenticated"
           :admin-available="adminAvailable"
+          :account-login-available="accountLoginAvailable"
           :user-label="authSession.user?.displayContact"
           open-label="Abrir menu"
           @open-auth="authPanelOpen = true"
@@ -903,8 +921,8 @@ function createId(prefix: string): string {
             <section class="drawer-history-panel" aria-labelledby="drawer-history-title">
               <div v-if="isAuthenticated" class="hist-group-label" id="drawer-history-title">Histórico</div>
               <div v-if="!isAuthenticated" class="drawer-empty">
-                <p>O histórico de conversas fica disponível depois de iniciar sessão.</p>
-                <button class="btn btn--primary" type="button" @click="close(); authPanelOpen = true">Entrar por OTP</button>
+                <p>{{ accountLoginAvailable ? 'O histórico de conversas fica disponível depois de iniciar sessão.' : 'O histórico requer uma conta, temporariamente indisponível.' }}</p>
+                <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="close(); authPanelOpen = true">Entrar por OTP</button>
               </div>
               <div v-else-if="!selectedSpecialistId" class="drawer-empty"><p>Seleccione uma especialidade.</p></div>
               <div v-else-if="historyPending" class="drawer-empty"><p>A carregar histórico...</p></div>
@@ -934,7 +952,7 @@ function createId(prefix: string): string {
       <div class="topbar-right">
         <span v-if="billingStatus.subscribed" class="quota-pill quota-pill--sub"><UjimuIcon name="star" /> Subscritor</span>
         <span v-else class="quota-pill">0/{{ isAuthenticated ? 40 : 10 }} hoje</span>
-        <button v-if="!isAuthenticated" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
+        <button v-if="!isAuthenticated && accountLoginAvailable" class="btn btn--ghost" type="button" @click="authPanelOpen = true">Entrar</button>
         <span v-else class="avatar" :title="authSession.user?.displayContact">{{ authSession.user?.displayContact?.slice(0, 1).toUpperCase() || 'U' }}</span>
       </div>
     </header>
@@ -1081,9 +1099,9 @@ function createId(prefix: string): string {
       <div class="promptwrap">
         <div v-if="quotaError" class="quota-notice" role="alert">
           <strong>Atingiu o limite de perguntas.</strong>
-          <span>{{ quotaError }}</span>
+          <span>{{ accountLoginAvailable ? quotaError : 'Atingiu o limite de perguntas gratuitas. Volte depois da reposição da quota.' }}</span>
           <div class="quota-notice-row">
-            <button class="btn btn--primary btn--xs" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
+            <button v-if="accountLoginAvailable" class="btn btn--primary btn--xs" type="button" @click="authPanelOpen = true">Entrar por OTP</button>
             <NuxtLink class="btn btn--ghost btn--xs" to="/subscription">Ver subscrição</NuxtLink>
           </div>
         </div>

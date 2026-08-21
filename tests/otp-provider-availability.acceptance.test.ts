@@ -42,7 +42,7 @@ describe('configured OTP provider availability acceptance', () => {
   })
 
   it('sends email OTP through the documented SendGrid Mail Send request', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 202 }))
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 202 }))
     const notifications = await import('../server/utils/notifications/provider')
     const provider = notifications.createNotificationProviderFromEnv({
       NODE_ENV: 'production',
@@ -73,7 +73,7 @@ describe('configured OTP provider availability acceptance', () => {
   })
 
   it('sends phone OTP through the documented Twilio Messages request', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 201 }))
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('{}', { status: 201 }))
     const notifications = await import('../server/utils/notifications/provider')
     const provider = notifications.createNotificationProviderFromEnv({
       NODE_ENV: 'production',
@@ -100,6 +100,19 @@ describe('configured OTP provider availability acceptance', () => {
       From: '+15551234567',
       Body: 'O seu código de acesso Ujimu é 654321. Expira em 10 minutos.'
     })
+  })
+
+  it('does not expose provider response bodies when delivery fails', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('provider-secret-detail', { status: 401 }))
+    const notifications = await import('../server/utils/notifications/provider')
+    const provider = notifications.createNotificationProviderFromEnv({
+      NODE_ENV: 'production',
+      UJIMU_SENDGRID_API_KEY: 'sendgrid-key',
+      UJIMU_SENDGRID_FROM_EMAIL: 'no-reply@example.com'
+    }, { fetch: fetchMock })
+
+    await expect(provider.deliverOtp({ channel: 'email', contact: 'user@example.com', code: '123456' }))
+      .rejects.toMatchObject({ code: 'NOTIFICATION_PROVIDER_DELIVERY_FAILED', message: 'OTP delivery failed.' })
   })
 
   it('exposes public OTP channels without exposing provider credentials', async () => {
@@ -133,6 +146,31 @@ describe('configured OTP provider availability acceptance', () => {
     expect(authModal).toContain("otpChannels.includes('phone')")
     expect(chatPage).toContain('accountLoginAvailable')
     expect(chatPage).toContain("fetch('/api/features')")
+  })
+
+  it('blocks passkey login when no OTP delivery channel is configured', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.UJIMU_PASSKEYS_ENABLED = 'true'
+    process.env.UJIMU_PASSKEY_RP_ID = 'example.com'
+    process.env.UJIMU_PASSKEY_RP_NAME = 'Ujimu'
+    process.env.UJIMU_PASSKEY_ORIGIN = 'https://example.com'
+    delete process.env.UJIMU_SENDGRID_API_KEY
+    delete process.env.UJIMU_SENDGRID_FROM_EMAIL
+    delete process.env.UJIMU_TWILIO_ACCOUNT_SID
+    delete process.env.UJIMU_TWILIO_AUTH_TOKEN
+    delete process.env.UJIMU_TWILIO_FROM_PHONE
+    const handler = (await import('../server/api/auth/passkeys/authentication/options.post')).default
+    const app = createApp()
+    const router = createRouter()
+    router.post('/api/auth/passkeys/authentication/options', handler)
+    app.use(router)
+
+    const response = await toWebHandler(app)(new Request('https://example.com/api/auth/passkeys/authentication/options', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    }))
+    expect(response.status).toBe(503)
   })
 
   it('rejects new OTP requests without configured channels while preserving the database', async () => {
