@@ -1024,7 +1024,7 @@ function createId(prefix: string): string {
                     <span class="cite-mark cite-mark--list">{{ index + 1 }}</span>
                     <span class="source-meta">
                       <span class="source-name">{{ citation.sourceTitle }}</span>
-                      <span class="source-ref">{{ citation.articleRefs.join(', ') }}<template v-if="citation.sourceFile"> · {{ citation.sourceFile }}</template></span>
+                      <span class="source-ref">{{ citation.articleRefs.join(', ') }}</span>
                     </span>
                   </div>
                 </div>

@@ -20,8 +20,7 @@ describe('assistant response copy acceptance', () => {
       '',
       'Fontes:',
       '1. Regime Jurídico das Facturas',
-      '   Referências: Artigo 4.º, Artigo 5.º',
-      '   Ficheiro: raw/decreto-presidencial-71-25.pdf'
+      '   Referências: Artigo 4.º, Artigo 5.º'
     ].join('\n'))
   })
 
@@ -48,6 +47,7 @@ describe('assistant response copy acceptance', () => {
     expect(page).toContain('copyAssistantResponse(item.message)')
     expect(page).toContain('Resposta copiada.')
     expect(page).toContain('Não foi possível copiar a resposta.')
+    expect(page).not.toContain('<template v-if="citation.sourceFile"> · {{ citation.sourceFile }}</template>')
   })
 
   it('keeps edit and copy question actions below the user question as hover-revealed icon buttons with tooltips', async () => {

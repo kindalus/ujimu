@@ -43,14 +43,9 @@ function formatCitationForClipboard(citation: ClipboardCitation, index: number):
 
   const lines = [`${index + 1}. ${title}`]
   const articleRefs = citation.articleRefs.map((articleRef) => articleRef.trim()).filter(Boolean)
-  const sourceFile = citation.sourceFile?.trim()
 
   if (articleRefs.length > 0) {
     lines.push(`   Referências: ${articleRefs.join(', ')}`)
-  }
-
-  if (sourceFile) {
-    lines.push(`   Ficheiro: ${sourceFile}`)
   }
 
   return lines.join('\n')
