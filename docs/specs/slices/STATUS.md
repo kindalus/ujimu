@@ -99,7 +99,7 @@ Known non-blocking warnings:
 | 44 | [`44-agent-owned-conversion-ingestion.html`](./44-agent-owned-conversion-ingestion.html) | `verified` | 2026-06-27 | Ingestion agent owns `raw/ -> converted/ -> wiki/` using the updated `llm-wiki` contract. |
 | 45 | [`45-llm-wiki-owned-specialist-agents.html`](./45-llm-wiki-owned-specialist-agents.html) | `verified` | 2026-08-21 | `llm-wiki` owns specialist scaffold; Ujimu supplies and validates consultation rules. |
 | 46 | [`46-doubled-free-quotas.html`](./46-doubled-free-quotas.html) | `verified` | 2026-08-21 | Double anonymous and registered free-tier quotas. |
-| 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `grilled` | — | Enable SendGrid email and Twilio SMS only when configured. |
+| 47 | [`47-configured-otp-channels.html`](./47-configured-otp-channels.html) | `acceptance-tested` | — | Enable SendGrid email and Twilio SMS only when configured. |
 | 48 | [`48-launch-feature-flags.html`](./48-launch-feature-flags.html) | `grilled` | — | Hide and block subscription/company features behind default-off flags. |
 
 ## Progressive account launch extension
@@ -146,7 +146,7 @@ Implementation and verification:
 
 ## Slice 47 — Configured OTP channels
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Refinement decisions:
 
@@ -170,6 +170,10 @@ Official sources:
 - https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
 - https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
 - https://nodejs.org/api/globals.html#fetch
+
+Acceptance-test RED:
+
+- `npm test -- tests/otp-provider-availability.acceptance.test.ts --reporter=verbose` — failed as expected because adapters, public capabilities, and channel-aware UI were absent.
 
 ## Slice 48 — Launch feature flags
 
