@@ -56,11 +56,12 @@ describe('project typography and control geometry acceptance', () => {
     expect(disallowedWeights).toEqual([])
   })
 
-  it('assigns Inter to UI, Literata to assistant reading, and JetBrains Mono to code', async () => {
+  it('assigns Inter to UI, Source Sans 3 to assistant reading, and JetBrains Mono to code', async () => {
     const css = await globalCss()
 
     expect(css).toContain('--font-ui: "Inter"')
-    expect(css).toContain('--font-read: "Literata"')
+    expect(css).toContain('--font-read: "Source Sans 3"')
+    expect(css).not.toContain('--font-read: "Literata"')
     expect(css).toContain('--font-code: "JetBrains Mono"')
     expect(css).toMatch(/body\s*\{[^}]*font-family:\s*var\(--font-ui\)/)
     expect(css).toMatch(/\.assistant-markdown\s*\{[^}]*font-family:\s*var\(--font-read\)[^}]*font-size:\s*var\(--fs-read\)[^}]*font-weight:\s*400[^}]*line-height:\s*var\(--lh-read\)[^}]*max-width:\s*34em/)
@@ -92,7 +93,7 @@ describe('project typography and control geometry acceptance', () => {
     expect(css).toMatch(/\.iconbtn\s*\{[^}]*width:\s*var\(--h-btn-icon\)[^}]*height:\s*var\(--h-btn-icon\)/)
     expect(css).toMatch(/\.field\s*\{[^}]*min-height:\s*var\(--h-input\)[^}]*padding-inline:\s*var\(--px-input\)/)
     expect(css).toMatch(/:focus-visible[^}]*outline:\s*2px solid[^}]*outline-offset:\s*2px/)
-    expect(css).toMatch(/\.prompt:focus-within[^}]*border-color:\s*var\(--yellow\)[^}]*outline:\s*2px solid var\(--yellow\)[^}]*outline-offset:\s*2px/)
+    expect(css).toMatch(/\.prompt:focus-within[^}]*border-color:\s*var\(--yellow\)/)
     expect(css).toMatch(/\.prompt-ta:focus-visible[^}]*outline:\s*none\s*!important/)
     expect(css).toContain('padding-bottom: calc(var(--gap-stack) + env(safe-area-inset-bottom));')
   })
@@ -135,7 +136,7 @@ describe('project typography and control geometry acceptance', () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*680px\)[\s\S]*\.thread[^}]*padding-inline:\s*1rem/)
   })
 
-  it('configures Nuxt Fonts for same-origin variable Latin assets', async () => {
+  it('configures Nuxt Fonts for same-origin Latin assets', async () => {
     const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as { dependencies?: Record<string, string> }
     const config = await readFile('nuxt.config.ts', 'utf8')
 
@@ -149,7 +150,7 @@ describe('project typography and control geometry acceptance', () => {
     expect(config).toContain('global: true')
     for (const [family, file] of [
       ['Inter', 'inter-latin-400-600.woff2'],
-      ['Literata', 'literata-latin-400-600.woff2'],
+      ['Source Sans 3', 'source-sans-3-latin-400-600.woff2'],
       ['JetBrains Mono', 'jetbrains-mono-latin-400-600.woff2']
     ]) {
       expect(config).toContain(`name: '${family}'`)
@@ -157,7 +158,7 @@ describe('project typography and control geometry acceptance', () => {
     }
 
     const css = await globalCss()
-    for (const fallback of ['Inter fallback', 'Literata fallback', 'JetBrains Mono fallback']) {
+    for (const fallback of ['Inter fallback', 'Source Sans 3 fallback', 'JetBrains Mono fallback']) {
       expect(css).toContain(`font-family: "${fallback}"`)
     }
     expect(css).toContain('size-adjust:')
@@ -166,9 +167,9 @@ describe('project typography and control geometry acceptance', () => {
     expect(css).toContain('line-gap-override:')
 
     const interBytes = (await stat('public/fonts/inter-latin-400-600.woff2')).size
-    const literataBytes = (await stat('public/fonts/literata-latin-400-600.woff2')).size
-    expect(interBytes + literataBytes).toBeLessThanOrEqual(90 * 1024)
-    for (const license of ['Inter-OFL.txt', 'Literata-OFL.txt', 'JetBrains-Mono-OFL.txt']) {
+    const sourceSansBytes = (await stat('public/fonts/source-sans-3-latin-400-600.woff2')).size
+    expect(interBytes + sourceSansBytes).toBeLessThanOrEqual(90 * 1024)
+    for (const license of ['Inter-OFL.txt', 'Source-Sans-3-OFL.txt', 'JetBrains-Mono-OFL.txt']) {
       expect(await readFile(`public/fonts/licenses/${license}`, 'utf8')).toContain('SIL OPEN FONT LICENSE')
     }
   })

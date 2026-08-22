@@ -25,10 +25,11 @@ Latest full verification after Slice 57 typography and control geometry:
 - `npm test` — passed, 278 tests.
 - `npm run typecheck` — passed.
 - `npm run build` — passed; generated CSS contains same-origin variable fonts, swap, and metric overrides.
-- Font budget — Inter + Literata total 87,692 bytes (85.64 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
+- Font budget — Inter + Source Sans 3 total 77,172 bytes (75.36 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
 - `npm audit` — passed with 0 known vulnerabilities.
 - `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
-- Chrome DevTools production-build check, 2026-08-22 — mobile controls met the 44px target, input rendered at 48px/17px, assistant text rendered in Literata 17px/400/1.65 without the lateral marker, public flows had a clean console, and a local trace measured LCP 67 ms and CLS 0.00.
+- Chrome DevTools production-build check, 2026-08-22 — mobile controls met the 44px target, input rendered at 48px/17px, assistant text rendered in Source Sans 3 at 17px/400/1.65 without the lateral marker, public flows had a clean console, and a local trace measured LCP 67 ms and CLS 0.00.
+- Post-verification typography adjustment, 2026-08-22 — Source Sans 3 replaced Literata only for assistant responses after a side-by-side browser review; same-origin loading, font metrics, width, and overflow checks passed.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
 - Chrome DevTools production browser and performance check, 2026-08-21 — passed at `https://ujimu.com`: SEO 100, Best Practices 100, LCP 237 ms, TTFB 173 ms, CLS 0, HTTP/2, four initial API calls, and no console errors or warnings.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.

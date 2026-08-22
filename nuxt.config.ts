@@ -20,12 +20,12 @@ const fonts: NuxtFontsOptions = {
       preload: true
     },
     {
-      name: 'Literata',
-      src: '/fonts/literata-latin-400-600.woff2',
+      name: 'Source Sans 3',
+      src: '/fonts/source-sans-3-latin-400-600.woff2',
       weight: '400 600',
       style: 'normal',
       display: 'swap',
-      fallbacks: ['Georgia'],
+      fallbacks: ['Arial'],
       global: true,
       preload: false
     },

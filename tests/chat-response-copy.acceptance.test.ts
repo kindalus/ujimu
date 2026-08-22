@@ -64,6 +64,6 @@ describe('assistant response copy acceptance', () => {
     expect(page).toContain('@click="copyUserQuestion(item.message)"')
     expect(page).not.toContain("{{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar pergunta' }}")
     expect(css).toMatch(/\.msg-user-actions\s*\{[^}]*position:\s*absolute[^}]*display:\s*flex[^}]*opacity:\s*0[^}]*pointer-events:\s*none/)
-    expect(css).toContain('.msg--user:hover .msg-user-actions, .msg--user:focus-within .msg-user-actions { opacity: 1; pointer-events: auto; }')
+    expect(css).toMatch(/\.msg--user:hover \.msg-user-actions,\s*\.msg--user:focus-within \.msg-user-actions\s*\{[^}]*opacity:\s*1[^}]*pointer-events:\s*auto/)
   })
 })
