@@ -110,7 +110,7 @@ Known non-blocking warnings:
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
-| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `idea-refined` | — | Approved seams: CSS/build, chat, shared controls, and real-browser verification; minimal CSS-first direction confirmed. |
+| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `grilled` | — | Compact pseudo-targets, real icon targets, flex composer, four-size Markdown hierarchy, and measured font delivery locked. |
 
 ## Persistent Pi chat sessions
 
