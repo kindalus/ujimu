@@ -12,11 +12,11 @@ The user explicitly retained the existing architecture. No separate architecture
 
 ## Architecture decisions
 
-- Add the already-transitive `@nuxt/fonts` package as a direct dependency and use its official build-time, same-origin asset emission.
-- Request normal variable fonts at weights 400–600 with the `latin` subset only.
+- Add the already-transitive `@nuxt/fonts` package as a direct dependency and use its official build-time, same-origin `@font-face` injection.
+- Commit the measured official Google Fonts WOFF2 files so clean builds do not depend on a remote provider; use normal variable weights 400–600 with the `latin` subset only.
 - Keep exactly four global text sizes: `0.75rem`, `0.875rem`, `1.0625rem`, and `1.5rem`.
 - Use `1.0625rem` for normal buttons and inputs rather than adding the guideline's `1rem` as a fifth size.
-- Keep typography and geometry as CSS custom properties in `assets/css/main.css`; do not add a TypeScript token layer.
+- Keep typography and geometry as CSS custom properties in `assets/css/typography.css`; do not add a TypeScript token layer. Load it after `main.css` so the legacy stylesheet remains below 1,000 lines.
 - Use 3rem for normal controls, 2.75rem for icon controls and minimum pointer targets, and 2.25rem only for the visible box of compact controls.
 - Extend compact controls to a 2.75rem pointer target with a shared pseudo-element pattern. Keep at least 0.5rem between neighbouring targets so extensions do not overlap.
 - Reuse the existing chat textarea auto-resize logic. Do not add `field-sizing` or another JavaScript path.
@@ -54,49 +54,49 @@ Acceptance contract
 
 ### Phase 1: Lock the contract
 
-- [ ] Task 1: Add failing acceptance tests for typography, control tokens, focus, safe area, and legacy undersized controls.
+- [x] Task 1: Add failing acceptance tests for typography, control tokens, focus, safe area, and legacy undersized controls.
 
 ### Checkpoint: RED
 
-- [ ] Focused tests fail because the current app uses an 18px root, IBM Plex aliases, pixel font sizes, scattered geometry, undersized icon buttons, and no shared `:focus-visible` rule.
+- [x] Focused tests fail because the current app uses an 18px root, IBM Plex aliases, pixel font sizes, scattered geometry, undersized icon buttons, and no shared `:focus-visible` rule.
 
 ### Phase 2: Establish foundations
 
-- [ ] Task 2: Configure Nuxt Fonts, preserve OFL notices, and add approved typography and geometry tokens.
-- [ ] Task 3: Apply typography roles and remove obsolete size declarations.
+- [x] Task 2: Configure Nuxt Fonts, preserve OFL notices, and add approved typography and geometry tokens.
+- [x] Task 3: Apply typography roles and remove obsolete size declarations.
 
 ### Checkpoint: Foundation
 
-- [ ] Focused token and font tests pass.
-- [ ] Production build emits same-origin variable WOFF2 with swap and fallback metrics.
-- [ ] Inter plus Literata total no more than 90KiB; JetBrains Mono is reported separately.
+- [x] Focused token and font tests pass.
+- [x] Production build emits same-origin variable WOFF2 with swap and fallback metrics.
+- [x] Inter plus Literata total no more than 90KiB; JetBrains Mono is reported separately.
 
 ### Phase 3: Migrate interaction families
 
-- [ ] Task 4: Remove the assistant marker and migrate the chat composer, send action, message actions, citations, and source controls.
-- [ ] Task 5: Migrate shared buttons, icon buttons, links, fields, chips, selectors, OTP controls, and focus treatment.
-- [ ] Task 6: Migrate remaining component-local and public-page controls, then remove invalid full-width secondary actions.
+- [x] Task 4: Remove the assistant marker and migrate the chat composer, send action, message actions, citations, and source controls.
+- [x] Task 5: Migrate shared buttons, icon buttons, links, fields, chips, selectors, OTP controls, and focus treatment.
+- [x] Task 6: Migrate remaining component-local and public-page controls, then remove invalid full-width secondary actions.
 
 ### Checkpoint: Interaction contract
 
-- [ ] Normal controls are 3rem high.
-- [ ] Every interactive pointer target is at least 2.75rem in each required dimension.
-- [ ] Compact visual controls remain 2.25rem where specified and accept pointer input across their expanded target.
-- [ ] Adjacent targets have at least 0.5rem separation.
-- [ ] The fixed composer respects the bottom safe area.
+- [x] Normal controls are 3rem high.
+- [x] Every interactive pointer target is at least 2.75rem in each required dimension.
+- [x] Compact visual controls remain 2.25rem where specified and accept pointer input across their expanded target.
+- [x] Adjacent targets have at least 0.5rem separation.
+- [x] The fixed composer respects the bottom safe area.
 
 ### Phase 4: Runtime and quality verification
 
-- [ ] Task 7: Verify representative chat, auth, subscription, account, admin, company, and public-specialist views in Chrome DevTools.
-- [ ] Task 8: Run the full quality gate, inspect the final diff, and update Zafir evidence.
+- [x] Task 7: Verify representative chat, auth, subscription, account, admin, company, and public-specialist views in Chrome DevTools.
+- [x] Task 8: Run the full quality gate, inspect the final diff, and update Zafir evidence.
 
 ### Checkpoint: Complete
 
-- [ ] `npm test` passes.
-- [ ] `npm run typecheck` passes.
-- [ ] `npm run build` passes.
-- [ ] Desktop and mobile browser checks pass with a clean console and no measurable CLS regression.
-- [ ] Slice 57 and `STATUS.md` contain final evidence before the slice is marked verified.
+- [x] `npm test` passes.
+- [x] `npm run typecheck` passes.
+- [x] `npm run build` passes.
+- [x] Desktop and mobile browser checks pass with a clean console and no measurable CLS regression.
+- [x] Slice 57 and `STATUS.md` contain final evidence before the slice is marked verified.
 
 ## Risks and mitigations
 
@@ -114,3 +114,13 @@ Acceptance contract
 ## Open questions
 
 None. The user confirmed that the previous four-size typography contract remains unchanged and that geometry applies only to interactive controls, their internal icons, radii, gaps, focus, and safe area.
+
+
+## Verification evidence
+
+- `npm test`: 277 tests passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed with local WOFF2, `font-display: swap`, and metric overrides.
+- `npm audit` and `npm audit signatures`: passed.
+- Inter + Literata: 85.64 KiB; JetBrains Mono: 30.61 KiB and demand-loaded.
+- Chrome DevTools: 44px minimum targets, 48px empty input, 17px Inter input, 17px Literata assistant text, visible 2px focus ring, same-origin fonts, no assistant marker, no horizontal overflow, and CLS 0.00.

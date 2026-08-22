@@ -518,22 +518,25 @@ function resizeQuestionTextarea(): void {
   const textarea = questionTextarea.value
   if (!textarea) return
 
-  textarea.style.height = 'auto'
+  const styles = window.getComputedStyle(textarea)
+  const minHeight = Number.parseFloat(styles.minHeight)
   const maxHeight = calculateQuestionTextareaMaxHeight(textarea)
-  const nextHeight = Math.min(textarea.scrollHeight, maxHeight)
+  textarea.style.minHeight = '0'
+  textarea.style.height = '0'
+  const contentHeight = textarea.value ? textarea.scrollHeight : minHeight
+  textarea.style.minHeight = ''
+
+  const nextHeight = Math.max(
+    Number.isFinite(minHeight) ? minHeight : 48,
+    Math.min(contentHeight, maxHeight)
+  )
   textarea.style.height = `${nextHeight}px`
-  textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  textarea.style.overflowY = contentHeight > maxHeight ? 'auto' : 'hidden'
 }
 
 function calculateQuestionTextareaMaxHeight(textarea: HTMLTextAreaElement): number {
-  const styles = window.getComputedStyle(textarea)
-  const lineHeight = Number.parseFloat(styles.lineHeight)
-  const paddingTop = Number.parseFloat(styles.paddingTop)
-  const paddingBottom = Number.parseFloat(styles.paddingBottom)
-
-  return (Number.isFinite(lineHeight) ? lineHeight : 24) * chatInputMaxRows +
-    (Number.isFinite(paddingTop) ? paddingTop : 0) +
-    (Number.isFinite(paddingBottom) ? paddingBottom : 0)
+  const maxHeight = Number.parseFloat(window.getComputedStyle(textarea).maxHeight)
+  return Number.isFinite(maxHeight) ? maxHeight : 140
 }
 
 async function loadSpecialists(): Promise<void> {
@@ -1057,7 +1060,6 @@ function createId(prefix: string): string {
             </div>
 
             <div v-else-if="item.type === 'message'" class="msg msg--ai" :class="{ 'msg--nocontext': Boolean(groundingNotice(item.message)) }">
-              <span class="ai-mark" aria-hidden="true">U</span>
               <div class="ai-body">
                 <span v-if="groundingNotice(item.message)" class="nocontext-tag"><UjimuIcon name="info" /> {{ groundingNotice(item.message) }}</span>
                 <div class="ai-text" :class="{ 'ai-text--streaming': item.message.status === 'streaming' }">

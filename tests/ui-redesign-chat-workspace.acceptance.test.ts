@@ -63,7 +63,7 @@ describe('UI redesign chat workspace acceptance', () => {
     expect(page).toContain('calculateQuestionTextareaMaxHeight')
     expect(page).toContain('ref="questionTextarea"')
     expect(page).toContain('@keydown.enter.exact.prevent="submitQuestion"')
-    expect(css).toContain('max-height: calc((1.5em * 5) + 12px)')
+    expect(css).toContain('max-height: 8.75rem')
     expect(css).toContain('overflow-y: hidden')
   })
 

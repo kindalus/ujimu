@@ -1,0 +1,190 @@
+/* Fontes métricas e tokens aprovados pela Slice 57. */
+@font-face {
+  font-family: "Inter fallback";
+  src: local("Arial");
+  size-adjust: 107.1194%;
+  ascent-override: 90.4365%;
+  descent-override: 22.518%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Literata fallback";
+  src: local("Georgia");
+  size-adjust: 107.6714%;
+  ascent-override: 109.3141%;
+  descent-override: 28.6056%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "JetBrains Mono fallback";
+  src: local("Courier New");
+  size-adjust: 99.9837%;
+  ascent-override: 102.0166%;
+  descent-override: 30.0049%;
+  line-gap-override: 0%;
+}
+
+:root {
+  --font-ui: "Inter", "Inter fallback", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-read: "Literata", "Literata fallback", ui-serif, Georgia, "Times New Roman", serif;
+  --font-code: "JetBrains Mono", "JetBrains Mono fallback", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --fs-micro: 0.75rem;
+  --fs-ui: 0.875rem;
+  --fs-read: 1.0625rem;
+  --fs-title: 1.5rem;
+  --lh-tight: 1.25;
+  --lh-ui: 1.4;
+  --lh-read: 1.65;
+  --h-input: 3rem;
+  --h-btn: 3rem;
+  --h-btn-sm: 2.25rem;
+  --h-btn-icon: 2.75rem;
+  --px-input: 1rem;
+  --px-btn: 1.25rem;
+  --px-btn-sm: 0.75rem;
+  --r-sm: 0.5rem;
+  --r-md: 0.75rem;
+  --r-pill: 1.5rem;
+  --gap-inline: 0.5rem;
+  --gap-stack: 0.75rem;
+  --tap-min: 2.75rem;
+}
+
+/* ---------- Tipografia e geometria interactiva aprovadas ---------- */
+button { min-height: var(--tap-min); }
+.btn {
+  min-height: var(--h-btn);
+  padding-inline: var(--px-btn);
+  border-radius: var(--r-md);
+  gap: var(--gap-inline);
+  font-size: var(--fs-read);
+  font-weight: 500;
+  line-height: var(--lh-ui);
+}
+.admin-card a:not(.btn), .admin-card button:not(.iconbtn),
+.subscription-card a:not(.btn), .subscription-card button:not(.iconbtn),
+.profile-card a:not(.btn), .profile-card button:not(.iconbtn),
+.companies-card a:not(.btn), .companies-card button:not(.iconbtn),
+.company-card a:not(.btn), .company-card button:not(.iconbtn),
+.security-card a:not(.btn), .security-card button:not(.iconbtn) {
+  min-height: var(--h-btn);
+  padding-inline: var(--px-btn);
+  border-radius: var(--r-md);
+  gap: var(--gap-inline);
+  font-size: var(--fs-read);
+  font-weight: 500;
+  line-height: var(--lh-ui);
+}
+.iconbtn {
+  width: var(--h-btn-icon);
+  height: var(--h-btn-icon);
+  border-radius: var(--r-md);
+}
+.iconbtn--danger,
+.iconbtn--queue,
+.msg-user-actions .iconbtn,
+.ujimu-runtime .app-drawer-trigger,
+.app-drawer-trigger {
+  width: var(--h-btn-icon) !important;
+  height: var(--h-btn-icon) !important;
+  border-radius: var(--r-md) !important;
+}
+.iconbtn > .iconify,
+.iconbtn--danger > .iconify,
+.iconbtn--queue > .iconify { width: 1.25rem; height: 1.25rem; }
+.btn > .iconify,
+.drawer-foot-link > .iconify,
+.adm-nav-item > .iconify { width: 1.125rem; height: 1.125rem; }
+.btn--xs,
+.copybtn,
+.sugg,
+.spec-chip,
+.ad-cta,
+.sendbtn {
+  position: relative;
+  min-height: var(--h-btn-sm);
+  height: var(--h-btn-sm);
+  padding-inline: var(--px-btn-sm);
+  border-radius: var(--r-sm);
+  gap: var(--gap-inline);
+  font-size: var(--fs-ui);
+  font-weight: 500;
+}
+.btn--xs::before,
+.copybtn::before,
+.sugg::before,
+.spec-chip::before,
+.ad-cta::before,
+.sendbtn::before {
+  content: '';
+  position: absolute;
+  inset: -0.25rem;
+}
+.sendbtn { width: var(--h-btn-sm); height: var(--h-btn-sm); padding: 0; border-radius: 50%; }
+.sendbtn > .iconify { width: 1.25rem; height: 1.25rem; }
+.btn-link,
+.drawer-foot-link,
+.drawer-user-out,
+.specialist-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding-inline: var(--gap-inline);
+  font-size: var(--fs-ui);
+  font-weight: 500;
+}
+.drawer-foot-link,
+.hist-item,
+.msg-user-actions,
+.ai-actions,
+.sugg-row,
+.quota-notice-row,
+.otp-row,
+.adm-row-actions,
+.hero-actions { gap: var(--gap-inline); }
+.auth-form,
+.auth-actions,
+.auth-field,
+.modal-body,
+.adm-create { gap: var(--gap-stack); }
+.ai-actions { gap: var(--gap-inline); }
+.field {
+  min-height: var(--h-input);
+  padding-inline: var(--px-input);
+  border-radius: var(--r-md);
+  font-size: var(--fs-read);
+  line-height: var(--lh-ui);
+}
+.profile-card select,
+.profile-card input,
+.companies-card select,
+.security-card input,
+.company-card input,
+.company-card textarea,
+.admin-card input,
+.admin-card textarea,
+.admin-card select {
+  min-height: var(--h-input);
+  padding-inline: var(--px-input);
+  border-radius: var(--r-md);
+  font-size: var(--fs-read);
+  line-height: var(--lh-ui);
+}
+.otp-cell { width: var(--h-input); height: var(--h-input); border-radius: var(--r-md); }
+.prompt { border-radius: var(--r-pill); gap: var(--gap-inline); }
+.prompt-row { gap: var(--gap-inline); }
+.spec-card,
+.spec-opt,
+.hist-item-main,
+.drawer-foot-link,
+.adm-nav-item,
+.adm-spec-main,
+.pay-method,
+.adm-toggle,
+.seg-opt { min-height: var(--tap-min); }
+.sources { border-radius: var(--r-sm); }
+.source-row { gap: var(--gap-inline); border-radius: var(--r-sm); }
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--yellow) !important;
+  outline-offset: 2px !important;
+}

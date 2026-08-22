@@ -10,7 +10,7 @@ describe('Nuxt UI integration', () => {
 
     expect(packageJson.dependencies).toHaveProperty('@nuxt/ui')
     expect(packageJson.dependencies).toHaveProperty('tailwindcss')
-    expect(nuxtConfig).toContain("modules: ['@nuxt/ui']")
+    expect(nuxtConfig).toContain("'@nuxt/ui'")
   })
 
   it('imports Tailwind CSS and Nuxt UI theme layers from the global stylesheet', async () => {

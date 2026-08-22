@@ -166,7 +166,7 @@ function formatNumber(value: number): string {
   <main v-else class="subpage" aria-labelledby="company-title" data-screen-label="Subscrição — Gestão da Empresa">
     <NuxtLink class="btn btn--ghost btn--back" to="/"><UjimuIcon name="chevLeft" /> Voltar à consulta</NuxtLink>
     <h1 id="company-title" class="subpage-title">{{ detail.company.name }}</h1>
-    <p class="subpage-sub">Conta corporativa · <span class="plan-current--on" style="font-size: 13px"><UjimuIcon name="check" /> Subscrição activa</span></p>
+    <p class="subpage-sub">Conta corporativa · <span class="plan-current--on"><UjimuIcon name="check" /> Subscrição activa</span></p>
 
     <div class="adm-statrow">
       <div class="adm-card adm-statcard">

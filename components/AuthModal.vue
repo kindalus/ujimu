@@ -300,7 +300,7 @@ function resetAndClose(): void {
         <p class="modal-sub">{{ authSubtitle }}</p>
 
         <div v-if="passkeySignInAvailable" class="auth-actions">
-          <button class="btn btn--ghost btn--block" type="button" :disabled="!passkeysSupported || passkeyPending" @click="signInWithPasskey">
+          <button class="btn btn--ghost" type="button" :disabled="!passkeysSupported || passkeyPending" @click="signInWithPasskey">
             {{ passkeyPending ? 'A confirmar…' : 'Entrar com passkey' }}
           </button>
         </div>
@@ -319,7 +319,7 @@ function resetAndClose(): void {
         <div v-if="purpose === 'login' && devAuthAvailable && authContact.trim()" class="dev-auth-panel" aria-label="Modo de desenvolvimento">
           <p><strong>Modo de desenvolvimento</strong></p>
           <p>Activo apenas em desenvolvimento com UJIMU_DEV_AUTH_ENABLED.</p>
-          <button class="btn btn--ghost btn--block" type="button" :disabled="authPending || devAuthPending" @click="signInWithDevContact">
+          <button class="btn btn--ghost" type="button" :disabled="authPending || devAuthPending" @click="signInWithDevContact">
             {{ devAuthPending ? 'A entrar…' : 'Entrar em modo desenvolvimento' }}
           </button>
         </div>
@@ -361,11 +361,11 @@ function resetAndClose(): void {
 <style scoped>
 .auth-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 18px 0; align-items: stretch; }
 .auth-actions, .auth-field { display: grid; gap: 8px; }
-.auth-field span { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+.auth-field span { color: var(--muted); font-size: var(--fs-micro); letter-spacing: .08em; text-transform: uppercase; }
 .dev-auth-panel { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 10px; background: var(--yellow-soft); }
-.dev-auth-panel p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.dev-auth-panel p { margin: 0; color: var(--muted); font-size: var(--fs-ui); line-height: 1.35; }
 .dev-auth-panel strong { color: var(--ink); }
-.auth-message, .auth-error { margin: 0; line-height: 1.4; font-size: 13px; }
+.auth-message, .auth-error { margin: 0; line-height: 1.4; font-size: var(--fs-ui); }
 .auth-message { color: var(--ink); }
 .auth-error { color: var(--danger); }
 </style>

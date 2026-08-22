@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -20,13 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 56 persistent Pi chat sessions:
+Latest full verification after Slice 57 typography and control geometry:
 
-- `npm test` — passed, 269 tests
-- `npm run typecheck` — passed
-- `npm run build` — passed with existing Nuxt/Tailwind/VueUse/Node warnings
-- `npm audit` — passed with 0 known vulnerabilities after updating Nuxt, Nuxt UI, Vite, and related dependencies.
+- `npm test` — passed, 277 tests.
+- `npm run typecheck` — passed.
+- `npm run build` — passed; generated CSS contains same-origin variable fonts, swap, and metric overrides.
+- Font budget — Inter + Literata total 87,692 bytes (85.64 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
+- `npm audit` — passed with 0 known vulnerabilities.
 - `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
+- Chrome DevTools production-build check, 2026-08-22 — mobile controls met the 44px target, input rendered at 48px/17px, assistant text rendered in Literata 17px/400/1.65 without the lateral marker, public flows had a clean console, and a local trace measured LCP 67 ms and CLS 0.00.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
 - Chrome DevTools production browser and performance check, 2026-08-21 — passed at `https://ujimu.com`: SEO 100, Best Practices 100, LCP 237 ms, TTFB 173 ms, CLS 0, HTTP/2, four initial API calls, and no console errors or warnings.
 - Real Pi initialization smoke test, 2026-08-21 — passed with the configured OpenRouter model in a temporary workspace; `llm-wiki` created `AGENTS.md`, `wiki/index.md`, and `wiki/log.md`, and strengthened backend validation accepted the generated contract.
@@ -110,7 +112,7 @@ Known non-blocking warnings:
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
-| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `acceptance-tested` | — | RED: 9 of 13 focused tests fail on the expected missing typography, geometry, font delivery, safe-area, focus, and marker-removal behaviour. |
+| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 277 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 
 ## Persistent Pi chat sessions
 

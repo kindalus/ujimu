@@ -110,16 +110,16 @@ useHead({
 
 <style scoped>
 .specialist-public { width: min(820px, 100%); margin: 0 auto; padding: 56px 24px 80px; }
-.specialist-back { color: var(--muted); font-size: 13px; text-decoration: none; }
+.specialist-back { color: var(--muted); font-size: var(--fs-ui); text-decoration: none; }
 .specialist-back:hover { color: var(--ink); }
 .specialist-hero { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
-.specialist-kicker { color: var(--yellow); font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.specialist-hero h1 { max-width: 760px; margin: 14px 0 18px; font-size: clamp(36px, 6vw, 64px); line-height: 1.05; letter-spacing: -.04em; }
-.specialist-hero p, .specialist-section p, .specialist-trust p { color: var(--muted); font-size: 17px; line-height: 1.7; }
+.specialist-kicker { color: var(--yellow); font-size: var(--fs-micro); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.specialist-hero h1 { max-width: 760px; margin: 14px 0 18px; font-size: var(--fs-title); line-height: 1.05; letter-spacing: -.04em; }
+.specialist-hero p, .specialist-section p, .specialist-trust p { color: var(--muted); font-size: var(--fs-read); line-height: 1.7; }
 .specialist-section, .specialist-trust { padding: 36px 0; border-bottom: 1px solid var(--line); }
-.specialist-section h2, .specialist-trust h2 { margin: 0 0 16px; font-size: 22px; }
+.specialist-section h2, .specialist-trust h2 { margin: 0 0 16px; font-size: var(--fs-read); }
 .specialist-topics { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.specialist-topics li { border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; color: var(--ink); font-size: 14px; }
+.specialist-topics li { border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; color: var(--ink); font-size: var(--fs-ui); }
 .specialist-trust p { margin: 8px 0 0; }
 .specialist-cta { display: inline-flex; margin-top: 36px; text-decoration: none; }
 @media (max-width: 640px) { .specialist-public { padding-top: 32px; } .specialist-hero { padding-top: 44px; } }

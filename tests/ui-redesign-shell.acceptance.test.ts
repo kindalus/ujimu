@@ -9,7 +9,7 @@ describe('UI redesign shell and drawer acceptance', () => {
     const css = await readFile('assets/css/main.css', 'utf8')
 
     expect(css).toMatch(/html\s*\{[^}]*font-size:\s*100%/)
-    expect(css).toMatch(/\.app\s*\{[^}]*font-size:\s*var\(--fs-read\)/)
+    expect(css).toMatch(/\.app\s*\{[^}]*font-size:\s*var\(--fs-ui\)/)
   })
 
   it('uses the prototype fixed scrim/aside drawer instead of a generic Nuxt UI drawer', async () => {
