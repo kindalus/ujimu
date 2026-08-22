@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ujimu — Brainstorm da tipografia e geometria interactiva</title>
+  <style>
+    :root { --bg:#0b0b09; --panel:#171712; --text:#f4f2e9; --muted:#aaa79b; --line:#34332d; --accent:#f7ce1b; --serif:Georgia,"Times New Roman",serif; --sans:Inter,system-ui,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 12% 8%,#292611 0,transparent 30%),var(--bg); color:var(--text); font-family:var(--sans); }
+    .slide { display:none; width:100vw; height:100vh; padding:8vh 12vw; align-items:center; }
+    .slide.active { display:flex; }
+    .frame { width:min(1080px,100%); padding:clamp(28px,5vw,54px); border:1px solid var(--line); border-radius:24px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 28px 80px rgba(0,0,0,.38); }
+    .kicker { margin-bottom:14px; color:var(--accent); font:600 .78rem/1.4 var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+    h1,h2 { margin:0; line-height:1.02; letter-spacing:-.045em; }
+    h1 { max-width:900px; font-size:clamp(3rem,7vw,6rem); }
+    h2 { max-width:920px; font-size:clamp(2rem,4vw,3.8rem); }
+    p,li { color:var(--muted); font-size:1.08rem; line-height:1.5; }
+    .lead { max-width:860px; margin:22px 0 0; font-size:1.3rem; }
+    ul { display:grid; gap:10px; margin:24px 0 0; padding-left:1.2rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:24px; }
+    .card { padding:18px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    .card strong { display:block; margin-bottom:7px; color:var(--text); }
+    .card p { margin:0; font-size:.98rem; }
+    code { color:#fff1a1; font-family:var(--mono); }
+    .sample { margin-top:24px; padding:20px; border-left:3px solid var(--accent); background:var(--panel); font:400 1.08rem/1.65 var(--serif); }
+    .counter { position:fixed; right:28px; bottom:22px; color:var(--muted); font:.8rem var(--mono); }
+    @media(max-width:800px){ .slide{padding:5vh 6vw}.grid{grid-template-columns:1fr}.frame{padding:26px} }
+    @media print { body{overflow:visible}.slide{display:flex;break-after:page}.counter{display:none} }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="frame"><div class="kicker">Brainstorm Zafir · reaberto</div><h1>Tipografia e geometria interactiva</h1><p class="lead">Dar às respostas uma cadência editorial e aos controlos uma escala tátil coerente, sem dispersar tokens nem redesenhar a aplicação.</p></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Como poderemos</div><h2>Separar interface e leitura sem fragmentar o produto?</h2><p class="lead">A Inter organiza controlos e mensagens do utilizador. A Literata assinala o conteúdo produzido pelo especialista. A JetBrains Mono fica reservada a código e dados técnicos.</p><div class="sample">Uma resposta com citações deve ler-se como texto editorial, não como mais um bloco de interface.</div></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Contexto governante</div><h2>O projecto já fixa parte da direcção</h2><ul><li>Não existe <code>docs/wiki/</code>; governam <code>AGENTS.md</code>, os specs aprovados e o código actual.</li><li>A aplicação usa Nuxt 4.5.2, Nuxt UI 4.10.0 e Tailwind CSS 4.3.3.</li><li>A UI aprovada usa uma base preta e branca com amarelo angolano e mantém as citações no fim das respostas.</li><li>A cópia visível e os decks Zafir usam português europeu pré-1990.</li><li>A alteração deve respeitar zoom de texto, foco, mobile e leitura das citações.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Base actual</div><h2>Há 28 declarações de tamanho distintas</h2><div class="grid"><div class="card"><strong>Raiz fora da recomendação</strong><p><code>html</code> usa actualmente <code>18px</code>; um teste de aceitação exige esse valor.</p></div><div class="card"><strong>Famílias sem ficheiros locais</strong><p>O CSS pede IBM Plex Sans e Mono, mas <code>public/</code> não contém fontes.</p></div><div class="card"><strong>Mistura de unidades</strong><p>Existem muitos valores em <code>px</code>, vários <code>em</code> e apenas um tamanho principal em <code>rem</code>.</p></div><div class="card"><strong>Boa zona de intervenção</strong><p><code>assets/css/main.css</code> concentra quase toda a tipografia; alguns componentes e páginas têm estilos locais.</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Direcção pedida</div><h2>Três famílias, funções sem sobreposição</h2><ul><li><strong>Inter Variable:</strong> cabeçalhos, botões, inputs, navegação, mensagens do utilizador e restante UI.</li><li><strong>Literata Variable:</strong> corpo, listas, citações longas e títulos internos das respostas da IA.</li><li><strong>JetBrains Mono:</strong> blocos e fragmentos de código; não substituir texto de metadados só por hábito.</li><li>Usar peso 400 no corpo, 500 para ênfase de UI e 600 para títulos.</li><li>Evitar peso 700 na Literata.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Convergência proposta</div><h2>Quatro tamanhos reais em toda a aplicação</h2><div class="grid"><div class="card"><strong><code>0.75rem</code> · micro</strong><p>Domínios, timestamps, labels de fontes e metadados discretos.</p></div><div class="card"><strong><code>0.875rem</code> · UI</strong><p>Botões, chips, navegação, cards, tabelas e código.</p></div><div class="card"><strong><code>1.0625rem</code> · leitura</strong><p>Input, mensagens do utilizador e respostas da IA. O input fica acima do mínimo do iOS.</p></div><div class="card"><strong><code>1.5rem</code> · título</strong><p>Títulos de página e estados vazios. A hierarquia secundária usa peso e espaçamento.</p></div></div><p>Esta proposta elimina o tamanho base distinto de <code>1rem</code> para cumprir o limite absoluto de quatro.</p></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Leitura e citações</div><h2>Ritmo editorial, largura contida</h2><ul><li>Respostas da IA: Literata, peso 400, <code>line-height: 1.65</code> e <code>max-width: 34em</code>.</li><li>Interface: Inter, <code>line-height: 1.4</code>; títulos usam <code>1.25</code>.</li><li>O chat mantém 16–20px de padding lateral, traduzidos para <code>rem</code>.</li><li>O marcador inline segue <code>0.75em</code>, alinhamento vertical <code>0.35em</code>, linha zero e números tabulares.</li><li>Cards de fonte deixam de usar maiúsculas; título a 600 e domínio a 400 com espaçamento <code>0.01em</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">PWA e desempenho</div><h2>O orçamento fica nos 90KiB</h2><ul><li>Inter e Literata usam WOFF2 variáveis apenas com o subconjunto <code>latin</code>, que cobre os caracteres portugueses até U+00FF.</li><li>A medição preliminar dos ficheiros oficiais Google Fonts, só com eixo de peso 400–600, deu cerca de 85KiB para as duas famílias.</li><li>A JetBrains Mono é medida separadamente e só carrega quando existe código; não altera o orçamento das duas famílias principais.</li><li><code>font-display: swap</code> e fallbacks métricos continuam obrigatórios; o preload depende da medição do primeiro ecrã.</li><li>Fontes: <code>fonts.nuxt.com/get-started/configuration</code>, <code>fonts.nuxt.com/get-started/providers</code> e repositório oficial <code>google/fonts</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Fora do âmbito</div><h2>Uma alteração tipográfica, não outra reformulação</h2><ul><li>Não mudar cores, estrutura de navegação, comportamento do chat ou regras de citações.</li><li>Não introduzir um gestor de fontes novo se ficheiros locais e CSS resolverem o problema.</li><li>Não alterar conteúdo, contratos de API nem persistência.</li><li>Não manter aliases IBM Plex depois da migração.</li><li>Não criar escalas diferentes para desktop e telemóvel.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Decisões aprovadas</div><h2>Escala fechada para o desenho</h2><ul><li>O limite inclui todos os textos da aplicação: <code>0.75 / 0.875 / 1.0625 / 1.5rem</code>.</li><li>O corpo das respostas usa Literata a <code>1.0625rem</code>, equivalente a 17px com a raiz a 16px.</li><li>O marcador inline a <code>0.75em</code> é a excepção contextual pedida; não cria mais um token global.</li><li>O utilizador confirmou que não existe material governante adicional fora do repositório.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Extensão pedida</div><h2>Controlos com alvos táteis previsíveis</h2><ul><li>Usar 3rem como altura normal de inputs e botões.</li><li>Garantir pelo menos 2.75rem de alvo tátil, mesmo quando o controlo visual mede 2.25rem.</li><li>Normalizar padding horizontal, raios e espaçamento entre alvos.</li><li>Aplicar focus ring de 2px e safe area ao composer fixo.</li><li>Preservar o auto-resize actual do chat até cinco linhas.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Base actual</div><h2>A geometria também está dispersa</h2><div class="grid"><div class="card"><strong>Alturas</strong><p>38 valores distintos; vários botões de ícone medem apenas 26–34px.</p></div><div class="card"><strong>Padding</strong><p>75 combinações distintas em 109 declarações.</p></div><div class="card"><strong>Raios</strong><p>18 valores distintos, incluindo 999px para pills.</p></div><div class="card"><strong>Foco</strong><p>Inputs removem o outline e não existe uma regra global <code>:focus-visible</code>.</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Tokens propostos</div><h2>Uma escala curta para controlos</h2><ul><li>Alturas: <code>3rem</code> normal, <code>2.25rem</code> visual pequeno e <code>2.75rem</code> para ícone/alvo mínimo.</li><li>Padding horizontal: <code>1rem</code> em inputs, <code>1.25rem</code> em botões e <code>0.75rem</code> em controlos pequenos.</li><li>Raios: <code>0.5rem</code>, <code>0.75rem</code> e <code>1.5rem</code>.</li><li>Espaçamento: <code>0.5rem</code> em linha e <code>0.75rem</code> em pilha.</li><li>Bordas e focus ring mantêm 1px/2px físicos.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Decisões confirmadas</div><h2>A extensão preserva a spec anterior</h2><ul><li>Inputs e botões normais usam <code>1.0625rem</code>, não introduzem um quinto tamanho e continuam seguros no iOS.</li><li>O âmbito cobre controlos interactivos, ícones dentro de controlos, raios, gaps, focus ring e safe area.</li><li>Avatares, logótipo, ilustrações, conteúdo publicitário e outros elementos decorativos ficam fora desta normalização.</li><li>O alvo tátil mínimo de <code>2.75rem</code> aplica-se também quando o controlo visual mede <code>2.25rem</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Referências oficiais</div><h2>44px como contrato de acessibilidade</h2><ul><li>WCAG 2.2, critério 2.5.5: alvo melhorado de 44 × 44 CSS px.</li><li>Android Accessibility recomenda pelo menos 48 × 48dp para interfaces táteis.</li><li>MDN documenta <code>:focus-visible</code> e <code>env(safe-area-inset-bottom)</code>.</li><li>Fontes: <code>w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html</code>, <code>developer.android.com/guide/topics/ui/accessibility/apps#touch-targets</code> e <code>developer.mozilla.org</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Largura de leitura</div><h2>Resposta sem marcador lateral</h2><ul><li>Remover o pequeno marcador “U” e apenas o gap reservado para ele.</li><li>Manter padding lateral da thread: <code>1rem</code> em mobile e <code>1.25rem</code> em ecrãs maiores.</li><li>O corpo usa a largura interior disponível e mantém o limite editorial de <code>34em</code>.</li><li>Mensagens do utilizador, citações, fontes e streaming mantêm a estrutura actual.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Decisões e iteração</div><h2>Extensão actualizada</h2><ul><li>Iterações 1–5: aprovada a tipografia, fontes, quatro tamanhos, arquitectura actual e subset <code>latin</code>.</li><li>Iterações 6–8: definida e aprovada a escala tátil dos controlos interactivos.</li><li>A auditoria encontrou 38 alturas, 75 paddings e 18 raios distintos.</li><li>Iteração 9: pedida a remoção global do marcador lateral das respostas para recuperar largura de leitura em mobile.</li><li>Iteração 10: clarificado que só desaparece o espaço do marcador; o padding lateral da thread mantém-se.</li></ul></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides=[...document.querySelectorAll('.slide')]; let index=0; const current=document.getElementById('current'); document.getElementById('total').textContent=String(slides.length);
+    function go(next){slides[index].classList.remove('active');index=Math.max(0,Math.min(next,slides.length-1));slides[index].classList.add('active');current.textContent=String(index+1)}
+    document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key===' '){event.preventDefault();go(index+1)}if(event.key==='ArrowLeft')go(index-1)});
+    document.addEventListener('click',event=>go(event.clientX>innerWidth/2?index+1:index-1));
+  </script>
+</body>
+</html>
