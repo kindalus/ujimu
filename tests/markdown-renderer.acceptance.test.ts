@@ -41,6 +41,6 @@ describe('chat Markdown rendering acceptance', () => {
     expect(page).toContain('v-html="renderAssistantMessageHtml(item.message)"')
     expect(css).toContain('.assistant-markdown ul { list-style: disc; }')
     expect(css).toContain('.assistant-markdown ol { list-style: decimal; }')
-    expect(css).toContain('.assistant-markdown h2 { font-size: 1.22em; }')
+    expect(css).toMatch(/\.assistant-markdown h2\s*\{[^}]*font-size:\s*var\(--fs-read\)[^}]*font-weight:\s*600/)
   })
 })
