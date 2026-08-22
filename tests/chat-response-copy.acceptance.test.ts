@@ -50,7 +50,7 @@ describe('assistant response copy acceptance', () => {
     expect(page).not.toContain('<template v-if="citation.sourceFile"> · {{ citation.sourceFile }}</template>')
   })
 
-  it('keeps edit and copy question actions below the user question as hover-revealed icon buttons with tooltips', async () => {
+  it('keeps edit and copy question actions beside the user question as hover-revealed icon buttons with tooltips', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
     const css = await readFile('assets/css/main.css', 'utf8')
 
@@ -63,7 +63,7 @@ describe('assistant response copy acceptance', () => {
     expect(page).toContain(':title="copiedMessageId === item.message.id ? \'Pergunta copiada\' : \'Copiar pergunta\'"')
     expect(page).toContain('@click="copyUserQuestion(item.message)"')
     expect(page).not.toContain("{{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar pergunta' }}")
-    expect(css).toContain('.msg-user-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }')
+    expect(css).toMatch(/\.msg-user-actions\s*\{[^}]*position:\s*absolute[^}]*display:\s*flex[^}]*opacity:\s*0[^}]*pointer-events:\s*none/)
     expect(css).toContain('.msg--user:hover .msg-user-actions, .msg--user:focus-within .msg-user-actions { opacity: 1; pointer-events: auto; }')
   })
 })

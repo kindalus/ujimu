@@ -22,7 +22,7 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 Latest full verification after Slice 57 typography and control geometry:
 
-- `npm test` — passed, 277 tests.
+- `npm test` — passed, 278 tests.
 - `npm run typecheck` — passed.
 - `npm run build` — passed; generated CSS contains same-origin variable fonts, swap, and metric overrides.
 - Font budget — Inter + Literata total 87,692 bytes (85.64 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
@@ -112,7 +112,7 @@ Known non-blocking warnings:
 | 54 | [`54-real-quota-admin-navigation.html`](./54-real-quota-admin-navigation.html) | `verified` | 2026-08-21 | Show real quota, attribute anonymous usage, and hide admin navigation from non-admins. |
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
-| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 277 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
+| 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 
 ## Persistent Pi chat sessions
 

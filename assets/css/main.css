@@ -253,8 +253,12 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: var(--lh-tight); }
 
 /* ---------- Mensagens ---------- */
 .msg--user { display: flex; justify-content: flex-end; align-items: flex-end; gap: 6px; }
-.msg-user-stack { max-width: 78%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.msg-user-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.msg-user-stack { position: relative; max-width: 78%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.msg-user-actions {
+  position: absolute; right: calc(100% + var(--gap-inline)); bottom: 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
 .msg--user:hover .msg-user-actions, .msg--user:focus-within .msg-user-actions { opacity: 1; pointer-events: auto; }
 .msg-user-actions .iconbtn { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); }
 .msg-user-actions .iconbtn > .iconify { width: 14px; height: 14px; }
@@ -388,8 +392,11 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: var(--lh-tight); }
   display: flex; flex-direction: column; gap: 6px;
   transition: border-color 0.15s;
 }
-.prompt:focus-within { border-color: var(--ink); }
-.app[data-yellow="forte"] .prompt:focus-within { border-color: var(--yellow); }
+.prompt:focus-within {
+  border-color: var(--yellow);
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
 .prompt--off { opacity: 0.55; }
 .prompt-toprow { display: flex; }
 .prompt-row { display: flex; align-items: flex-end; gap: 10px; }

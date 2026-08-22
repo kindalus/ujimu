@@ -188,3 +188,4 @@ button { min-height: var(--tap-min); }
   outline: 2px solid var(--yellow) !important;
   outline-offset: 2px !important;
 }
+.prompt-ta:focus-visible { outline: none !important; }

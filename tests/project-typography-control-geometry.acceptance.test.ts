@@ -92,6 +92,8 @@ describe('project typography and control geometry acceptance', () => {
     expect(css).toMatch(/\.iconbtn\s*\{[^}]*width:\s*var\(--h-btn-icon\)[^}]*height:\s*var\(--h-btn-icon\)/)
     expect(css).toMatch(/\.field\s*\{[^}]*min-height:\s*var\(--h-input\)[^}]*padding-inline:\s*var\(--px-input\)/)
     expect(css).toMatch(/:focus-visible[^}]*outline:\s*2px solid[^}]*outline-offset:\s*2px/)
+    expect(css).toMatch(/\.prompt:focus-within[^}]*border-color:\s*var\(--yellow\)[^}]*outline:\s*2px solid var\(--yellow\)[^}]*outline-offset:\s*2px/)
+    expect(css).toMatch(/\.prompt-ta:focus-visible[^}]*outline:\s*none\s*!important/)
     expect(css).toContain('padding-bottom: calc(var(--gap-stack) + env(safe-area-inset-bottom));')
   })
 
@@ -105,6 +107,13 @@ describe('project typography and control geometry acceptance', () => {
     expect(css).toMatch(/\.sendbtn::before[^}]*inset:\s*-0\.25rem/)
     expect(css).toMatch(/\.sendbtn\s+\.iconify|\.sendbtn\s*>\s*\.iconify/)
     expect(css).toMatch(/\.ai-actions\s*\{[^}]*gap:\s*var\(--gap-inline\)/)
+  })
+
+  it('keeps hidden user actions out of the vertical conversation flow', async () => {
+    const css = await globalCss()
+
+    expect(css).toMatch(/\.msg-user-stack[^}]*position:\s*relative/)
+    expect(css).toMatch(/\.msg-user-actions[^}]*position:\s*absolute[^}]*right:\s*calc\(100% \+ var\(--gap-inline\)\)[^}]*bottom:\s*0/)
   })
 
   it('reserves full-width treatment for primary actions', async () => {
