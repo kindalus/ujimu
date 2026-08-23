@@ -251,6 +251,7 @@ async function preparePersistentChatSession(
       identity: historyUserId ? { type: 'registered', userId: historyUserId } : { type: 'anonymous' },
       ...(input.conversationId ? { conversationId: input.conversationId } : {}),
       ...(replaceFromPiEntryId ? { replaceFromPiEntryId } : {}),
+      ...(replacementMessageId ? { replaceFromHistoryMessageId: replacementMessageId } : {}),
       ...(input.regenerateLast && !historyUserId ? { regenerateLastQuestion: input.question } : {}),
       ...(replacementMessageId && !replaceFromPiEntryId ? { reconstructFromHistory: true } : {}),
       ...(historyUserId && database && input.conversationId

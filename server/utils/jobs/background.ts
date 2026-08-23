@@ -321,6 +321,7 @@ async function runSpecialistHardResetJob(
 ): Promise<void> {
   const dataDir = options.dataDir ?? resolveAppConfig().dataDir
   try {
+    await editSpecialist(job.specialist_id, { status: 'initializing' }, { dataDir })
     await deleteChatSessionsForSpecialist({ dataDir, specialistId: job.specialist_id })
     purgeSpecialistAssociatedData(options.database, job.specialist_id)
     const specialist = await resetSpecialistWorkspace(job.specialist_id, { dataDir })

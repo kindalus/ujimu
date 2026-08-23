@@ -181,7 +181,7 @@ describe('persistent Pi chat sessions acceptance', () => {
     }
     const common = {
       runner, piChatEnabled: true, persistentChatSessions: true,
-      chatSessionDataDir: fixture.dataDir, chatSessionSecret: SECRET,
+      chatSessionDataDir: fixture.dataDir, chatSessionSecret: SECRET, chatSessionNow: BASE_TIME,
       history: { database, subject: { type: 'registered' as const, id: 'user-a' }, now: BASE_TIME }
     }
 
@@ -201,9 +201,16 @@ describe('persistent Pi chat sessions acceptance', () => {
       ))
 
       expect(contexts[1]).not.toContain('resposta 1')
+
+      await collectEvents(await createChatEventStreamForSpecialist(
+        testSpecialist(fixture.specialistDir),
+        { specialistId: SPECIALIST_ID, conversationId, question: 'pergunta igual', regenerateLast: true },
+        { ...common, chatSessionNow: new Date(BASE_TIME.getTime() + 31 * 24 * 60 * 60 * 1000) }
+      ))
+      expect(contexts[2]).not.toContain('resposta 2')
       expect(database.prepare('SELECT role, content FROM conversation_messages ORDER BY message_order').all()).toEqual([
         { role: 'user', content: 'pergunta igual' },
-        { role: 'assistant', content: 'resposta 2' }
+        { role: 'assistant', content: 'resposta 3' }
       ])
     } finally {
       database.close()

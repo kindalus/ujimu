@@ -38,6 +38,7 @@ export interface OpenChatSessionTurnOptions {
   identity: ChatSessionIdentity
   conversationId?: string
   replaceFromPiEntryId?: string
+  replaceFromHistoryMessageId?: string
   regenerateLastQuestion?: string
   reconstructFromHistory?: boolean
   rehydrationMessages?: ChatSessionHistoryMessage[]
@@ -204,6 +205,12 @@ export async function openChatSessionTurn(options: OpenChatSessionTurnOptions): 
         throw new ChatConversationUnauthorizedError()
       }
       branchFromPiEntryId = latest.userPiEntryId
+    }
+
+    if (branchFromPiEntryId && !manager.getEntry(branchFromPiEntryId) && options.replaceFromHistoryMessageId) {
+      branchFromPiEntryId = rehydratedMappings.find(
+        (mapping) => mapping.messageId === options.replaceFromHistoryMessageId
+      )?.piEntryId
     }
 
     if (branchFromPiEntryId) {
