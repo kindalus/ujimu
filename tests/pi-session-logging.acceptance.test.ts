@@ -102,7 +102,9 @@ describe('Ujimu Pi session logging acceptance', () => {
 
     await createUjimuPiSession({ cwd: root, task: 'ingestion' })
 
-    expect(createAgentSessionMock.mock.calls[0]?.[0]).not.toHaveProperty('thinkingLevel')
+    expect(createAgentSessionMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ thinkingLevel: expect.anything() })
+    )
   })
 
   it('does not apply the ingestion thinking level to chat sessions', async () => {
@@ -112,7 +114,9 @@ describe('Ujimu Pi session logging acceptance', () => {
 
     await createUjimuPiSession({ cwd: root, task: 'chat' })
 
-    expect(createAgentSessionMock.mock.calls[0]?.[0]).not.toHaveProperty('thinkingLevel')
+    expect(createAgentSessionMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({ thinkingLevel: expect.anything() })
+    )
   })
 
   it('rejects an invalid ingestion thinking level before creating a Pi session', async () => {

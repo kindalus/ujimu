@@ -8,6 +8,10 @@ export type PiTaskName = AgentSessionLogTask | 'chat'
 export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
+const UJIMU_PI_INGESTION_THINKING_LEVEL_ENV = 'UJIMU_PI_INGESTION_THINKING_LEVEL'
+const UJIMU_PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+
+type UjimuPiThinkingLevel = typeof UJIMU_PI_THINKING_LEVELS[number]
 
 export interface CreateUjimuPiSessionOptions {
   cwd: string
@@ -27,6 +31,7 @@ export interface CreateUjimuPiSessionResult {
 }
 
 export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions): Promise<CreateUjimuPiSessionResult> {
+  const thinkingLevel = resolveTaskThinkingLevel(options.task)
   const {
     createAgentSession,
     DefaultResourceLoader,
@@ -64,7 +69,8 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     sessionManager: options.sessionManager ?? SessionManager.inMemory(options.cwd),
     settingsManager,
     modelRuntime,
-    ...(selectedModel ? { model: selectedModel as any } : {})
+    ...(selectedModel ? { model: selectedModel as any } : {}),
+    ...(thinkingLevel ? { thinkingLevel } : {})
   })
 
   const sessionContext = {
@@ -248,6 +254,20 @@ async function resolveTaskModel(
   }
 
   return resolveConfiguredModel(modelRuntime, defaultProvider, defaultModel)
+}
+
+function resolveTaskThinkingLevel(task: PiTaskName): UjimuPiThinkingLevel | undefined {
+  if (task !== 'ingestion') return undefined
+
+  const configured = process.env[UJIMU_PI_INGESTION_THINKING_LEVEL_ENV]?.trim()
+  if (!configured) return undefined
+  if (!UJIMU_PI_THINKING_LEVELS.includes(configured as UjimuPiThinkingLevel)) {
+    throw new Error(
+      `${UJIMU_PI_INGESTION_THINKING_LEVEL_ENV} must be one of: ${UJIMU_PI_THINKING_LEVELS.join(', ')}.`
+    )
+  }
+
+  return configured as UjimuPiThinkingLevel
 }
 
 function resolveConfiguredModel(modelRuntime: any, provider: string, model: string): unknown {

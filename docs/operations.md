@@ -58,6 +58,7 @@ Configure these outside source control:
 - `UJIMU_PI_BUNDLE_DIR` — optional override for bundled Pi resources; defaults to `config/pi` and stores product skills, tools, extensions, and seed config files.
 - `UJIMU_PI_CONVERSION_ENABLED` — legacy/manual conversion endpoint flag; the normal ingestion worker no longer depends on this flag.
 - `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may let the ingestion agent convert `raw/` into `converted/` and ingest into specialist wikis.
+- `UJIMU_PI_INGESTION_THINKING_LEVEL` — optional ingestion-only override; accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Missing or empty input preserves `defaultThinkingLevel` from `<UJIMU_CONFIG_DIR>/settings.json`; invalid input aborts session creation. The Pi SDK may clamp a valid level to the selected model's capabilities.
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
