@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import { buildChatPrompt } from '../server/utils/chat/pi-runner'
 import { initializeDatabase } from '../server/utils/db'
-import { getConversation } from '../server/utils/history/repository'
+import { getConversation, persistCompletedHistoryTurn } from '../server/utils/history/repository'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { writeIngestionState } from '../server/utils/ingestion/state'
 import { storeRawSource } from '../server/utils/ingestion/storage'
@@ -70,10 +70,28 @@ describe('desktop history and generated titles acceptance', () => {
     database.close()
   })
 
-  it('asks the response model for optional title metadata and keeps it outside answer text', () => {
+  it('rejects generic title labels and shows only the useful conversation title in history', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-generic-title-'))
+    const database = await initializeDatabase({ dbPath: join(dataDir, 'db.sqlite') })
+    database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('user-a', '2026-08-23T00:00:00.000Z')
+    const persisted = await persistCompletedHistoryTurn(database, {
+      userId: 'user-a', specialistId: 'iva', specialistName: 'IVA',
+      question: 'Como funciona a dedução?', answer: 'Resposta.', grounded: true, citations: [],
+      generatedTitle: '  TÍTULO GERADO.  '
+    })
+    expect(persisted).toMatchObject({ title: 'Como funciona a dedução?', titleStatus: 'pending' })
+
+    const page = await import('node:fs/promises').then(({ readFile }) => readFile('pages/index.vue', 'utf8'))
+    expect(page).toContain('{{ conversation.title }}')
+    expect(page).not.toContain("conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado'")
+    database.close()
+  })
+
+  it('asks the response model for a specific optional title and keeps it outside answer text', () => {
     const prompt = buildChatPrompt({ specialist: {} as never, question: 'Pergunta', citationEvidence: [] })
-    expect(prompt).toContain('{"type":"title","title":"..."}')
+    expect(prompt).toContain('{"type":"title","title":"Prazo legal para férias"}')
     expect(prompt).toContain('at most 80 characters')
+    expect(prompt).toContain('Never use a generic label')
   })
 })
 

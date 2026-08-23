@@ -478,7 +478,17 @@ function temporaryTitle(question: string): string {
 }
 
 function normalizeGeneratedTitle(title: string): string {
-  return title.replace(/\s+/g, ' ').trim().slice(0, 80)
+  const normalized = title.replace(/\s+/g, ' ').trim().slice(0, 80)
+  const comparable = normalized
+    .normalize('NFD')
+    .replace(/\p{Mark}/gu, '')
+    .toLocaleLowerCase('pt')
+    .replace(/[.!?…]+$/u, '')
+    .trim()
+  if (['...', 'titulo gerado', 'titulo pendente', 'nova conversa', 'generated title'].includes(comparable)) {
+    return ''
+  }
+  return normalized
 }
 
 function readNextMessageOrder(database: DatabaseSync, conversationId: string): number {

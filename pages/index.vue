@@ -1002,7 +1002,6 @@ function createId(prefix: string): string {
                 >
                   <button class="hist-item-main" type="button" @click="openConversationFromDrawer(conversation.id, close)">
                     <span class="hist-item-title">{{ conversation.title }}</span>
-                    <span class="hist-item-when">{{ conversation.titleStatus === 'pending' ? 'Título pendente' : 'Título gerado' }}</span>
                   </button>
                   <button class="iconbtn iconbtn--danger" type="button" title="Apagar permanentemente" @click="deleteHistoryConversation(conversation.id)">
                     <UjimuIcon name="trash" />

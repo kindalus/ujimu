@@ -95,6 +95,10 @@ async function listRawFiles(root: string): Promise<string[]> {
   const files: string[] = []
 
   for (const entry of entries) {
+    if (entry.name.startsWith('.')) {
+      continue
+    }
+
     const path = join(root, entry.name)
 
     if (entry.isDirectory()) {

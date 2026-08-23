@@ -324,8 +324,9 @@ The current working directory is the specialist root. Use the available tools no
 If you include machine-readable citations, emit them as JSON lines in one of these optional shapes:
 {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
 {"type":"citation","citation":{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}}
-Also emit one concise conversation title, at most 80 characters, as a separate JSON line:
-{"type":"title","title":"..."}
+Also emit one concise conversation title that specifically summarizes the user's question, at most 80 characters, as a separate JSON line:
+{"type":"title","title":"Prazo legal para férias"}
+Never use a generic label such as "Título gerado", "Título pendente", or "Nova conversa".
 Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu. Missing or malformed title metadata will also be omitted.
 
 Known citation metadata, if useful:
