@@ -20,14 +20,15 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 57 typography and control geometry:
+Latest full verification after Slice 58 ingestion thinking level:
 
-- `npm test` — passed, 278 tests.
+- `npm test` — passed, 282 tests.
 - `npm run typecheck` — passed.
 - `npm run build` — passed; generated CSS contains same-origin variable fonts, swap, and metric overrides.
 - Font budget — Inter + Source Sans 3 total 77,172 bytes (75.36 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
 - `npm audit` — passed with 0 known vulnerabilities.
 - `npm audit signatures` — passed; 1,034 packages had verified registry signatures and 357 had verified attestations.
+- Production ingestion configuration check, 2026-08-23 — deployment `687be07` ran successfully; the container received `openai-codex/gpt-5.6-sol` with `high` thinking, both health endpoints passed, and a disposable Pi SDK session resolved that authenticated reasoning model at the requested level without sending a prompt.
 - Chrome DevTools production-build check, 2026-08-22 — mobile controls met the 44px target, input rendered at 48px/17px, assistant text rendered in Source Sans 3 at 17px/400/1.65 without the lateral marker, public flows had a clean console, and a local trace measured LCP 67 ms and CLS 0.00.
 - Post-verification typography adjustment, 2026-08-22 — Source Sans 3 replaced Literata only for assistant responses after a side-by-side browser review; same-origin loading, font metrics, width, and overflow checks passed.
 - Dependency audit note: the prior `esbuild` advisory was resolved with a lockfile refresh and a top-level `overrides.esbuild = 0.28.1` pin; new advisories appeared after that snapshot.
@@ -114,11 +115,11 @@ Known non-blocking warnings:
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
-| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `acceptance-tested` | 2026-08-23 | RED tests cover override, fallback, chat isolation, invalid input, runbook, and container examples. |
+| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
 
 ## Pi ingestion thinking level
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Approved originating decks:
 
@@ -145,6 +146,14 @@ Acceptance RED:
 - `tests/pi-session-logging.acceptance.test.ts` proves override, fallback, chat isolation, and invalid-input rejection.
 - `tests/ops-ci-docs.acceptance.test.ts` and `tests/container-deployment.acceptance.test.ts` require the operational contract.
 - Focused run: 9 passed and 4 failed for the missing implementation and documentation.
+
+Implementation and verification:
+
+- `server/utils/pi/session.ts` validates the ingestion-only environment value and passes it to the Pi SDK session factory.
+- Environment samples and `docs/operations.md` document values, precedence, fallback, and model clamping.
+- 282 tests, typecheck, build, dependency audit, and registry signature audit passed.
+- Production deploy `687be07` passed internal and public health checks.
+- A disposable production-host SDK check resolved authenticated `openai-codex/gpt-5.6-sol` with `high` thinking and created the session without issuing a provider prompt.
 
 ## Persistent Pi chat sessions
 
