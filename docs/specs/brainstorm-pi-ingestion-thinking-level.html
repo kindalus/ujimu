@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ujimu — Brainstorm do nível de raciocínio da ingestão</title>
+  <style>
+    :root { --bg:#0b0b09; --panel:#171712; --text:#f4f2e9; --muted:#aaa79b; --line:#34332d; --accent:#f7ce1b; --sans:Inter,system-ui,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; background:radial-gradient(circle at 12% 8%,#292611 0,transparent 30%),var(--bg); color:var(--text); font-family:var(--sans); }
+    .slide { display:none; width:100vw; height:100vh; padding:8vh 12vw; align-items:center; }
+    .slide.active { display:flex; }
+    .frame { width:min(1080px,100%); padding:clamp(28px,5vw,54px); border:1px solid var(--line); border-radius:24px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 28px 80px rgba(0,0,0,.38); }
+    .kicker { margin-bottom:14px; color:var(--accent); font:600 .78rem/1.4 var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+    h1,h2 { margin:0; line-height:1.02; letter-spacing:-.045em; }
+    h1 { max-width:900px; font-size:clamp(3rem,7vw,6rem); }
+    h2 { max-width:920px; font-size:clamp(2rem,4vw,3.8rem); }
+    p,li { color:var(--muted); font-size:1.08rem; line-height:1.5; }
+    .lead { max-width:860px; margin:22px 0 0; font-size:1.3rem; }
+    ul { display:grid; gap:10px; margin:24px 0 0; padding-left:1.2rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:24px; }
+    .card { padding:18px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    .card strong { display:block; margin-bottom:7px; color:var(--text); }
+    .card p { margin:0; font-size:.98rem; }
+    code { color:#fff1a1; font-family:var(--mono); }
+    .counter { position:fixed; right:28px; bottom:22px; color:var(--muted); font:.8rem var(--mono); }
+    @media(max-width:800px){ .slide{padding:5vh 6vw}.grid{grid-template-columns:1fr}.frame{padding:26px} }
+    @media print { body{overflow:visible}.slide{display:flex;break-after:page}.counter{display:none} }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="frame"><div class="kicker">Brainstorm Zafir · iteração 1</div><h1>Raciocínio próprio para a ingestão</h1><p class="lead">Escolher modelo e nível de raciocínio da ingestão sem alterar a conversação nem depender do valor global do Pi.</p></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Problema</div><h2>O modelo muda por tarefa. O raciocínio ainda não.</h2><ul><li>A ingestão já aceita <code>UJIMU_PI_INGESTION_PROVIDER</code> e <code>UJIMU_PI_INGESTION_MODEL</code>.</li><li>O nível vem hoje de <code>defaultThinkingLevel</code> em <code>settings.json</code>.</li><li>Alterar esse valor também afecta a conversação.</li><li>O operador precisa de dar mais raciocínio à ingestão sem aumentar o custo de todas as respostas.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Contexto governante</div><h2>Uma decisão antiga tem de ser substituída de forma explícita</h2><ul><li>Não existe <code>docs/wiki/</code>; governam <code>AGENTS.md</code>, a Slice 13, os testes e o código actual.</li><li>A Slice 13 removeu as antigas variáveis <code>*_THINKING_LEVEL</code> durante a consolidação da configuração Pi.</li><li>O pedido actual reintroduz apenas a variável da ingestão, com validação e cobertura de testes.</li><li>O Pi continua a resolver provider, modelo e autenticação antes de iniciar a sessão.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Direcções avaliadas</div><h2>A opção mínima é também a mais segura</h2><div class="grid"><div class="card"><strong>Valor global</strong><p>Mudar <code>defaultThinkingLevel</code>. É simples, mas afecta conversação e ingestão.</p></div><div class="card"><strong>Override só para ingestão</strong><p>Adicionar <code>UJIMU_PI_INGESTION_THINKING_LEVEL</code>. Resolve o pedido sem alargar o âmbito.</p></div><div class="card"><strong>Overrides para todas as tarefas</strong><p>Criar variáveis para chat, conversão e ingestão. Acrescenta configuração que não foi pedida.</p></div><div class="card"><strong>Configuração por especialidade</strong><p>Permite granularidade máxima, mas mistura política operacional com o domínio da especialidade.</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Direcção proposta</div><h2>Um override opcional e validado</h2><ul><li>Adicionar <code>UJIMU_PI_INGESTION_THINKING_LEVEL</code>.</li><li>Aceitar apenas níveis suportados pelo Pi; um valor inválido deve falhar antes da execução do agente.</li><li>Quando a variável estiver vazia, manter <code>defaultThinkingLevel</code>.</li><li>Aplicar o nível à sessão de ingestão sem alterar conversação nem conversão manual.</li><li>Produção ficará em <code>openai-codex / gpt-5.6-sol / high</code>.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Âmbito e prova</div><h2>Alteração pequena, verificação real</h2><ul><li>Actualizar sessão Pi, exemplos de ambiente, documentação operacional e testes de aceitação.</li><li>Não criar uma variável de chat nem uma variável para a conversão manual.</li><li>Não guardar credenciais no repositório.</li><li>Executar testes, typecheck e build antes do commit.</li><li>Depois do deploy, confirmar o commit, saúde da aplicação e uma sessão de ingestão com o modelo configurado.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="kicker">Decisão aprovada</div><h2>Override exclusivo da ingestão</h2><p class="lead">A implementação avança apenas para <code>UJIMU_PI_INGESTION_THINKING_LEVEL</code>. O valor global continua a controlar a conversação.</p><ul><li>Iteração 1: pedido para controlar o raciocínio e configurar produção com <code>openai-codex / gpt-5.6-sol / high</code>.</li><li>Recomendação: reintroduzir somente a variável necessária, com validação e fallback.</li><li>Iteração 2, 2026-08-23: o utilizador aprovou o deck e mandou concluir implementação, commit, push e deploy sem novas pausas.</li></ul></div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides=[...document.querySelectorAll('.slide')]; let index=0; const current=document.getElementById('current'); document.getElementById('total').textContent=String(slides.length);
+    function go(next){slides[index].classList.remove('active');index=Math.max(0,Math.min(next,slides.length-1));slides[index].classList.add('active');current.textContent=String(index+1)}
+    document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key===' '){event.preventDefault();go(index+1)}if(event.key==='ArrowLeft')go(index-1)});
+    document.addEventListener('click',event=>go(event.clientX>innerWidth/2?index+1:index-1));
+  </script>
+</body>
+</html>

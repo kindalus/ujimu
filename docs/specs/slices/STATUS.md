@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-08-22
+Last updated: 2026-08-23
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -114,6 +114,24 @@ Known non-blocking warnings:
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
+| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `idea-refined` | 2026-08-23 | Approved ingestion-only thinking-level override; existing Pi SDK architecture retained. |
+
+## Pi ingestion thinking level
+
+Status: `idea-refined`
+
+Approved originating decks:
+
+- [`../brainstorm-pi-ingestion-thinking-level.html`](../brainstorm-pi-ingestion-thinking-level.html)
+- [`../pi-ingestion-thinking-level-architecture.html`](../pi-ingestion-thinking-level-architecture.html)
+
+Refined direction:
+
+- Add only `UJIMU_PI_INGESTION_THINKING_LEVEL`.
+- Validate the seven levels supported by the Pi SDK.
+- Keep the global `settings.json` value as the fallback.
+- Do not change chat or legacy/manual conversion thinking configuration.
+- Configure production ingestion as `openai-codex/gpt-5.6-sol` with `high` thinking.
 
 ## Persistent Pi chat sessions
 
