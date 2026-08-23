@@ -41,6 +41,8 @@ const editForm = ref({
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const confirmDeleteOpen = ref(false)
+const confirmResetOpen = ref(false)
+const confirmResetId = ref('')
 const pending = ref(false)
 const feedback = ref('')
 const ingestionNote = ref('')
@@ -225,6 +227,24 @@ async function runIngestion(): Promise<void> {
     replaceSelectedSources(payload.sources)
     ingestionNote.value = 'Comando enviado. A conversão e a ingestão decorrem em background — use Actualizar para acompanhar o estado.'
     feedback.value = formatIngestionFeedback(payload)
+  })
+}
+
+async function hardResetSpecialist(): Promise<void> {
+  const selected = specialist.value
+  if (!selected || confirmResetId.value !== selected.id) return
+
+  await runAdminAction(async () => {
+    const response = await fetch(`/api/admin/specialists/${encodeURIComponent(selected.id)}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmationId: confirmResetId.value })
+    })
+    if (!response.ok) throw new Error(await readAdminApiError(response))
+    confirmResetOpen.value = false
+    confirmResetId.value = ''
+    replaceSpecialist({ ...selected, status: 'initializing', sources: [] })
+    feedback.value = 'Reinicialização completa agendada. Actualize o estado para acompanhar.'
   })
 }
 
@@ -596,6 +616,13 @@ function canIngestSource(source: IngestionSource): boolean {
       </div>
       <div class="adm-card-toprow" style="border-top: 1px solid var(--line); padding-top: 12px">
         <div>
+          <h2 class="adm-card-title">Reinicializar completamente</h2>
+          <p class="adm-card-note">Preserva apenas as fontes originais em raw/. Apaga wiki, conversões, histórico, analytics e sessões; a nova ingestão é manual.</p>
+        </div>
+        <button class="btn btn--danger btn--xs" type="button" :disabled="pending" @click="confirmResetOpen = true; confirmResetId = ''">Reinicializar</button>
+      </div>
+      <div class="adm-card-toprow" style="border-top: 1px solid var(--line); padding-top: 12px">
+        <div>
           <h2 class="adm-card-title">Apagar especialidade</h2>
           <p class="adm-card-note">Apaga a wiki e todo o histórico de clientes associado, permanentemente.</p>
         </div>
@@ -605,6 +632,23 @@ function canIngestSource(source: IngestionSource): boolean {
 
     <p v-if="feedback" class="plan-current--on"><UjimuIcon name="check" :size="11" /> {{ feedback }}</p>
     <p v-if="errorMessage" class="adm-src-error" role="alert">{{ errorMessage }}</p>
+
+    <div v-if="confirmResetOpen" class="modal-scrim" @click="confirmResetOpen = false">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reset-specialist-title" @click.stop>
+        <div class="modal-body" style="padding-top: 18px; padding-bottom: 6px">
+          <h2 id="reset-specialist-title" class="modal-title">Reinicializar completamente «{{ specialist.name }}»?</h2>
+          <p class="modal-sub">Só os ficheiros originais em <code>raw/</code> sobrevivem. Escreva <strong>{{ specialist.id }}</strong> para confirmar.</p>
+          <label class="adm-field">
+            <span class="adm-field-label">Identificador exacto</span>
+            <input v-model="confirmResetId" class="field" autocomplete="off" :disabled="pending" />
+          </label>
+          <div class="adm-row-actions">
+            <button class="btn btn--ghost" type="button" :disabled="pending" @click="confirmResetOpen = false">Cancelar</button>
+            <button class="btn btn--danger" type="button" :disabled="pending || confirmResetId !== specialist.id" @click="hardResetSpecialist">Reinicializar completamente</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div v-if="confirmDeleteOpen" class="modal-scrim" @click="confirmDeleteOpen = false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-specialist-title" @click.stop>

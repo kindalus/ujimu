@@ -15,6 +15,9 @@ export type AdminAuditAction =
   | 'ingestion_completed'
   | 'ingestion_skipped_disabled'
   | 'specialist_deleted'
+  | 'specialist_hard_reset_requested'
+  | 'specialist_hard_reset_completed'
+  | 'specialist_hard_reset_failed'
 
 export interface RecordAdminAuditEventInput {
   admin: RequiredAdminSession

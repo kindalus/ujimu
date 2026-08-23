@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { deleteConversationHistoryForSpecialist } from '../history/delete'
@@ -90,6 +90,32 @@ export async function editSpecialist(
   await reloadSpecialistRegistry({ specialtiesRoot })
 
   return { ...updated, paths }
+}
+
+export async function resetSpecialistWorkspace(
+  specialistId: string,
+  options: SpecialistManagerOptions = {}
+): Promise<SpecialistRuntime> {
+  assertValidSpecialistId(specialistId)
+  const specialtiesRoot = resolveSpecialtiesRoot(options)
+  const paths = resolveSpecialistPaths(specialtiesRoot, specialistId)
+  if (!(await pathExists(paths.root))) {
+    throw new SpecialistOperationError('SPECIALIST_NOT_FOUND', `Specialist "${specialistId}" does not exist.`)
+  }
+
+  const config = validateSpecialistConfig(parse(await readFile(paths.config, 'utf8')), specialistId)
+  for (const entry of await readdir(paths.root)) {
+    if (entry === 'raw' || entry === 'specialist.yaml') continue
+    await rm(join(paths.root, entry), { recursive: true, force: true })
+  }
+  await mkdir(paths.raw, { recursive: true })
+  await mkdir(paths.converted, { recursive: true })
+  await mkdir(paths.wiki, { recursive: true })
+  await mkdir(paths.ingest, { recursive: true })
+  await writeFile(paths.ingestState, '{}\n')
+  await writeFile(paths.config, stringifySpecialistConfig(config))
+  await reloadSpecialistRegistry({ specialtiesRoot })
+  return { ...config, paths }
 }
 
 export async function rollbackSpecialistCreation(

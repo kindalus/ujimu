@@ -1,16 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { hostname } from 'node:os'
 import type { DatabaseSync } from 'node:sqlite'
+import { recordAdminAuditEvent } from '../admin/audit'
+import { deleteChatSessionsForSpecialist } from '../chat/session-store'
 import { resolveAppConfig } from '../config'
 import { initializeDatabase } from '../db'
 import type { PiConversionRunner } from '../ingestion/conversion'
 import type { PiIngestionRunner } from '../ingestion/pi-runner'
+import { scanSpecialistRawSources } from '../ingestion/detect'
 import { runPendingIngestion } from '../ingestion/run'
 import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializationRunner, type SpecialistInitializationRunner } from '../specialists/initialization'
 import { loadSpecialistsFromDisk } from '../specialists/loader'
-import { editSpecialist, rollbackSpecialistCreation } from '../specialists/manager'
+import { editSpecialist, resetSpecialistWorkspace, rollbackSpecialistCreation } from '../specialists/manager'
 
-export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion'
+export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset'
 export type BackgroundJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 export interface BackgroundJobRecord {
@@ -27,6 +30,8 @@ export interface BackgroundJobRecord {
   created_at: string
   updated_at: string
   completed_at: string | null
+  requested_by_user_id: string | null
+  requested_by_contact: string | null
 }
 
 export interface RunDueBackgroundJobsOptions {
@@ -65,12 +70,41 @@ export function enqueueSpecialistIngestionJob(
   return enqueueSpecialistJob(database, { ...input, type: 'specialist_ingestion' })
 }
 
+export function enqueueSpecialistHardResetJob(
+  database: DatabaseSync,
+  input: { specialistId: string; requestedByUserId: string; requestedByContact: string; now?: Date }
+): BackgroundJobRecord {
+  return enqueueSpecialistJob(database, {
+    specialistId: input.specialistId,
+    type: 'specialist_hard_reset',
+    requestedByUserId: input.requestedByUserId,
+    requestedByContact: input.requestedByContact,
+    ...(input.now ? { now: input.now } : {})
+  })
+}
+
+export class BackgroundJobConflictError extends Error {
+  constructor() {
+    super('Specialist already has an active background job.')
+    this.name = 'BackgroundJobConflictError'
+  }
+}
+
 function enqueueSpecialistJob(
   database: DatabaseSync,
-  input: { specialistId: string; type: BackgroundJobType; now?: Date }
+  input: {
+    specialistId: string
+    type: BackgroundJobType
+    now?: Date
+    requestedByUserId?: string
+    requestedByContact?: string
+  }
 ): BackgroundJobRecord {
-  const existing = findActiveSpecialistJob(database, input.specialistId, input.type)
-  if (existing) return existing
+  const active = findActiveSpecialistJob(database, input.specialistId)
+  if (active) {
+    if (active.type === input.type && input.type !== 'specialist_hard_reset') return active
+    throw new BackgroundJobConflictError()
+  }
 
   const now = (input.now ?? new Date()).toISOString()
   const job: BackgroundJobRecord = {
@@ -86,7 +120,9 @@ function enqueueSpecialistJob(
     last_error_message: null,
     created_at: now,
     updated_at: now,
-    completed_at: null
+    completed_at: null,
+    requested_by_user_id: input.requestedByUserId ?? null,
+    requested_by_contact: input.requestedByContact ?? null
   }
 
   try {
@@ -105,8 +141,10 @@ function enqueueSpecialistJob(
           last_error_message,
           created_at,
           updated_at,
-          completed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          completed_at,
+          requested_by_user_id,
+          requested_by_contact
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         job.id,
@@ -121,11 +159,14 @@ function enqueueSpecialistJob(
         job.last_error_message,
         job.created_at,
         job.updated_at,
-        job.completed_at
+        job.completed_at,
+        job.requested_by_user_id,
+        job.requested_by_contact
       )
   } catch (error) {
-    const active = findActiveSpecialistJob(database, input.specialistId, input.type)
-    if (active) return active
+    const activeAfterConflict = findActiveSpecialistJob(database, input.specialistId)
+    if (activeAfterConflict && activeAfterConflict.type === input.type && input.type !== 'specialist_hard_reset') return activeAfterConflict
+    if (activeAfterConflict) throw new BackgroundJobConflictError()
     throw error
   }
 
@@ -152,9 +193,11 @@ export async function runDueBackgroundJobs(
     try {
       await runBackgroundJob(locked, options)
       markJobSucceeded(options.database, locked.id, new Date())
+      recordHardResetAudit(options.database, locked, 'completed')
       result.succeeded += 1
     } catch (error) {
       markJobFailed(options.database, locked.id, error, new Date())
+      recordHardResetAudit(options.database, locked, 'failed', error)
       result.failed += 1
     }
   }
@@ -177,20 +220,18 @@ export function scheduleDueBackgroundJobs(options: { dataDir?: string; env?: Rec
 
 function findActiveSpecialistJob(
   database: DatabaseSync,
-  specialistId: string,
-  type: BackgroundJobType
+  specialistId: string
 ): BackgroundJobRecord | undefined {
   return database
     .prepare(`
       SELECT *
       FROM background_jobs
-      WHERE type = ?
-        AND specialist_id = ?
+      WHERE specialist_id = ?
         AND status IN ('queued', 'running')
       ORDER BY created_at ASC, id ASC
       LIMIT 1
     `)
-    .get(type, specialistId) as BackgroundJobRecord | undefined
+    .get(specialistId) as BackgroundJobRecord | undefined
 }
 
 function findDueJobs(
@@ -245,6 +286,10 @@ async function runBackgroundJob(
     await runSpecialistInitializationJob(job, options)
     return
   }
+  if (job.type === 'specialist_hard_reset') {
+    await runSpecialistHardResetJob(job, options)
+    return
+  }
 
   await runSpecialistIngestionJob(job, options)
 }
@@ -270,6 +315,38 @@ async function runSpecialistInitializationJob(
   }
 }
 
+async function runSpecialistHardResetJob(
+  job: BackgroundJobRecord,
+  options: RunDueBackgroundJobsOptions
+): Promise<void> {
+  const dataDir = options.dataDir ?? resolveAppConfig().dataDir
+  try {
+    await deleteChatSessionsForSpecialist({ dataDir, specialistId: job.specialist_id })
+    purgeSpecialistAssociatedData(options.database, job.specialist_id)
+    const specialist = await resetSpecialistWorkspace(job.specialist_id, { dataDir })
+    await (options.initializationRunner ?? createPiSdkSpecialistInitializationRunner()).initializeSpecialist(specialist)
+    await assertSpecialistInitializedWorkspace(specialist)
+    await scanSpecialistRawSources(specialist)
+    await editSpecialist(specialist.id, { status: 'awaiting_sources' }, { dataDir })
+  } catch (error) {
+    await editSpecialist(job.specialist_id, { status: 'failed' }, { dataDir }).catch(() => undefined)
+    throw error
+  }
+}
+
+function purgeSpecialistAssociatedData(database: DatabaseSync, specialistId: string): void {
+  database.exec('BEGIN')
+  try {
+    database.prepare('DELETE FROM question_analytics_reviews WHERE specialist_id = ?').run(specialistId)
+    database.prepare('DELETE FROM question_analytics_events WHERE specialist_id = ?').run(specialistId)
+    database.prepare('DELETE FROM conversations WHERE specialist_id = ?').run(specialistId)
+    database.exec('COMMIT')
+  } catch (error) {
+    database.exec('ROLLBACK')
+    throw error
+  }
+}
+
 async function runSpecialistIngestionJob(
   job: BackgroundJobRecord,
   options: RunDueBackgroundJobsOptions
@@ -284,6 +361,27 @@ async function runSpecialistIngestionJob(
   await runPendingIngestion(specialist, {
     piIngestionEnabled: options.piIngestionEnabled,
     ...(options.runner ? { runner: options.runner } : {})
+  })
+}
+
+function recordHardResetAudit(
+  database: DatabaseSync,
+  job: BackgroundJobRecord,
+  outcome: 'completed' | 'failed',
+  error?: unknown
+): void {
+  if (job.type !== 'specialist_hard_reset' || !job.requested_by_user_id || !job.requested_by_contact) return
+  recordAdminAuditEvent(database, {
+    admin: {
+      adminContact: job.requested_by_contact,
+      user: { id: job.requested_by_user_id, displayContact: job.requested_by_contact }
+    },
+    action: outcome === 'completed' ? 'specialist_hard_reset_completed' : 'specialist_hard_reset_failed',
+    specialistId: job.specialist_id,
+    metadata: {
+      job_id: job.id,
+      ...(error ? { error_code: resolveErrorCode(error) } : {})
+    }
   })
 }
 

@@ -435,6 +435,13 @@ export async function deleteChatSessionsForSpecialist(input: {
 }): Promise<void> {
   assertSafeComponent(input.specialistId)
   const root = join(input.dataDir ?? resolveAppConfig().dataDir, ...SESSION_ROOT_PARTS)
+  const specialistSessionRoots = [
+    join(root, 'anonymous', input.specialistId),
+    join(root, 'registered', input.specialistId)
+  ]
+  if ([...activeSessionLocks].some((lock) => specialistSessionRoots.some((sessionRoot) => lock.startsWith(`${sessionRoot}/`)))) {
+    throw new ChatConversationBusyError()
+  }
   await Promise.all([
     rm(join(root, 'anonymous', input.specialistId), { recursive: true, force: true }),
     rm(join(root, 'registered', input.specialistId), { recursive: true, force: true })

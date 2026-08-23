@@ -576,6 +576,45 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_conversation_messages_pi_entry
         ON conversation_messages (conversation_id, pi_entry_id);
     `
+  },
+  {
+    version: '0020_specialist_hard_reset_jobs',
+    sql: `
+      CREATE TABLE background_jobs_new (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('specialist_initialization', 'specialist_ingestion', 'specialist_hard_reset')),
+        specialist_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        locked_at TEXT,
+        locked_by TEXT,
+        last_error_code TEXT,
+        last_error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        requested_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        requested_by_contact TEXT
+      );
+
+      INSERT INTO background_jobs_new (
+        id, type, specialist_id, status, attempts, max_attempts, locked_at, locked_by,
+        last_error_code, last_error_message, created_at, updated_at, completed_at
+      )
+      SELECT
+        id, type, specialist_id, status, attempts, max_attempts, locked_at, locked_by,
+        last_error_code, last_error_message, created_at, updated_at, completed_at
+      FROM background_jobs;
+
+      DROP TABLE background_jobs;
+      ALTER TABLE background_jobs_new RENAME TO background_jobs;
+
+      CREATE INDEX idx_background_jobs_status_time ON background_jobs (status, updated_at);
+      CREATE UNIQUE INDEX idx_background_jobs_specialist_active
+        ON background_jobs (specialist_id)
+        WHERE status IN ('queued', 'running');
+    `
   }
 ]
 
