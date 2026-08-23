@@ -31,6 +31,7 @@ describe('operations CI and runbook acceptance', () => {
     expect(runbook).toContain('UJIMU_CONFIG_DIR')
     expect(runbook).toContain('UJIMU_PI_BUNDLE_DIR')
     expect(runbook).toContain('UJIMU_PI_CONVERSION_ENABLED')
+    expect(runbook).toContain('UJIMU_PI_INGESTION_THINKING_LEVEL')
     expect(runbook).toContain('UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES')
     expect(runbook).toContain('Pi conversion, ingestion, and consultation smoke test')
     expect(runbook).toContain('OTP continues to be the fallback')
@@ -51,8 +52,7 @@ describe('operations CI and runbook acceptance', () => {
     ]
     const removedKeys = [
       `UJIMU_PI_${'AGENT_DIR'}`,
-      `UJIMU_PI_CONVERSION_${'THINKING_LEVEL'}`,
-      `UJIMU_PI_INGESTION_${'THINKING_LEVEL'}`
+      `UJIMU_PI_CONVERSION_${'THINKING_LEVEL'}`
     ]
 
     for (const file of files) {

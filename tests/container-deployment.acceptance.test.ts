@@ -48,6 +48,7 @@ describe('Podman container deployment acceptance', () => {
       expect(envFile).toContain('UJIMU_PI_BUNDLE_DIR=/app/config/pi')
       expect(envFile).toContain('UJIMU_PI_CONVERSION_ENABLED=true')
       expect(envFile).toContain('UJIMU_PI_INGESTION_ENABLED=true')
+      expect(envFile).toContain('UJIMU_PI_INGESTION_THINKING_LEVEL=')
       expect(envFile).toContain('UJIMU_PI_CHAT_ENABLED=true')
       expect(envFile).toContain('GEMINI_API_KEY=')
     }

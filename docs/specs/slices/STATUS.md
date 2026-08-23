@@ -114,11 +114,11 @@ Known non-blocking warnings:
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
-| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `grilled` | 2026-08-23 | Ingestion-only override approved; precedence, validation, fallback, model clamping, and rollback decisions locked. |
+| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `acceptance-tested` | 2026-08-23 | RED tests cover override, fallback, chat isolation, invalid input, runbook, and container examples. |
 
 ## Pi ingestion thinking level
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -139,6 +139,12 @@ Locked decisions:
 - Trim outer whitespace and accept only `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 - Reject invalid input before the provider request and let the Pi SDK clamp a valid level to model capabilities.
 - Roll back by restoring the previous production environment and redeploying.
+
+Acceptance RED:
+
+- `tests/pi-session-logging.acceptance.test.ts` proves override, fallback, chat isolation, and invalid-input rejection.
+- `tests/ops-ci-docs.acceptance.test.ts` and `tests/container-deployment.acceptance.test.ts` require the operational contract.
+- Focused run: 9 passed and 4 failed for the missing implementation and documentation.
 
 ## Persistent Pi chat sessions
 

@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const writeSessionCreatedMock = vi.hoisted(() => vi.fn())
 const createAgentSessionLoggerMock = vi.hoisted(() => vi.fn(async () => ({
@@ -48,10 +48,21 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 }))
 
 describe('Ujimu Pi session logging acceptance', () => {
+  const originalIngestionThinkingLevel = process.env.UJIMU_PI_INGESTION_THINKING_LEVEL
+
   beforeEach(() => {
     writeSessionCreatedMock.mockClear()
     createAgentSessionLoggerMock.mockClear()
     createAgentSessionMock.mockClear()
+    delete process.env.UJIMU_PI_INGESTION_THINKING_LEVEL
+  })
+
+  afterEach(() => {
+    if (originalIngestionThinkingLevel === undefined) {
+      delete process.env.UJIMU_PI_INGESTION_THINKING_LEVEL
+    } else {
+      process.env.UJIMU_PI_INGESTION_THINKING_LEVEL = originalIngestionThinkingLevel
+    }
   })
 
   it('logs all default Pi tools plus Ujimu custom tools for the specialist-root session', async () => {
@@ -73,5 +84,45 @@ describe('Ujimu Pi session logging acceptance', () => {
       tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown'],
       model: 'configured'
     })
+  })
+
+  it('passes the validated ingestion thinking-level override to the Pi SDK', async () => {
+    process.env.UJIMU_PI_INGESTION_THINKING_LEVEL = ' high '
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-thinking-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({ cwd: root, task: 'ingestion' })
+
+    expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({ thinkingLevel: 'high' }))
+  })
+
+  it('preserves the settings fallback when the ingestion override is absent', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-thinking-fallback-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({ cwd: root, task: 'ingestion' })
+
+    expect(createAgentSessionMock.mock.calls[0]?.[0]).not.toHaveProperty('thinkingLevel')
+  })
+
+  it('does not apply the ingestion thinking level to chat sessions', async () => {
+    process.env.UJIMU_PI_INGESTION_THINKING_LEVEL = 'high'
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-thinking-chat-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({ cwd: root, task: 'chat' })
+
+    expect(createAgentSessionMock.mock.calls[0]?.[0]).not.toHaveProperty('thinkingLevel')
+  })
+
+  it('rejects an invalid ingestion thinking level before creating a Pi session', async () => {
+    process.env.UJIMU_PI_INGESTION_THINKING_LEVEL = 'extreme'
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-thinking-invalid-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await expect(createUjimuPiSession({ cwd: root, task: 'ingestion' })).rejects.toThrow(
+      'UJIMU_PI_INGESTION_THINKING_LEVEL'
+    )
+    expect(createAgentSessionMock).not.toHaveBeenCalled()
   })
 })
