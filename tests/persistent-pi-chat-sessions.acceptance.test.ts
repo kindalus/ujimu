@@ -165,6 +165,82 @@ describe('persistent Pi chat sessions acceptance', () => {
     }
   })
 
+  it('regenerates the last registered response from before its question and replaces SQLite only on commit', async () => {
+    const fixture = await createFixture()
+    const database = await initializeDatabase({ dbPath: join(fixture.dataDir, 'db', 'ujimu.sqlite') })
+    database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('user-a', BASE_TIME.toISOString())
+    const contexts: string[] = []
+    let run = 0
+    const runner: ChatEngineRunner = {
+      async run(input) {
+        contexts.push(JSON.stringify(input.piSessionManager?.buildSessionContext() ?? {}))
+        run += 1
+        appendPiTurn(input.piSessionManager, input.question, `resposta ${run}`)
+        return { grounded: true, citations: [], deltas: (async function* () { yield `resposta ${run}` })() }
+      }
+    }
+    const common = {
+      runner, piChatEnabled: true, persistentChatSessions: true,
+      chatSessionDataDir: fixture.dataDir, chatSessionSecret: SECRET,
+      history: { database, subject: { type: 'registered' as const, id: 'user-a' }, now: BASE_TIME }
+    }
+
+    try {
+      const first = await collectEvents(await createChatEventStreamForSpecialist(
+        testSpecialist(fixture.specialistDir),
+        { specialistId: SPECIALIST_ID, question: 'pergunta igual' },
+        common
+      ))
+      const history = first.find((event) => event.type === 'history')
+      const conversationId = history?.type === 'history' ? history.conversationId : ''
+
+      await collectEvents(await createChatEventStreamForSpecialist(
+        testSpecialist(fixture.specialistDir),
+        { specialistId: SPECIALIST_ID, conversationId, question: 'pergunta igual', regenerateLast: true },
+        common
+      ))
+
+      expect(contexts[1]).not.toContain('resposta 1')
+      expect(database.prepare('SELECT role, content FROM conversation_messages ORDER BY message_order').all()).toEqual([
+        { role: 'user', content: 'pergunta igual' },
+        { role: 'assistant', content: 'resposta 2' }
+      ])
+    } finally {
+      database.close()
+    }
+  })
+
+  it('regenerates an anonymous response by branching before its latest question', async () => {
+    const fixture = await createFixture()
+    const contexts: string[] = []
+    let run = 0
+    const runner: ChatEngineRunner = {
+      async run(input) {
+        contexts.push(JSON.stringify(input.piSessionManager?.buildSessionContext() ?? {}))
+        run += 1
+        appendPiTurn(input.piSessionManager, input.question, `resposta anónima ${run}`)
+        return { grounded: true, citations: [], deltas: (async function* () { yield `resposta anónima ${run}` })() }
+      }
+    }
+    const common = {
+      runner, piChatEnabled: true, persistentChatSessions: true,
+      chatSessionDataDir: fixture.dataDir, chatSessionSecret: SECRET, chatSessionNow: BASE_TIME
+    }
+    const first = await collectEvents(await createChatEventStreamForSpecialist(
+      testSpecialist(fixture.specialistDir),
+      { specialistId: SPECIALIST_ID, question: 'pergunta anónima' }, common
+    ))
+    const event = first.find((candidate) => candidate.type === 'conversation')
+    const conversationId = event?.type === 'conversation' ? event.conversationId : ''
+
+    await collectEvents(await createChatEventStreamForSpecialist(
+      testSpecialist(fixture.specialistDir),
+      { specialistId: SPECIALIST_ID, conversationId, question: 'pergunta anónima', regenerateLast: true }, common
+    ))
+
+    expect(contexts[1]).not.toContain('resposta anónima 1')
+  })
+
   it('rejects a concurrent HTTP turn before consuming a second quota event', async () => {
     const fixture = await createFixture()
     const database = await initializeDatabase({ dbPath: join(fixture.dataDir, 'db', 'ujimu.sqlite') })
