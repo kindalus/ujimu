@@ -350,6 +350,7 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
   if (wasAnonymousConversation && session.authenticated) {
     startNewConversation()
   }
+  if (session.authenticated) void recordVisit()
   void loadAuthSession()
 }
 

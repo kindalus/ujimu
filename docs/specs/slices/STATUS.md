@@ -120,7 +120,7 @@ Known non-blocking warnings:
 | 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `verified` | 2026-08-23 | 285 tests, typecheck, build, audit, and desktop browser computed-style/accessibility checks passed. |
 | 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `implemented` | — | Desktop/mobile semantics, title persistence, focused tests, typecheck, build, and audit passed; production title correction awaits final deployment. |
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `verified` | 2026-08-23 | Registered and anonymous branching, SQLite replacement, request validation, UI rollback, 292 tests, typecheck, build, and audit passed. |
-| 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `planned` | — | Monthly visitor clusters join account and cookie identities without IP or fingerprinting. |
+| 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `verified` | 2026-08-23 | Account-linked cookie clusters, post-login linkage, browser-estimate disclosure, 294 tests, typecheck, build, and audit passed. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `planned` | — | Admin hard reset preserves only raw sources as content and requires a separate re-ingestion action. |
 
 ## Product experience refinement and specialist hard reset

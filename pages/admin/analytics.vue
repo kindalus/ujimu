@@ -203,7 +203,7 @@ function questionWhen(value: string): string {
             <span class="chart-lbl">{{ bar.label }}</span>
           </div>
         </div>
-        <p class="adm-foot-note">{{ currentMonth }} em curso.</p>
+        <p class="adm-foot-note">{{ currentMonth }} em curso. Os visitantes sem conta são estimados por browser.</p>
       </div>
 
       <p v-if="analyticsPending" class="adm-card adm-sub">A carregar analytics...</p>

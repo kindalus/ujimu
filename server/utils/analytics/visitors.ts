@@ -71,12 +71,26 @@ export function countDistinctMonthlyVisitors(database: DatabaseSync, month: stri
   const normalizedMonth = normalizeMonth(month)
   const row = database
     .prepare(`
+      WITH visitor_links AS (
+        SELECT visitor_id, (
+          SELECT linked.user_id
+          FROM visitor_events AS linked
+          WHERE linked.visitor_id = visitors.visitor_id
+            AND linked.user_id IS NOT NULL
+            AND linked.user_id != ''
+          ORDER BY linked.occurred_at DESC, linked.id DESC
+          LIMIT 1
+        ) AS linked_user_id
+        FROM visitor_events AS visitors
+        GROUP BY visitor_id
+      )
       SELECT COUNT(DISTINCT CASE
-        WHEN user_id IS NOT NULL AND user_id != '' THEN 'user:' || user_id
-        ELSE 'visitor:' || visitor_id
+        WHEN links.linked_user_id IS NOT NULL THEN 'user:' || links.linked_user_id
+        ELSE 'visitor:' || events.visitor_id
       END) AS count
-      FROM visitor_events
-      WHERE month = ?
+      FROM visitor_events AS events
+      JOIN visitor_links AS links ON links.visitor_id = events.visitor_id
+      WHERE events.month = ?
     `)
     .get(normalizedMonth) as { count: number }
 
