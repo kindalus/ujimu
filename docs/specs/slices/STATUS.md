@@ -116,11 +116,11 @@ Known non-blocking warnings:
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
-| 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `idea-refined` | 2026-08-23 | Approved post-ingestion lint/fix convergence defined as one complete pass with no new fixable issue. |
+| 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `grilled` | 2026-08-23 | Review scope, clean-pass exit, conflict handling, mutation boundaries, and shared prompt wording locked. |
 
 ## Ingestion wiki convergence
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
@@ -134,6 +134,14 @@ Refined direction:
 - Repeat review and repair until one complete pass finds no new fixable issue.
 - Preserve legitimate source conflicts and record issues that require human confirmation instead of inventing a resolution.
 - Apply the contract to both batch and legacy single-source prompts without changing the manifest schema.
+
+Locked decisions:
+
+- Review the complete `wiki/`, but mutate only wiki pages, `wiki/index.md`, and `wiki/log.md` during the convergence phase.
+- Record source or conversion problems outside the current batch rather than silently reconverting unrelated material.
+- A legitimate documented conflict or human-confirmation blocker is not a fixable inconsistency and therefore does not prevent convergence.
+- Write the final manifest only after a clean pass.
+- Share one convergence instruction block between both prompts.
 
 ## Pi ingestion thinking level
 
