@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   buildInlineAdStreamItems,
@@ -674,21 +674,21 @@ async function startQuestion(
   const specialistId = selectedSpecialistId.value
   if (!specialistId) return
 
-  const userMessage: ChatMessage = options.regenerationUserMessage ?? {
+  const userMessage = reactive<ChatMessage>(options.regenerationUserMessage ?? {
     id: createId('user'),
     role: 'user',
     text,
     citations: [],
     status: 'done'
-  }
-  const assistantMessage: ChatMessage = {
+  })
+  const assistantMessage = reactive<ChatMessage>({
     id: createId('assistant'),
     role: 'assistant',
     text: '',
     citations: [],
     status: 'streaming',
     statusMessage: 'A consultar as fontes desta especialidade…'
-  }
+  })
   let continueQueue = true
   const previousMessages = options.previousMessages
     ?? (options.replaceFromMessageId ? [...messages.value] : undefined)

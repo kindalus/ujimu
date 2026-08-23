@@ -2,6 +2,13 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 describe('anonymous specialist chat UI acceptance', () => {
+  it('keeps streamed message mutations reactive before history refreshes', async () => {
+    const page = await readFile('pages/index.vue', 'utf8')
+    expect(page).toContain("import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'")
+    expect(page).toContain('const userMessage = reactive<ChatMessage>')
+    expect(page).toContain('const assistantMessage = reactive<ChatMessage>')
+  })
+
   it('exposes specialist selection, AI notice, citation area, and a visible pending-question queue', async () => {
     const page = await readFile('pages/index.vue', 'utf8')
     const drawer = await readFile('components/AppDrawer.vue', 'utf8')
