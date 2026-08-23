@@ -117,6 +117,39 @@ Known non-blocking warnings:
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
 | 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `verified` | 2026-08-23 | Shared convergence instructions passed 282 tests, typecheck, build, focused prompt verification, and dependency audit. |
+| 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `planned` | — | Pills for actions, circular icon buttons, underlined form fields, link buttons, and profile spacing. |
+| 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `planned` | — | Permanent chat history at desktop widths plus model-generated conversation titles and pending-title correction. |
+| 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `planned` | — | Safe last-response regeneration for anonymous and registered Pi sessions. |
+| 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `planned` | — | Monthly visitor clusters join account and cookie identities without IP or fingerprinting. |
+| 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `planned` | — | Admin hard reset preserves only raw sources as content and requires a separate re-ingestion action. |
+
+## Product experience refinement and specialist hard reset
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-product-experience-refinement.html`](../brainstorm-product-experience-refinement.html)
+- [`../brainstorm-specialist-hard-reset.html`](../brainstorm-specialist-hard-reset.html)
+- [`../product-experience-refinement-architecture.html`](../product-experience-refinement-architecture.html)
+
+Planned order:
+
+1. Slice 60 fixes the shared visual control language and small profile/chat presentation defects.
+2. Slice 61 makes chat history permanent at desktop widths and completes conversation title generation.
+3. Slice 62 adds safe regeneration after the history and title flow is stable.
+4. Slice 63 corrects distinct-visitor identity reconciliation independently of chat presentation.
+5. Slice 64 implements the destructive hard reset last, after the related history and analytics deletion paths are green.
+
+Locked planning boundaries:
+
+- Pills apply to actions, not cards, options, toggles, or other structural buttons.
+- Underlined fields exclude the composer, OTP cells, and selects.
+- Desktop means a viewport width of at least 1024px, and only the chat gets a permanent product drawer.
+- Refazer applies only to the latest completed answer, works for anonymous and registered users, consumes quota, and rolls back on failure.
+- The answering model emits validated title metadata; the 13 existing pending production titles are corrected through a controlled operation.
+- Distinct visitors use account-and-cookie identity clusters without IP, user-agent fingerprinting, or a new analytics provider.
+- Hard reset preserves only `raw/` as specialist content, recreates configuration, preserves global audit/quota records, and does not run ingestion automatically.
 
 ## Ingestion wiki convergence
 
