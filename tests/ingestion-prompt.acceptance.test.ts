@@ -12,7 +12,7 @@ vi.mock('../server/utils/pi/session', () => ({
 }))
 
 describe('Pi ingestion prompt acceptance', () => {
-  it('asks Pi to convert raw sources through converted before ingestion without listing sources in the prompt', async () => {
+  it('asks Pi to convert, ingest, and repair the wiki until a clean convergence pass', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-ingestion-prompt-'))
     const specialist = specialistRuntimeFixture(root)
     await mkdir(specialist.paths.raw, { recursive: true })
@@ -76,6 +76,14 @@ Follow the llm-wiki contract exactly:
 - Keep wiki/ OKF-compliant and update its index and log.
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+
+Before finishing, bring wiki/ to convergence:
+- Review the complete wiki for inconsistencies and incoherences, including OKF compliance, source lineage, broken or missing links, orphan pages, duplicates, stale claims, contradictions, and cross-page coherence.
+- Fix every issue that the available sources resolve unambiguously. During this phase, modify only files under wiki/, including wiki/index.md and wiki/log.md.
+- Preserve and clearly represent legitimate conflicts between sources. Never invent a resolution or hide uncertainty to make the wiki appear consistent.
+- Record source or conversion problems outside the current batch, and issues that require human confirmation, in the relevant failed[] or warnings instead of modifying unrelated raw/ or converted/ files.
+- Repeat the review-and-fix cycle until one complete pass finds no new fixable issue. A documented legitimate conflict or human-confirmation blocker is not a fixable issue and does not prevent convergence.
+- In batch mode, write the final manifest only after this clean pass.
 
 Write a complete Ujimu ingestion manifest to .ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 

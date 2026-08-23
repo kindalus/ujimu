@@ -116,11 +116,11 @@ Known non-blocking warnings:
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
-| 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `grilled` | 2026-08-23 | Review scope, clean-pass exit, conflict handling, mutation boundaries, and shared prompt wording locked. |
+| 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `acceptance-tested` | 2026-08-23 | RED test fixes review scope, repair boundaries, conflict handling, and the clean-pass exit condition. |
 
 ## Ingestion wiki convergence
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -142,6 +142,11 @@ Locked decisions:
 - A legitimate documented conflict or human-confirmation blocker is not a fixable inconsistency and therefore does not prevent convergence.
 - Write the final manifest only after a clean pass.
 - Share one convergence instruction block between both prompts.
+
+Acceptance RED:
+
+- `tests/ingestion-prompt.acceptance.test.ts` requires the normal batch prompt to review and repair the wiki until a clean pass.
+- Focused run failed because the current prompt contains no convergence instructions.
 
 ## Pi ingestion thinking level
 
