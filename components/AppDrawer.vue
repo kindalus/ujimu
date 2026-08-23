@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = withDefaults(defineProps<{
   isAuthenticated?: boolean
@@ -8,13 +8,15 @@ const props = withDefaults(defineProps<{
   subscriptionsEnabled?: boolean
   userLabel?: string
   openLabel?: string
+  permanentOnDesktop?: boolean
 }>(), {
   isAuthenticated: false,
   isAdmin: false,
   accountLoginAvailable: false,
   subscriptionsEnabled: false,
   userLabel: '',
-  openLabel: 'Abrir menu'
+  openLabel: 'Abrir menu',
+  permanentOnDesktop: false
 })
 
 const emit = defineEmits<{
@@ -24,7 +26,22 @@ const emit = defineEmits<{
 }>()
 
 const drawerOpen = ref(false)
+const isPermanent = ref(false)
 const temporaryDrawerContent = ref<HTMLElement | null>(null)
+let desktopMedia: MediaQueryList | undefined
+
+function syncDrawerMode(event: MediaQueryList | MediaQueryListEvent): void {
+  isPermanent.value = props.permanentOnDesktop && event.matches
+  if (isPermanent.value) drawerOpen.value = false
+}
+
+onMounted(() => {
+  desktopMedia = window.matchMedia('(min-width: 1024px)')
+  syncDrawerMode(desktopMedia)
+  desktopMedia.addEventListener('change', syncDrawerMode)
+})
+
+onBeforeUnmount(() => desktopMedia?.removeEventListener('change', syncDrawerMode))
 
 function openDrawer(event?: MouseEvent): void {
   if (event?.currentTarget instanceof HTMLElement) event.currentTarget.blur()
@@ -38,6 +55,7 @@ function focusTemporaryDrawerStart(): void {
 }
 
 function closeTemporaryDrawer(): void {
+  if (isPermanent.value) return
   if (document.activeElement instanceof HTMLElement && temporaryDrawerContent.value?.contains(document.activeElement)) {
     document.activeElement.blur()
   }
@@ -63,24 +81,24 @@ function logout(): void {
 
 <template>
   <div class="app-drawer-shell">
-    <button class="iconbtn app-drawer-trigger" type="button" :aria-label="openLabel" aria-haspopup="dialog" :aria-expanded="drawerOpen" @click="openDrawer">
+    <button v-if="!isPermanent" class="iconbtn app-drawer-trigger" type="button" :aria-label="openLabel" aria-haspopup="dialog" :aria-expanded="drawerOpen" @click="openDrawer">
       <UjimuIcon name="menu" />
       <span class="sr-only">{{ openLabel }}</span>
     </button>
 
-    <div class="scrim" :class="{ 'scrim--on': drawerOpen }" @click="closeTemporaryDrawer" />
+    <div v-if="!isPermanent" class="scrim" :class="{ 'scrim--on': drawerOpen }" @click="closeTemporaryDrawer" />
 
     <aside
       ref="temporaryDrawerContent"
       class="drawer"
-      :class="{ 'drawer--open': drawerOpen }"
-      :aria-hidden="!drawerOpen"
-      :inert="!drawerOpen"
+      :class="{ 'drawer--open': drawerOpen, 'drawer--permanent': isPermanent }"
+      :aria-hidden="isPermanent ? false : !drawerOpen"
+      :inert="isPermanent ? undefined : !drawerOpen"
       @keydown.esc="closeTemporaryDrawer"
     >
       <div class="drawer-head">
         <span class="wordmark">Ujimu<span class="wordmark-dot" /></span>
-        <button class="iconbtn" type="button" aria-label="Fechar menu" @click="closeTemporaryDrawer"><UjimuIcon name="close" /></button>
+        <button v-if="!isPermanent" class="iconbtn" type="button" aria-label="Fechar menu" @click="closeTemporaryDrawer"><UjimuIcon name="close" /></button>
       </div>
 
       <NuxtLink class="btn btn--new" to="/" @click="startNewConversation"><UjimuIcon name="plus" /> Nova consulta</NuxtLink>

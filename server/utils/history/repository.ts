@@ -30,6 +30,7 @@ export interface PersistCompletedHistoryTurnInput {
   citations: ChatCitation[]
   now?: Date
   titleRunner?: ConversationTitleRunner
+  generatedTitle?: string
   titleTimeoutMs?: number
 }
 
@@ -400,6 +401,11 @@ async function resolveInitialTitle(input: PersistCompletedHistoryTurnInput): Pro
   title: string
   titleStatus: ConversationTitleStatus
 }> {
+  const generatedTitle = normalizeGeneratedTitle(input.generatedTitle ?? '')
+  if (generatedTitle) {
+    return { title: generatedTitle, titleStatus: 'generated' }
+  }
+
   if (!input.titleRunner) {
     return { title: temporaryTitle(input.question), titleStatus: 'pending' }
   }

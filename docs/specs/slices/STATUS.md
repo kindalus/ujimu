@@ -118,7 +118,7 @@ Known non-blocking warnings:
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
 | 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `verified` | 2026-08-23 | Shared convergence instructions passed 282 tests, typecheck, build, focused prompt verification, and dependency audit. |
 | 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `verified` | 2026-08-23 | 285 tests, typecheck, build, audit, and desktop browser computed-style/accessibility checks passed. |
-| 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `planned` | — | Permanent chat history at desktop widths plus model-generated conversation titles and pending-title correction. |
+| 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `implemented` | — | Desktop/mobile semantics, title persistence, focused tests, typecheck, build, and audit passed; production title correction awaits final deployment. |
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `planned` | — | Safe last-response regeneration for anonymous and registered Pi sessions. |
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `planned` | — | Monthly visitor clusters join account and cookie identities without IP or fingerprinting. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `planned` | — | Admin hard reset preserves only raw sources as content and requires a separate re-ingestion action. |

@@ -932,7 +932,7 @@ function createId(prefix: string): string {
   Resposta copiada. Fila de perguntas Subir Descer Remover Retomar Apagar Editar class="citations" class="inline-ad-card" selectedSpecialist?.name selectedSpecialist?.description
   .workspace { align-items: start } .chat-panel { height: calc(100dvh - 128px) } .messages { min-height: 0 }
   -->
-  <div class="app ujimu-runtime" data-theme="dark" data-yellow="moderado" data-screen-label="Consulta">
+  <div class="app ujimu-runtime app--chat" data-theme="dark" data-yellow="moderado" data-screen-label="Consulta">
     <header class="topbar">
       <div class="topbar-left">
         <AppDrawer
@@ -942,6 +942,7 @@ function createId(prefix: string): string {
           :subscriptions-enabled="subscriptionsEnabled"
           :user-label="authSession.user?.displayName || authSession.user?.displayContact"
           open-label="Abrir menu"
+          :permanent-on-desktop="true"
           @open-auth="authPanelOpen = true"
           @logout="logout"
           @new-conversation="startNewConversation"

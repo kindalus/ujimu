@@ -2724,3 +2724,15 @@ a.wordmark {
 .subscription-card button:not(.iconbtn) {
     margin-top: 4px;
 }
+
+@media (min-width: 1024px) {
+    .app--chat .stage,
+    .app--chat .topbar {
+        margin-left: 320px;
+    }
+    .app--chat .drawer--permanent {
+        transform: translateX(0);
+        box-shadow: none;
+        transition: none;
+    }
+}

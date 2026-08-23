@@ -348,7 +348,8 @@ function streamChatWithRunner(input: {
         deltas: result.deltas,
         history: input.history,
         chatSession: input.chatSession,
-        analytics: result.grounded ? input.answeredAnalytics : undefined
+        analytics: result.grounded ? input.answeredAnalytics : undefined,
+        title: result.title
       })
     } finally {
       await input.chatSession?.rollback().catch(() => undefined)
@@ -394,6 +395,7 @@ async function* streamRunnerEventResult(input: {
   let sawDone = false
   let grounded = false
   let totalTokens: number | undefined
+  let title: string | undefined
 
   try {
     for await (const event of withHeartbeat(input.events)) {
@@ -419,6 +421,11 @@ async function* streamRunnerEventResult(input: {
         continue
       }
 
+      if (event.type === 'title') {
+        title = event.title
+        continue
+      }
+
       sawDone = true
       grounded = event.grounded
       break
@@ -439,7 +446,8 @@ async function* streamRunnerEventResult(input: {
       ...(totalTokens ? { totalTokens } : {}),
       history: input.history,
       chatSession: input.chatSession,
-      analytics: grounded ? input.answeredAnalytics : undefined
+      analytics: grounded ? input.answeredAnalytics : undefined,
+      title
     })
   } catch {
     yield { type: 'error', code: 'CHAT_STREAM_FAILED', message: STREAM_ERROR_MESSAGE }
@@ -489,6 +497,7 @@ async function* streamRunnerResult(input: {
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
+  title?: string
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
 
@@ -506,7 +515,8 @@ async function* streamRunnerResult(input: {
       citations: input.citations,
       history: input.history,
       chatSession: input.chatSession,
-      analytics: input.analytics
+      analytics: input.analytics,
+      title: input.title
     })
   } catch {
     yield { type: 'error', code: 'CHAT_STREAM_FAILED', message: STREAM_ERROR_MESSAGE }
@@ -522,6 +532,7 @@ async function* completeStreamResult(input: {
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
+  title?: string
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
     yield { type: 'citation', citation }
@@ -550,6 +561,7 @@ async function* completeStreamResult(input: {
       citations: input.citations,
       ...(input.history.now ? { now: input.history.now } : {}),
       ...(input.history.titleRunner ? { titleRunner: input.history.titleRunner } : {}),
+      ...(input.title ? { generatedTitle: input.title } : {}),
       ...(input.history.titleTimeoutMs !== undefined ? { titleTimeoutMs: input.history.titleTimeoutMs } : {})
     })
   }

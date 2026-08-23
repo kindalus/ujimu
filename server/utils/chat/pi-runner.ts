@@ -64,7 +64,7 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
       return
     }
 
-    emittedAssistantOutput = true
+    if (event.type === 'delta') emittedAssistantOutput = true
     queue.push(event)
   })
 
@@ -303,6 +303,11 @@ function parsePiOutputLine(
     return
   }
 
+  if (event.type === 'title' && typeof event.title === 'string') {
+    enqueue({ type: 'title', title: event.title })
+    return
+  }
+
   if (event.type === 'done') {
     enqueue({ type: 'done', grounded: event.grounded !== false })
   }
@@ -319,7 +324,9 @@ The current working directory is the specialist root. Use the available tools no
 If you include machine-readable citations, emit them as JSON lines in one of these optional shapes:
 {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
 {"type":"citation","citation":{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}}
-Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu.
+Also emit one concise conversation title, at most 80 characters, as a separate JSON line:
+{"type":"title","title":"..."}
+Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu. Missing or malformed title metadata will also be omitted.
 
 Known citation metadata, if useful:
 ${formatCitationEvidence(input.citationEvidence)}

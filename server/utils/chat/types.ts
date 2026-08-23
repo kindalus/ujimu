@@ -41,6 +41,7 @@ export type ChatRunnerStreamEvent =
   | { type: 'heartbeat' }
   | { type: 'delta'; text: string }
   | { type: 'citation'; citation: ChatCitation }
+  | { type: 'title'; title: string }
   | ChatMetricsEvent
   | { type: 'done'; grounded: boolean }
 
@@ -63,6 +64,7 @@ export interface ChatEngineRun {
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
   events?: AsyncIterable<ChatRunnerStreamEvent>
+  title?: string
 }
 
 export interface ChatEngineRunner {
