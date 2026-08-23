@@ -13,6 +13,14 @@ export interface PiBatchIngestionResult {
   manifest: IngestionManifest
 }
 
+const WIKI_CONVERGENCE_INSTRUCTIONS = `Before finishing, bring wiki/ to convergence:
+- Review the complete wiki for inconsistencies and incoherences, including OKF compliance, source lineage, broken or missing links, orphan pages, duplicates, stale claims, contradictions, and cross-page coherence.
+- Fix every issue that the available sources resolve unambiguously. During this phase, modify only files under wiki/, including wiki/index.md and wiki/log.md.
+- Preserve and clearly represent legitimate conflicts between sources. Never invent a resolution or hide uncertainty to make the wiki appear consistent.
+- Do not modify unrelated raw/ or converted/ files. In batch mode, record source or conversion problems outside the current batch, and issues that require human confirmation, in the relevant failed[] or warnings. In single-source mode, explain them clearly in the final response.
+- Repeat the review-and-fix cycle until one complete pass finds no new fixable issue. A documented legitimate conflict or human-confirmation blocker is not a fixable issue and does not prevent convergence.
+- In batch mode, write the final manifest only after this clean pass.`
+
 export interface PiIngestionRunner {
   ingestSource(
     specialist: SpecialistRuntime,
@@ -145,6 +153,8 @@ Follow the llm-wiki contract exactly:
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 
+${WIKI_CONVERGENCE_INSTRUCTIONS}
+
 Write a complete Ujimu ingestion manifest to .ujimu/ingestion-manifest.json and repeat the same JSON as your final response.
 
 .ujimu/ingestion-manifest.json specification:
@@ -236,5 +246,7 @@ Instructions:
 6. Update wiki/index.md and wiki/log.md if present, or create them if missing.
 7. If this is a reingestion, reconcile existing wiki pages instead of creating duplicate source pages.
 8. If you cannot convert or ingest the source from the available context, explain the failure clearly.
+
+${WIKI_CONVERGENCE_INSTRUCTIONS}
 `
 }
