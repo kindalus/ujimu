@@ -723,11 +723,13 @@ h6 {
     color: var(--ink);
     background: var(--surface-2);
 }
-.msg-user-actions .iconbtn--done {
+.msg-user-actions .iconbtn--done,
+.ai-actions .iconbtn--done {
     color: #2c7a3d;
     border-color: currentColor;
 }
-.app[data-theme="dark"] .msg-user-actions .iconbtn--done {
+.app[data-theme="dark"] .msg-user-actions .iconbtn--done,
+.app[data-theme="dark"] .ai-actions .iconbtn--done {
     color: #7bc88a;
 }
 .msg-user-stack .bubble {

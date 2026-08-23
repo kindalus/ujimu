@@ -1116,18 +1116,26 @@ function createId(prefix: string): string {
                   <p class="ai-note">Pode demorar se o agente estiver a consultar várias fontes.</p>
                 </div>
                 <div v-if="item.message.role === 'assistant' && item.message.status === 'done'" class="ai-actions">
-                  <button class="copybtn" :class="{ 'copybtn--done': copiedMessageId === item.message.id }" type="button" @click="copyAssistantResponse(item.message)">
+                  <button
+                    class="iconbtn assistant-copy"
+                    :class="{ 'iconbtn--done': copiedMessageId === item.message.id }"
+                    type="button"
+                    :title="copiedMessageId === item.message.id ? 'Resposta copiada' : 'Copiar resposta'"
+                    :aria-label="copiedMessageId === item.message.id ? 'Resposta copiada' : 'Copiar resposta'"
+                    @click="copyAssistantResponse(item.message)"
+                  >
                     <UjimuIcon :name="copiedMessageId === item.message.id ? 'check' : 'copy'" />
-                    {{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar resposta' }}
                   </button>
                   <button
                     v-if="item.message.id === latestCompletedAssistantMessageId && activeConversationId"
-                    class="copybtn regenerate-response"
+                    class="iconbtn regenerate-response"
                     type="button"
+                    title="Refazer resposta"
+                    aria-label="Refazer resposta"
                     :disabled="isStreaming"
                     @click="regenerateLastResponse(item.message)"
                   >
-                    <UjimuIcon name="refresh" /> Refazer
+                    <UjimuIcon name="refresh" />
                   </button>
                   <p v-if="responseMetricsLabel(item.message)" class="ai-note response-metrics">{{ responseMetricsLabel(item.message) }}</p>
                   <p class="ai-note">Gerado por IA · pode conter imprecisões</p>
