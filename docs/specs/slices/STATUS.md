@@ -114,11 +114,11 @@ Known non-blocking warnings:
 | 55 | [`55-editable-profile-verified-contacts.html`](./55-editable-profile-verified-contacts.html) | `verified` | 2026-08-21 | Edit display name and manage verified primary/secondary contacts safely. |
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
-| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `idea-refined` | 2026-08-23 | Approved ingestion-only thinking-level override; existing Pi SDK architecture retained. |
+| 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `grilled` | 2026-08-23 | Ingestion-only override approved; precedence, validation, fallback, model clamping, and rollback decisions locked. |
 
 ## Pi ingestion thinking level
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
@@ -132,6 +132,13 @@ Refined direction:
 - Keep the global `settings.json` value as the fallback.
 - Do not change chat or legacy/manual conversion thinking configuration.
 - Configure production ingestion as `openai-codex/gpt-5.6-sol` with `high` thinking.
+
+Locked decisions:
+
+- The ingestion environment override takes precedence over `settings.json`; missing or empty input preserves the global fallback.
+- Trim outer whitespace and accept only `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+- Reject invalid input before the provider request and let the Pi SDK clamp a valid level to model capabilities.
+- Roll back by restoring the previous production environment and redeploying.
 
 ## Persistent Pi chat sessions
 
