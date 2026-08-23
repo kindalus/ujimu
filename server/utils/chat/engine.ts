@@ -10,6 +10,7 @@ import {
   buildConversationContext,
   getConversationSummary,
   getEditableMessagePiEntryId,
+  getLastCompletedTurnForRegeneration,
   hasConversationPiEntryPair,
   listConversationMessagesForPi,
   persistCompletedHistoryTurn,
@@ -115,9 +116,21 @@ export async function createChatEventStreamForSpecialist(
   const historyUserId = resolveHistoryUserId(options.history)
   const piChatEnabled = isPiChatEnabled(options.piChatEnabled)
   const persistentChatSessions = options.persistentChatSessions ?? !options.runner
-  const chatSession = persistentChatSessions && piChatEnabled
-    ? await preparePersistentChatSession(specialist, input, options, historyUserId)
+  const regeneration = input.regenerateLast && historyUserId
+    ? resolveRegisteredRegeneration(options.history!.database, {
+        userId: historyUserId,
+        conversationId: input.conversationId!,
+        question: input.question
+      })
     : undefined
+  const replacementMessageId = regeneration?.userMessageId ?? input.replaceFromMessageId
+  const chatSession = persistentChatSessions && piChatEnabled
+    ? await preparePersistentChatSession(specialist, input, options, historyUserId, replacementMessageId)
+    : undefined
+
+  if (input.regenerateLast && !chatSession) {
+    throw new ChatRequestError(409, 'CONVERSATION_BUSY', 'Regeneration requires a persistent chat session.')
+  }
 
   try {
     if (options.quota) {
@@ -151,7 +164,7 @@ export async function createChatEventStreamForSpecialist(
       ? buildRunnerConversationContext(options.history?.database, {
           userId: historyUserId,
           conversationId: input.conversationId,
-          beforeMessageId: input.replaceFromMessageId
+          beforeMessageId: replacementMessageId
         })
       : undefined
     const historyPersistence = historyUserId
@@ -162,7 +175,7 @@ export async function createChatEventStreamForSpecialist(
           specialistName: specialist.name,
           conversationId: chatSession?.internalConversationId ?? input.conversationId,
           createConversationIfMissing: Boolean(chatSession && !input.conversationId),
-          replaceFromMessageId: input.replaceFromMessageId,
+          replaceFromMessageId: replacementMessageId,
           question: input.question,
           titleRunner: options.history!.titleRunner,
           titleTimeoutMs: options.history!.titleTimeoutMs,
@@ -216,14 +229,15 @@ async function preparePersistentChatSession(
   specialist: SpecialistRuntime,
   input: ValidatedChatRequest,
   options: CreateChatEventStreamOptions,
-  historyUserId: string | undefined
+  historyUserId: string | undefined,
+  replacementMessageId: string | undefined
 ): Promise<ChatSessionTurn> {
   const database = options.history?.database
-  const replaceFromPiEntryId = historyUserId && database && input.conversationId && input.replaceFromMessageId
+  const replaceFromPiEntryId = historyUserId && database && input.conversationId && replacementMessageId
     ? getEditableMessagePiEntryId(database, {
         userId: historyUserId,
         conversationId: input.conversationId,
-        messageId: input.replaceFromMessageId
+        messageId: replacementMessageId
       })
     : undefined
 
@@ -237,13 +251,14 @@ async function preparePersistentChatSession(
       identity: historyUserId ? { type: 'registered', userId: historyUserId } : { type: 'anonymous' },
       ...(input.conversationId ? { conversationId: input.conversationId } : {}),
       ...(replaceFromPiEntryId ? { replaceFromPiEntryId } : {}),
-      ...(input.replaceFromMessageId && !replaceFromPiEntryId ? { reconstructFromHistory: true } : {}),
+      ...(input.regenerateLast && !historyUserId ? { regenerateLastQuestion: input.question } : {}),
+      ...(replacementMessageId && !replaceFromPiEntryId ? { reconstructFromHistory: true } : {}),
       ...(historyUserId && database && input.conversationId
         ? {
             loadRehydrationMessages: () => listConversationMessagesForPi(database, {
               userId: historyUserId,
               conversationId: input.conversationId!,
-              beforeMessageId: input.replaceFromMessageId
+              beforeMessageId: replacementMessageId
             })
           }
         : {}),
@@ -267,6 +282,18 @@ async function preparePersistentChatSession(
     }
     throw error
   }
+}
+
+function resolveRegisteredRegeneration(
+  database: DatabaseSync,
+  input: { userId: string; conversationId: string; question: string }
+): { userMessageId: string } {
+  const turn = getLastCompletedTurnForRegeneration(database, input)
+  if (!turn) throw new ChatRequestError(404, 'HISTORY_NOT_FOUND', 'Completed conversation turn was not found.')
+  if (turn.question !== input.question) {
+    throw new ChatRequestError(400, 'INVALID_CHAT_REQUEST', 'Regeneration question must match the latest turn.')
+  }
+  return { userMessageId: turn.userMessageId }
 }
 
 function resolveSpecialistIdForRequest(

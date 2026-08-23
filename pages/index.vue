@@ -229,6 +229,13 @@ const chatUiMessages = computed<ChatUiMessage[]>(() =>
   }))
 )
 const completedAssistantResponseCount = computed(() => countCompletedAssistantResponses(messages.value))
+const latestCompletedAssistantMessageId = computed(() => {
+  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
+    const message = messages.value[index]
+    if (message?.role === 'assistant' && message.status === 'done') return message.id
+  }
+  return ''
+})
 const latestResponseMetricMessageId = computed(() => {
   for (let index = messages.value.length - 1; index >= 0; index -= 1) {
     const message = messages.value[index]
@@ -459,6 +466,20 @@ function cancelStreamingResponse(): void {
   activeChatAbortController.value?.abort()
 }
 
+function regenerateLastResponse(message: ChatUiMessage): void {
+  if (isStreaming.value || message.id !== latestCompletedAssistantMessageId.value || !activeConversationId.value) return
+  const assistantIndex = messages.value.findIndex((candidate) => candidate.id === message.id)
+  const userMessage = messages.value[assistantIndex - 1]
+  if (assistantIndex < 1 || userMessage?.role !== 'user') return
+  const previousMessages = [...messages.value]
+  void startQuestion(userMessage.text, {
+    regenerateLast: true,
+    previousMessages,
+    regenerationUserMessage: userMessage,
+    replacedAssistantId: message.id
+  })
+}
+
 async function copyAssistantResponse(message: ChatUiMessage): Promise<void> {
   if (message.role !== 'assistant' || message.status !== 'done') return
 
@@ -641,12 +662,18 @@ function moveQueuedQuestion(index: number, direction: -1 | 1): void {
 
 async function startQuestion(
   text: string,
-  options: { replaceFromMessageId?: string } = {}
+  options: {
+    replaceFromMessageId?: string
+    regenerateLast?: boolean
+    previousMessages?: ChatMessage[]
+    regenerationUserMessage?: ChatMessage
+    replacedAssistantId?: string
+  } = {}
 ): Promise<void> {
   const specialistId = selectedSpecialistId.value
   if (!specialistId) return
 
-  const userMessage: ChatMessage = {
+  const userMessage: ChatMessage = options.regenerationUserMessage ?? {
     id: createId('user'),
     role: 'user',
     text,
@@ -662,7 +689,8 @@ async function startQuestion(
     statusMessage: 'A consultar as fontes desta especialidade…'
   }
   let continueQueue = true
-  const previousMessages = options.replaceFromMessageId ? [...messages.value] : undefined
+  const previousMessages = options.previousMessages
+    ?? (options.replaceFromMessageId ? [...messages.value] : undefined)
   const abortController = new AbortController()
   const responseStartedAt = performance.now()
   let slowResponseTimer: ReturnType<typeof setTimeout> | undefined
@@ -676,9 +704,10 @@ async function startQuestion(
     }
   }
 
-  messages.value.push(userMessage, assistantMessage)
-  const reactiveUserMessage = messages.value[messages.value.length - 2]!
-  const reactiveAssistantMessage = messages.value[messages.value.length - 1]!
+  if (options.regenerateLast) messages.value.push(assistantMessage)
+  else messages.value.push(userMessage, assistantMessage)
+  const reactiveUserMessage = userMessage
+  const reactiveAssistantMessage = assistantMessage
   isStreaming.value = true
   activeChatAbortController.value = abortController
   slowResponseTimer = setTimeout(() => {
@@ -697,7 +726,8 @@ async function startQuestion(
         question: text,
         clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         ...(activeConversationId.value ? { conversationId: activeConversationId.value } : {}),
-        ...(options.replaceFromMessageId ? { replaceFromMessageId: options.replaceFromMessageId } : {})
+        ...(options.replaceFromMessageId ? { replaceFromMessageId: options.replaceFromMessageId } : {}),
+        ...(options.regenerateLast ? { regenerateLast: true } : {})
       })
     })
 
@@ -735,6 +765,10 @@ async function startQuestion(
     if (reactiveAssistantMessage.status === 'streaming') {
       reactiveAssistantMessage.status = 'done'
       reactiveAssistantMessage.statusMessage = undefined
+    }
+    if (options.regenerateLast && previousMessages && options.replacedAssistantId) {
+      messages.value = previousMessages.filter((message) => message.id !== options.replacedAssistantId)
+      messages.value.push(reactiveAssistantMessage)
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -1085,6 +1119,15 @@ function createId(prefix: string): string {
                   <button class="copybtn" :class="{ 'copybtn--done': copiedMessageId === item.message.id }" type="button" @click="copyAssistantResponse(item.message)">
                     <UjimuIcon :name="copiedMessageId === item.message.id ? 'check' : 'copy'" />
                     {{ copiedMessageId === item.message.id ? 'Copiado' : 'Copiar resposta' }}
+                  </button>
+                  <button
+                    v-if="item.message.id === latestCompletedAssistantMessageId && activeConversationId"
+                    class="copybtn regenerate-response"
+                    type="button"
+                    :disabled="isStreaming"
+                    @click="regenerateLastResponse(item.message)"
+                  >
+                    <UjimuIcon name="refresh" /> Refazer
                   </button>
                   <p v-if="responseMetricsLabel(item.message)" class="ai-note response-metrics">{{ responseMetricsLabel(item.message) }}</p>
                   <p class="ai-note">Gerado por IA · pode conter imprecisões</p>

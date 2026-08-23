@@ -38,6 +38,7 @@ export interface OpenChatSessionTurnOptions {
   identity: ChatSessionIdentity
   conversationId?: string
   replaceFromPiEntryId?: string
+  regenerateLastQuestion?: string
   reconstructFromHistory?: boolean
   rehydrationMessages?: ChatSessionHistoryMessage[]
   loadRehydrationMessages?: () => ChatSessionHistoryMessage[] | Promise<ChatSessionHistoryMessage[]>
@@ -195,8 +196,18 @@ export async function openChatSessionTurn(options: OpenChatSessionTurnOptions): 
       throw new ChatConversationUnauthorizedError()
     }
 
-    if (options.replaceFromPiEntryId) {
-      const target = manager.getEntry(options.replaceFromPiEntryId)
+    let branchFromPiEntryId = options.replaceFromPiEntryId
+    if (options.regenerateLastQuestion) {
+      const latest = findLatestTurnEntryIds(manager)
+      const target = manager.getEntry(latest.userPiEntryId)
+      if (!target || readUserEntryText(target) !== options.regenerateLastQuestion.trim()) {
+        throw new ChatConversationUnauthorizedError()
+      }
+      branchFromPiEntryId = latest.userPiEntryId
+    }
+
+    if (branchFromPiEntryId) {
+      const target = manager.getEntry(branchFromPiEntryId)
       if (!target) {
         throw new ChatConversationUnauthorizedError()
       }
@@ -245,7 +256,7 @@ export async function openChatSessionTurn(options: OpenChatSessionTurnOptions): 
           checkpointBytes: checkpoint?.size ?? 0,
           sessionFileExisted: Boolean(checkpoint),
           removeOnRollback: state!.lastCommittedAt === null && rehydratedMappings.length === 0,
-          ...(options.replaceFromPiEntryId ? { replaceFromPiEntryId: options.replaceFromPiEntryId } : {})
+          ...(branchFromPiEntryId ? { replaceFromPiEntryId: branchFromPiEntryId } : {})
         }
         await writePrivateJson(join(sessionDir, PENDING_TURN_FILENAME), pending)
         began = true
@@ -258,7 +269,7 @@ export async function openChatSessionTurn(options: OpenChatSessionTurnOptions): 
           : await captureCompletedEntryIds(commitOptions)
         const committedAt = commitOptions.now ?? (pending.completedAt ? new Date(pending.completedAt) : new Date())
 
-        if (options.replaceFromPiEntryId) {
+        if (branchFromPiEntryId) {
           const branchedFile = manager.createBranchedSession(entryIds.assistantPiEntryId)
           if (!branchedFile) throw new Error('Pi did not create a persistent branch session.')
           await secureSessionFile(branchedFile)
@@ -492,6 +503,11 @@ async function createPiSessionManager(cwd: string, sessionDir: string, id: strin
 async function openPiSessionManager(file: string, sessionDir: string, cwd?: string): Promise<any> {
   const { SessionManager } = await import('@earendil-works/pi-coding-agent')
   return SessionManager.open(file, sessionDir, cwd)
+}
+
+function readUserEntryText(entry: unknown): string {
+  const message = (entry as { message?: { role?: unknown; content?: unknown } })?.message
+  return message?.role === 'user' && typeof message.content === 'string' ? message.content.trim() : ''
 }
 
 function findLatestTurnEntryIds(manager: any): {

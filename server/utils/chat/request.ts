@@ -4,6 +4,7 @@ export interface ValidatedChatRequest {
   clientTimezone?: string
   conversationId?: string
   replaceFromMessageId?: string
+  regenerateLast?: boolean
 }
 
 export type ChatRequestErrorCode = 'INVALID_CHAT_REQUEST' | 'SPECIALIST_NOT_FOUND' | 'HISTORY_NOT_FOUND' | 'CONVERSATION_BUSY'
@@ -34,9 +35,13 @@ export function validateChatRequestBody(body: unknown): ValidatedChatRequest {
   const clientTimezone = readOptionalString(body.clientTimezone, 'clientTimezone')
   const conversationId = readOptionalString(body.conversationId, 'conversationId', 200)
   const replaceFromMessageId = readOptionalString(body.replaceFromMessageId, 'replaceFromMessageId', 200)
+  const regenerateLast = readOptionalBoolean(body.regenerateLast, 'regenerateLast')
 
-  if (replaceFromMessageId && !conversationId) {
-    throw invalidRequest('replaceFromMessageId requires conversationId.')
+  if ((replaceFromMessageId || regenerateLast) && !conversationId) {
+    throw invalidRequest('Conversation replacement requires conversationId.')
+  }
+  if (replaceFromMessageId && regenerateLast) {
+    throw invalidRequest('replaceFromMessageId and regenerateLast are mutually exclusive.')
   }
 
   return {
@@ -44,7 +49,8 @@ export function validateChatRequestBody(body: unknown): ValidatedChatRequest {
     question,
     ...(clientTimezone ? { clientTimezone } : {}),
     ...(conversationId ? { conversationId } : {}),
-    ...(replaceFromMessageId ? { replaceFromMessageId } : {})
+    ...(replaceFromMessageId ? { replaceFromMessageId } : {}),
+    ...(regenerateLast ? { regenerateLast: true } : {})
   }
 }
 
@@ -80,6 +86,12 @@ function readOptionalString(value: unknown, fieldName: string, maxLength = 100):
   }
 
   return trimmed || undefined
+}
+
+function readOptionalBoolean(value: unknown, fieldName: string): boolean {
+  if (value === undefined || value === null || value === false) return false
+  if (value !== true) throw invalidRequest(`${fieldName} must be a boolean.`)
+  return true
 }
 
 function invalidRequest(message: string): ChatRequestError {

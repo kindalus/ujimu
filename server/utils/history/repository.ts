@@ -275,6 +275,33 @@ export function listConversationMessagesForPi(
     }))
 }
 
+export function getLastCompletedTurnForRegeneration(
+  database: DatabaseSync,
+  input: { userId: string; conversationId: string }
+): { userMessageId: string; userPiEntryId?: string; question: string } | undefined {
+  const summary = getConversationSummary(database, input)
+  if (!summary) return undefined
+  const rows = database.prepare(`
+    SELECT id, role, content, pi_entry_id
+    FROM conversation_messages
+    WHERE conversation_id = ?
+    ORDER BY message_order DESC
+    LIMIT 2
+  `).all(summary.id) as Array<{
+    id: string
+    role: HistoryMessageRole
+    content: string
+    pi_entry_id: string | null
+  }>
+  const [assistant, user] = rows
+  if (assistant?.role !== 'assistant' || user?.role !== 'user') return undefined
+  return {
+    userMessageId: user.id,
+    question: user.content,
+    ...(user.pi_entry_id ? { userPiEntryId: user.pi_entry_id } : {})
+  }
+}
+
 export function getEditableMessagePiEntryId(
   database: DatabaseSync,
   input: { userId: string; conversationId: string; messageId: string }
