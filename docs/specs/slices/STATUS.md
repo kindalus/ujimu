@@ -116,6 +116,24 @@ Known non-blocking warnings:
 | 56 | [`56-persistent-pi-chat-sessions.html`](./56-persistent-pi-chat-sessions.html) | `verified` | 2026-08-22 | Preserve one isolated, persistent Pi session per anonymous or registered conversation. |
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
+| 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `idea-refined` | 2026-08-23 | Approved post-ingestion lint/fix convergence defined as one complete pass with no new fixable issue. |
+
+## Ingestion wiki convergence
+
+Status: `idea-refined`
+
+Approved originating decks:
+
+- [`../brainstorm-ingestion-wiki-convergence.html`](../brainstorm-ingestion-wiki-convergence.html)
+- [`../ingestion-wiki-convergence-architecture.html`](../ingestion-wiki-convergence-architecture.html)
+
+Refined direction:
+
+- Run a wiki health and coherence review after ingestion and before writing the final manifest.
+- Fix every issue that can be resolved unambiguously from the available sources.
+- Repeat review and repair until one complete pass finds no new fixable issue.
+- Preserve legitimate source conflicts and record issues that require human confirmation instead of inventing a resolution.
+- Apply the contract to both batch and legacy single-source prompts without changing the manifest schema.
 
 ## Pi ingestion thinking level
 
