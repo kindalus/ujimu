@@ -293,13 +293,20 @@ describe('question analytics and content gaps acceptance', () => {
     )
     expect(repeatedAnonymousVisit.status).toBe(200)
 
-    const registeredVisit = await fetchAnalytics(
-      new Request('http://local/api/analytics/visit', {
-        method: 'POST',
-        headers: sessionHeaders('registered-user')
-      })
-    )
-    expect(registeredVisit.status).toBe(200)
+    const linkedHeaders = sessionHeaders('registered-user')
+    if (visitorCookie) linkedHeaders.set('cookie', `${linkedHeaders.get('cookie')}; ${visitorCookie}`)
+    const linkedVisit = await fetchAnalytics(new Request('http://local/api/analytics/visit', {
+      method: 'POST', headers: linkedHeaders
+    }))
+    expect(linkedVisit.status).toBe(200)
+
+    const secondCookieSameAccount = await fetchAnalytics(new Request('http://local/api/analytics/visit', {
+      method: 'POST', headers: sessionHeaders('registered-user')
+    }))
+    expect(secondCookieSameAccount.status).toBe(200)
+
+    await fetchAnalytics(new Request('http://local/api/analytics/visit', { method: 'POST' }))
+    await fetchAnalytics(new Request('http://local/api/analytics/visit', { method: 'POST' }))
 
     const month = new Date().toISOString().slice(0, 7)
     const visitors = await fetchAnalytics(
@@ -308,7 +315,7 @@ describe('question analytics and content gaps acceptance', () => {
       })
     )
     expect(visitors.status).toBe(200)
-    await expect(visitors.json()).resolves.toMatchObject({ month, distinctVisitors: 2 })
+    await expect(visitors.json()).resolves.toMatchObject({ month, distinctVisitors: 3 })
   })
 
   it('collapses repeat visits so an unauthenticated caller cannot grow the table without bound', async () => {
