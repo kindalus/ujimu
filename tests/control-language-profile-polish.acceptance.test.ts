@@ -15,6 +15,7 @@ describe('control language and profile polish acceptance', () => {
     expect(css).toMatch(/button:not\(:disabled\)[^}]*cursor:\s*pointer/)
     expect(css).not.toMatch(/\.spec-card\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s)
     expect(css).not.toMatch(/\.spec-opt\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s)
+    expect(css).not.toMatch(/\.adm-toggle\s*\{[^}]*border-radius:\s*var\(--r-pill\)/s)
   })
 
   it('uses underlined input and textarea fields while preserving selects, OTP, and the composer', async () => {
@@ -40,5 +41,6 @@ describe('control language and profile polish acceptance', () => {
     expect(css).toMatch(/\.btn-link\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s)
     expect(css).toMatch(/\.prof-head \.subpage-sub\s*\{[^}]*margin-top:\s*0/s)
     expect(css).toMatch(/\.prof-head\s*>\s*div\s*\{[^}]*gap:\s*var\(--gap-inline\)/s)
+    expect(css).toMatch(/\.profile-back\s*\{[^}]*align-self:\s*flex-start/s)
   })
 })

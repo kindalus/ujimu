@@ -20,7 +20,7 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 59 ingestion wiki convergence:
+Latest full verification after Slice 60 control language and profile polish:
 
 - `npm test` — passed, 282 tests.
 - `npm run typecheck` — passed.
@@ -117,7 +117,7 @@ Known non-blocking warnings:
 | 57 | [`57-project-typography-control-geometry.html`](./57-project-typography-control-geometry.html) | `verified` | 2026-08-22 | 278 tests, typecheck, build, audit, font budget, mobile target audit, font loading, focus, and CLS verification passed. |
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
 | 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `verified` | 2026-08-23 | Shared convergence instructions passed 282 tests, typecheck, build, focused prompt verification, and dependency audit. |
-| 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `acceptance-tested` | — | RED acceptance test fixes action pills, circular icons, underlined fields, exclusions, link actions, pointer semantics, and profile spacing. |
+| 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `verified` | 2026-08-23 | 285 tests, typecheck, build, audit, and desktop browser computed-style/accessibility checks passed. |
 | 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `planned` | — | Permanent chat history at desktop widths plus model-generated conversation titles and pending-title correction. |
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `planned` | — | Safe last-response regeneration for anonymous and registered Pi sessions. |
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `planned` | — | Monthly visitor clusters join account and cookie identities without IP or fingerprinting. |
@@ -140,6 +140,14 @@ Planned order:
 3. Slice 62 adds safe regeneration after the history and title flow is stable.
 4. Slice 63 corrects distinct-visitor identity reconciliation independently of chat presentation.
 5. Slice 64 implements the destructive hard reset last, after the related history and analytics deletion paths are green.
+
+Slice 60 implementation and verification:
+
+- The final typography cascade now gives action buttons pill geometry and icon buttons circular geometry while preserving structural controls.
+- Form inputs and textareas use an underlined treatment; selects, OTP, and the chat composer remain unchanged.
+- Response cancellation and profile navigation use the existing underlined link-button contract with a 44px target.
+- Profile heading/credential spacing is corrected.
+- 285 tests, typecheck, production build, dependency audit, and browser computed-style checks passed with a clean console.
 
 Locked planning boundaries:
 

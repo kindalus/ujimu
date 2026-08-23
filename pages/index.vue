@@ -1077,7 +1077,7 @@ function createId(prefix: string): string {
                   </div>
                 </div>
                 <div v-if="item.message.role === 'assistant' && item.message.status === 'streaming'" class="ai-actions ai-actions--streaming">
-                  <button class="copybtn" type="button" @click="cancelStreamingResponse">Cancelar resposta</button>
+                  <button class="btn-link cancel-response" type="button" @click="cancelStreamingResponse">Cancelar resposta</button>
                   <p class="ai-note">Pode demorar se o agente estiver a consultar várias fontes.</p>
                 </div>
                 <div v-if="item.message.role === 'assistant' && item.message.status === 'done'" class="ai-actions">

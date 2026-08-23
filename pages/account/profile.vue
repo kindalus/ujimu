@@ -223,13 +223,13 @@ function handleAuthenticatedSession(session: AuthSessionResponse): void {
     <h1 id="profile-title" class="subpage-title">O meu perfil</h1>
     <p class="subpage-sub" style="margin-top: 0">Inicie sessão para gerir o seu perfil.</p>
     <div class="adm-row-actions" style="justify-content: center">
-      <NuxtLink class="btn btn--ghost" to="/">Voltar à consulta</NuxtLink>
+      <NuxtLink class="btn-link profile-back" to="/">Voltar à consulta</NuxtLink>
       <button v-if="accountLoginAvailable" class="btn btn--primary" type="button" @click="openAuth('login')">Entrar por OTP</button>
     </div>
   </main>
 
   <main v-else class="subpage" aria-labelledby="profile-title" data-screen-label="Perfil">
-    <NuxtLink class="btn btn--ghost btn--back" to="/"><UjimuIcon name="chevLeft" /> Voltar à consulta</NuxtLink>
+    <NuxtLink class="btn-link profile-back" to="/"><UjimuIcon name="chevLeft" /> Voltar à consulta</NuxtLink>
 
     <div class="prof-head">
       <span class="avatar prof-avatar">{{ userInitial }}</span>
