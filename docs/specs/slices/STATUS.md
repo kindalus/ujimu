@@ -20,9 +20,9 @@ This file is the canonical progress tracker for implementation slices. Keep it c
 
 ## Current verification snapshot
 
-Latest full verification after Slice 60 control language and profile polish:
+Latest full verification after Slices 61–64 and production deployment `6c294d4`:
 
-- `npm test` — passed, 282 tests.
+- `npm test` — passed, 297 tests.
 - `npm run typecheck` — passed.
 - `npm run build` — passed; generated CSS contains same-origin variable fonts, swap, and metric overrides.
 - Font budget — Inter + Source Sans 3 total 77,172 bytes (75.36 KiB); JetBrains Mono is 31,340 bytes (30.61 KiB) and loads only when code is present.
@@ -118,14 +118,14 @@ Known non-blocking warnings:
 | 58 | [`58-pi-ingestion-thinking-level.html`](./58-pi-ingestion-thinking-level.html) | `verified` | 2026-08-23 | 282 tests, typecheck, build, audit, production deploy, health checks, and authenticated Pi SDK model/session resolution passed. |
 | 59 | [`59-ingestion-wiki-convergence.html`](./59-ingestion-wiki-convergence.html) | `verified` | 2026-08-23 | Shared convergence instructions passed 282 tests, typecheck, build, focused prompt verification, and dependency audit. |
 | 60 | [`60-control-language-profile-polish.html`](./60-control-language-profile-polish.html) | `verified` | 2026-08-23 | 285 tests, typecheck, build, audit, and desktop browser computed-style/accessibility checks passed. |
-| 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `implemented` | — | Desktop/mobile semantics, title persistence, focused tests, typecheck, build, and audit passed; production title correction awaits final deployment. |
+| 61 | [`61-desktop-history-titles.html`](./61-desktop-history-titles.html) | `verified` | 2026-08-23 | Production desktop/mobile semantics passed; the controlled operation corrected all 13 pending titles and left zero pending. |
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `verified` | 2026-08-23 | Registered and anonymous branching, SQLite replacement, request validation, UI rollback, 292 tests, typecheck, build, and audit passed. |
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `verified` | 2026-08-23 | Account-linked cookie clusters, post-login linkage, browser-estimate disclosure, 294 tests, typecheck, build, and audit passed. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `verified` | 2026-08-23 | Exact-ID admin reset, global job exclusion, byte-identical raw preservation, destructive cleanup, audit, 297 tests, typecheck, build, and audit passed. |
 
 ## Product experience refinement and specialist hard reset
 
-Status: `planned`
+Status: `verified`
 
 Approved originating decks:
 
@@ -140,6 +140,14 @@ Planned order:
 3. Slice 62 adds safe regeneration after the history and title flow is stable.
 4. Slice 63 corrects distinct-visitor identity reconciliation independently of chat presentation.
 5. Slice 64 implements the destructive hard reset last, after the related history and analytics deletion paths are green.
+
+Slices 61–64 production verification:
+
+- Deployment `6c294d4` completed with database backup `/srv/ujimu/data/db/ujimu.sqlite.bak.20260823T101447Z` and migration `0020_specialist_hard_reset_jobs` applied.
+- The controlled title operation updated all 13 pending production conversations; zero pending titles remain.
+- Production browser checks confirmed the 320px accessible desktop history panel, temporary drawer semantics below 1024px, and a clean console.
+- Production health passed, the hard-reset endpoint rejects anonymous access with HTTP 401, the exclusive active-job index exists, and ingestion remains `openai-codex/gpt-5.6-sol/high`.
+- The August visitor query now resolves account-linked cookie clusters; no IP or fingerprint data was added.
 
 Slice 60 implementation and verification:
 
