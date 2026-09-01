@@ -1,5 +1,7 @@
+import { resolve } from 'node:path'
 import { defineNuxtConfig } from 'nuxt/config'
 import type { ModuleOptions as NuxtFontsOptions } from '@nuxt/fonts'
+import type {} from '@nuxt/nitro-server/augments'
 
 const fonts: NuxtFontsOptions = {
   defaults: {
@@ -46,6 +48,13 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-05-15',
   modules: ['@nuxt/ui', ['@nuxt/fonts', fonts]],
   css: ['~/assets/css/main.css', '~/assets/css/typography.css'],
+  nitro: {
+    externals: {
+      traceInclude: [
+        resolve('node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js')
+      ]
+    }
+  },
   runtimeConfig: {
     ujimuDataDir: process.env.UJIMU_DATA_DIR ?? '~/.local/share/ujimu',
     ujimuDbPath: process.env.UJIMU_DB_PATH,

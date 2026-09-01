@@ -25,6 +25,13 @@ describe('Podman container deployment acceptance', () => {
     expect(dockerfile).toContain('CMD ["node", ".output/server/index.mjs"]')
   })
 
+  it('includes the dynamically loaded OpenAI Codex OAuth module in the Nitro server output', async () => {
+    const nuxtConfig = await readFile('nuxt.config.ts', 'utf8')
+
+    expect(nuxtConfig).toContain('traceInclude')
+    expect(nuxtConfig).toContain('@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js')
+  })
+
   it('keeps local build artefacts, env files, and real Pi credentials out of the image build context', async () => {
     const dockerignore = await readFile('.dockerignore', 'utf8')
 
