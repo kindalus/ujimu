@@ -5,7 +5,7 @@ import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../spe
 import { getSpecialistById } from '../specialists/registry'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowedWithFallback } from '../quota/usage'
-import { recordQuestionAnalyticsEvent, type QuestionAnalyticsOutcome } from '../analytics/questions'
+import { recordQuestionAnalyticsEvent } from '../analytics/questions'
 import {
   buildConversationContext,
   getConversationSummary,
@@ -34,6 +34,7 @@ import {
   type ValidatedChatRequest
 } from './request'
 import type {
+  ChatAnswerOutcome,
   ChatCitation,
   ChatConversationContextMessage,
   ChatEngineRunner,
@@ -201,7 +202,7 @@ export async function createChatEventStreamForSpecialist(
       runnerInput,
       history: historyPersistence,
       chatSession,
-      answeredAnalytics: buildAnalyticsPersistence('answered')
+      analytics: buildAnalyticsPersistence()
     })
   } catch (error) {
     await chatSession?.rollback().catch(() => undefined)
@@ -209,13 +210,12 @@ export async function createChatEventStreamForSpecialist(
     throw error
   }
 
-  function buildAnalyticsPersistence(outcome: QuestionAnalyticsOutcome): StreamAnalyticsPersistence | undefined {
+  function buildAnalyticsPersistence(): StreamAnalyticsPersistence | undefined {
     if (!options.analytics) return undefined
 
     return {
       database: options.analytics.database,
       specialistId: specialist.id,
-      outcome,
       question: input.question,
       userTimezone: input.clientTimezone,
       visitorId: options.analytics.visitorId,
@@ -352,7 +352,7 @@ function streamChatWithRunner(input: {
   runnerInput: Parameters<ChatEngineRunner['run']>[0]
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
-  answeredAnalytics?: StreamAnalyticsPersistence
+  analytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   return (async function* () {
     try {
@@ -363,7 +363,7 @@ function streamChatWithRunner(input: {
           events: result.events,
           history: input.history,
           chatSession: input.chatSession,
-          answeredAnalytics: input.answeredAnalytics
+          analytics: input.analytics
         })
         return
       }
@@ -376,7 +376,8 @@ function streamChatWithRunner(input: {
         deltas: result.deltas,
         history: input.history,
         chatSession: input.chatSession,
-        analytics: result.grounded ? input.answeredAnalytics : undefined,
+        analytics: input.analytics,
+        analyticsOutcome: result.outcome ?? (result.grounded ? 'answered' : undefined),
         title: result.title
       })
     } finally {
@@ -403,7 +404,6 @@ interface StreamHistoryPersistence {
 interface StreamAnalyticsPersistence {
   database: DatabaseSync
   specialistId: string
-  outcome: QuestionAnalyticsOutcome
   question: string
   userTimezone?: string
   visitorId?: string
@@ -415,13 +415,14 @@ async function* streamRunnerEventResult(input: {
   events: AsyncIterable<ChatRunnerStreamEvent>
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
-  answeredAnalytics?: StreamAnalyticsPersistence
+  analytics?: StreamAnalyticsPersistence
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
   const receivedCitations: ChatCitation[] = []
   let citations: ChatCitation[] = []
   let sawDone = false
   let grounded = false
+  let analyticsOutcome: ChatAnswerOutcome | undefined
   let totalTokens: number | undefined
   let title: string | undefined
 
@@ -456,6 +457,7 @@ async function* streamRunnerEventResult(input: {
 
       sawDone = true
       grounded = event.grounded
+      analyticsOutcome = event.outcome ?? (event.grounded ? 'answered' : undefined)
       break
     }
 
@@ -474,7 +476,8 @@ async function* streamRunnerEventResult(input: {
       ...(totalTokens ? { totalTokens } : {}),
       history: input.history,
       chatSession: input.chatSession,
-      analytics: grounded ? input.answeredAnalytics : undefined,
+      analytics: input.analytics,
+      analyticsOutcome,
       title
     })
   } catch {
@@ -525,6 +528,7 @@ async function* streamRunnerResult(input: {
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
+  analyticsOutcome?: ChatAnswerOutcome
   title?: string
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
@@ -544,6 +548,7 @@ async function* streamRunnerResult(input: {
       history: input.history,
       chatSession: input.chatSession,
       analytics: input.analytics,
+      analyticsOutcome: input.analyticsOutcome,
       title: input.title
     })
   } catch {
@@ -560,6 +565,7 @@ async function* completeStreamResult(input: {
   history?: StreamHistoryPersistence
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
+  analyticsOutcome?: ChatAnswerOutcome
   title?: string
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
@@ -613,18 +619,8 @@ async function* completeStreamResult(input: {
     yield { type: 'conversation', conversationId: sessionCommit.conversationId }
   }
 
-  if (input.analytics) {
-    recordQuestionAnalyticsEvent(input.analytics.database, {
-      specialistId: input.analytics.specialistId,
-      outcome: input.analytics.outcome,
-      question: input.analytics.question,
-      userTimezone: input.analytics.userTimezone,
-      visitorId: input.analytics.visitorId,
-      userId: input.analytics.userId,
-      conversationId: persisted?.conversationId,
-      userMessageId: persisted?.userMessageId,
-      occurredAt: input.analytics.now
-    })
+  if (input.analytics && input.analyticsOutcome) {
+    scheduleQuestionAnalytics(input.analytics, input.analyticsOutcome, persisted)
   }
 
   const totalTokens = normalizeTotalTokens(input.totalTokens)
@@ -636,6 +632,32 @@ async function* completeStreamResult(input: {
     type: 'done',
     grounded: input.grounded
   }
+}
+
+function scheduleQuestionAnalytics(
+  analytics: StreamAnalyticsPersistence,
+  outcome: ChatAnswerOutcome,
+  persisted?: { conversationId: string; userMessageId: string }
+): void {
+  setImmediate(() => {
+    try {
+      recordQuestionAnalyticsEvent(analytics.database, {
+        specialistId: analytics.specialistId,
+        outcome,
+        question: analytics.question,
+        userTimezone: analytics.userTimezone,
+        visitorId: analytics.visitorId,
+        userId: analytics.userId,
+        conversationId: persisted?.conversationId,
+        userMessageId: persisted?.userMessageId,
+        occurredAt: analytics.now
+      })
+    } catch {
+      console.error('[ujimu] telemetry task failed', {
+        code: 'QUESTION_ANALYTICS_WRITE_FAILED'
+      })
+    }
+  })
 }
 
 async function* toAsyncDeltas(deltas: string[]): AsyncIterable<string> {

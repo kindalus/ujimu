@@ -125,7 +125,11 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
       if (pendingDoneEvent) {
         queue.push(pendingDoneEvent)
       } else if (!sawTerminalEvent) {
-        queue.push({ type: 'done', grounded: emittedAssistantOutput })
+        queue.push({
+          type: 'done',
+          grounded: emittedAssistantOutput,
+          ...(emittedAssistantOutput ? { outcome: 'answered' as const } : {})
+        })
       }
       queue.close()
     })
@@ -309,7 +313,12 @@ function parsePiOutputLine(
   }
 
   if (event.type === 'done') {
-    enqueue({ type: 'done', grounded: event.grounded !== false })
+    const outcome = event.outcome === 'answered' || event.outcome === 'insufficient_context'
+      ? event.outcome
+      : event.grounded === false
+        ? 'insufficient_context'
+        : 'answered'
+    enqueue({ type: 'done', grounded: outcome === 'answered', outcome })
   }
 }
 
@@ -327,6 +336,9 @@ If you include machine-readable citations, emit them as JSON lines in one of the
 Also emit one concise conversation title that specifically summarizes the user's question, at most 80 characters, as a separate JSON line:
 {"type":"title","title":"Prazo legal para férias"}
 Never use a generic label such as "Título gerado", "Título pendente", or "Nova conversa".
+Finish with exactly one terminal JSON line. Use answered only when the specialist wiki supports the substantive answer; otherwise explain the limitation and use insufficient_context:
+{"type":"done","outcome":"answered"}
+{"type":"done","outcome":"insufficient_context"}
 Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu. Missing or malformed title metadata will also be omitted.
 
 Known citation metadata, if useful:

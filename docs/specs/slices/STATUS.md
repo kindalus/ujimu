@@ -122,7 +122,7 @@ Known non-blocking warnings:
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `verified` | 2026-08-23 | Registered and anonymous branching, SQLite replacement, request validation, UI rollback, 292 tests, typecheck, build, and audit passed. |
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `verified` | 2026-08-23 | Account-linked cookie clusters, post-login linkage, browser-estimate disclosure, 294 tests, typecheck, build, and audit passed. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `verified` | 2026-08-23 | Exact-ID admin reset, global job exclusion, byte-identical raw preservation, destructive cleanup, audit, 297 tests, typecheck, build, and audit passed. |
-| 65 | [`65-reliable-gaps-nonblocking-telemetry.html`](./65-reliable-gaps-nonblocking-telemetry.html) | `planned` | — | Persist completed insufficient-context outcomes and keep analytics failures out of the user response. |
+| 65 | [`65-reliable-gaps-nonblocking-telemetry.html`](./65-reliable-gaps-nonblocking-telemetry.html) | `verified` | 2026-09-01 | Terminal outcomes persist completed gaps; best-effort analytics cannot turn a delivered answer into a stream failure. |
 | 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `planned` | — | Enforce read-only, path-scoped chat tools and prohibit consultation-time derived writes in specialist AGENTS.md files. |
 | 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `planned` | — | Count unique successful content-file reads and persist the count on question analytics events. |
 | 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `planned` | — | Add exact and Sørensen–Dice retrieval hints with a seven-day lazy TTL, without caching answers. |
@@ -132,14 +132,21 @@ Known non-blocking warnings:
 
 ## Knowledge-gap derivation and retrieval hints
 
-Status: `planned`
+Status: `in_progress`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Implementation has not started.
+The user approved the plan and Slice 65–71 order on 2026-09-01. Slice 65 is verified; Slice 66 is next.
 
 Approved originating decks:
 
 - [`../brainstorm-knowledge-gap-derivation-and-answer-memory.html`](../brainstorm-knowledge-gap-derivation-and-answer-memory.html)
 - [`../knowledge-gap-derivation-and-answer-memory-architecture.html`](../knowledge-gap-derivation-and-answer-memory-architecture.html)
+
+Slice 65 verification:
+
+- Added an explicit terminal answer outcome while preserving the public stream contract.
+- Persisted completed <code>insufficient_context</code> responses and excluded failed streams.
+- Deferred question analytics with sanitised failure logging after synchronous history/session work.
+- 301 tests, typecheck, build, and dependency audit passed.
 
 Planned order:
 

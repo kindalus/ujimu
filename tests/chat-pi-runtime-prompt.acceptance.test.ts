@@ -75,9 +75,10 @@ describe('Pi chat runtime prompt acceptance', () => {
     expect(prompts[0]).toContain('{"sourceTitle":"Código do IVA","sourceFile":"raw/codigo-iva.original.md","articleRefs":["Artigo 1.º"]}')
     expect(prompts[0]).toContain('{"type":"citations"')
     expect(prompts[0]).toContain('User question:\nO que diz o Artigo 1.º?')
+    expect(prompts[0]).toContain('{"type":"done","outcome":"insufficient_context"}')
     expect(prompts[0]).not.toContain('Selected specialist')
     expect(prompts[0]).not.toContain('Specialist system prompt')
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('streams plain text when citations are required but the model emits no valid citations', async () => {
@@ -121,7 +122,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
 
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'citation' }))
     expect(events).toContainEqual({ type: 'delta', text: 'Resposta sem citação e fora do protocolo.' })
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('streams plain assistant text when citations are not required and the model does not emit NDJSON', async () => {
@@ -162,7 +163,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
     }
 
     expect(joinDeltas(events)).toBe('**Assunto:** Convocatória\n\nExmo. Senhor,')
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('does not abort an active Pi chat while it is producing events', async () => {
@@ -215,7 +216,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
 
       expect(abort).not.toHaveBeenCalled()
       expect(events).toContainEqual({ type: 'delta', text: 'O Artigo 1.º define o âmbito.' })
-      expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+      expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
     } finally {
       vi.useRealTimers()
     }
@@ -274,7 +275,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
       citation: { sourceTitle: 'Código do IVA', sourceFile: 'raw/codigo-iva.original.md', articleRefs: ['Artigo 1.º'] }
     })
     expect(events).toContainEqual({ type: 'delta', text: 'O Artigo 1.º define o âmbito.' })
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('parses final assistant message NDJSON when the provider does not stream text deltas', async () => {
@@ -327,7 +328,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
       citation: { sourceTitle: 'Código do IVA', sourceFile: 'raw/codigo-iva.original.md', articleRefs: ['Artigo 1.º'] }
     })
     expect(events).toContainEqual({ type: 'delta', text: 'O Artigo 1.º define o âmbito.' })
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('does not duplicate an answer emitted as plain text and structured deltas', async () => {
@@ -371,7 +372,7 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
 
     expect(joinDeltas(events).trim()).toBe('O limite semanal normal de trabalho é de 44 horas.')
     expect(events.filter((event) => (event as { type?: unknown })?.type === 'citation')).toHaveLength(1)
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
   it('fails without exposing the user prompt when the Pi assistant ends with an error', async () => {

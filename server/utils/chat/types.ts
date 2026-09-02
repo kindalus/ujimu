@@ -15,6 +15,8 @@ export interface ChatHistoryEvent {
   titleStatus: 'generated' | 'pending'
 }
 
+export type ChatAnswerOutcome = 'answered' | 'insufficient_context'
+
 export interface ChatMetricsEvent {
   type: 'metrics'
   totalTokens?: number
@@ -43,7 +45,7 @@ export type ChatRunnerStreamEvent =
   | { type: 'citation'; citation: ChatCitation }
   | { type: 'title'; title: string }
   | ChatMetricsEvent
-  | { type: 'done'; grounded: boolean }
+  | { type: 'done'; grounded: boolean; outcome?: ChatAnswerOutcome }
 
 export interface ChatConversationContextMessage {
   role: 'user' | 'assistant'
@@ -64,6 +66,7 @@ export interface ChatEngineRun {
   citations: ChatCitation[]
   deltas: AsyncIterable<string>
   events?: AsyncIterable<ChatRunnerStreamEvent>
+  outcome?: ChatAnswerOutcome
   title?: string
 }
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { createApp, createRouter, toWebHandler } from 'h3'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import visitHandler from '../server/api/analytics/visit.post'
 import adminQuestionAnalyticsHandler from '../server/api/admin/analytics/questions.get'
 import adminQuestionReviewHandler from '../server/api/admin/analytics/questions/[fingerprint]/review.post'
@@ -48,7 +48,7 @@ describe('question analytics and content gaps acceptance', () => {
         { specialistId: 'empty', question: 'Existe uma regra sem fontes?', clientTimezone: 'Africa/Luanda' },
         {
           specialtiesRoot,
-          runner: fakeRunner(['Nunca deve ser chamada.']),
+          runner: insufficientContextRunner(['Não consigo responder com o contexto actual.']),
           analytics: {
             database,
             visitorId: 'visitor-a',
@@ -89,11 +89,44 @@ describe('question analytics and content gaps acceptance', () => {
     expect(rows[0]?.fingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(rows[1]).toMatchObject({
       specialist_id: 'empty',
-      outcome: 'answered',
+      outcome: 'insufficient_context',
       question_text: 'Existe uma regra sem fontes?',
       normalized_question: 'existe uma regra sem fontes'
     })
     expect(JSON.stringify(rows)).not.toContain('Resposta fundamentada')
+    database.close()
+  })
+
+  it('does not turn a completed response into a stream error when analytics fails', async () => {
+    const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
+    await createTempSpecialist('iva', dataDir)
+    await createIngestedSource(specialtiesRoot, 'iva')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const failingDatabase = {
+      prepare() {
+        throw new Error('question text must not be logged')
+      }
+    } as unknown as DatabaseSync
+
+    const events = await collectChatEvents(
+      await createChatEventStreamFromBody(
+        { specialistId: 'iva', question: 'Pergunta privada' },
+        {
+          specialtiesRoot,
+          runner: fakeRunner(['Resposta concluída.']),
+          analytics: { database: failingDatabase }
+        }
+      )
+    )
+    await waitForTelemetry()
+
+    expect(events).toContainEqual({ type: 'done', grounded: true })
+    expect(events.some((event) => event.type === 'error')).toBe(false)
+    expect(log).toHaveBeenCalledWith('[ujimu] telemetry task failed', {
+      code: 'QUESTION_ANALYTICS_WRITE_FAILED'
+    })
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Pergunta privada')
+    log.mockRestore()
     database.close()
   })
 
@@ -151,6 +184,7 @@ describe('question analytics and content gaps acceptance', () => {
       )
     )
 
+    await waitForTelemetry()
     expect(readQuestionAnalyticsRows(database).map((row) => row.question_text)).toEqual([
       'Pergunta original',
       'Pergunta editada'
@@ -435,6 +469,19 @@ function fakeRunner(deltas: string[]): ChatEngineRunner {
   }
 }
 
+function insufficientContextRunner(deltas: string[]): ChatEngineRunner {
+  return {
+    async run() {
+      return {
+        grounded: false,
+        outcome: 'insufficient_context',
+        citations: [],
+        deltas: toAsyncDeltas(deltas)
+      }
+    }
+  }
+}
+
 function failingStreamRunner(): ChatEngineRunner {
   return {
     async run(input) {
@@ -570,6 +617,10 @@ function fingerprintFor(normalizedQuestion: string): string {
 
 async function waitForClockTick(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 5))
+}
+
+async function waitForTelemetry(): Promise<void> {
+  await new Promise((resolve) => setImmediate(resolve))
 }
 
 function restoreEnv(key: string, value: string | undefined): void {
