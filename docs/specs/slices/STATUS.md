@@ -126,7 +126,7 @@ Known non-blocking warnings:
 | 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `verified` | 2026-09-01 | Chat exposes only read/search tools under AGENTS.md and wiki; existing specialist policies are backed up and upgraded idempotently. |
 | 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `verified` | 2026-09-01 | Correlate successful Pi reads, deduplicate real wiki Markdown paths, and persist their count on question events. |
 | 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `verified` | 2026-09-01 | Global wiki-path hints use exact then trigram Dice matching with a lazy seven-day TTL and never cache answers. |
-| 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `planned` | — | Add the idempotent analytics-event decision and specialist derivation job contract. |
+| 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `verified` | 2026-09-01 | Eligible events acquire one final decision, deterministic target, and retryable specialist derivation job. |
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `planned` | — | Execute one path-constrained derived-page job with validation and filesystem rollback. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `planned` | — | Let admins make an idempotent ignored/derived decision for eligible multi-source question events. |
 
@@ -134,7 +134,7 @@ Known non-blocking warnings:
 
 Status: `in_progress`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–68 are verified; Slice 69 is next.
+The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–69 are verified; Slice 70 is next.
 
 Approved originating decks:
 
@@ -171,6 +171,14 @@ Slice 68 verification:
 - Stored only validated wiki paths for answered events; no prior answer text enters storage or prompts.
 - Injected hints as non-authoritative candidates that the chat agent must re-read.
 - 304 tests, typecheck, build, and dependency audit passed.
+
+Slice 69 verification:
+
+- Added migration `0023_derivation_job_contract` for derivation jobs and final event actions.
+- Enforced answered outcome and more-than-three consulted documents inside an immediate transaction.
+- Created one deterministic target and job per event; repeated equal decisions are idempotent and opposite decisions conflict.
+- Added injectable job execution, generic persisted errors, and retry of the same job and target.
+- 308 tests, typecheck, build, and dependency audit passed.
 
 Planned order:
 

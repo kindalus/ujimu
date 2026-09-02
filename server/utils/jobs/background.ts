@@ -13,7 +13,7 @@ import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializati
 import { loadSpecialistsFromDisk } from '../specialists/loader'
 import { editSpecialist, resetSpecialistWorkspace, rollbackSpecialistCreation } from '../specialists/manager'
 
-export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset'
+export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset' | 'specialist_derivation'
 export type BackgroundJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 export interface BackgroundJobRecord {
@@ -32,6 +32,19 @@ export interface BackgroundJobRecord {
   completed_at: string | null
   requested_by_user_id: string | null
   requested_by_contact: string | null
+  derivation_event_id: string | null
+  derivation_target_path: string | null
+}
+
+export interface DerivationJob {
+  id: string
+  specialistId: string
+  eventId: string
+  targetPath: string
+}
+
+export interface DerivationJobRunner {
+  run(job: DerivationJob): Promise<void>
 }
 
 export interface RunDueBackgroundJobsOptions {
@@ -41,6 +54,7 @@ export interface RunDueBackgroundJobsOptions {
   piIngestionEnabled?: boolean
   conversionRunner?: PiConversionRunner
   initializationRunner?: SpecialistInitializationRunner
+  derivationRunner?: DerivationJobRunner
   runner?: PiIngestionRunner
   now?: Date
   limit?: number
@@ -68,6 +82,28 @@ export function enqueueSpecialistIngestionJob(
   input: { specialistId: string; now?: Date }
 ): BackgroundJobRecord {
   return enqueueSpecialistJob(database, { ...input, type: 'specialist_ingestion' })
+}
+
+export function enqueueSpecialistDerivationJob(
+  database: DatabaseSync,
+  input: {
+    specialistId: string
+    eventId: string
+    targetPath: string
+    requestedByUserId: string
+    requestedByContact: string
+    now?: Date
+  }
+): BackgroundJobRecord {
+  return enqueueSpecialistJob(database, {
+    specialistId: input.specialistId,
+    type: 'specialist_derivation',
+    requestedByUserId: input.requestedByUserId,
+    requestedByContact: input.requestedByContact,
+    derivationEventId: input.eventId,
+    derivationTargetPath: input.targetPath,
+    ...(input.now ? { now: input.now } : {})
+  })
 }
 
 export function enqueueSpecialistHardResetJob(
@@ -98,11 +134,14 @@ function enqueueSpecialistJob(
     now?: Date
     requestedByUserId?: string
     requestedByContact?: string
+    derivationEventId?: string
+    derivationTargetPath?: string
   }
 ): BackgroundJobRecord {
   const active = findActiveSpecialistJob(database, input.specialistId)
   if (active) {
-    if (active.type === input.type && input.type !== 'specialist_hard_reset') return active
+    if (active.type === input.type && input.type !== 'specialist_hard_reset' &&
+      (input.type !== 'specialist_derivation' || active.derivation_event_id === input.derivationEventId)) return active
     throw new BackgroundJobConflictError()
   }
 
@@ -122,7 +161,9 @@ function enqueueSpecialistJob(
     updated_at: now,
     completed_at: null,
     requested_by_user_id: input.requestedByUserId ?? null,
-    requested_by_contact: input.requestedByContact ?? null
+    requested_by_contact: input.requestedByContact ?? null,
+    derivation_event_id: input.derivationEventId ?? null,
+    derivation_target_path: input.derivationTargetPath ?? null
   }
 
   try {
@@ -143,8 +184,10 @@ function enqueueSpecialistJob(
           updated_at,
           completed_at,
           requested_by_user_id,
-          requested_by_contact
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          requested_by_contact,
+          derivation_event_id,
+          derivation_target_path
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         job.id,
@@ -161,11 +204,14 @@ function enqueueSpecialistJob(
         job.updated_at,
         job.completed_at,
         job.requested_by_user_id,
-        job.requested_by_contact
+        job.requested_by_contact,
+        job.derivation_event_id,
+        job.derivation_target_path
       )
   } catch (error) {
     const activeAfterConflict = findActiveSpecialistJob(database, input.specialistId)
-    if (activeAfterConflict && activeAfterConflict.type === input.type && input.type !== 'specialist_hard_reset') return activeAfterConflict
+    if (activeAfterConflict && activeAfterConflict.type === input.type && input.type !== 'specialist_hard_reset' &&
+      (input.type !== 'specialist_derivation' || activeAfterConflict.derivation_event_id === input.derivationEventId)) return activeAfterConflict
     if (activeAfterConflict) throw new BackgroundJobConflictError()
     throw error
   }
@@ -196,7 +242,7 @@ export async function runDueBackgroundJobs(
       recordHardResetAudit(options.database, locked, 'completed')
       result.succeeded += 1
     } catch (error) {
-      markJobFailed(options.database, locked.id, error, new Date())
+      markJobFailed(options.database, locked, error, new Date())
       recordHardResetAudit(options.database, locked, 'failed', error)
       result.failed += 1
     }
@@ -288,6 +334,18 @@ async function runBackgroundJob(
   }
   if (job.type === 'specialist_hard_reset') {
     await runSpecialistHardResetJob(job, options)
+    return
+  }
+  if (job.type === 'specialist_derivation') {
+    if (!job.derivation_event_id || !job.derivation_target_path || !options.derivationRunner) {
+      throw createJobError('DERIVATION_RUNNER_UNAVAILABLE', 'Derivation runner is unavailable.')
+    }
+    await options.derivationRunner.run({
+      id: job.id,
+      specialistId: job.specialist_id,
+      eventId: job.derivation_event_id,
+      targetPath: job.derivation_target_path
+    })
     return
   }
 
@@ -403,7 +461,7 @@ function markJobSucceeded(database: DatabaseSync, jobId: string, completedAt: Da
     .run(now, now, jobId)
 }
 
-function markJobFailed(database: DatabaseSync, jobId: string, error: unknown, failedAt: Date): void {
+function markJobFailed(database: DatabaseSync, job: BackgroundJobRecord, error: unknown, failedAt: Date): void {
   const now = failedAt.toISOString()
   database
     .prepare(`
@@ -417,7 +475,13 @@ function markJobFailed(database: DatabaseSync, jobId: string, error: unknown, fa
           completed_at = ?
       WHERE id = ?
     `)
-    .run(resolveErrorCode(error), sanitizeErrorMessage(error), now, now, jobId)
+    .run(
+      resolveErrorCode(error),
+      job.type === 'specialist_derivation' ? 'Derivation job failed.' : sanitizeErrorMessage(error),
+      now,
+      now,
+      job.id
+    )
 }
 
 async function rollbackSpecialistInitialization(dataDir: string, specialistId: string): Promise<void> {

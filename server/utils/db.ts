@@ -640,6 +640,67 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_question_retrieval_hints_lookup
         ON question_retrieval_hints (specialist_id, fingerprint, expires_at);
     `
+  },
+  {
+    version: '0023_derivation_job_contract',
+    sql: `
+      CREATE TABLE background_jobs_new (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('specialist_initialization', 'specialist_ingestion', 'specialist_hard_reset', 'specialist_derivation')),
+        specialist_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        locked_at TEXT,
+        locked_by TEXT,
+        last_error_code TEXT,
+        last_error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        requested_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        requested_by_contact TEXT,
+        derivation_event_id TEXT REFERENCES question_analytics_events(id) ON DELETE CASCADE,
+        derivation_target_path TEXT
+      );
+
+      INSERT INTO background_jobs_new (
+        id, type, specialist_id, status, attempts, max_attempts, locked_at, locked_by,
+        last_error_code, last_error_message, created_at, updated_at, completed_at,
+        requested_by_user_id, requested_by_contact
+      )
+      SELECT
+        id, type, specialist_id, status, attempts, max_attempts, locked_at, locked_by,
+        last_error_code, last_error_message, created_at, updated_at, completed_at,
+        requested_by_user_id, requested_by_contact
+      FROM background_jobs;
+
+      DROP TABLE background_jobs;
+      ALTER TABLE background_jobs_new RENAME TO background_jobs;
+      CREATE INDEX idx_background_jobs_status_time ON background_jobs (status, updated_at);
+      CREATE UNIQUE INDEX idx_background_jobs_specialist_active
+        ON background_jobs (specialist_id)
+        WHERE status IN ('queued', 'running');
+      CREATE UNIQUE INDEX idx_background_jobs_derivation_event
+        ON background_jobs (derivation_event_id)
+        WHERE derivation_event_id IS NOT NULL;
+
+      CREATE TABLE question_derivation_actions (
+        event_id TEXT PRIMARY KEY REFERENCES question_analytics_events(id) ON DELETE CASCADE,
+        specialist_id TEXT NOT NULL,
+        decision TEXT NOT NULL CHECK (decision IN ('ignored', 'derived')),
+        target_path TEXT,
+        job_id TEXT UNIQUE REFERENCES background_jobs(id) ON DELETE SET NULL,
+        decided_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        decided_by_contact TEXT NOT NULL,
+        decided_at TEXT NOT NULL,
+        CHECK ((decision = 'ignored' AND target_path IS NULL AND job_id IS NULL)
+          OR (decision = 'derived' AND target_path IS NOT NULL AND job_id IS NOT NULL))
+      );
+
+      CREATE INDEX idx_question_derivation_actions_specialist
+        ON question_derivation_actions (specialist_id, decided_at);
+    `
   }
 ]
 

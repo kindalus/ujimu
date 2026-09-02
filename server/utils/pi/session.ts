@@ -5,11 +5,12 @@ import { createChatFilePolicyExtension } from './file-policy'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
-export type PiTaskName = AgentSessionLogTask | 'chat'
+export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation'
 export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
 const UJIMU_PI_CHAT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'grep', 'find', 'ls']
+const UJIMU_PI_DERIVATION_TOOL_NAMES: UjimuPiToolName[] = ['read', 'edit', 'write', 'grep', 'find', 'ls']
 const UJIMU_PI_INGESTION_THINKING_LEVEL_ENV = 'UJIMU_PI_INGESTION_THINKING_LEVEL'
 const UJIMU_PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 
@@ -228,13 +229,17 @@ export function createUjimuPiEnabledToolNames(
   task?: PiTaskName
 ): string[] {
   return [...new Set([
-    ...(task === 'chat' ? UJIMU_PI_CHAT_TOOL_NAMES : UJIMU_PI_DEFAULT_TOOL_NAMES),
+    ...(task === 'chat'
+      ? UJIMU_PI_CHAT_TOOL_NAMES
+      : task === 'derivation'
+        ? UJIMU_PI_DERIVATION_TOOL_NAMES
+        : UJIMU_PI_DEFAULT_TOOL_NAMES),
     ...customTools.map((tool) => tool.name).filter((name): name is string => typeof name === 'string' && name.length > 0)
   ])]
 }
 
 export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
-  return task === 'chat' ? [] : [createPdfToMarkdownTool({ cwd })]
+  return task === 'chat' || task === 'derivation' ? [] : [createPdfToMarkdownTool({ cwd })]
 }
 
 async function resolveTaskModel(

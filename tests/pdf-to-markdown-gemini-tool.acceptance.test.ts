@@ -98,10 +98,15 @@ exit 88
     const conversionTools = await sessionModule.createUjimuCustomToolsForTask('conversion')
     const ingestionTools = await sessionModule.createUjimuCustomToolsForTask('ingestion')
     const chatTools = await sessionModule.createUjimuCustomToolsForTask('chat')
+    const derivationTools = await sessionModule.createUjimuCustomToolsForTask('derivation')
 
     expect(conversionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
     expect(ingestionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
     expect(chatTools).toEqual([])
+    expect(derivationTools).toEqual([])
+    expect(sessionModule.createUjimuPiEnabledToolNames([], 'derivation')).toEqual([
+      'read', 'edit', 'write', 'grep', 'find', 'ls'
+    ])
   })
 
   it('includes project custom tools in the Pi SDK enabled tool list', async () => {
