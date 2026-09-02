@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingestão OCR com confirmação visual — Brainstorm</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+    :root { --bg:#090a0c; --panel:#14161a; --line:#2b2e34; --text:#f5f5f2; --muted:#a7a9ae; --accent:#f5c518; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:radial-gradient(circle at 80% 15%,#24210d 0,transparent 32%),var(--bg); color:var(--text); font-family:Manrope,sans-serif; overflow:hidden; }
+    .slide { width:100vw; height:100vh; display:none; align-items:center; justify-content:center; padding:9vh 14vw; position:relative; }
+    .slide.active { display:flex; animation:enter .28s ease-out; }
+    .frame { width:min(1120px,100%); }
+    h1,h2 { font-family:'Space Grotesk',sans-serif; letter-spacing:-.035em; }
+    h1 { font-size:clamp(2.8rem,6vw,5.8rem); line-height:.96; max-width:950px; }
+    h2 { font-size:clamp(2rem,4.2vw,4rem); line-height:1.03; margin-bottom:2rem; }
+    p,li { font-size:clamp(1rem,1.45vw,1.35rem); line-height:1.6; color:var(--muted); }
+    ul { display:grid; gap:1rem; padding-left:1.4rem; }
+    .k { color:var(--accent); font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:.78rem; margin-bottom:1.2rem; }
+    .lead { font-size:clamp(1.2rem,2vw,1.7rem); max-width:850px; margin-top:1.6rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .card { background:linear-gradient(145deg,rgba(24,26,31,.96),rgba(15,16,19,.94)); border:1px solid var(--line); border-radius:.75rem; padding:1.5rem; }
+    .card strong { display:block; color:var(--text); font-family:'Space Grotesk',sans-serif; font-size:1.15rem; margin-bottom:.5rem; }
+    .flow { display:flex; align-items:stretch; gap:.7rem; }
+    .step { flex:1; border:1px solid var(--line); border-radius:.75rem; padding:1.25rem; background:var(--panel); }
+    .arrow { color:var(--accent); align-self:center; font-size:1.5rem; }
+    .callout { border-left:4px solid var(--accent); background:#17170f; padding:1.25rem 1.5rem; border-radius:0 .75rem .75rem 0; }
+    code { color:#ffe36e; }
+    .counter { position:fixed; right:2rem; bottom:1.5rem; color:#777b83; font-size:.82rem; }
+    .hint { position:fixed; left:2rem; bottom:1.5rem; color:#656970; font-size:.76rem; }
+    @keyframes enter { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+    @media(max-width:900px){ .grid,.flow{grid-template-columns:1fr;display:grid}.arrow{display:none}.slide{padding:7vh 8vw} }
+    @media print { body{overflow:visible}.slide{display:flex;break-after:page}.counter,.hint{display:none} }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div class="frame"><div class="k">Brainstorm · Iteração 1</div><h1>Ingestão OCR com confirmação visual</h1><p class="lead">Como preservar integralmente documentos digitalizados sem publicar uma wiki construída sobre extracção incompleta.</p></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Problema</div><h2>Um PDF pode conter páginas, mas nenhum texto utilizável</h2><div class="grid"><div class="card"><strong>Risco silencioso</strong><p>Uma conversão vazia ou parcial pode parecer válida e omitir artigos, tabelas, notas ou carimbos.</p></div><div class="card"><strong>Impacto</strong><p>A omissão propaga-se para a wiki, para as respostas e para as citações apresentadas ao utilizador.</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Objectivo</div><h2>Converter com prova de cobertura</h2><div class="callout"><p>Quando a camada textual for inexistente ou insuficiente, aplicar OCR e confirmação visual página a página. Incoerências devem ser resolvidas pela imagem original; se a integridade não puder ser confirmada, a ingestão falha.</p></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Decisões confirmadas</div><h2>O erro seguro é não publicar</h2><ul><li>OCR deixa de estar fora do MVP para PDFs digitalizados.</li><li>A confirmação visual deve ter qualidade suficiente para resolver incoerências.</li><li>Não existe promessa absoluta de perfeição; existe validação e falha explícita.</li><li><code>raw/</code> permanece imutável e é a referência visual canónica.</li><li>A rastreabilidade até ao PDF original continua obrigatória.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Direcção escolhida</div><h2>OCR local + revisão visual, sem Gemini</h2><div class="grid"><div class="card"><strong>Primeira extracção</strong><p>Um motor OCR local e determinístico processa o documento completo.</p></div><div class="card"><strong>Base visual</strong><p>Cada página é renderizada como imagem de alta resolução.</p></div><div class="card"><strong>Confirmação total</strong><p>Todas as páginas são confrontadas com a imagem, não apenas as suspeitas.</p></div><div class="card"><strong>Reprovação segura</strong><p>Qualquer conteúdo persistentemente ilegível reprova o documento completo.</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Fluxo candidato</div><h2>Detectar → extrair → confrontar → aceitar</h2><div class="flow"><div class="step"><p><strong>1.</strong><br>Inventário de páginas e camada textual</p></div><span class="arrow">→</span><div class="step"><p><strong>2.</strong><br>OCR das páginas insuficientes</p></div><span class="arrow">→</span><div class="step"><p><strong>3.</strong><br>Confirmação visual e correcção</p></div><span class="arrow">→</span><div class="step"><p><strong>4.</strong><br>Relatório de cobertura ou falha</p></div></div></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Fronteiras</div><h2>O que não devemos fingir</h2><ul><li>Uma instrução no prompt, sem instrumento verificável, não garante OCR.</li><li>Tamanho mínimo do Markdown não prova que todas as páginas foram convertidas.</li><li>Uma única passagem do mesmo modelo não é confirmação independente.</li><li>Conteúdo ilegível, cortado ou protegido deve bloquear a publicação.</li><li>A revisão não pode inventar caracteres para eliminar incerteza.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Contrato fechado</div><h2>Uma cadeia, sem fornecedor visual novo</h2><ul><li>OCR local suporta inicialmente português e inglês.</li><li>O modelo definido em <code>UJIMU_PI_INGESTION_*</code> confirma visualmente todas as páginas.</li><li>Gemini não participa na extracção, revisão ou validação.</li><li>O relatório de cobertura deve provar que cada página foi processada e revista.</li><li>Qualquer ilegibilidade residual reprova o documento completo.</li></ul></div></section>
+
+  <section class="slide"><div class="frame"><div class="k">Registo de iteração</div><h2>2026-09-02 · Três convergências</h2><ul><li>Iteração 1: OCR obrigatório; falhar sem publicar quando a integridade não puder ser confirmada.</li><li>Iteração 2: sem Gemini; confirmar todas as páginas; rejeitar o documento completo perante ilegibilidade.</li><li>Iteração 3: o próprio modelo de ingestão executa a confirmação visual.</li><li>Iteração 3: OCR local começa com modelos português e inglês.</li><li>Próximo passo: aprovação deste brainstorm e desenho da arquitectura.</li></ul></div></section>
+
+  <div class="hint">← → ou espaço</div><div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+  <script>
+    const slides=[...document.querySelectorAll('.slide')]; let idx=0;
+    document.getElementById('total').textContent=slides.length;
+    function go(next){slides[idx].classList.remove('active');idx=Math.max(0,Math.min(next,slides.length-1));slides[idx].classList.add('active');document.getElementById('current').textContent=idx+1}
+    document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(idx+1)}if(e.key==='ArrowLeft')go(idx-1)});
+    document.addEventListener('click',e=>go(idx+(e.clientX>innerWidth/2?1:-1)));
+  </script>
+</body>
+</html>
