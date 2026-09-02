@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
+import { createChatFilePolicyExtension } from './file-policy'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
@@ -8,6 +9,7 @@ export type PiTaskName = AgentSessionLogTask | 'chat'
 export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
+const UJIMU_PI_CHAT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'grep', 'find', 'ls']
 const UJIMU_PI_INGESTION_THINKING_LEVEL_ENV = 'UJIMU_PI_INGESTION_THINKING_LEVEL'
 const UJIMU_PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 
@@ -53,13 +55,14 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     settingsManager,
     additionalSkillPaths: [join(bundledPiDir, 'skills')],
     additionalExtensionPaths: [join(bundledPiDir, 'extensions')],
+    ...(options.task === 'chat' ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] } : {}),
     noSkills: true
   })
   await loader.reload()
 
   const selectedModel = await resolveTaskModel(modelRuntime, settingsManager, options.modelEnvPrefix)
   const customTools = createUjimuCustomToolsForTask(options.task, options.cwd)
-  const enabledTools = createUjimuPiEnabledToolNames(customTools)
+  const enabledTools = createUjimuPiEnabledToolNames(customTools, options.task)
 
   const result = await createAgentSession({
     cwd: options.cwd,
@@ -220,15 +223,18 @@ function redactSensitiveText(value: string): string {
     .replace(/\b(?:sk|pk|rk|or)-[A-Za-z0-9_-]{16,}\b/g, '[redacted-key]')
 }
 
-export function createUjimuPiEnabledToolNames(customTools: Array<{ name?: unknown }> = []): string[] {
+export function createUjimuPiEnabledToolNames(
+  customTools: Array<{ name?: unknown }> = [],
+  task?: PiTaskName
+): string[] {
   return [...new Set([
-    ...UJIMU_PI_DEFAULT_TOOL_NAMES,
+    ...(task === 'chat' ? UJIMU_PI_CHAT_TOOL_NAMES : UJIMU_PI_DEFAULT_TOOL_NAMES),
     ...customTools.map((tool) => tool.name).filter((name): name is string => typeof name === 'string' && name.length > 0)
   ])]
 }
 
-export function createUjimuCustomToolsForTask(_task: PiTaskName, cwd = process.cwd()): any[] {
-  return [createPdfToMarkdownTool({ cwd })]
+export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
+  return task === 'chat' ? [] : [createPdfToMarkdownTool({ cwd })]
 }
 
 async function resolveTaskModel(

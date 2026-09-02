@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises'
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,15 +48,18 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: createAgentSessionMock
 }))
 
-describe('unrestricted Pi tools acceptance', () => {
+describe('task-scoped Pi tools acceptance', () => {
   beforeEach(() => {
     createAgentSessionMock.mockClear()
     sessionManagerInMemoryMock.mockClear()
     defaultResourceLoaderMock.mockClear()
   })
 
-  it('uses the specialist directory as the real Pi root and enables all default plus project custom tools', async () => {
+  it('gives chat only read-only file tools and installs the path policy', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-unrestricted-'))
+    await mkdir(join(root, 'wiki'))
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
+    await writeFile(join(root, 'wiki', 'page.md'), '# Page\n')
     const { createUjimuPiSession } = await import('../server/utils/pi/session')
 
     await createUjimuPiSession({ cwd: root, task: 'chat' })
@@ -66,13 +69,46 @@ describe('unrestricted Pi tools acceptance', () => {
       cwd: root,
       agentDir: '/tmp/ujimu-config',
       additionalSkillPaths: ['/tmp/ujimu-bundle/skills'],
+      extensionFactories: [expect.objectContaining({ name: 'ujimu-chat-file-policy', hidden: true })],
       noSkills: true
     }))
     expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
       cwd: root,
       modelRuntime: expect.objectContaining({ getModel: expect.any(Function) }),
-      tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown'],
-      customTools: [expect.objectContaining({ name: 'pdf_to_markdown' })]
+      tools: ['read', 'grep', 'find', 'ls'],
+      customTools: []
     }))
+
+    const loaderOptions = defaultResourceLoaderMock.mock.calls[0][0]
+    let toolCallHandler: ((event: unknown) => Promise<unknown>) | undefined
+    loaderOptions.extensionFactories[0].factory({
+      on: (_event: string, handler: (event: unknown) => Promise<unknown>) => { toolCallHandler = handler }
+    })
+    await expect(toolCallHandler?.({ toolName: 'read', input: { path: 'wiki/page.md' } })).resolves.toBeUndefined()
+    await expect(toolCallHandler?.({ toolName: 'read', input: { path: 'specialist.yaml' } })).resolves.toMatchObject({ block: true })
+    await expect(toolCallHandler?.({ toolName: 'write', input: { path: 'wiki/page.md' } })).resolves.toMatchObject({ block: true })
+  })
+
+  it('allows only AGENTS.md and real paths inside wiki', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-policy-'))
+    const outside = await mkdtemp(join(tmpdir(), 'ujimu-pi-outside-'))
+    await mkdir(join(root, 'wiki'))
+    await mkdir(join(root, 'raw'))
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
+    await writeFile(join(root, 'wiki', 'page.md'), '# Page\n')
+    await writeFile(join(root, 'raw', 'source.md'), '# Source\n')
+    await writeFile(join(root, 'specialist.yaml'), 'id: test\n')
+    await writeFile(join(outside, 'secret.md'), '# Secret\n')
+    await symlink(join(outside, 'secret.md'), join(root, 'wiki', 'escaped.md'))
+
+    const { isChatPathAllowed } = await import('../server/utils/pi/file-policy')
+
+    await expect(isChatPathAllowed(root, 'AGENTS.md')).resolves.toBe(true)
+    await expect(isChatPathAllowed(root, 'wiki')).resolves.toBe(true)
+    await expect(isChatPathAllowed(root, 'wiki/page.md')).resolves.toBe(true)
+    await expect(isChatPathAllowed(root, 'raw/source.md')).resolves.toBe(false)
+    await expect(isChatPathAllowed(root, 'specialist.yaml')).resolves.toBe(false)
+    await expect(isChatPathAllowed(root, '../secret.md')).resolves.toBe(false)
+    await expect(isChatPathAllowed(root, 'wiki/escaped.md')).resolves.toBe(false)
   })
 })

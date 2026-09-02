@@ -55,7 +55,8 @@ export async function assertSpecialistInitializedWorkspace(specialist: Specialis
     ['insufficient evidence handling', /lacks sufficient evidence/iu],
     ['original source citations', /cite the original document title and relevant articles/iu],
     ['internal path protection', /do not expose physical or internal file paths to the user/iu],
-    ['unslop final pass', /read and apply the `?unslop`? skill/iu]
+    ['unslop final pass', /read and apply the `?unslop`? skill/iu],
+    ['derived write prohibition', /normal user consultations[^]*never create, edit, or delete `?wiki\/derived\/?`?[^]*explicit derivation job initiated by an administrator/iu]
   ] as const
 
   for (const [rule, pattern] of requiredRules) {
@@ -129,8 +130,9 @@ These rules apply only when answering user consultation questions, not during wi
 4. Ground every substantive answer in the wiki and cite the original document title and relevant articles.
 5. Do not expose physical or internal file paths to the user. \`sourceFile\` is internal machine-readable citation metadata and must not be repeated in answer text.
 6. Before emitting the final consultation answer, read and apply the \`unslop\` skill. This style pass must not change grounded facts, legal meaning, citations, or the required output structure.
-7. Machine-readable citations remain optional. When useful citations are available, they may be emitted as JSON lines in this shape:
+7. During normal user consultations, never create, edit, or delete \`wiki/derived/\`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.
+8. Machine-readable citations remain optional. When useful citations are available, they may be emitted as JSON lines in this shape:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-8. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
+9. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
 `
 }

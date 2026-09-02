@@ -123,7 +123,7 @@ Known non-blocking warnings:
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `verified` | 2026-08-23 | Account-linked cookie clusters, post-login linkage, browser-estimate disclosure, 294 tests, typecheck, build, and audit passed. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `verified` | 2026-08-23 | Exact-ID admin reset, global job exclusion, byte-identical raw preservation, destructive cleanup, audit, 297 tests, typecheck, build, and audit passed. |
 | 65 | [`65-reliable-gaps-nonblocking-telemetry.html`](./65-reliable-gaps-nonblocking-telemetry.html) | `verified` | 2026-09-01 | Terminal outcomes persist completed gaps; best-effort analytics cannot turn a delivered answer into a stream failure. |
-| 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `planned` | — | Enforce read-only, path-scoped chat tools and prohibit consultation-time derived writes in specialist AGENTS.md files. |
+| 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `verified` | 2026-09-01 | Chat exposes only read/search tools under AGENTS.md and wiki; existing specialist policies are backed up and upgraded idempotently. |
 | 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `planned` | — | Count unique successful content-file reads and persist the count on question analytics events. |
 | 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `planned` | — | Add exact and Sørensen–Dice retrieval hints with a seven-day lazy TTL, without caching answers. |
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `planned` | — | Add the idempotent analytics-event decision and specialist derivation job contract. |
@@ -134,7 +134,7 @@ Known non-blocking warnings:
 
 Status: `in_progress`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Slice 65 is verified; Slice 66 is next.
+The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–66 are verified; Slice 67 is next.
 
 Approved originating decks:
 
@@ -147,6 +147,14 @@ Slice 65 verification:
 - Persisted completed <code>insufficient_context</code> responses and excluded failed streams.
 - Deferred question analytics with sanitised failure logging after synchronous history/session work.
 - 301 tests, typecheck, build, and dependency audit passed.
+
+Slice 66 verification:
+
+- Restricted chat sessions to `read`, `grep`, `find`, and `ls`, without conversion or write-capable tools.
+- Added a fail-closed inline Pi path policy for `AGENTS.md` and the real `wiki/` tree, including traversal and symlink checks.
+- Required the explicit admin-derived exception in newly initialized workspaces.
+- Added a startup migration that preserves one backup and appends the policy once to existing specialists.
+- 303 tests, typecheck, build, and dependency audit passed.
 
 Planned order:
 

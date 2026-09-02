@@ -62,7 +62,7 @@ describe('specialist hard reset acceptance', () => {
     const result = await runDueBackgroundJobs({
       database, dataDir,
       initializationRunner: { async initializeSpecialist(current) {
-        await writeFile(join(current.paths.root, 'AGENTS.md'), 'llm-wiki only source of truth lacks sufficient evidence cite the original document title and relevant articles do not expose physical or internal file paths to the user read and apply the `unslop` skill')
+        await writeFile(join(current.paths.root, 'AGENTS.md'), 'llm-wiki only source of truth lacks sufficient evidence cite the original document title and relevant articles do not expose physical or internal file paths to the user read and apply the `unslop` skill. During normal user consultations, never create, edit, or delete `wiki/derived/`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.')
         await writeFile(join(current.paths.wiki, 'index.md'), '# Índice novo')
         await writeFile(join(current.paths.wiki, 'log.md'), '# Log novo')
       } }

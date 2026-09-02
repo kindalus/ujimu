@@ -59,6 +59,7 @@ If the wiki lacks sufficient evidence, do not guess.
 Cite the original document title and relevant articles.
 Do not expose physical or internal file paths to the user.
 Before the final answer, read and apply the \`unslop\` skill.
+During normal user consultations, never create, edit, or delete \`wiki/derived/\`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.
 `)
           await writeFile(join(specialist.paths.wiki, 'index.md'), '# Índice\n')
           await writeFile(join(specialist.paths.wiki, 'log.md'), '# Log\n')

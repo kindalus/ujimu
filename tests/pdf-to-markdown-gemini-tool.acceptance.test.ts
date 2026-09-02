@@ -91,7 +91,7 @@ exit 88
     expect(existsSync(join(workspace.root, 'raw', 'lei.pdf.md'))).toBe(false)
   })
 
-  it('exposes pdf_to_markdown to every Ujimu Pi session by default', async () => {
+  it('exposes pdf_to_markdown only to write-capable Ujimu Pi tasks', async () => {
     const sessionModule = await import('../server/utils/pi/session') as any
 
     expect(sessionModule.createUjimuCustomToolsForTask).toBeTypeOf('function')
@@ -101,7 +101,7 @@ exit 88
 
     expect(conversionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
     expect(ingestionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
-    expect(chatTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
+    expect(chatTools).toEqual([])
   })
 
   it('includes project custom tools in the Pi SDK enabled tool list', async () => {

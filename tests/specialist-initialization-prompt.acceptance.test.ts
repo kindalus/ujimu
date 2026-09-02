@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -61,9 +61,10 @@ These rules apply only when answering user consultation questions, not during wi
 4. Ground every substantive answer in the wiki and cite the original document title and relevant articles.
 5. Do not expose physical or internal file paths to the user. \`sourceFile\` is internal machine-readable citation metadata and must not be repeated in answer text.
 6. Before emitting the final consultation answer, read and apply the \`unslop\` skill. This style pass must not change grounded facts, legal meaning, citations, or the required output structure.
-7. Machine-readable citations remain optional. When useful citations are available, they may be emitted as JSON lines in this shape:
+7. During normal user consultations, never create, edit, or delete \`wiki/derived/\`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.
+8. Machine-readable citations remain optional. When useful citations are available, they may be emitted as JSON lines in this shape:
    {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
-8. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
+9. Plain-text answers are acceptable. Missing or malformed citations are ignored by Ujimu instead of blocking the answer.
 `)
   })
 
@@ -88,7 +89,8 @@ These rules apply only when answering user consultation questions, not during wi
       'lacks sufficient evidence',
       'cite the original document title and relevant articles',
       'Do not expose physical or internal file paths to the user',
-      'read and apply the `unslop` skill'
+      'read and apply the `unslop` skill',
+      'During normal user consultations, never create, edit, or delete `wiki/derived/`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.'
     ]
     const completeAgents = `# Specialist context\n\n${requiredRules.join('\n')}\n`
 
@@ -101,6 +103,27 @@ These rules apply only when answering user consultation questions, not during wi
 
     await writeFile(join(root, 'AGENTS.md'), completeAgents)
     await expect(assertSpecialistInitializedWorkspace(specialist)).resolves.toBeUndefined()
+  })
+
+  it('backs up and appends the derived policy to an existing specialist only once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-agents-policy-'))
+    const ingest = join(root, 'ingest')
+    await mkdir(ingest, { recursive: true })
+    await writeFile(join(root, 'AGENTS.md'), '# Existing specialist\n')
+    const specialist = {
+      ...specialistRuntimeFixture(),
+      paths: { ...specialistRuntimeFixture().paths, root, ingest }
+    }
+    const { ensureSpecialistConsultationPolicy } = await import('../server/utils/specialists/consultation-policy')
+
+    await expect(ensureSpecialistConsultationPolicy(specialist)).resolves.toBe(true)
+    await expect(ensureSpecialistConsultationPolicy(specialist)).resolves.toBe(false)
+
+    const updated = await readFile(join(root, 'AGENTS.md'), 'utf8')
+    const backup = await readFile(join(ingest, 'policy-backups', 'AGENTS.before-derived-policy.md'), 'utf8')
+    expect(updated.match(/ujimu-derived-write-policy-v1/gu)).toHaveLength(1)
+    expect(updated).toContain('Only an explicit derivation job initiated by an administrator')
+    expect(backup).toBe('# Existing specialist\n')
   })
 
   it('writes the specialist system prompt as a one-time initialization persona before the chat protocol', async () => {
