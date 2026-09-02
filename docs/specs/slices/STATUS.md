@@ -130,13 +130,13 @@ Known non-blocking warnings:
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
-| 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `in-progress` | 2026-09-02 | Require visual confirmation of every PDF page and reject incomplete documents before converted/wiki publication. |
+| 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
 
 ## Visual OCR ingestion
 
-Status: `planned`
+Status: `verified`
 
-The user approved the brainstorm and architecture on 2026-09-02. Implementation proceeds in Slice 72 then Slice 73.
+The user approved the brainstorm and architecture on 2026-09-02. Slices 72 and 73 are implemented and verified.
 
 Approved originating decks:
 
@@ -160,13 +160,16 @@ Slice 72 verification:
 - Built the production image and processed a real image-only PDF with OCRmyPDF 16.7.0, qpdf 12.2.0, Poppler 25.03.0, and both language packs.
 - 316 tests, typecheck, build, and the high-severity dependency gate passed; the audit reported pre-existing moderate Tiptap advisories.
 
-Slice 73 refinement:
+Slice 73 verification:
 
-- Render a page overview plus overlapping tiles smaller than 2000×2000 pixels.
-- Require successful reads of OCR text, overview, and every tile before accepting a page decision.
-- Persist the coverage ledger only through a dedicated confirmation tool.
-- Remove `bash` and the Gemini converter from ingestion sessions to prevent bypass.
-- Block `converted/` and `wiki/` publication until all expected PDF pages are publishable.
+- Added a page overview plus overlapping 300 DPI tiles bounded below Pi's 2000×2000 resize threshold.
+- Required successful reads of OCR text, overview, and every tile before a page can be confirmed, corrected, or rejected.
+- Added an application-owned coverage ledger and enforced contiguous page order against the prepared page count.
+- Removed `bash` and the Gemini converter from ingestion sessions and rejected non-image-capable ingestion models.
+- Blocked raw and unrelated writes, direct managed-PDF writes to `converted/`, and all converted/wiki publication before complete coverage.
+- Added `publish_pdf_ocr_markdown` for atomic promotion of the reviewed draft and required current-run publication in the final manifest.
+- Built the production image and verified a real image-only A4 PDF: 2480×3508 overview, four overlapping 1900×1900 tiles, local OCR, and no Gemini dependency in ingestion.
+- 322 tests, typecheck, build, and the high-severity dependency gate passed; the audit reported 36 moderate advisories in the existing Tiptap dependency tree.
 
 Implementation order:
 

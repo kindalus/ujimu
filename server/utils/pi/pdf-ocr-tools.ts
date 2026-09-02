@@ -1,4 +1,10 @@
 import { spawn } from 'node:child_process'
+import type {
+  PdfOcrCoverageTracker,
+  PdfOcrPageStatus,
+  PdfOcrPreparedResult,
+  PdfOcrRenderedResult
+} from '../ingestion/pdf-ocr-coverage'
 import { resolveUjimuPiToolPath } from './paths'
 
 export const PREPARE_PDF_OCR_TOOL_NAME = 'prepare_pdf_ocr'
@@ -7,6 +13,7 @@ export const RENDER_PDF_OCR_PAGE_TOOL_NAME = 'render_pdf_ocr_page'
 interface CreatePdfOcrToolsOptions {
   cwd: string
   scriptPath?: string
+  coverage?: PdfOcrCoverageTracker
 }
 
 const KNOWN_ERROR_CODES = new Set([
@@ -29,7 +36,14 @@ export function createPdfOcrTools(options: CreatePdfOcrToolsOptions): any[] {
       description: 'Validate and prepare one PDF under raw/ with local Portuguese and English OCR.',
       parameters: pdfPathParameters(),
       async execute(_toolCallId: string, params: { pdfPath: string }) {
-        return toolResult(await runPdfOcrScript(options, ['prepare', params.pdfPath]))
+        try {
+          const result = await runPdfOcrScript(options, ['prepare', params.pdfPath]) as PdfOcrPreparedResult
+          options.coverage?.recordPrepared(params.pdfPath, result)
+          return toolResult(result)
+        } catch (error) {
+          options.coverage?.recordPreparationFailure(params.pdfPath, readErrorCode(error))
+          throw error
+        }
       }
     },
     {
@@ -46,7 +60,60 @@ export function createPdfOcrTools(options: CreatePdfOcrToolsOptions): any[] {
         additionalProperties: false
       },
       async execute(_toolCallId: string, params: { pdfPath: string; page: number }) {
-        return toolResult(await runPdfOcrScript(options, ['page', params.pdfPath, String(params.page)]))
+        options.coverage?.beforeRender(params.pdfPath)
+        try {
+          const result = await runPdfOcrScript(
+            options,
+            ['page', params.pdfPath, String(params.page)]
+          ) as PdfOcrRenderedResult
+          options.coverage?.recordRendered(params.pdfPath, result)
+          return toolResult(result)
+        } catch (error) {
+          options.coverage?.recordPreparationFailure(params.pdfPath, readErrorCode(error))
+          throw error
+        }
+      }
+    },
+    {
+      name: 'confirm_pdf_ocr_page',
+      label: 'Confirm PDF OCR page',
+      description: 'Record visual confirmation after reading OCR text, overview, and every high-resolution tile.',
+      parameters: {
+        type: 'object',
+        properties: {
+          pdfPath: { type: 'string', description: 'Relative PDF path under raw/.' },
+          page: { type: 'integer', minimum: 1, description: 'One-based PDF page number.' },
+          status: {
+            type: 'string',
+            enum: ['confirmed', 'corrected', 'illegible'],
+            description: 'Visual review outcome. Never guess illegible content.'
+          }
+        },
+        required: ['pdfPath', 'page', 'status'],
+        additionalProperties: false
+      },
+      async execute(_toolCallId: string, params: {
+        pdfPath: string
+        page: number
+        status: PdfOcrPageStatus
+      }) {
+        if (!options.coverage) {
+          throw createToolError('PDF_OCR_COVERAGE_INCOMPLETE', 'PDF OCR coverage tracking is unavailable.')
+        }
+        await options.coverage.confirmPage(params)
+        return toolResult({ status: 'recorded', page: params.page, review: params.status })
+      }
+    },
+    {
+      name: 'publish_pdf_ocr_markdown',
+      label: 'Publish PDF OCR Markdown',
+      description: 'Atomically publish a complete reviewed OCR draft into converted/ after all PDF coverage passes.',
+      parameters: pdfPathParameters(),
+      async execute(_toolCallId: string, params: { pdfPath: string }) {
+        if (!options.coverage) {
+          throw createToolError('PDF_OCR_COVERAGE_INCOMPLETE', 'PDF OCR coverage tracking is unavailable.')
+        }
+        return toolResult(await options.coverage.publishReviewedMarkdown(params.pdfPath))
       }
     }
   ]
@@ -113,6 +180,12 @@ function parseScriptError(stderr: string): { code: string; message: string } {
     code: match && KNOWN_ERROR_CODES.has(match[1]) ? match[1] : 'PDF_OCR_PREPARATION_FAILED',
     message: match?.[2] || 'Local PDF OCR failed.'
   }
+}
+
+function readErrorCode(error: unknown): string {
+  return typeof error === 'object' && error !== null && typeof (error as { code?: unknown }).code === 'string'
+    ? (error as { code: string }).code
+    : 'PDF_OCR_PREPARATION_FAILED'
 }
 
 function createToolError(code: string, message: string): Error & { code: string } {

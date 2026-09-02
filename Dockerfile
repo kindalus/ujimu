@@ -35,6 +35,7 @@ RUN apt-get update \
     coreutils \
     ocrmypdf \
     poppler-utils \
+    python3-pil \
     qpdf \
     tesseract-ocr \
     tesseract-ocr-eng \

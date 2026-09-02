@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -12,6 +12,7 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-ocr-coverage-'))
     const workspace = '.ujimu/ocr/sourcehash'
     await mkdir(join(root, workspace), { recursive: true })
+    await mkdir(join(root, 'converted'))
     const tracker = createPdfOcrCoverageTracker({
       cwd: root,
       expectedPdfPaths: ['raw/lei.pdf']
@@ -41,8 +42,25 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
     ]) tracker.recordSuccessfulRead(path)
     await tracker.confirmPage({ pdfPath: 'raw/lei.pdf', page: 2, status: 'confirmed' })
 
-    expect(tracker.isPublicationAllowed()).toBe(true)
+    expect(tracker.isPublicationAllowed()).toBe(false)
     expect(() => tracker.assertPublishable()).not.toThrow()
+    expect(() => tracker.validateManifest({
+      processed: [{ raw_path: 'lei.pdf' }],
+      failed: []
+    })).toThrowError(PdfOcrCoverageError)
+    await writeFile(join(root, workspace, 'draft.md'), '# Lei\n\nConteúdo revisto integralmente.\n')
+    await expect(tracker.publishReviewedMarkdown('raw/lei.pdf')).resolves.toMatchObject({
+      status: 'published',
+      convertedPath: 'converted/lei.pdf.md',
+      sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/)
+    })
+    await expect(readFile(join(root, 'converted', 'lei.pdf.md'), 'utf8'))
+      .resolves.toContain('Conteúdo revisto integralmente.')
+    expect(tracker.isPublicationAllowed()).toBe(true)
+    expect(() => tracker.validateManifest({
+      processed: [{ raw_path: 'lei.pdf' }],
+      failed: []
+    })).not.toThrow()
     const ledger = JSON.parse(await readFile(join(root, workspace, 'coverage.json'), 'utf8'))
     expect(ledger).toMatchObject({
       version: 1,
@@ -79,18 +97,27 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
     expect(() => tracker.assertPublishable()).toThrowError(
       expect.objectContaining({ code: 'PDF_OCR_VISUAL_REVIEW_FAILED' })
     )
+    expect(() => tracker.validateManifest({
+      processed: [],
+      failed: [{ raw_path: 'lei.pdf', error_code: 'PDF_OCR_VISUAL_REVIEW_FAILED' }]
+    })).not.toThrow()
+    expect(() => tracker.validateManifest({
+      processed: [{ raw_path: 'lei.pdf' }],
+      failed: []
+    })).toThrowError(PdfOcrCoverageError)
   })
 
   it('removes bash and the Gemini converter from ingestion while exposing page confirmation', async () => {
     const session = await import('../server/utils/pi/session')
     const tools = session.createUjimuCustomToolsForTask('ingestion')
-      .map((tool: { name: string }) => tool.name)
+    const toolNames = tools.map((tool: { name: string }) => tool.name)
 
     expect(session.createUjimuPiEnabledToolNames(tools, 'ingestion')).toEqual([
       'read', 'edit', 'write', 'grep', 'find', 'ls',
-      'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page'
+      'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
+      'publish_pdf_ocr_markdown'
     ])
-    expect(tools).not.toContain('pdf_to_markdown')
+    expect(toolNames).not.toContain('pdf_to_markdown')
   })
 })
 
@@ -113,8 +140,8 @@ function rendered(workspace: string, page: number, pageCount: number) {
     overviewSha256: `sha256:overview${page}`,
     ocrTextPath: `${workspace}/current/page.txt`,
     tiles: [
-      { path: `${workspace}/current/tiles/tile-0001.png`, sha256: `sha256:tile1page${page}` },
-      { path: `${workspace}/current/tiles/tile-0002.png`, sha256: `sha256:tile2page${page}` }
+      { path: `${workspace}/current/tiles/tile-0001.png`, sha256: `sha256:tile1page${page}`, width: 1900, height: 1900 },
+      { path: `${workspace}/current/tiles/tile-0002.png`, sha256: `sha256:tile2page${page}`, width: 1900, height: 1900 }
     ]
   }
 }

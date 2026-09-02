@@ -18,6 +18,7 @@ describe('Podman container deployment acceptance', () => {
     for (const pdfTool of [
       'ocrmypdf',
       'poppler-utils',
+      'python3-pil',
       'qpdf',
       'tesseract-ocr-por',
       'tesseract-ocr-eng'

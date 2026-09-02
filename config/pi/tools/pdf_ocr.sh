@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 fail() {
   printf '%s: %s\n' "$1" "$2" >&2
   exit 1
@@ -90,10 +92,11 @@ render_page() {
   require_command pdftotext
   require_command sha256sum
   require_command node
+  require_command python3
 
   [[ "${page:-}" =~ ^[1-9][0-9]*$ ]] || fail "PDF_OCR_PAGE_OUT_OF_RANGE" "Page must be a positive integer."
 
-  local hash workspace normalized page_count current prefix image text image_hash
+  local hash workspace normalized page_count current prefix image text image_hash tiles tile_records
   ensure_workspace_root
   hash=$(sha256sum "$pdf_rel" | awk '{print $1}')
   workspace=".ujimu/ocr/${hash}"
@@ -109,22 +112,50 @@ render_page() {
   current="${workspace}/current"
   rm -rf -- "$current"
   mkdir -p "$current"
-  prefix="${current}/page"
+  prefix="${current}/overview"
   image="${prefix}.png"
-  text="${prefix}.txt"
+  text="${current}/page.txt"
+  tiles="${current}/tiles"
+  tile_records="${current}/tiles.json"
 
   timeout --foreground 300 pdftoppm -f "$page" -l "$page" -singlefile -r 300 -png \
     "$normalized" "$prefix" >/dev/null 2>&1 \
     || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page rendering failed."
-  [ -s "$image" ] || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page image is missing."
+  [ -s "$image" ] || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page overview is missing."
+  timeout --foreground 300 python3 "$script_dir/pdf_ocr_tiles.py" "$image" "$tiles" >"$tile_records" 2>/dev/null \
+    || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page tiling failed."
+  find "$tiles" -type f -name 'tile-*.png' -print -quit | grep -q . \
+    || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page tiles are missing."
   timeout --foreground 120 pdftotext -f "$page" -l "$page" -layout \
     "$normalized" "$text" >/dev/null 2>&1 \
     || fail "PDF_OCR_PAGE_RENDER_FAILED" "PDF page text extraction failed."
   image_hash=$(sha256sum "$image" | awk '{print $1}')
-  chmod 600 "$image" "$text" 2>/dev/null || true
+  chmod 600 "$image" "$text" "$tile_records" "$tiles"/*.png 2>/dev/null || true
 
-  node -e 'console.log(JSON.stringify({status:"rendered",page:Number(process.argv[1]),pageCount:Number(process.argv[2]),imagePath:process.argv[3],ocrTextPath:process.argv[4],imageSha256:`sha256:${process.argv[5]}`}))' \
-    "$page" "$page_count" "$image" "$text" "$image_hash"
+  node - "$page" "$page_count" "$image" "$text" "$image_hash" "$tiles" "$tile_records" <<'NODE'
+const { createHash } = require('node:crypto')
+const { readFileSync } = require('node:fs')
+const [page, pageCount, overviewPath, ocrTextPath, overviewHash, tilesDir, recordsPath] = process.argv.slice(2)
+const tiles = JSON.parse(readFileSync(recordsPath, 'utf8')).map(record => {
+  const path = `${tilesDir}/${record.file}`
+  const sha256 = createHash('sha256').update(readFileSync(path)).digest('hex')
+  return {
+    path,
+    sha256: `sha256:${sha256}`,
+    width: record.right - record.left,
+    height: record.bottom - record.top
+  }
+})
+console.log(JSON.stringify({
+  status: 'rendered',
+  page: Number(page),
+  pageCount: Number(pageCount),
+  overviewPath,
+  overviewSha256: `sha256:${overviewHash}`,
+  ocrTextPath,
+  tiles
+}))
+NODE
 }
 
 [ "$#" -ge 2 ] || fail "INVALID_PDF_INPUT" "Expected prepare|page and a PDF path."

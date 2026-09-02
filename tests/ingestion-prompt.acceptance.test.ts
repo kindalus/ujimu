@@ -77,6 +77,15 @@ Follow the llm-wiki contract exactly:
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 
+Mandatory PDF visual OCR workflow:
+- Do not use Gemini or pdf_to_markdown for PDF conversion.
+- Before writing anything in converted/ or wiki/, process every pending PDF with prepare_pdf_ocr.
+- For each page from 1 through pageCount, call render_pdf_ocr_page, read its OCR text, overview and every overlapping 300 DPI tile, and compare all visible content.
+- Resolve OCR inconsistencies only from the page images. Preserve all legible wording, headings, articles, tables, notes, stamps, and visible structure; never guess unreadable characters.
+- After reviewing each page, call confirm_pdf_ocr_page with confirmed, corrected, or illegible. For confirmed or corrected pages, append the complete reviewed page Markdown in order to draft.md inside that PDF's OCR workspace; do not rely on retaining every page in model context.
+- If any page is illegible, do not convert or ingest that PDF. Put it in failed[] with error_code PDF_OCR_VISUAL_REVIEW_FAILED.
+- Only after every PDF page is confirmed or corrected, call publish_pdf_ocr_markdown to atomically move the reviewed draft into converted/. Never write PDF conversions directly to converted/. Then ingest only that published Markdown into wiki/.
+
 Before finishing, bring wiki/ to convergence:
 - Review the complete wiki for inconsistencies and incoherences, including OKF compliance, source lineage, broken or missing links, orphan pages, duplicates, stale claims, contradictions, and cross-page coherence.
 - Fix every issue that the available sources resolve unambiguously. During this phase, modify only files under wiki/, including wiki/index.md and wiki/log.md.
@@ -118,9 +127,11 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
     expect(prompts[0]).toContain('prepare_pdf_ocr')
     expect(prompts[0]).toContain('render_pdf_ocr_page')
     expect(prompts[0]).toContain('confirm_pdf_ocr_page')
+    expect(prompts[0]).toContain('publish_pdf_ocr_markdown')
     expect(prompts[0]).toContain('overview and every overlapping 300 DPI tile')
+    expect(prompts[0]).toContain('draft.md inside that PDF\'s OCR workspace')
     expect(prompts[0]).toContain('PDF_OCR_VISUAL_REVIEW_FAILED')
-    expect(prompts[0]).not.toContain('Gemini')
+    expect(prompts[0]).toContain('Do not use Gemini')
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
     expect(sessionOptions).toMatchObject({
@@ -131,6 +142,54 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
     expect(sessionOptions).not.toHaveProperty('fileSystemPolicy')
     expect(sessionOptions).not.toHaveProperty('tools')
+  })
+
+  it('rejects a PDF manifest when no page coverage was recorded', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-ingestion-ocr-gate-'))
+    const specialist = specialistRuntimeFixture(root)
+    await mkdir(specialist.paths.raw, { recursive: true })
+    await mkdir(specialist.paths.converted, { recursive: true })
+    await mkdir(specialist.paths.wiki, { recursive: true })
+    await mkdir(specialist.paths.ingest, { recursive: true })
+    await writeFile(join(specialist.paths.raw, 'source.pdf'), '%PDF-1.7')
+    const source = { ...sourceRecordFixture(), raw_path: 'source.pdf' }
+    const manifest: IngestionManifest = {
+      version: 2,
+      specialist_id: specialist.id,
+      processed: [{
+        raw_path: 'source.pdf',
+        source_path: 'source.pdf.md',
+        converted_path: 'source.pdf.md',
+        source_sha256: source.checksum,
+        converted_sha256: 'sha256:converted',
+        conversion_status: 'full',
+        wiki_pages: ['source.md'],
+        citations: [],
+        warnings: []
+      }],
+      failed: []
+    }
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async () => {
+          await writeFile(join(root, '.ujimu', 'ingestion-manifest.json'), JSON.stringify(manifest))
+          subscriber?.({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_delta', delta: JSON.stringify(manifest) }
+          })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => { subscriber = undefined }
+        }),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiSdkIngestionRunner } = await import('../server/utils/ingestion/pi-runner')
+    await expect(createPiSdkIngestionRunner().ingestSources!(specialist, [source]))
+      .rejects.toMatchObject({ code: 'PDF_OCR_COVERAGE_INCOMPLETE' })
   })
 })
 

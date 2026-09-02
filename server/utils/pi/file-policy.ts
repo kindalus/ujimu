@@ -45,6 +45,60 @@ export async function normalizeConsultedWikiDocumentPath(
   }
 }
 
+export function createIngestionPublicationPolicyExtension(
+  cwd: string,
+  coverage: {
+    isPublicationAllowed(): boolean
+    isManagedConvertedPath?(path: string): boolean
+  }
+): {
+  name: string
+  hidden: boolean
+  factory: (pi: any) => void
+} {
+  const rootPath = resolve(cwd)
+  return {
+    name: 'ujimu-ingestion-publication-policy',
+    hidden: true,
+    factory(pi) {
+      pi.on('tool_call', async (event: { toolName?: unknown; input?: { path?: unknown } }) => {
+        if (event.toolName !== 'write' && event.toolName !== 'edit') return undefined
+        const requestedPath = typeof event.input?.path === 'string' ? event.input.path : '.'
+        const root = await realpath(rootPath)
+        const raw = resolve(root, 'raw')
+        const internal = resolve(root, '.ujimu')
+        const wiki = resolve(root, 'wiki')
+        const converted = resolve(root, 'converted')
+        const target = resolve(root, requestedPath)
+        const targetStats = await lstat(target).catch(() => undefined)
+        if (!isWithin(root, target) || targetStats?.isSymbolicLink()) {
+          return { block: true, reason: 'Write path escapes the specialist ingestion workspace.' }
+        }
+        if (isWithin(raw, target)) {
+          return { block: true, reason: 'Raw specialist sources are immutable.' }
+        }
+        const outputRoot = [internal, wiki, converted].find(directory => isWithin(directory, target))
+        if (!outputRoot) {
+          return { block: true, reason: 'Write path is not part of the ingestion output contract.' }
+        }
+        if (!(await hasSafeExistingParent(outputRoot, target))) {
+          return { block: true, reason: 'Write path escapes the specialist ingestion workspace.' }
+        }
+        if (isWithin(converted, target) && !coverage.isPublicationAllowed()) {
+          return { block: true, reason: 'Complete visual PDF coverage before publishing converted content.' }
+        }
+        if (isWithin(converted, target) && coverage.isManagedConvertedPath?.(requestedPath)) {
+          return { block: true, reason: 'PDF conversions must be published through the atomic OCR publication tool.' }
+        }
+        if (isWithin(wiki, target) && !coverage.isPublicationAllowed()) {
+          return { block: true, reason: 'Complete visual PDF coverage before publishing wiki content.' }
+        }
+        return undefined
+      })
+    }
+  }
+}
+
 export function createDerivationFilePolicyExtension(cwd: string, targetPath: string): {
   name: string
   hidden: boolean
@@ -114,6 +168,20 @@ export async function isChatPathAllowed(cwd: string, requestedPath: string): Pro
   } catch {
     return false
   }
+}
+
+async function hasSafeExistingParent(allowedRoot: string, target: string): Promise<boolean> {
+  const realAllowedRoot = await realpath(allowedRoot).catch(() => '')
+  if (!realAllowedRoot) return false
+
+  let candidate = dirname(target)
+  while (isWithin(allowedRoot, candidate)) {
+    const existing = await realpath(candidate).catch(() => '')
+    if (existing) return isWithin(realAllowedRoot, existing)
+    if (candidate === allowedRoot) break
+    candidate = dirname(candidate)
+  }
+  return false
 }
 
 function isWithin(root: string, target: string): boolean {

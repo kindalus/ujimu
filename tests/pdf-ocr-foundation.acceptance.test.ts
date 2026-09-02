@@ -50,9 +50,14 @@ describe('local PDF OCR foundation acceptance', () => {
     expect(firstPayload.tiles).toEqual(expect.arrayContaining([
       expect.objectContaining({
         path: expect.stringMatching(/\/current\/tiles\/tile-\d{4}\.png$/),
-        sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/)
+        sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        width: expect.any(Number),
+        height: expect.any(Number)
       })
     ]))
+    expect((firstPayload.tiles as Array<{ width: number; height: number }>).every(
+      tile => tile.width < 2000 && tile.height < 2000
+    )).toBe(true)
 
     const second = await runScript(fixture.root, ['page', 'raw/lei.pdf', '2'], fixture.bin)
     expect(second.code).toBe(0)

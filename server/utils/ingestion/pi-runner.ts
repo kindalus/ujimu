@@ -2,6 +2,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createUjimuPiSession } from '../pi/session'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
+import { createPdfOcrCoverageTracker, PdfOcrCoverageError } from './pdf-ocr-coverage'
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { IngestionManifest, IngestionSourceRecord } from './types'
 
@@ -34,7 +35,13 @@ export interface PiIngestionRunner {
 
 export class PiIngestionError extends Error {
   constructor(
-    public readonly code: 'PI_EXECUTION_FAILED' | 'WIKI_OUTPUT_MISSING' | 'INGESTION_MANIFEST_MISSING' | 'INGESTION_MANIFEST_INVALID',
+    public readonly code:
+      | 'PI_EXECUTION_FAILED'
+      | 'WIKI_OUTPUT_MISSING'
+      | 'INGESTION_MANIFEST_MISSING'
+      | 'INGESTION_MANIFEST_INVALID'
+      | 'PDF_OCR_COVERAGE_INCOMPLETE'
+      | 'PDF_OCR_VISUAL_REVIEW_FAILED',
     message: string
   ) {
     super(message)
@@ -60,20 +67,40 @@ function countManifestSuccesses(manifest: IngestionManifest): number {
 
 async function runPiSdkBatchIngestion(
   specialist: SpecialistRuntime,
-  _sources: IngestionSourceRecord[]
+  sources: IngestionSourceRecord[]
 ): Promise<PiBatchIngestionResult> {
   const cwd = specialist.paths.root
   await mkdir(join(cwd, '.ujimu'), { recursive: true })
+  const pdfOcrCoverage = createPdfOcrCoverageTracker({
+    cwd,
+    expectedPdfPaths: sources
+      .filter(source => source.raw_path.toLowerCase().endsWith('.pdf'))
+      .map(source => `raw/${source.raw_path}`)
+  })
   const { session, agentLog } = await createUjimuPiSession({
     cwd,
     task: 'ingestion',
     modelEnvPrefix: 'UJIMU_PI_INGESTION',
+    pdfOcrCoverage,
     agentLog: { specialistId: specialist.id }
   })
 
   let finalText = ''
   let logStatus: AgentSessionLogCloseStatus = 'succeeded'
+  const readPathsByToolCall = new Map<string, string>()
   const unsubscribe = session.subscribe?.((event: any) => {
+    if (event?.type === 'tool_execution_start' && event.toolName === 'read') {
+      if (typeof event.toolCallId === 'string' && typeof event.args?.path === 'string') {
+        readPathsByToolCall.set(event.toolCallId, event.args.path)
+      }
+      return
+    }
+    if (event?.type === 'tool_execution_end' && event.toolName === 'read') {
+      const path = readPathsByToolCall.get(event.toolCallId)
+      readPathsByToolCall.delete(event.toolCallId)
+      if (!event.isError && path) pdfOcrCoverage.recordSuccessfulRead(path)
+      return
+    }
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
       finalText += event.assistantMessageEvent.delta
     }
@@ -86,11 +113,23 @@ async function runPiSdkBatchIngestion(
     if (JSON.stringify(fileManifest) !== JSON.stringify(finalManifest)) {
       throw new PiIngestionError('INGESTION_MANIFEST_INVALID', 'Pi ingestion final manifest does not match .ujimu/ingestion-manifest.json.')
     }
+    if (fileManifest.version !== 2) {
+      throw new PiIngestionError('INGESTION_MANIFEST_INVALID', 'Visual OCR requires an ingestion manifest version 2.')
+    }
+    pdfOcrCoverage.validateManifest(fileManifest)
     return { manifest: fileManifest }
   } catch (error) {
     logStatus = 'failed'
     if (error instanceof PiIngestionError) {
       throw error
+    }
+    if (error instanceof PdfOcrCoverageError) {
+      throw new PiIngestionError(
+        error.code === 'PDF_OCR_VISUAL_REVIEW_FAILED'
+          ? 'PDF_OCR_VISUAL_REVIEW_FAILED'
+          : 'PDF_OCR_COVERAGE_INCOMPLETE',
+        error.message
+      )
     }
 
     throw new PiIngestionError(
@@ -152,6 +191,15 @@ Follow the llm-wiki contract exactly:
 - Keep wiki/ OKF-compliant and update its index and log.
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
+
+Mandatory PDF visual OCR workflow:
+- Do not use Gemini or pdf_to_markdown for PDF conversion.
+- Before writing anything in converted/ or wiki/, process every pending PDF with prepare_pdf_ocr.
+- For each page from 1 through pageCount, call render_pdf_ocr_page, read its OCR text, overview and every overlapping 300 DPI tile, and compare all visible content.
+- Resolve OCR inconsistencies only from the page images. Preserve all legible wording, headings, articles, tables, notes, stamps, and visible structure; never guess unreadable characters.
+- After reviewing each page, call confirm_pdf_ocr_page with confirmed, corrected, or illegible. For confirmed or corrected pages, append the complete reviewed page Markdown in order to draft.md inside that PDF's OCR workspace; do not rely on retaining every page in model context.
+- If any page is illegible, do not convert or ingest that PDF. Put it in failed[] with error_code PDF_OCR_VISUAL_REVIEW_FAILED.
+- Only after every PDF page is confirmed or corrected, call publish_pdf_ocr_markdown to atomically move the reviewed draft into converted/. Never write PDF conversions directly to converted/. Then ingest only that published Markdown into wiki/.
 
 ${WIKI_CONVERGENCE_INSTRUCTIONS}
 

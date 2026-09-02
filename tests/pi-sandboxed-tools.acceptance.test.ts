@@ -110,9 +110,14 @@ describe('task-scoped Pi tools acceptance', () => {
 
   it('blocks ingestion publication until PDF visual coverage is publishable', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-ingestion-policy-'))
+    await mkdir(join(root, 'raw'))
     await mkdir(join(root, 'wiki'))
     await mkdir(join(root, 'converted'))
-    const coverage = { isPublicationAllowed: vi.fn(() => false) }
+    await mkdir(join(root, '.ujimu'))
+    const coverage = {
+      isPublicationAllowed: vi.fn(() => false),
+      isManagedConvertedPath: vi.fn((path: string) => path === 'converted/source.pdf.md')
+    }
     const { createIngestionPublicationPolicyExtension } = await import('../server/utils/pi/file-policy')
     const extension = createIngestionPublicationPolicyExtension(root, coverage)
     let handler: ((event: any) => Promise<unknown>) | undefined
@@ -130,6 +135,14 @@ describe('task-scoped Pi tools acceptance', () => {
     coverage.isPublicationAllowed.mockReturnValue(true)
     await expect(handler?.({ toolName: 'write', input: { path: 'wiki/page.md' } }))
       .resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'write', input: { path: 'wiki/nested/page.md' } }))
+      .resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'write', input: { path: 'converted/source.pdf.md' } }))
+      .resolves.toMatchObject({ block: true })
+    await expect(handler?.({ toolName: 'write', input: { path: 'raw/source.pdf' } }))
+      .resolves.toMatchObject({ block: true })
+    await expect(handler?.({ toolName: 'write', input: { path: 'specialist.yaml' } }))
+      .resolves.toMatchObject({ block: true })
   })
 
   it('allows only AGENTS.md and real paths inside wiki', async () => {

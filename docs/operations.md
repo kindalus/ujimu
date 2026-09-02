@@ -138,7 +138,7 @@ cp -R ~/.agents/skills/research config/pi/skills/research
 
 Ujimu now uses the Pi agent directly instead of wrapping file tools with a virtual `/data` mount or per-task allowlist. Each Pi session runs with its real current working directory set to the selected specialist root directory. Prompts and manifests refer to real relative paths such as `raw/`, `converted/`, `wiki/`, `AGENTS.md`, and `ingest/state.json`.
 
-Pi sessions enable the default file/shell tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`) plus Ujimu project custom tools such as `pdf_to_markdown`. Ujimu loads its explicit skill bundle from `config/pi/skills`, bundled extensions from `config/pi/extensions`, and mutable configuration from `<UJIMU_CONFIG_DIR>`; it does not discover skills from global agent directories.
+Pi tools are scoped by task. Ingestion has file tools (`read`, `edit`, `write`, `grep`, `find`, `ls`) without `bash`, plus `prepare_pdf_ocr`, `render_pdf_ocr_page`, `confirm_pdf_ocr_page`, and `publish_pdf_ocr_markdown`. Its path policy keeps `raw/` immutable, blocks direct PDF writes to `converted/`, and blocks wiki publication until visual coverage passes. The legacy manual conversion task retains `pdf_to_markdown`. Ujimu loads its explicit skill bundle from `config/pi/skills`, bundled extensions from `config/pi/extensions`, and mutable configuration from `<UJIMU_CONFIG_DIR>`; it does not discover skills from global agent directories.
 
 If production needs a stronger isolation boundary, provide it outside the Pi harness, for example by running the application or tool execution in a container, VM, or equivalent runtime with the intended specialist directory mounted as the workspace.
 

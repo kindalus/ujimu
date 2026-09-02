@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const modelInput = vi.hoisted(() => ({ value: ['text', 'image'] }))
 const writeSessionCreatedMock = vi.hoisted(() => vi.fn())
 const createAgentSessionLoggerMock = vi.hoisted(() => vi.fn(async () => ({
   path: '/tmp/ujimu-agent.log',
@@ -30,7 +31,7 @@ vi.mock('../server/utils/pi/paths', () => ({
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   ModelRuntime: {
     create: vi.fn(async () => ({
-      getModel: vi.fn(() => ({ provider: 'test', id: 'model' })),
+      getModel: vi.fn(() => ({ provider: 'test', id: 'model', input: modelInput.value })),
       hasConfiguredAuth: vi.fn(() => true)
     }))
   },
@@ -54,6 +55,7 @@ describe('Ujimu Pi session logging acceptance', () => {
     writeSessionCreatedMock.mockClear()
     createAgentSessionLoggerMock.mockClear()
     createAgentSessionMock.mockClear()
+    modelInput.value = ['text', 'image']
     delete process.env.UJIMU_PI_INGESTION_THINKING_LEVEL
   })
 
@@ -78,18 +80,33 @@ describe('Ujimu Pi session logging acceptance', () => {
     expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
       cwd: root,
       tools: [
-        'read', 'bash', 'edit', 'write', 'grep', 'find', 'ls',
-        'pdf_to_markdown', 'prepare_pdf_ocr', 'render_pdf_ocr_page'
+        'read', 'edit', 'write', 'grep', 'find', 'ls',
+        'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
+        'publish_pdf_ocr_markdown'
       ]
     }))
     expect(writeSessionCreatedMock).toHaveBeenCalledWith({
       task: 'ingestion',
       tools: [
-        'read', 'bash', 'edit', 'write', 'grep', 'find', 'ls',
-        'pdf_to_markdown', 'prepare_pdf_ocr', 'render_pdf_ocr_page'
+        'read', 'edit', 'write', 'grep', 'find', 'ls',
+        'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
+        'publish_pdf_ocr_markdown'
       ],
       model: 'configured'
     })
+  })
+
+  it('rejects visual PDF review when the ingestion model has no image input', async () => {
+    modelInput.value = ['text']
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-no-vision-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await expect(createUjimuPiSession({
+      cwd: root,
+      task: 'ingestion',
+      pdfOcrCoverage: { requiresVisualReview: () => true } as any
+    })).rejects.toThrow('must support image input')
+    expect(createAgentSessionMock).not.toHaveBeenCalled()
   })
 
   it('passes the validated ingestion thinking-level override to the Pi SDK', async () => {

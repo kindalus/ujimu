@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import type { PdfOcrCoverageTracker } from '../ingestion/pdf-ocr-coverage'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
-import { createChatFilePolicyExtension, createDerivationFilePolicyExtension } from './file-policy'
+import { createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { createPdfOcrTools } from './pdf-ocr-tools'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
@@ -11,6 +12,7 @@ export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'fin
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
 const UJIMU_PI_CHAT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'grep', 'find', 'ls']
+const UJIMU_PI_INGESTION_TOOL_NAMES: UjimuPiToolName[] = ['read', 'edit', 'write', 'grep', 'find', 'ls']
 const UJIMU_PI_DERIVATION_TOOL_NAMES: UjimuPiToolName[] = ['read', 'edit', 'write', 'grep', 'find', 'ls']
 const UJIMU_PI_INGESTION_THINKING_LEVEL_ENV = 'UJIMU_PI_INGESTION_THINKING_LEVEL'
 const UJIMU_PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
@@ -23,6 +25,7 @@ export interface CreateUjimuPiSessionOptions {
   modelEnvPrefix?: string
   sessionManager?: any
   derivationTargetPath?: string
+  pdfOcrCoverage?: PdfOcrCoverageTracker
   agentLog?: {
     dataDir?: string
     specialistId: string
@@ -62,13 +65,18 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
       ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] }
       : options.task === 'derivation'
         ? { extensionFactories: [createDerivationFilePolicyExtension(options.cwd, requireDerivationTarget(options))] }
-        : {}),
+        : options.task === 'ingestion' && options.pdfOcrCoverage
+          ? { extensionFactories: [createIngestionPublicationPolicyExtension(options.cwd, options.pdfOcrCoverage)] }
+          : {}),
     noSkills: true
   })
   await loader.reload()
 
   const selectedModel = await resolveTaskModel(modelRuntime, settingsManager, options.modelEnvPrefix)
-  const customTools = createUjimuCustomToolsForTask(options.task, options.cwd)
+  if (options.pdfOcrCoverage?.requiresVisualReview() && !supportsImageInput(selectedModel)) {
+    throw new Error('The configured ingestion model must support image input for visual PDF review.')
+  }
+  const customTools = createUjimuCustomToolsForTask(options.task, options.cwd, options.pdfOcrCoverage)
   const enabledTools = createUjimuPiEnabledToolNames(customTools, options.task)
 
   const result = await createAgentSession({
@@ -237,18 +245,23 @@ export function createUjimuPiEnabledToolNames(
   return [...new Set([
     ...(task === 'chat'
       ? UJIMU_PI_CHAT_TOOL_NAMES
-      : task === 'derivation'
-        ? UJIMU_PI_DERIVATION_TOOL_NAMES
-        : UJIMU_PI_DEFAULT_TOOL_NAMES),
+      : task === 'ingestion'
+        ? UJIMU_PI_INGESTION_TOOL_NAMES
+        : task === 'derivation'
+          ? UJIMU_PI_DERIVATION_TOOL_NAMES
+          : UJIMU_PI_DEFAULT_TOOL_NAMES),
     ...customTools.map((tool) => tool.name).filter((name): name is string => typeof name === 'string' && name.length > 0)
   ])]
 }
 
-export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
+export function createUjimuCustomToolsForTask(
+  task: PiTaskName,
+  cwd = process.cwd(),
+  pdfOcrCoverage?: PdfOcrCoverageTracker
+): any[] {
   if (task === 'chat' || task === 'derivation') return []
-
-  const tools = [createPdfToMarkdownTool({ cwd })]
-  return task === 'ingestion' ? [...tools, ...createPdfOcrTools({ cwd })] : tools
+  if (task === 'ingestion') return createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })
+  return [createPdfToMarkdownTool({ cwd })]
 }
 
 async function resolveTaskModel(
@@ -288,6 +301,12 @@ function resolveTaskThinkingLevel(task: PiTaskName): UjimuPiThinkingLevel | unde
   }
 
   return configured as UjimuPiThinkingLevel
+}
+
+function supportsImageInput(model: unknown): boolean {
+  return typeof model === 'object' && model !== null &&
+    Array.isArray((model as { input?: unknown }).input) &&
+    (model as { input: unknown[] }).input.includes('image')
 }
 
 function requireDerivationTarget(options: CreateUjimuPiSessionOptions): string {

@@ -101,7 +101,10 @@ exit 88
     const derivationTools = await sessionModule.createUjimuCustomToolsForTask('derivation')
 
     expect(conversionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
-    expect(ingestionTools.map((tool: { name: string }) => tool.name)).toContain('pdf_to_markdown')
+    expect(ingestionTools.map((tool: { name: string }) => tool.name)).not.toContain('pdf_to_markdown')
+    expect(ingestionTools.map((tool: { name: string }) => tool.name)).toEqual([
+      'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page', 'publish_pdf_ocr_markdown'
+    ])
     expect(chatTools).toEqual([])
     expect(derivationTools).toEqual([])
     expect(sessionModule.createUjimuPiEnabledToolNames([], 'derivation')).toEqual([
