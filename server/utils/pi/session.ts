@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
-import { createChatFilePolicyExtension } from './file-policy'
+import { createChatFilePolicyExtension, createDerivationFilePolicyExtension } from './file-policy'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
@@ -21,6 +21,7 @@ export interface CreateUjimuPiSessionOptions {
   task: PiTaskName
   modelEnvPrefix?: string
   sessionManager?: any
+  derivationTargetPath?: string
   agentLog?: {
     dataDir?: string
     specialistId: string
@@ -56,7 +57,11 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     settingsManager,
     additionalSkillPaths: [join(bundledPiDir, 'skills')],
     additionalExtensionPaths: [join(bundledPiDir, 'extensions')],
-    ...(options.task === 'chat' ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] } : {}),
+    ...(options.task === 'chat'
+      ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] }
+      : options.task === 'derivation'
+        ? { extensionFactories: [createDerivationFilePolicyExtension(options.cwd, requireDerivationTarget(options))] }
+        : {}),
     noSkills: true
   })
   await loader.reload()
@@ -279,6 +284,13 @@ function resolveTaskThinkingLevel(task: PiTaskName): UjimuPiThinkingLevel | unde
   }
 
   return configured as UjimuPiThinkingLevel
+}
+
+function requireDerivationTarget(options: CreateUjimuPiSessionOptions): string {
+  if (!options.derivationTargetPath) {
+    throw new Error('A derivation target path is required for Pi derivation sessions.')
+  }
+  return options.derivationTargetPath
 }
 
 function resolveConfiguredModel(modelRuntime: any, provider: string, model: string): unknown {

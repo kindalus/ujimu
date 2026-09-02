@@ -89,20 +89,46 @@ describe('task-scoped Pi tools acceptance', () => {
     await expect(toolCallHandler?.({ toolName: 'write', input: { path: 'wiki/page.md' } })).resolves.toMatchObject({ block: true })
   })
 
+  it('installs an exact derivation policy with no bash or conversion tool', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-derivation-'))
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({
+      cwd: root,
+      task: 'derivation',
+      derivationTargetPath: 'wiki/derived/result.md'
+    })
+
+    expect(defaultResourceLoaderMock).toHaveBeenCalledWith(expect.objectContaining({
+      extensionFactories: [expect.objectContaining({ name: 'ujimu-derivation-file-policy', hidden: true })]
+    }))
+    expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+      tools: ['read', 'edit', 'write', 'grep', 'find', 'ls'],
+      customTools: []
+    }))
+  })
+
   it('allows only AGENTS.md and real paths inside wiki', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-policy-'))
     const outside = await mkdtemp(join(tmpdir(), 'ujimu-pi-outside-'))
-    await mkdir(join(root, 'wiki'))
+    await mkdir(join(root, 'wiki', 'derived'), { recursive: true })
+    await mkdir(join(root, 'converted'))
     await mkdir(join(root, 'raw'))
     await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
     await writeFile(join(root, 'wiki', 'page.md'), '# Page\n')
     await writeFile(join(root, 'wiki', 'index.md'), '# Index\n')
+    await writeFile(join(root, 'converted', 'source.md'), '# Converted\n')
     await writeFile(join(root, 'raw', 'source.md'), '# Source\n')
     await writeFile(join(root, 'specialist.yaml'), 'id: test\n')
     await writeFile(join(outside, 'secret.md'), '# Secret\n')
     await symlink(join(outside, 'secret.md'), join(root, 'wiki', 'escaped.md'))
 
-    const { isChatPathAllowed, normalizeConsultedWikiDocumentPath } = await import('../server/utils/pi/file-policy')
+    const {
+      isChatPathAllowed,
+      isDerivationReadPathAllowed,
+      isDerivationWritePathAllowed,
+      normalizeConsultedWikiDocumentPath
+    } = await import('../server/utils/pi/file-policy')
 
     await expect(isChatPathAllowed(root, 'AGENTS.md')).resolves.toBe(true)
     await expect(isChatPathAllowed(root, 'wiki')).resolves.toBe(true)
@@ -115,5 +141,12 @@ describe('task-scoped Pi tools acceptance', () => {
     await expect(normalizeConsultedWikiDocumentPath(root, 'wiki/index.md')).resolves.toBeUndefined()
     await expect(normalizeConsultedWikiDocumentPath(root, 'raw/source.md')).resolves.toBeUndefined()
     await expect(normalizeConsultedWikiDocumentPath(root, 'wiki/escaped.md')).resolves.toBeUndefined()
+
+    await expect(isDerivationReadPathAllowed(root, 'converted/source.md')).resolves.toBe(true)
+    await expect(isDerivationReadPathAllowed(root, 'raw/source.md')).resolves.toBe(false)
+    const writeTargets = ['wiki/derived/new.md', 'wiki/index.md', 'wiki/log.md']
+    await expect(isDerivationWritePathAllowed(root, 'wiki/derived/new.md', writeTargets)).resolves.toBe(true)
+    await expect(isDerivationWritePathAllowed(root, 'wiki/page.md', writeTargets)).resolves.toBe(false)
+    await expect(isDerivationWritePathAllowed(root, '../outside.md', writeTargets)).resolves.toBe(false)
   })
 })

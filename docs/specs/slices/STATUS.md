@@ -127,14 +127,14 @@ Known non-blocking warnings:
 | 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `verified` | 2026-09-01 | Correlate successful Pi reads, deduplicate real wiki Markdown paths, and persist their count on question events. |
 | 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `verified` | 2026-09-01 | Global wiki-path hints use exact then trigram Dice matching with a lazy seven-day TTL and never cache answers. |
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `verified` | 2026-09-01 | Eligible events acquire one final decision, deterministic target, and retryable specialist derivation job. |
-| 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `planned` | — | Execute one path-constrained derived-page job with validation and filesystem rollback. |
+| 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `planned` | — | Let admins make an idempotent ignored/derived decision for eligible multi-source question events. |
 
 ## Knowledge-gap derivation and retrieval hints
 
 Status: `in_progress`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–69 are verified; Slice 70 is next.
+The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–70 are verified; Slice 71 is next.
 
 Approved originating decks:
 
@@ -179,6 +179,14 @@ Slice 69 verification:
 - Created one deterministic target and job per event; repeated equal decisions are idempotent and opposite decisions conflict.
 - Added injectable job execution, generic persisted errors, and retry of the same job and target.
 - 308 tests, typecheck, build, and dependency audit passed.
+
+Slice 70 verification:
+
+- Added the default Pi derivation runner with the approved event question and deterministic target.
+- Restricted reads to AGENTS/wiki/converted and writes to target/index/log, without bash or conversion tools.
+- Validated Derived Analysis frontmatter, source-page existence, index/log references, and untouched wiki hashes.
+- Restored the three writable files byte-for-byte when execution or validation failed.
+- 311 tests, typecheck, build, and dependency audit passed.
 
 Planned order:
 

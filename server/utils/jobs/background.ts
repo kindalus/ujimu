@@ -337,10 +337,15 @@ async function runBackgroundJob(
     return
   }
   if (job.type === 'specialist_derivation') {
-    if (!job.derivation_event_id || !job.derivation_target_path || !options.derivationRunner) {
-      throw createJobError('DERIVATION_RUNNER_UNAVAILABLE', 'Derivation runner is unavailable.')
+    if (!job.derivation_event_id || !job.derivation_target_path) {
+      throw createJobError('DERIVATION_JOB_INVALID', 'Derivation job is incomplete.')
     }
-    await options.derivationRunner.run({
+    const derivationRunner = options.derivationRunner ??
+      (await import('../analytics/derivation-runner')).createPiDerivationJobRunner({
+        database: options.database,
+        dataDir: options.dataDir
+      })
+    await derivationRunner.run({
       id: job.id,
       specialistId: job.specialist_id,
       eventId: job.derivation_event_id,
