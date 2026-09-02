@@ -104,7 +104,7 @@ export interface SourceStatusCounts {
 
 export interface BackgroundJobSummary {
   id: string
-  type: 'specialist_initialization' | 'specialist_ingestion'
+  type: 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset' | 'specialist_derivation'
   specialist_id: string
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 }
@@ -143,11 +143,28 @@ export interface RecentQuestionAnalytics {
   fingerprint: string
   occurredAt: string
   userTimezone: string
+  consultedDocumentCount: number
+}
+
+export interface MultiSourceQuestion {
+  id: string
+  specialistId: string
+  questionText: string
+  occurredAt: string
+  consultedDocumentCount: number
+  decision: 'ignored' | 'derived' | null
+  job: {
+    id: string
+    status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    errorCode: string | null
+    errorMessage: string | null
+  } | null
 }
 
 export interface QuestionAnalyticsResponse {
   candidates: ContentGapCandidate[]
   recentQuestions: RecentQuestionAnalytics[]
+  multiSourceQuestions: MultiSourceQuestion[]
 }
 
 export interface AdminReadinessResponse {

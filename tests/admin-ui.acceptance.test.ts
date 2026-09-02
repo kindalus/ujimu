@@ -108,6 +108,13 @@ describe('admin specialist management UI acceptance', () => {
     expect(analytics).toContain('Lacunas de conteúdo')
     expect(analytics).toContain('Perguntas recentes')
     expect(analytics).toContain('Marcar como revista')
+    expect(analytics).toContain('Perguntas com várias fontes')
+    expect(analytics).toContain("curateMultiSourceQuestion(question, 'ignored')")
+    expect(analytics).toContain("curateMultiSourceQuestion(question, 'derived')")
+    expect(analytics).toContain('/action')
+    expect(analytics).toContain('/retry')
+    expect(analytics).toContain('Tentar novamente')
+    expect(analytics).not.toContain('targetPath')
     expect(analytics).not.toContain('/api/admin/ops/readyz')
 
     expect(ops).toContain('/api/admin/session')

@@ -128,13 +128,13 @@ Known non-blocking warnings:
 | 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `verified` | 2026-09-01 | Global wiki-path hints use exact then trigram Dice matching with a lazy seven-day TTL and never cache answers. |
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `verified` | 2026-09-01 | Eligible events acquire one final decision, deterministic target, and retryable specialist derivation job. |
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
-| 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `planned` | — | Let admins make an idempotent ignored/derived decision for eligible multi-source question events. |
+| 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 
 ## Knowledge-gap derivation and retrieval hints
 
-Status: `in_progress`
+Status: `verified`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–70 are verified; Slice 71 is next.
+The user approved the plan and Slice 65–71 order on 2026-09-01. All seven slices are implemented and verified.
 
 Approved originating decks:
 
@@ -188,7 +188,15 @@ Slice 70 verification:
 - Restored the three writable files byte-for-byte when execution or validation failed.
 - 311 tests, typecheck, build, and dependency audit passed.
 
-Planned order:
+Slice 71 verification:
+
+- Added authorised action and retry endpoints keyed by UUID analytics events.
+- Listed eligible multi-source events with final decisions and sanitised job states, without internal paths.
+- Added Portuguese ignore, derive, progress, failure, and retry states to admin analytics.
+- Verified idempotent repeated decisions, `409` opposite decisions, job-free ignore, and same-job retry.
+- 312 tests, typecheck, build, dependency audit, and desktop/mobile Chrome DevTools checks passed with no console or request errors.
+
+Implemented order:
 
 1. Slice 65 fixes insufficient-context analytics and establishes non-blocking post-response telemetry.
 2. Slice 66 removes write-capable chat tools and applies the explicit derived-page policy to new and existing specialist schemas.

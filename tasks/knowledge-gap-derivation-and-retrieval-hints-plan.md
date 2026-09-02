@@ -6,7 +6,7 @@ Implement the approved knowledge-improvement workflow without adding an embeddin
 
 The canonical task status is `docs/specs/slices/STATUS.md`. This plan is the ordered implementation index and does not duplicate status tracking.
 
-**Plan status:** Approved by the user on 2026-09-01. Implementation is in progress; Slices 65–70 are verified and Slice 71 is next.
+**Plan status:** Completed. The user approved the plan on 2026-09-01; Slices 65–71 are implemented and verified.
 
 ## Approved Specifications
 

@@ -6,6 +6,7 @@ import type {
   AdminSpecialistsResponse,
   ContentGapCandidate,
   MonthlyVisitorsResponse,
+  MultiSourceQuestion,
   QuestionAnalyticsResponse,
   RecentQuestionAnalytics
 } from '../../utils/admin-ui'
@@ -18,6 +19,7 @@ const selectedSpecialistId = ref('all')
 const monthlyVisitors = ref<MonthlyVisitorsResponse | undefined>()
 const analyticsCandidates = ref<ContentGapCandidate[]>([])
 const recentQuestions = ref<RecentQuestionAnalytics[]>([])
+const multiSourceQuestions = ref<MultiSourceQuestion[]>([])
 const analyticsPending = ref(false)
 const analyticsError = ref('')
 const pending = ref(false)
@@ -83,6 +85,7 @@ async function loadQuestionAnalytics(): Promise<void> {
   if (specialists.value.length === 0) {
     analyticsCandidates.value = []
     recentQuestions.value = []
+    multiSourceQuestions.value = []
     return
   }
 
@@ -104,10 +107,14 @@ async function loadQuestionAnalytics(): Promise<void> {
       .flatMap((result) => result.recentQuestions)
       .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
       .slice(0, 12)
+    multiSourceQuestions.value = results
+      .flatMap((result) => result.multiSourceQuestions)
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
   } catch {
     analyticsError.value = 'Não foi possível carregar as lacunas de conteúdo.'
     analyticsCandidates.value = []
     recentQuestions.value = []
+    multiSourceQuestions.value = []
   } finally {
     analyticsPending.value = false
   }
@@ -124,6 +131,40 @@ async function reviewCandidate(candidate: ContentGapCandidate): Promise<void> {
     feedback.value = 'Lacuna marcada como revista.'
     await loadQuestionAnalytics()
   })
+}
+
+async function curateMultiSourceQuestion(question: MultiSourceQuestion, decision: 'ignored' | 'derived'): Promise<void> {
+  if (decision === 'derived' && !window.confirm('Criar uma síntese derivada e validada para esta pergunta?')) return
+  await runAdminAction(async () => {
+    const response = await fetch(`/api/admin/analytics/questions/${encodeURIComponent(question.id)}/action`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision })
+    })
+    if (!response.ok) throw new Error(await readAdminApiError(response))
+    feedback.value = decision === 'ignored' ? 'Pergunta ignorada.' : 'Derivação agendada.'
+    await loadQuestionAnalytics()
+  })
+}
+
+async function retryDerivation(question: MultiSourceQuestion): Promise<void> {
+  await runAdminAction(async () => {
+    const response = await fetch(`/api/admin/analytics/questions/${encodeURIComponent(question.id)}/retry`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error(await readAdminApiError(response))
+    feedback.value = 'Derivação novamente agendada.'
+    await loadQuestionAnalytics()
+  })
+}
+
+function derivationStatus(question: MultiSourceQuestion): string {
+  if (question.decision === 'ignored') return 'Ignorada'
+  if (question.job?.status === 'queued') return 'Na fila'
+  if (question.job?.status === 'running') return 'Em processamento'
+  if (question.job?.status === 'succeeded') return 'Derivada'
+  if (question.job?.status === 'failed') return 'Falhou'
+  return question.decision === 'derived' ? 'Derivação registada' : ''
 }
 
 async function runAdminAction(action: () => Promise<void>): Promise<void> {
@@ -208,6 +249,33 @@ function questionWhen(value: string): string {
 
       <p v-if="analyticsPending" class="adm-card adm-sub">A carregar analytics...</p>
       <p v-else-if="analyticsError" class="adm-src-error" role="alert">{{ analyticsError }}</p>
+
+      <section class="adm-card" aria-labelledby="multisource-title">
+        <h2 id="multisource-title" class="adm-card-title">Perguntas com várias fontes</h2>
+        <p class="adm-card-note">Respostas que exigiram mais de três páginas da wiki. A decisão é final por pergunta.</p>
+        <div class="adm-feed">
+          <div v-for="question in multiSourceQuestions" :key="question.id" class="adm-feed-row adm-gap">
+            <div class="adm-gap-main">
+              <span class="adm-feed-q">{{ question.questionText }}</span>
+              <span class="adm-feed-meta">
+                {{ specialistName(question.specialistId) }} · {{ question.consultedDocumentCount }} documentos · {{ questionWhen(question.occurredAt) }}
+              </span>
+              <span v-if="question.decision" class="adm-feed-meta">{{ derivationStatus(question) }}</span>
+              <span v-if="question.job?.status === 'failed'" class="adm-src-error" role="alert">
+                A derivação não foi concluída.
+              </span>
+            </div>
+            <div v-if="!question.decision" class="adm-row-actions">
+              <button class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="curateMultiSourceQuestion(question, 'ignored')">Ignorar</button>
+              <button class="btn btn--primary btn--xs" type="button" :disabled="pending" @click="curateMultiSourceQuestion(question, 'derived')">Derivar</button>
+            </div>
+            <button v-else-if="question.job?.status === 'failed'" class="btn btn--ghost btn--xs" type="button" :disabled="pending" @click="retryDerivation(question)">
+              Tentar novamente
+            </button>
+          </div>
+          <p v-if="multiSourceQuestions.length === 0" class="adm-sub">Sem perguntas multi-fonte nesta especialidade.</p>
+        </div>
+      </section>
 
       <div class="adm-twocol">
         <div class="adm-card">

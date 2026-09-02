@@ -8,12 +8,15 @@ import { describe, expect, it, vi } from 'vitest'
 import visitHandler from '../server/api/analytics/visit.post'
 import adminQuestionAnalyticsHandler from '../server/api/admin/analytics/questions.get'
 import adminQuestionReviewHandler from '../server/api/admin/analytics/questions/[fingerprint]/review.post'
+import adminQuestionActionHandler from '../server/api/admin/analytics/questions/[eventId]/action.post'
+import adminQuestionRetryHandler from '../server/api/admin/analytics/questions/[eventId]/retry.post'
 import adminVisitorsHandler from '../server/api/admin/analytics/visitors.get'
 import historyDeleteHandler from '../server/api/history/[conversationId].delete'
 import { createSessionToken } from '../server/utils/auth/session'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import type { ChatEngineRunner, ChatStreamEvent } from '../server/utils/chat/types'
 import { initializeDatabase } from '../server/utils/db'
+import { runDueBackgroundJobs } from '../server/utils/jobs/background'
 import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
 import { lookupRetrievalHints, storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
@@ -374,6 +377,95 @@ describe('question analytics and content gaps acceptance', () => {
     ])
   })
 
+  it('lists and curates eligible multi-source events with final decisions and retry', async () => {
+    const { dataDir, database } = await createTempAnalyticsData()
+    seedUser(database, 'admin-user', ['admin@example.com'])
+    seedUser(database, 'regular-user', ['user@example.com'])
+    await createTempSpecialist('iva', dataDir)
+    const derivedEvent = recordQuestionAnalyticsEvent(database, {
+      specialistId: 'iva', outcome: 'answered', question: 'Comparar quatro regras?', consultedDocumentCount: 4
+    })!
+    const ignoredEvent = recordQuestionAnalyticsEvent(database, {
+      specialistId: 'iva', outcome: 'answered', question: 'Comparar cinco regras?', consultedDocumentCount: 5
+    })!
+    recordQuestionAnalyticsEvent(database, {
+      specialistId: 'iva', outcome: 'answered', question: 'Só três regras?', consultedDocumentCount: 3
+    })
+    recordQuestionAnalyticsEvent(database, {
+      specialistId: 'iva', outcome: 'insufficient_context', question: 'Lacuna com muitas leituras?', consultedDocumentCount: 8
+    })
+    database.close()
+    const fetchAnalytics = createAnalyticsFetch(dataDir, 'admin@example.com')
+
+    const denied = await fetchAnalytics(jsonRequest(
+      `http://local/api/admin/analytics/questions/${derivedEvent.id}/action`,
+      { method: 'POST', headers: sessionHeaders('regular-user'), body: { decision: 'derived' } }
+    ))
+    expect(denied.status).toBe(403)
+
+    const initial = await fetchAnalytics(new Request(
+      'http://local/api/admin/analytics/questions?specialistId=iva',
+      { headers: sessionHeaders('admin-user') }
+    ))
+    const initialBody = await initial.json() as { multiSourceQuestions: Array<Record<string, any>> }
+    expect(initialBody.multiSourceQuestions.map((question) => question.id).sort()).toEqual([
+      derivedEvent.id, ignoredEvent.id
+    ].sort())
+    expect(initialBody.multiSourceQuestions.every((question) => question.decision === null)).toBe(true)
+
+    const ignored = await fetchAnalytics(jsonRequest(
+      `http://local/api/admin/analytics/questions/${ignoredEvent.id}/action`,
+      { method: 'POST', headers: sessionHeaders('admin-user'), body: { decision: 'ignored' } }
+    ))
+    expect(ignored.status).toBe(200)
+    await expect(ignored.json()).resolves.toMatchObject({ action: { decision: 'ignored' }, job: null })
+
+    const derived = await fetchAnalytics(jsonRequest(
+      `http://local/api/admin/analytics/questions/${derivedEvent.id}/action`,
+      { method: 'POST', headers: sessionHeaders('admin-user'), body: { decision: 'derived' } }
+    ))
+    expect(derived.status).toBe(202)
+    const derivedBody = await derived.json() as { job: { id: string; status: string } }
+    expect(derivedBody.job).toMatchObject({ status: 'queued' })
+
+    const repeated = await fetchAnalytics(jsonRequest(
+      `http://local/api/admin/analytics/questions/${derivedEvent.id}/action`,
+      { method: 'POST', headers: sessionHeaders('admin-user'), body: { decision: 'derived' } }
+    ))
+    expect(repeated.status).toBe(202)
+    await expect(repeated.json()).resolves.toMatchObject({ job: { id: derivedBody.job.id } })
+
+    const opposite = await fetchAnalytics(jsonRequest(
+      `http://local/api/admin/analytics/questions/${derivedEvent.id}/action`,
+      { method: 'POST', headers: sessionHeaders('admin-user'), body: { decision: 'ignored' } }
+    ))
+    expect(opposite.status).toBe(409)
+
+    const workerDatabase = await openAnalyticsDatabase(dataDir)
+    await runDueBackgroundJobs({
+      database: workerDatabase,
+      derivationRunner: { async run() { throw new Error('provider secret') } }
+    })
+    workerDatabase.close()
+
+    const failed = await fetchAnalytics(new Request(
+      'http://local/api/admin/analytics/questions?specialistId=iva',
+      { headers: sessionHeaders('admin-user') }
+    ))
+    const failedBody = await failed.json() as { multiSourceQuestions: Array<Record<string, any>> }
+    expect(failedBody.multiSourceQuestions.find((question) => question.id === derivedEvent.id)).toMatchObject({
+      decision: 'derived',
+      job: { id: derivedBody.job.id, status: 'failed', errorMessage: 'Derivation job failed.' }
+    })
+
+    const retry = await fetchAnalytics(new Request(
+      `http://local/api/admin/analytics/questions/${derivedEvent.id}/retry`,
+      { method: 'POST', headers: sessionHeaders('admin-user') }
+    ))
+    expect(retry.status).toBe(202)
+    await expect(retry.json()).resolves.toMatchObject({ job: { id: derivedBody.job.id, status: 'queued' } })
+  })
+
   it('records first-party visits and reports distinct monthly visitors to admins', async () => {
     const { dataDir, database } = await createTempAnalyticsData()
     seedUser(database, 'admin-user', ['admin@example.com'])
@@ -634,7 +726,9 @@ function createAnalyticsFetch(dataDir: string, adminContacts: string): (request:
   const router = createRouter()
   router.post('/api/analytics/visit', visitHandler)
   router.get('/api/admin/analytics/questions', adminQuestionAnalyticsHandler)
-  router.post('/api/admin/analytics/questions/:fingerprint/review', adminQuestionReviewHandler)
+  router.post('/api/admin/analytics/questions/:id/review', adminQuestionReviewHandler)
+  router.post('/api/admin/analytics/questions/:id/action', adminQuestionActionHandler)
+  router.post('/api/admin/analytics/questions/:id/retry', adminQuestionRetryHandler)
   router.get('/api/admin/analytics/visitors', adminVisitorsHandler)
   router.delete('/api/history/:conversationId', historyDeleteHandler)
   app.use(router)

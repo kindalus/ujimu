@@ -66,9 +66,25 @@ export interface ListQuestionAnalyticsInput {
   recentLimit?: number
 }
 
+export interface MultiSourceQuestionEvent {
+  id: string
+  specialistId: string
+  questionText: string
+  occurredAt: string
+  consultedDocumentCount: number
+  decision: 'ignored' | 'derived' | null
+  job: {
+    id: string
+    status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    errorCode: string | null
+    errorMessage: string | null
+  } | null
+}
+
 export interface QuestionAnalyticsList {
   candidates: QuestionAnalyticsCandidate[]
   recentQuestions: RecentQuestionAnalyticsEvent[]
+  multiSourceQuestions: MultiSourceQuestionEvent[]
 }
 
 export interface MarkQuestionCandidateReviewedInput {
@@ -193,8 +209,54 @@ export function listQuestionAnalytics(
 
   return {
     candidates,
-    recentQuestions: events.slice(0, input.recentLimit ?? RECENT_QUESTION_LIMIT)
+    recentQuestions: events.slice(0, input.recentLimit ?? RECENT_QUESTION_LIMIT),
+    multiSourceQuestions: listMultiSourceQuestions(database, input.specialistId)
   }
+}
+
+export function listMultiSourceQuestions(
+  database: DatabaseSync,
+  specialistId: string,
+  limit = 50
+): MultiSourceQuestionEvent[] {
+  const rows = database.prepare(`
+    SELECT events.id, events.specialist_id, events.question_text, events.occurred_at,
+      events.consulted_document_count, actions.decision, actions.job_id,
+      jobs.status AS job_status, jobs.last_error_code, jobs.last_error_message
+    FROM question_analytics_events AS events
+    LEFT JOIN question_derivation_actions AS actions ON actions.event_id = events.id
+    LEFT JOIN background_jobs AS jobs ON jobs.id = actions.job_id
+    WHERE events.specialist_id = ?
+      AND events.outcome = 'answered'
+      AND events.consulted_document_count > 3
+    ORDER BY events.occurred_at DESC, events.id DESC
+    LIMIT ?
+  `).all(specialistId, limit) as unknown as Array<{
+    id: string
+    specialist_id: string
+    question_text: string
+    occurred_at: string
+    consulted_document_count: number
+    decision: 'ignored' | 'derived' | null
+    job_id: string | null
+    job_status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null
+    last_error_code: string | null
+    last_error_message: string | null
+  }>
+  return rows.map((row) => ({
+    id: row.id,
+    specialistId: row.specialist_id,
+    questionText: row.question_text,
+    occurredAt: row.occurred_at,
+    consultedDocumentCount: row.consulted_document_count,
+    decision: row.decision,
+    job: row.job_id && row.job_status ? {
+      id: row.job_id,
+      status: row.job_status,
+      errorCode: row.last_error_code,
+      errorMessage: row.last_error_message
+    } : null
+  }))
 }
 
 export function markQuestionCandidateReviewed(
