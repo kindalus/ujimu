@@ -45,6 +45,7 @@ describe('transactional derivation runner acceptance', () => {
     expect(createUjimuPiSessionMock).toHaveBeenCalledWith(expect.objectContaining({
       cwd: fixture.root,
       task: 'derivation',
+      modelEnvPrefix: 'UJIMU_PI_INGESTION',
       derivationTargetPath: action.targetPath
     }))
     expect(prompt).toContain(`Event ID: ${EVENT_ID}`)

@@ -47,7 +47,7 @@ export function createPiDerivationJobRunner(options: {
         const { session } = await createUjimuPiSession({
           cwd: specialist.paths.root,
           task: 'derivation',
-          modelEnvPrefix: 'UJIMU_PI_DERIVATION',
+          modelEnvPrefix: 'UJIMU_PI_INGESTION',
           derivationTargetPath: job.targetPath
         })
         try {

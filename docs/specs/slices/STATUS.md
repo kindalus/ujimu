@@ -183,6 +183,7 @@ Slice 69 verification:
 Slice 70 verification:
 
 - Added the default Pi derivation runner with the approved event question and deterministic target.
+- Reused the ingestion provider/model configuration; derivation has no separate provider variables.
 - Restricted reads to AGENTS/wiki/converted and writes to target/index/log, without bash or conversion tools.
 - Validated Derived Analysis frontmatter, source-page existence, index/log references, and untouched wiki hashes.
 - Restored the three writable files byte-for-byte when execution or validation failed.
@@ -214,6 +215,7 @@ Locked cross-slice decisions:
 - Retrieval hints expire individually after seven days; there is no weekly scheduler, embedding provider, vector store, or answer cache.
 - Only `answered` events with more than three consulted documents can be ignored or derived; `insufficient_context` stays in the gap workflow.
 - The ignored/derived decision is final per analytics event. A failed derivation may retry without changing that decision.
+- Derivation always reuses `UJIMU_PI_INGESTION_PROVIDER` and `UJIMU_PI_INGESTION_MODEL`; no derivation-specific provider configuration exists.
 - Question analytics and retrieval-cache writes are best-effort after the response; quota, history, and Pi session commit remain synchronous.
 - Slice 63 already satisfies browser/account visitor reconciliation, so no visitor-identity implementation is planned.
 
