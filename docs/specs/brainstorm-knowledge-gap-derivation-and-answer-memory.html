@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>Brainstorm — Lacunas, derivação e memória de respostas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg:#0b0b08; --panel:#171711; --panel2:#202018; --text:#f7f3e8; --muted:#aaa594; --line:#38362c; --accent:#f7ce1b; --ok:#8bd7a5; --warn:#efaa62; --danger:#e77b73; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; color:var(--text); font-family:'IBM Plex Sans',sans-serif; background:radial-gradient(circle at 12% 5%,rgba(247,206,27,.17),transparent 28%),linear-gradient(135deg,#0b0b08,#17150d 72%,#0d0d09); }
+    .slide { display:none; width:100vw; height:100vh; padding:7vh 10vw; align-items:center; justify-content:center; }
+    .slide.active { display:flex; animation:enter .18s ease-out; }
+    @keyframes enter { from { opacity:.25; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .frame { width:min(1140px,100%); }
+    h1,h2 { margin:0 0 1.25rem; line-height:1.02; letter-spacing:-.045em; }
+    h1 { max-width:980px; font-size:clamp(2.9rem,6vw,5.9rem); font-weight:700; }
+    h2 { font-size:clamp(2rem,4vw,3.7rem); font-weight:700; }
+    p,li,td,th { font-size:clamp(.98rem,1.35vw,1.16rem); line-height:1.48; }
+    p,li,td { color:var(--muted); }
+    ul { display:grid; gap:.65rem; margin:0; padding-left:1.2rem; }
+    .eyebrow { margin-bottom:1rem; color:var(--accent); font:600 .8rem/1.4 'IBM Plex Mono',monospace; letter-spacing:.13em; text-transform:uppercase; }
+    .panel { padding:1.35rem; border:1px solid var(--line); border-radius:22px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 24px 80px rgba(0,0,0,.28); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .kicker { color:var(--text); font-weight:600; }
+    .good { border-color:color-mix(in srgb,var(--ok) 45%,var(--line)); }
+    .warn { border-color:color-mix(in srgb,var(--warn) 48%,var(--line)); }
+    .danger { border-color:color-mix(in srgb,var(--danger) 48%,var(--line)); }
+    code { color:#fff0a0; font-family:'IBM Plex Mono',monospace; font-size:.92em; }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+    th,td { padding:.78rem .9rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--text); font-weight:600; }
+    tr:last-child td { border-bottom:0; }
+    .flow { display:flex; align-items:stretch; gap:.6rem; }
+    .node { flex:1; min-width:0; padding:1rem; border:1px solid var(--line); border-radius:18px; background:var(--panel2); }
+    .node b { display:block; margin-bottom:.35rem; }
+    .node span { color:var(--muted); line-height:1.35; }
+    .arrow { align-self:center; color:var(--accent); font:600 1.3rem 'IBM Plex Mono',monospace; }
+    .pill { display:inline-flex; margin-top:1rem; padding:.38rem .72rem; border:1px solid var(--line); border-radius:999px; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .counter { position:fixed; right:2rem; bottom:1.4rem; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .bar { position:fixed; left:0; bottom:0; height:3px; width:calc((var(--idx) + 1) / var(--total) * 100%); background:var(--accent); transition:width .18s ease; }
+    @media (max-width:900px) { .slide { padding:5vh 6vw; } .grid,.three { grid-template-columns:1fr; } .flow { display:grid; grid-template-columns:1fr; } .arrow { display:none; } }
+    @media print { body { overflow:visible; } .slide { display:flex; break-after:page; } .counter,.bar { display:none; } }
+  </style>
+</head>
+<body style="--idx:0;--total:24">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Brainstorm vivo · Zafir · iteração 1</div>
+    <h1>Lacunas, derivação e memória de respostas</h1>
+    <p>Transformar consultas difíceis em melhoria editorial sem atrasar a resposta, permitir escrita acidental na wiki ou misturar contexto entre utilizadores.</p>
+    <span class="pill">docs/specs/brainstorm-knowledge-gap-derivation-and-answer-memory.html</span>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Como poderemos</div>
+    <h2>Aprender com o esforço do agente sem degradar a consulta?</h2>
+    <div class="panel"><p><span class="kicker">Objectivo:</span> registar lacunas e documentos consultados, submeter sínteses multi-fonte a decisão administrativa e reutilizar respostas anteriores como memória auxiliar — sempre com a wiki como autoridade e a resposta fora do caminho crítico de analytics.</p></div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Contexto governante</div>
+    <h2>Decisões anteriores que continuam válidas</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Sem <code>docs/wiki/</code>.</span> O repositório não tem wiki de projecto a consultar.</p></div>
+      <div class="panel"><p><span class="kicker">Wiki exclusiva.</span> Respostas substantivas dependem do wiki da especialidade e exigem rastreabilidade.</p></div>
+      <div class="panel"><p><span class="kicker">Autoridade separada.</span> Agente mantém <code>wiki/</code>; backend mantém estados, jobs e validação.</p></div>
+      <div class="panel"><p><span class="kicker">Privacidade.</span> Perguntas, sessões, cookies e histórico são dados sensíveis.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · lacunas</div>
+    <h2>O schema prevê o sinal; o fluxo de chat perde-o</h2>
+    <div class="flow">
+      <div class="node"><b>Modelo termina</b><span><code>grounded=false</code> pode representar contexto insuficiente.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Engine filtra</b><span>Analytics só é passado quando <code>grounded=true</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Admin não vê</b><span><code>insufficient_context</code> existe na tabela, mas não é gravado.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · ficheiros</div>
+    <h2>Pi expõe eventos, mas “consultado” não está definido</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker"><code>read</code>.</span> O evento contém um caminho exacto; contagem única é determinística.</p></div>
+      <div class="panel warn"><p><span class="kicker"><code>grep</code>.</span> Um directório pode ler muitos ficheiros; o argumento não revela todos os resultados.</p></div>
+      <div class="panel"><p><span class="kicker"><code>find</code>/<code>ls</code>.</span> Descobrem nomes, mas não consultam necessariamente conteúdo.</p></div>
+      <div class="panel danger"><p><span class="kicker"><code>bash</code>.</span> Pode ler ou destruir sem telemetria estruturada e não deve existir no chat.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · derived</div>
+    <h2>Duas políticas entram hoje em colisão</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">LLM Wiki.</span> Perguntas substantivas multi-fonte são arquivadas em <code>wiki/derived/</code> por omissão.</p></div>
+      <div class="panel danger"><p><span class="kicker">Chat Ujimu.</span> As sessões recebem ferramentas de escrita e já alteraram a wiki durante consultas comuns.</p></div>
+    </div>
+    <p>O <code>AGENTS.md</code> actual não proíbe esta escrita e o backend não impõe uma política de ferramentas específica para chat.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · administração</div>
+    <h2>Já existe uma base reutilizável</h2>
+    <ul>
+      <li><code>question_analytics_events</code> conserva evento, pergunta, resultado, identidade e conversa.</li>
+      <li><code>question_analytics_reviews</code> revê grupos por fingerprint, não eventos individuais.</li>
+      <li><code>pages/admin/analytics.vue</code> já lista perguntas recentes e lacunas repetidas.</li>
+      <li><code>background_jobs</code> já serializa trabalho de agente por especialidade com tentativas e falhas.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · resposta</div>
+    <h2>A persistência ainda pode transformar sucesso em erro</h2>
+    <div class="flow">
+      <div class="node"><b>Deltas</b><span>A resposta aparece progressivamente.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Persistência</b><span>Histórico, sessão e analytics correm antes de <code>done</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Falha tardia</b><span>Uma excepção produz <code>CHAT_STREAM_FAILED</code> depois do texto.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Diagnóstico · cache</div>
+    <h2>Não há infra-estrutura semântica instalada</h2>
+    <table>
+      <tr><th>Activo actual</th><th>Capacidade</th><th>Limite</th></tr>
+      <tr><td>Fingerprint SHA-256</td><td>Correspondência exacta normalizada</td><td>Não reconhece paráfrases</td></tr>
+      <tr><td>SQLite sem ORM</td><td>Índice simples e TTL</td><td>Sem pesquisa vectorial</td></tr>
+      <tr><td>Pi/modelo</td><td>Pode receber memória no prompt</td><td>Não deve tratar resposta antiga como facto</td></tr>
+    </table>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Risco de privacidade</div>
+    <h2>Uma cache global de respostas é perigosa</h2>
+    <div class="panel danger"><p>Uma resposta anterior pode conter nomes, montantes ou circunstâncias pessoais. Injectá-la numa consulta semelhante de outro utilizador cria risco de fuga. A memória por identidade evita a mistura; conhecimento partilhável deve passar pela derivação administrativa e entrar no wiki.</p></div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Variações exploradas</div>
+    <h2>Seis alavancas, três que merecem ficar</h2>
+    <div class="grid three">
+      <div class="panel good"><p><span class="kicker">1. Leitura exacta.</span> Contar ficheiros únicos de <code>read</code>.</p></div>
+      <div class="panel warn"><p><span class="kicker">2. Observador profundo.</span> Instrumentar todas as operações internas de ferramentas.</p></div>
+      <div class="panel good"><p><span class="kicker">3. Memória privada.</span> Cache semanal por identidade.</p></div>
+      <div class="panel danger"><p><span class="kicker">4. Cache global.</span> Mais hits, risco de fuga e obsolescência.</p></div>
+      <div class="panel good"><p><span class="kicker">5. Derivação aprovada.</span> Única promoção global de síntese.</p></div>
+      <div class="panel"><p><span class="kicker">6. Outbox completo.</span> Durável, mas acrescenta fila a operações simples.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Direcção preliminar · ponytail</div>
+    <h2>Quatro seams, sem plataforma nova</h2>
+    <ul>
+      <li><span class="kicker">Observação:</span> o runner devolve resultado, citações, tokens e conjunto de documentos.</li>
+      <li><span class="kicker">Pós-resposta:</span> um módulo isolado tenta guardar analytics e cache; falhas são registadas, não mostradas ao utilizador.</li>
+      <li><span class="kicker">Curadoria:</span> uma acção por evento decide <code>ignored</code> ou <code>derive</code>; derivação usa o job existente.</li>
+      <li><span class="kicker">Capacidades:</span> chat só lê; job explícito de derivação pode escrever em <code>wiki/derived/</code>, índice e log.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Identidade de visitantes</div>
+    <h2>O requisito já está entregue</h2>
+    <div class="grid">
+      <div class="panel good"><p>Browsers nunca autenticados usam cookies distintos e contam separadamente.</p></div>
+      <div class="panel good"><p>Cookies ligados à mesma conta convergem para um único <code>user:id</code>.</p></div>
+      <div class="panel good"><p>Uma visita anónima é reatribuída quando o mesmo cookie surge autenticado.</p></div>
+      <div class="panel"><p>Não se propõe código novo; apenas manter os testes do Slice 63 como regressão.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões e limites actuais</div>
+    <h2>O que já não precisa de debate</h2>
+    <ul>
+      <li>Registar respostas sem contexto suficiente e não registar streams falhados como lacunas.</li>
+      <li>Mostrar no admin eventos com mais de três documentos e permitir ignorar ou derivar.</li>
+      <li>Proibir derivação durante chat comum no <code>AGENTS.md</code> e nas ferramentas efectivas.</li>
+      <li>Cache é contexto auxiliar; o agente volta a fundamentar na wiki e produz nova resposta.</li>
+      <li>Analytics e cache não podem converter uma resposta bem-sucedida em erro visível.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões · iteração 4</div>
+    <h2>A fila de derivação ficou fechada</h2>
+    <ul>
+      <li>Eventos <code>insufficient_context</code> permanecem apenas na secção de lacunas, mesmo quando houve mais de três leituras.</li>
+      <li>Só respostas <code>answered</code> com quatro ou mais documentos ficam candidatas a derivação.</li>
+      <li><code>ignored</code> ou <code>derive</code> é decisão final por evento.</li>
+      <li>Um job <code>derive</code> falhado pode repetir sem criar nova decisão ou página duplicada.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Registo de iterações</div>
+    <h2>Do diagnóstico à direcção final</h2>
+    <ul>
+      <li><span class="kicker">1.</span> Confirmadas as lacunas de analytics, capacidades Pi, escrita no chat e persistência no stream.</li>
+      <li><span class="kicker">2.</span> Escolhidas leituras únicas, cache global, comparação lexical e TTL de sete dias.</li>
+      <li><span class="kicker">3.</span> Aceite a resposta integral global; telemetria separada, histórico síncrono.</li>
+      <li><span class="kicker">4.</span> Respostas insuficientes não derivam; decisões administrativas são finais por evento.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões · iteração 2</div>
+    <h2>A primeira entrevista fechou quatro escolhas</h2>
+    <ul>
+      <li>Não há contexto governante adicional fora do repositório.</li>
+      <li>Contam ficheiros de conteúdo únicos em <code>wiki/</code> ou <code>converted/</code> lidos com sucesso por <code>read</code>; schema, índice e log ficam excluídos.</li>
+      <li>A cache será global por especialidade, sujeita a uma barreira de privacidade ainda por decidir.</li>
+      <li>Cada entrada expira sete dias depois; não haverá reconstrução semanal nem scheduler novo.</li>
+      <li>Pesquisa: fingerprint exacto, depois Sørensen–Dice sobre trigramas, com limiar <code>0,85</code>.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Registo de iteração</div>
+    <h2>Iteração 2 — escolhas do utilizador</h2>
+    <div class="panel">
+      <p>Escolhidas leituras únicas, cache global automática e similaridade lexical com TTL individual de sete dias.</p>
+      <p>O algoritmo proposto mantém o fingerprint exacto e usa Sørensen–Dice sobre trigramas para pequenas variações.</p>
+      <p><span class="kicker">Próximo:</span> fechar protecção da cache global e fronteira entre resposta, histórico e telemetria.</p>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões · iteração 3</div>
+    <h2>Cache integral escolhida; depois revista por segurança</h2>
+    <ul>
+      <li>A resposta integral anterior pode atravessar utilizadores da mesma especialidade; o risco contextual foi aceite explicitamente.</li>
+      <li>A memória entra no prompt como conteúdo não fiável e nunca como fonte de verdade ou resposta pronta.</li>
+      <li>Só respostas fundamentadas, concluídas e ainda dentro do TTL entram na cache.</li>
+      <li>Quota, histórico e commit Pi continuam síncronos.</li>
+      <li>Analytics, contagem e actualização da cache são agendados depois da resposta; uma falha gera log técnico, não erro no chat.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Modelo mínimo de dados</div>
+    <h2>Estender eventos; separar memória e decisão</h2>
+    <table>
+      <tr><th>Estrutura</th><th>Responsabilidade</th></tr>
+      <tr><td><code>question_analytics_events</code></td><td>Resultado e <code>documents_consulted_count</code>.</td></tr>
+      <tr><td><code>retrieval_hint_cache</code></td><td>Fingerprint, pergunta normalizada, ficheiros wiki consultados, citações e validade de sete dias.</td></tr>
+      <tr><td><code>question_analytics_event_actions</code></td><td>Evento, decisão, admin, job, estado e página derivada.</td></tr>
+      <tr><td><code>background_jobs</code></td><td>Reutilizado para executar a derivação explicitamente pedida.</td></tr>
+    </table>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Âmbito mínimo e próximo passo</div>
+    <h2>Sem vector DB, scheduler ou pipeline paralelo</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Incluído.</span> Outcome correcto, contagem de leituras, telemetria não bloqueante, cache SQLite de pistas com TTL, curadoria administrativa, job de derivação e política read-only no chat.</p></div>
+      <div class="panel"><p><span class="kicker">Não fazer.</span> Embeddings, limpeza semanal agendada, derivação automática, alteração da identidade de visitantes, cache servida directamente ou histórico assíncrono.</p></div>
+    </div>
+    <p><span class="kicker">Aprovado novamente:</span> o utilizador aprovou a revisão com cache global de pistas. A arquitectura mínima foi autorizada apenas por ser necessária para fixar os seams de segurança e pós-resposta.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Iteração 5 · gate de segurança</div>
+    <h2>Resposta integral global não pode avançar</h2>
+    <div class="panel danger"><p>A resposta pode conter dados particulares derivados da pergunta ou da conversa. Injectá-la no prompt de outro utilizador viola o isolamento de histórico e a regra de manter dados de outros utilizadores fora do contexto do modelo.</p></div>
+    <p>O objectivo de reutilização mantém-se aberto a três formas seguras: pistas globais de ficheiros, resposta integral por identidade ou resposta global após aprovação humana.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Iteração 6 · resolução</div>
+    <h2>Cache global de pistas, nunca de respostas</h2>
+    <div class="flow">
+      <div class="node"><b>Lookup</b><span>Fingerprint exacto; depois Sørensen–Dice ≥ 0,85.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Hit</b><span>Devolve apenas caminhos wiki anteriormente lidos e citações validadas.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Novo agente</b><span>Relê esses ficheiros, segue referências e produz uma resposta nova.</span></div>
+    </div>
+    <p>A pergunta e resposta anteriores não entram no prompt. A entrada expira sete dias depois da última resposta fundamentada.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Iteração 7 · fonte única</div>
+    <h2>Chat conta apenas páginas do wiki</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Consulta comum.</span> Lê, conta e recebe pistas apenas de <code>wiki/</code>; <code>converted/</code> fica bloqueado.</p></div>
+      <div class="panel good"><p><span class="kicker">Derivação explícita.</span> Pode consultar <code>converted/</code>, porque integra o resultado numa página wiki validada.</p></div>
+    </div>
+    <p>Esta decisão preserva o requisito governante de wiki como única fonte de verdade.</p>
+   </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">24</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let index = 0;
+    const current = document.getElementById('current');
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', String(total));
+    function go(next) {
+      slides[index].classList.remove('active');
+      index = Math.max(0, Math.min(next, total - 1));
+      slides[index].classList.add('active');
+      current.textContent = String(index + 1);
+      document.body.style.setProperty('--idx', String(index));
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1); }
+      if (event.key === 'ArrowLeft') go(index - 1);
+    });
+    document.addEventListener('click', event => go(event.clientX > innerWidth / 2 ? index + 1 : index - 1));
+  </script>
+</body>
+</html>

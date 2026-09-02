@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-08-23
+Last updated: 2026-09-01
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -122,6 +122,45 @@ Known non-blocking warnings:
 | 62 | [`62-regenerate-last-response.html`](./62-regenerate-last-response.html) | `verified` | 2026-08-23 | Registered and anonymous branching, SQLite replacement, request validation, UI rollback, 292 tests, typecheck, build, and audit passed. |
 | 63 | [`63-distinct-visitor-identity.html`](./63-distinct-visitor-identity.html) | `verified` | 2026-08-23 | Account-linked cookie clusters, post-login linkage, browser-estimate disclosure, 294 tests, typecheck, build, and audit passed. |
 | 64 | [`64-specialist-hard-reset.html`](./64-specialist-hard-reset.html) | `verified` | 2026-08-23 | Exact-ID admin reset, global job exclusion, byte-identical raw preservation, destructive cleanup, audit, 297 tests, typecheck, build, and audit passed. |
+| 65 | [`65-reliable-gaps-nonblocking-telemetry.html`](./65-reliable-gaps-nonblocking-telemetry.html) | `planned` | — | Persist completed insufficient-context outcomes and keep analytics failures out of the user response. |
+| 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `planned` | — | Enforce read-only, path-scoped chat tools and prohibit consultation-time derived writes in specialist AGENTS.md files. |
+| 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `planned` | — | Count unique successful content-file reads and persist the count on question analytics events. |
+| 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `planned` | — | Add exact and Sørensen–Dice retrieval hints with a seven-day lazy TTL, without caching answers. |
+| 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `planned` | — | Add the idempotent analytics-event decision and specialist derivation job contract. |
+| 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `planned` | — | Execute one path-constrained derived-page job with validation and filesystem rollback. |
+| 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `planned` | — | Let admins make an idempotent ignored/derived decision for eligible multi-source question events. |
+
+## Knowledge-gap derivation and retrieval hints
+
+Status: `planned`
+
+The user approved the plan and Slice 65–71 order on 2026-09-01. Implementation has not started.
+
+Approved originating decks:
+
+- [`../brainstorm-knowledge-gap-derivation-and-answer-memory.html`](../brainstorm-knowledge-gap-derivation-and-answer-memory.html)
+- [`../knowledge-gap-derivation-and-answer-memory-architecture.html`](../knowledge-gap-derivation-and-answer-memory-architecture.html)
+
+Planned order:
+
+1. Slice 65 fixes insufficient-context analytics and establishes non-blocking post-response telemetry.
+2. Slice 66 removes write-capable chat tools and applies the explicit derived-page policy to new and existing specialist schemas.
+3. Slice 67 observes unique successful reads and persists the document count.
+4. Slice 68 uses those validated paths as short-lived global retrieval hints, never as cached answer text.
+5. Slice 69 extends the existing specialist job worker with an event-keyed derivation decision and injectable job contract.
+6. Slice 70 implements path-constrained derived-page execution, validation, and filesystem rollback.
+7. Slice 71 exposes eligible events, final decisions, derivation status, and retry in the admin analytics interface.
+
+Locked cross-slice decisions:
+
+- Failed model or stream executions are not content-gap events.
+- Only successful `read` calls for Markdown content under `wiki/` count; `AGENTS.md`, `wiki/index.md`, and `wiki/log.md` do not.
+- Retrieval matching uses the existing exact fingerprint first, then Sørensen–Dice character trigrams at `>= 0.85`.
+- Retrieval hints expire individually after seven days; there is no weekly scheduler, embedding provider, vector store, or answer cache.
+- Only `answered` events with more than three consulted documents can be ignored or derived; `insufficient_context` stays in the gap workflow.
+- The ignored/derived decision is final per analytics event. A failed derivation may retry without changing that decision.
+- Question analytics and retrieval-cache writes are best-effort after the response; quota, history, and Pi session commit remain synchronous.
+- Slice 63 already satisfies browser/account visitor reconciliation, so no visitor-identity implementation is planned.
 
 ## Product experience refinement and specialist hard reset
 

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>Arquitectura — Lacunas, derivação e cache de pistas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg:#0a0a08; --panel:#171711; --panel2:#222219; --text:#f7f3e8; --muted:#aaa594; --line:#38362d; --accent:#f7ce1b; --ok:#8bd7a5; --warn:#efaa62; --danger:#e77b73; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; color:var(--text); font-family:'IBM Plex Sans',sans-serif; background:radial-gradient(circle at 85% 2%,rgba(247,206,27,.16),transparent 28%),linear-gradient(135deg,#0a0a08,#17150d 70%,#0d0d09); }
+    .slide { display:none; width:100vw; height:100vh; padding:7vh 10vw; align-items:center; justify-content:center; }
+    .slide.active { display:flex; animation:enter .18s ease-out; }
+    @keyframes enter { from { opacity:.2; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .frame { width:min(1140px,100%); }
+    h1,h2 { margin:0 0 1.25rem; line-height:1.02; letter-spacing:-.045em; }
+    h1 { font-size:clamp(2.9rem,6vw,5.8rem); font-weight:700; }
+    h2 { font-size:clamp(2rem,4vw,3.65rem); font-weight:700; }
+    p,li,td,th { font-size:clamp(.98rem,1.34vw,1.14rem); line-height:1.46; }
+    p,li,td { color:var(--muted); }
+    ul { display:grid; gap:.62rem; margin:0; padding-left:1.2rem; }
+    .eyebrow { margin-bottom:1rem; color:var(--accent); font:600 .8rem/1.4 'IBM Plex Mono',monospace; letter-spacing:.13em; text-transform:uppercase; }
+    .panel { padding:1.35rem; border:1px solid var(--line); border-radius:22px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 24px 80px rgba(0,0,0,.28); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .good { border-color:color-mix(in srgb,var(--ok) 45%,var(--line)); }
+    .warn { border-color:color-mix(in srgb,var(--warn) 48%,var(--line)); }
+    .danger { border-color:color-mix(in srgb,var(--danger) 48%,var(--line)); }
+    .kicker { color:var(--text); font-weight:600; }
+    code { color:#fff0a0; font-family:'IBM Plex Mono',monospace; font-size:.91em; }
+    .flow { display:flex; align-items:stretch; gap:.55rem; }
+    .node { flex:1; min-width:0; padding:1rem; border:1px solid var(--line); border-radius:18px; background:var(--panel2); }
+    .node b { display:block; margin-bottom:.35rem; color:var(--text); }
+    .node span { color:var(--muted); line-height:1.35; }
+    .arrow { align-self:center; color:var(--accent); font:600 1.25rem 'IBM Plex Mono',monospace; }
+    table { width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:var(--panel); }
+    th,td { padding:.72rem .85rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--text); font-weight:600; }
+    tr:last-child td { border-bottom:0; }
+    .pill { display:inline-flex; margin-top:1rem; padding:.38rem .72rem; border:1px solid var(--line); border-radius:999px; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .counter { position:fixed; right:2rem; bottom:1.4rem; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .bar { position:fixed; left:0; bottom:0; height:3px; width:calc((var(--idx) + 1) / var(--total) * 100%); background:var(--accent); transition:width .18s ease; }
+    @media (max-width:900px) { .slide { padding:5vh 6vw; } .grid,.three { grid-template-columns:1fr; } .flow { display:grid; grid-template-columns:1fr; } .arrow { display:none; } }
+    @media print { body { overflow:visible; } .slide { display:flex; break-after:page; } .counter,.bar { display:none; } }
+  </style>
+</head>
+<body style="--idx:0;--total:18">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Arquitectura mínima · Zafir</div>
+    <h1>Lacunas, derivação e cache de pistas</h1>
+    <p>Quatro seams para observar o agente, libertar a resposta, orientar nova pesquisa e permitir escrita apenas por decisão administrativa.</p>
+    <span class="pill">Origem aprovada: brainstorm-knowledge-gap-derivation-and-answer-memory.html</span>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Princípios</div>
+    <h2>Preservar o desenho; aprofundar fronteiras</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Runner observa.</span> Recolhe sinais Pi sem conhecer SQLite ou UI.</p></div>
+      <div class="panel"><p><span class="kicker">Engine orquestra.</span> Entrega resposta e agenda telemetria sem a executar.</p></div>
+      <div class="panel"><p><span class="kicker">Analytics decide.</span> Guarda eventos, cache e acções por interfaces pequenas.</p></div>
+      <div class="panel"><p><span class="kicker">Job deriva.</span> Única capacidade que pode escrever sínteses no wiki.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Mapa de módulos</div>
+    <h2>Quatro interfaces internas</h2>
+    <div class="flow">
+      <div class="node"><b>ChatObservation</b><span>Outcome, caminhos lidos, citações e tokens.</span></div><div class="arrow">→</div>
+      <div class="node"><b>TelemetryTask</b><span>Evento e cache best-effort após resposta.</span></div><div class="arrow">→</div>
+      <div class="node"><b>RetrievalHints</b><span>Exacto; depois Dice; só caminhos válidos.</span></div><div class="arrow">→</div>
+      <div class="node"><b>DerivationJob</b><span>Pedido admin idempotente e escrita validada.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Sequência de chat</div>
+    <h2>A resposta deixa de esperar pela telemetria</h2>
+    <div class="flow">
+      <div class="node"><b>1. Preparar</b><span>Quota, sessão, cache lookup tolerante a falha.</span></div><div class="arrow">→</div>
+      <div class="node"><b>2. Responder</b><span>Pi lê, emite texto e observação terminal.</span></div><div class="arrow">→</div>
+      <div class="node"><b>3. Confirmar</b><span>Histórico e sessão são persistidos.</span></div><div class="arrow">→</div>
+      <div class="node"><b>4. Libertar</b><span><code>done</code>; telemetria é agendada sem await.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Capacidades Pi</div>
+    <h2>A segurança não depende do prompt</h2>
+    <table>
+      <tr><th>Tarefa</th><th>Ferramentas</th><th>Pode escrever wiki?</th></tr>
+      <tr><td><code>chat</code></td><td><code>read, grep, find, ls</code></td><td>Não</td></tr>
+      <tr><td><code>derivation</code></td><td><code>read, grep, find, ls, write, edit</code></td><td>Só <code>wiki/derived/</code>, índice e log</td></tr>
+      <tr><td>init/conversão/ingestão</td><td>Política actual</td><td>Sem alteração neste âmbito</td></tr>
+    </table>
+    <p>O SDK Pi documenta a allowlist read-only e eventos <code>tool_execution_start/end</code> em <code>docs/sdk.md</code>. Uma extensão inline bloqueia tool calls fora da política de caminhos.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Observação de leituras</div>
+    <h2>Um Map temporário e um Set final</h2>
+    <ul>
+      <li>No início de <code>read</code>, associar <code>toolCallId</code> ao caminho canónico.</li>
+      <li>No fim sem erro, adicionar ao Set se estiver em <code>wiki/</code>.</li>
+      <li>Contar apenas Markdown de conteúdo; excluir <code>AGENTS.md</code>, <code>wiki/index.md</code> e <code>wiki/log.md</code>.</li>
+      <li>Guardar caminhos relativos à especialidade; nunca aceitar traversal ou symlink exterior.</li>
+      <li>A extensão inline resolve caminhos canónicos e bloqueia o chat fora de <code>AGENTS.md</code> e <code>wiki/</code>; só derivação pode também ler <code>converted/</code>.</li>
+      <li>O runner devolve caminhos; analytics guarda apenas a contagem.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Outcome</div>
+    <h2>Lacuna é resultado, não erro</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker"><code>answered</code>.</span> Resposta concluída e fundamentada; pode alimentar cache e candidatura multi-fonte.</p></div>
+      <div class="panel warn"><p><span class="kicker"><code>insufficient_context</code>.</span> Resposta concluída que declara falta de evidência; entra nas lacunas, nunca em derivação/cache.</p></div>
+      <div class="panel danger"><p><span class="kicker">Erro.</span> Provider, stream ou persistência funcional falhou; não gera evento analítico de lacuna.</p></div>
+      <div class="panel"><p><span class="kicker">Protocolo.</span> Prompt técnico pede outcome terminal explícito; fallback preserva texto sem inventar lacuna.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Telemetria pós-resposta</div>
+    <h2>Best-effort deliberado, com sinal de falha</h2>
+    <ul>
+      <li>O engine agenda uma função imutável com pergunta, outcome, caminhos, citações e IDs já resolvidos.</li>
+      <li>A função grava evento e actualiza cache numa transacção SQLite curta.</li>
+      <li>A excepção é capturada e emitida como log estruturado sem pergunta, resposta ou caminhos.</li>
+      <li>Sem outbox: uma queda imediata do processo pode perder telemetria; este risco reduz complexidade e não afecta dados funcionais.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Cache de pistas</div>
+    <h2>Evitar redescoberta, não servir respostas</h2>
+    <div class="flow">
+      <div class="node"><b>Exacto</b><span>Fingerprint da pergunta normalizada.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Similar</b><span>Sørensen–Dice em trigramas; mínimo 0,85.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Validar</b><span>TTL activo e caminhos ainda dentro do wiki.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Injectar</b><span>Lista de pistas; o agente relê e responde de novo.</span></div>
+    </div>
+    <p>Empates usam maior similaridade e depois entrada mais recente. Expiração e limpeza são preguiçosas, sem scheduler.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Curadoria administrativa</div>
+    <h2>Uma decisão final por evento</h2>
+    <div class="flow">
+      <div class="node"><b>Elegível</b><span><code>answered</code> e quatro ou mais documentos.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Ignored</b><span>Decisão final; nenhum job.</span></div><div class="arrow">ou</div>
+      <div class="node"><b>Derived</b><span>Decisão final; cria job idempotente.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Validar</b><span>Página, frontmatter, índice e log.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Persistência</div>
+    <h2>Três estruturas com responsabilidades distintas</h2>
+    <table>
+      <tr><th>Tabela</th><th>Chave e campos essenciais</th></tr>
+      <tr><td><code>question_analytics_events</code></td><td><code>id</code>; novo <code>documents_consulted_count</code>.</td></tr>
+      <tr><td><code>question_retrieval_cache</code></td><td><code>(specialist_id, fingerprint)</code>; evento origem, normalizada, caminhos JSON, citações JSON, expiração.</td></tr>
+      <tr><td><code>question_analytics_event_actions</code></td><td><code>event_id</code> único; decisão, admin, job, estado, página e erro sanitizado.</td></tr>
+    </table>
+    <p>FKs com cascade seguem a eliminação de conversa/evento/especialidade.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Interface administrativa</div>
+    <h2>Um recurso por evento; uma mutação idempotente</h2>
+    <ul>
+      <li><code>GET /api/admin/analytics/questions</code> acrescenta candidatos multi-fonte sem remover campos actuais.</li>
+      <li><code>POST /api/admin/analytics/questions/:eventId/action</code> aceita <code>{ decision: "ignored" | "derived" }</code>.</li>
+      <li>Admin obrigatório; servidor volta a verificar outcome, contagem e especialidade.</li>
+      <li>Constraint única resolve duplo clique; mesma decisão devolve o resultado, decisão diferente responde <code>409</code>.</li>
+      <li>Retry de job falhado mantém a decisão e não cria página concorrente.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Prompt de derivação</div>
+    <h2>Pedido explícito, output estreito</h2>
+    <ul>
+      <li>Identifica evento e pergunta, mas não inclui resposta ou conversa de outro utilizador.</li>
+      <li>Manda usar <code>llm-wiki</code>, ler schema/índice e confirmar evidência no wiki.</li>
+      <li>Autoriza exactamente uma página em <code>wiki/derived/</code> e actualizações de índice/log.</li>
+      <li>Proíbe <code>raw/</code>, <code>converted/</code>, páginas de fontes e <code>specialist.yaml</code> como destinos de escrita.</li>
+      <li>Um interceptor <code>tool_call</code> bloqueia <code>write/edit</code> fora de <code>wiki/derived/</code>, <code>wiki/index.md</code> e <code>wiki/log.md</code>; erros bloqueiam por omissão.</li>
+      <li>Backend valida caminhos, frontmatter, <code>source_pages</code> e existência antes de concluir.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">AGENTS.md</div>
+    <h2>Política futura e migração explícita</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Novos especialistas.</span> O prompt e a validação de inicialização exigem proibição de derived em consultas comuns.</p></div>
+      <div class="panel"><p><span class="kicker">Existentes.</span> Deploy faz backup e acrescenta a regra aos <code>AGENTS.md</code> actuais, sem reescrever conteúdo gerido pelo LLM Wiki.</p></div>
+    </div>
+    <p>A restrição de ferramentas continua a ser a barreira real; o texto é orientação e auditoria.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Falhas e consistência</div>
+    <h2>O que pode falhar sem contaminar o utilizador</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Cache/analytics.</span> Log técnico e continuação; sem erro no chat.</p></div>
+      <div class="panel"><p><span class="kicker">Cache miss.</span> Fluxo normal; nenhuma diferença funcional.</p></div>
+      <div class="panel warn"><p><span class="kicker">Derivação.</span> Estado failed, página parcial rejeitada, retry explícito.</p></div>
+      <div class="panel danger"><p><span class="kicker">Histórico/sessão.</span> Mantêm comportamento actual e podem falhar o fecho do stream.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Segurança e exclusões</div>
+    <h2>O menor sistema que mantém as garantias</h2>
+    <ul>
+      <li>Sem resposta de outro utilizador no prompt; sem cache de texto; sem embeddings ou vector DB.</li>
+      <li>Sem <code>bash</code>, <code>edit</code> ou <code>write</code> no chat; prompt nunca é barreira de autorização.</li>
+      <li>Acção admin validada, parametrizada, auditável e idempotente.</li>
+      <li>Sem alteração à contagem de visitantes já verificada pelo Slice 63.</li>
+      <li>Sem scheduler semanal: TTL de sete dias é aplicado no lookup e limpo na escrita.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Gate de arquitectura</div>
+    <h2>Arquitectura aprovada</h2>
+    <div class="panel"><p>O utilizador aprovou este desenho mínimo. A mudança fica concentrada no runner, engine, analytics e job existente, com política efectiva de ferramentas e caminhos.</p></div>
+    <p>Próximo passo autorizado: cortar slices verticais e registá-los no tracker canónico.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Iteração final · fontes</div>
+    <h2>Chat wiki-only; derivação pode integrar converted</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Chat.</span> Lê, conta e recebe pistas apenas de páginas em <code>wiki/</code>.</p></div>
+      <div class="panel good"><p><span class="kicker">Derivação.</span> Pode ler <code>converted/</code>, mas só conclui depois de integrar uma página OKF validada.</p></div>
+    </div>
+    <p><span class="kicker">Arquitectura final aprovada:</span> implementação planeada nas Slices 65–71.</p>
+  </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">18</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let index = 0;
+    const current = document.getElementById('current');
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', String(total));
+    function go(next) {
+      slides[index].classList.remove('active');
+      index = Math.max(0, Math.min(next, total - 1));
+      slides[index].classList.add('active');
+      current.textContent = String(index + 1);
+      document.body.style.setProperty('--idx', String(index));
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1); }
+      if (event.key === 'ArrowLeft') go(index - 1);
+    });
+    document.addEventListener('click', event => go(event.clientX > innerWidth / 2 ? index + 1 : index - 1));
+  </script>
+</body>
+</html>
