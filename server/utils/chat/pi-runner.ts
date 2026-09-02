@@ -1,3 +1,4 @@
+import { normalizeConsultedWikiDocumentPath } from '../pi/file-policy'
 import { createUjimuPiSession } from '../pi/session'
 import type { ChatCitation, ChatEngineRunner, ChatRunnerInput, ChatRunnerStreamEvent } from './types'
 
@@ -56,6 +57,8 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   let emittedAssistantOutput = false
   let assistantFailure: Error | undefined
   let pendingDoneEvent: Extract<ChatRunnerStreamEvent, { type: 'done' }> | undefined
+  const readPathsByToolCall = new Map<string, string>()
+  const successfulReadPaths = new Set<string>()
 
   const parser = createPiOutputParser((event) => {
     if (event.type === 'done') {
@@ -69,6 +72,21 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   })
 
   const unsubscribe = session.subscribe((event: any) => {
+    if (event?.type === 'tool_execution_start' && event.toolName === 'read') {
+      const path = event.args?.path
+      if (typeof event.toolCallId === 'string' && typeof path === 'string') {
+        readPathsByToolCall.set(event.toolCallId, path)
+      }
+      return
+    }
+
+    if (event?.type === 'tool_execution_end' && event.toolName === 'read') {
+      const path = readPathsByToolCall.get(event.toolCallId)
+      readPathsByToolCall.delete(event.toolCallId)
+      if (!event.isError && path) successfulReadPaths.add(path)
+      return
+    }
+
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
       const delta = typeof event.assistantMessageEvent.delta === 'string' ? event.assistantMessageEvent.delta : ''
       rawAssistantText += delta
@@ -104,7 +122,7 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   })
 
   void session.prompt(buildChatPrompt(input))
-    .then(() => {
+    .then(async () => {
       if (assistantFailure) throw assistantFailure
 
       if (!rawAssistantText && finalAssistantText) {
@@ -122,13 +140,18 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
         queue.push({ type: 'metrics', totalTokens: finalTotalTokens })
       }
 
+      const consultedDocuments = await normalizeConsultedDocuments(cwd, successfulReadPaths)
       if (pendingDoneEvent) {
-        queue.push(pendingDoneEvent)
+        queue.push({
+          ...pendingDoneEvent,
+          ...(consultedDocuments.length > 0 ? { consultedDocuments } : {})
+        })
       } else if (!sawTerminalEvent) {
         queue.push({
           type: 'done',
           grounded: emittedAssistantOutput,
-          ...(emittedAssistantOutput ? { outcome: 'answered' as const } : {})
+          ...(emittedAssistantOutput ? { outcome: 'answered' as const } : {}),
+          ...(consultedDocuments.length > 0 ? { consultedDocuments } : {})
         })
       }
       queue.close()
@@ -149,6 +172,13 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
     }
     session.dispose()
   }
+}
+
+async function normalizeConsultedDocuments(cwd: string, paths: Set<string>): Promise<string[]> {
+  const normalized = await Promise.all(
+    [...paths].map((path) => normalizeConsultedWikiDocumentPath(cwd, path))
+  )
+  return [...new Set(normalized.filter((path): path is string => Boolean(path)))].sort()
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {

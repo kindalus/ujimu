@@ -33,7 +33,7 @@ describe('question analytics and content gaps acceptance', () => {
         { specialistId: 'iva', question: '  O que diz o Artigo 1.º?  ', clientTimezone: 'Africa/Luanda' },
         {
           specialtiesRoot,
-          runner: fakeRunner(['Resposta fundamentada.']),
+          runner: fakeRunner(['Resposta fundamentada.'], ['wiki/iva.md', 'wiki/deducoes.md']),
           analytics: {
             database,
             visitorId: 'visitor-a',
@@ -84,14 +84,16 @@ describe('question analytics and content gaps acceptance', () => {
       visitor_id: 'visitor-a',
       user_id: null,
       conversation_id: null,
-      user_message_id: null
+      user_message_id: null,
+      consulted_document_count: 2
     })
     expect(rows[0]?.fingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(rows[1]).toMatchObject({
       specialist_id: 'empty',
       outcome: 'insufficient_context',
       question_text: 'Existe uma regra sem fontes?',
-      normalized_question: 'existe uma regra sem fontes'
+      normalized_question: 'existe uma regra sem fontes',
+      consulted_document_count: 0
     })
     expect(JSON.stringify(rows)).not.toContain('Resposta fundamentada')
     database.close()
@@ -457,13 +459,14 @@ async function createIngestedSource(specialtiesRoot: string, specialistId: strin
   await writeIngestionState(specialist.paths.ingestState, state)
 }
 
-function fakeRunner(deltas: string[]): ChatEngineRunner {
+function fakeRunner(deltas: string[], consultedDocuments?: string[]): ChatEngineRunner {
   return {
     async run(input) {
       return {
         grounded: true,
         citations: [input.citationEvidence[0]],
-        deltas: toAsyncDeltas(deltas)
+        deltas: toAsyncDeltas(deltas),
+        consultedDocuments
       }
     }
   }
@@ -519,7 +522,7 @@ function readQuestionAnalyticsRows(database: DatabaseSync): Array<Record<string,
   return database
     .prepare(`
       SELECT specialist_id, outcome, question_text, normalized_question, fingerprint, user_timezone,
-        visitor_id, user_id, conversation_id, user_message_id, occurred_at
+        visitor_id, user_id, conversation_id, user_message_id, consulted_document_count, occurred_at
       FROM question_analytics_events
       ORDER BY occurred_at, id
     `)

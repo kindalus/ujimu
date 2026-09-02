@@ -45,7 +45,7 @@ export type ChatRunnerStreamEvent =
   | { type: 'citation'; citation: ChatCitation }
   | { type: 'title'; title: string }
   | ChatMetricsEvent
-  | { type: 'done'; grounded: boolean; outcome?: ChatAnswerOutcome }
+  | { type: 'done'; grounded: boolean; outcome?: ChatAnswerOutcome; consultedDocuments?: string[] }
 
 export interface ChatConversationContextMessage {
   role: 'user' | 'assistant'
@@ -67,6 +67,7 @@ export interface ChatEngineRun {
   deltas: AsyncIterable<string>
   events?: AsyncIterable<ChatRunnerStreamEvent>
   outcome?: ChatAnswerOutcome
+  consultedDocuments?: string[]
   title?: string
 }
 

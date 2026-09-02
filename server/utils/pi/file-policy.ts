@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { extname, isAbsolute, relative, resolve, sep } from 'node:path'
 
 const CHAT_FILE_TOOLS = new Set(['read', 'grep', 'find', 'ls'])
 
@@ -22,6 +22,26 @@ export function createChatFilePolicyExtension(cwd: string): {
         return { block: true, reason: 'Path is not available during chat consultations.' }
       })
     }
+  }
+}
+
+export async function normalizeConsultedWikiDocumentPath(
+  cwd: string,
+  requestedPath: string
+): Promise<string | undefined> {
+  try {
+    const root = await realpath(cwd)
+    const wiki = await realpath(resolve(root, 'wiki'))
+    const requested = await realpath(resolve(root, requestedPath))
+    if (!isWithin(root, wiki) || !isWithin(wiki, requested) || extname(requested).toLowerCase() !== '.md') {
+      return undefined
+    }
+
+    const relativeToWiki = relative(wiki, requested).split(sep).join('/')
+    if (relativeToWiki === 'index.md' || relativeToWiki === 'log.md') return undefined
+    return `wiki/${relativeToWiki}`
+  } catch {
+    return undefined
   }
 }
 

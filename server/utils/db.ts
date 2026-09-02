@@ -615,6 +615,14 @@ const MIGRATIONS: Migration[] = [
         ON background_jobs (specialist_id)
         WHERE status IN ('queued', 'running');
     `
+  },
+  {
+    version: '0021_consulted_document_count',
+    sql: `
+      ALTER TABLE question_analytics_events
+        ADD COLUMN consulted_document_count INTEGER NOT NULL DEFAULT 0
+        CHECK (consulted_document_count >= 0);
+    `
   }
 ]
 

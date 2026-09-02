@@ -378,6 +378,7 @@ function streamChatWithRunner(input: {
         chatSession: input.chatSession,
         analytics: input.analytics,
         analyticsOutcome: result.outcome ?? (result.grounded ? 'answered' : undefined),
+        consultedDocuments: result.consultedDocuments,
         title: result.title
       })
     } finally {
@@ -423,6 +424,7 @@ async function* streamRunnerEventResult(input: {
   let sawDone = false
   let grounded = false
   let analyticsOutcome: ChatAnswerOutcome | undefined
+  let consultedDocuments: string[] | undefined
   let totalTokens: number | undefined
   let title: string | undefined
 
@@ -458,6 +460,7 @@ async function* streamRunnerEventResult(input: {
       sawDone = true
       grounded = event.grounded
       analyticsOutcome = event.outcome ?? (event.grounded ? 'answered' : undefined)
+      consultedDocuments = event.consultedDocuments
       break
     }
 
@@ -478,6 +481,7 @@ async function* streamRunnerEventResult(input: {
       chatSession: input.chatSession,
       analytics: input.analytics,
       analyticsOutcome,
+      consultedDocuments,
       title
     })
   } catch {
@@ -529,6 +533,7 @@ async function* streamRunnerResult(input: {
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
   analyticsOutcome?: ChatAnswerOutcome
+  consultedDocuments?: string[]
   title?: string
 }): AsyncIterable<ChatStreamEvent> {
   let answer = ''
@@ -549,6 +554,7 @@ async function* streamRunnerResult(input: {
       chatSession: input.chatSession,
       analytics: input.analytics,
       analyticsOutcome: input.analyticsOutcome,
+      consultedDocuments: input.consultedDocuments,
       title: input.title
     })
   } catch {
@@ -566,6 +572,7 @@ async function* completeStreamResult(input: {
   chatSession?: ChatSessionTurn
   analytics?: StreamAnalyticsPersistence
   analyticsOutcome?: ChatAnswerOutcome
+  consultedDocuments?: string[]
   title?: string
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
@@ -620,7 +627,7 @@ async function* completeStreamResult(input: {
   }
 
   if (input.analytics && input.analyticsOutcome) {
-    scheduleQuestionAnalytics(input.analytics, input.analyticsOutcome, persisted)
+    scheduleQuestionAnalytics(input.analytics, input.analyticsOutcome, input.consultedDocuments, persisted)
   }
 
   const totalTokens = normalizeTotalTokens(input.totalTokens)
@@ -637,6 +644,7 @@ async function* completeStreamResult(input: {
 function scheduleQuestionAnalytics(
   analytics: StreamAnalyticsPersistence,
   outcome: ChatAnswerOutcome,
+  consultedDocuments: string[] | undefined,
   persisted?: { conversationId: string; userMessageId: string }
 ): void {
   setImmediate(() => {
@@ -650,6 +658,7 @@ function scheduleQuestionAnalytics(
         userId: analytics.userId,
         conversationId: persisted?.conversationId,
         userMessageId: persisted?.userMessageId,
+        consultedDocumentCount: consultedDocuments?.length,
         occurredAt: analytics.now
       })
     } catch {

@@ -13,6 +13,7 @@ export interface RecordQuestionAnalyticsInput {
   userId?: string
   conversationId?: string
   userMessageId?: string
+  consultedDocumentCount?: number
   occurredAt?: Date
 }
 
@@ -29,6 +30,7 @@ export interface QuestionAnalyticsEvent {
   userId: string | null
   conversationId: string | null
   userMessageId: string | null
+  consultedDocumentCount: number
 }
 
 export interface QuestionAnalyticsCandidate {
@@ -54,6 +56,7 @@ export interface RecentQuestionAnalyticsEvent {
   fingerprint: string
   occurredAt: string
   userTimezone: string
+  consultedDocumentCount: number
 }
 
 export interface ListQuestionAnalyticsInput {
@@ -109,7 +112,8 @@ export function recordQuestionAnalyticsEvent(
     visitorId: input.visitorId?.trim() || null,
     userId: input.userId?.trim() || null,
     conversationId: input.conversationId?.trim() || null,
-    userMessageId: input.userMessageId?.trim() || null
+    userMessageId: input.userMessageId?.trim() || null,
+    consultedDocumentCount: normalizeConsultedDocumentCount(input.consultedDocumentCount)
   }
 
   database
@@ -126,8 +130,9 @@ export function recordQuestionAnalyticsEvent(
         visitor_id,
         user_id,
         conversation_id,
-        user_message_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        user_message_id,
+        consulted_document_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
       event.id,
@@ -141,7 +146,8 @@ export function recordQuestionAnalyticsEvent(
       event.visitorId,
       event.userId,
       event.conversationId,
-      event.userMessageId
+      event.userMessageId,
+      event.consultedDocumentCount
     )
 
   return event
@@ -157,7 +163,7 @@ export function listQuestionAnalytics(
   const events = database
     .prepare(`
       SELECT id, specialist_id, outcome, question_text, normalized_question, fingerprint,
-        occurred_at, user_timezone
+        occurred_at, user_timezone, consulted_document_count
       FROM question_analytics_events
       WHERE specialist_id = ?
       ORDER BY occurred_at DESC, id DESC
@@ -239,6 +245,11 @@ export function fingerprintQuestion(normalizedQuestion: string): string {
   return createHash('sha256').update(normalizedQuestion).digest('hex')
 }
 
+function normalizeConsultedDocumentCount(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return 0
+  return Math.trunc(value)
+}
+
 function normalizeRawQuestionText(question: string): string {
   return question.trim().replace(/\s+/g, ' ').slice(0, MAX_QUESTION_TEXT_LENGTH).trim()
 }
@@ -293,6 +304,7 @@ function mapQuestionAnalyticsRow(row: unknown): RecentQuestionAnalyticsEvent {
     fingerprint: string
     occurred_at: string
     user_timezone: string
+    consulted_document_count: number
   }
 
   return {
@@ -303,6 +315,7 @@ function mapQuestionAnalyticsRow(row: unknown): RecentQuestionAnalyticsEvent {
     normalizedQuestion: event.normalized_question,
     fingerprint: event.fingerprint,
     occurredAt: event.occurred_at,
-    userTimezone: event.user_timezone
+    userTimezone: event.user_timezone,
+    consultedDocumentCount: event.consulted_document_count
   }
 }

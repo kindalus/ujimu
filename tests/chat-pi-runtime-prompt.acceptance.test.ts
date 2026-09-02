@@ -84,6 +84,7 @@ describe('Pi chat runtime prompt acceptance', () => {
   it('streams plain text when citations are required but the model emits no valid citations', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-chat-fallback-'))
     await mkdir(join(root, 'wiki'), { recursive: true })
+    await writeFile(join(root, 'wiki', 'index.md'), '# Índice\n')
     await writeFile(join(root, 'wiki', 'duracao-tempo-trabalho.md'), `# Duração do tempo de trabalho
 
 ## Período normal
@@ -95,6 +96,12 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
     createUjimuPiSessionMock.mockResolvedValue({
       session: {
         prompt: vi.fn(async () => {
+          subscriber?.({ type: 'tool_execution_start', toolCallId: 'read-1', toolName: 'read', args: { path: 'wiki/duracao-tempo-trabalho.md' } })
+          subscriber?.({ type: 'tool_execution_end', toolCallId: 'read-1', toolName: 'read', isError: false })
+          subscriber?.({ type: 'tool_execution_start', toolCallId: 'read-2', toolName: 'read', args: { path: join(root, 'wiki', 'duracao-tempo-trabalho.md') } })
+          subscriber?.({ type: 'tool_execution_end', toolCallId: 'read-2', toolName: 'read', isError: false })
+          subscriber?.({ type: 'tool_execution_start', toolCallId: 'read-3', toolName: 'read', args: { path: 'wiki/index.md' } })
+          subscriber?.({ type: 'tool_execution_end', toolCallId: 'read-3', toolName: 'read', isError: false })
           subscriber?.({
             type: 'message_update',
             assistantMessageEvent: { type: 'text_delta', delta: 'Resposta sem citação e fora do protocolo.' }
@@ -122,7 +129,12 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
 
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'citation' }))
     expect(events).toContainEqual({ type: 'delta', text: 'Resposta sem citação e fora do protocolo.' })
-    expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
+    expect(events.at(-1)).toEqual({
+      type: 'done',
+      grounded: true,
+      outcome: 'answered',
+      consultedDocuments: ['wiki/duracao-tempo-trabalho.md']
+    })
   })
 
   it('streams plain assistant text when citations are not required and the model does not emit NDJSON', async () => {
