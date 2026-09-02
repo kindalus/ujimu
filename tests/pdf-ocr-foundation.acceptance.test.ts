@@ -72,6 +72,13 @@ describe('local PDF OCR foundation acceptance', () => {
       expect(result.stderr).toContain('INVALID_PDF_INPUT')
     }
     expect(existsSync(fixture.log)).toBe(false)
+
+    const escapedWorkspace = await mkdtemp(join(tmpdir(), 'ujimu-escaped-ocr-'))
+    await symlink(escapedWorkspace, join(fixture.root, '.ujimu'))
+    const escaped = await runScript(fixture.root, ['prepare', 'raw/lei.pdf'], fixture.bin)
+    expect(escaped.code).not.toBe(0)
+    expect(escaped.stderr).toContain('PDF_OCR_WORKSPACE_INVALID')
+    expect(existsSync(join(escapedWorkspace, 'ocr'))).toBe(false)
   })
 
   it('exposes OCR preparation tools only to ingestion sessions', async () => {

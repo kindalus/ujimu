@@ -1,6 +1,6 @@
 # Visual OCR ingestion plan
 
-Status: approved for slicing; implementation pending
+Status: Slice 72 verified; Slice 73 pending
 
 Approved source decks:
 
@@ -19,7 +19,7 @@ Approved source decks:
 
 ## Slice order
 
-1. Slice 72 — install and expose the local PDF inspection, OCR, and page-rendering foundation without publishing converted or wiki content.
+1. Slice 72 — verified: installed and exposed the local PDF inspection, OCR, and page-rendering foundation without publishing converted or wiki content.
 2. Slice 73 — require and validate complete visual page coverage before atomically accepting converted Markdown and permitting wiki ingestion.
 
 ## Quality gates per slice

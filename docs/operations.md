@@ -251,7 +251,7 @@ Inside the container both profiles use:
 /home/ujimu/.local/share/ujimu
 ```
 
-The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`, sets `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu`, and keeps bundled Pi resources under `/app/config/pi`. It includes Gemini CLI through `npm install -g @google/gemini-cli` and exposes a `/healthz` Dockerfile healthcheck.
+The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`, sets `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu`, and keeps bundled Pi resources under `/app/config/pi`. It includes Gemini CLI for the legacy manual converter, plus OCRmyPDF, Poppler, qpdf, Tesseract, and Portuguese/English language data for the local PDF OCR foundation. It exposes a `/healthz` Dockerfile healthcheck.
 
 Create real env files from the examples, keeping secrets out of Git:
 

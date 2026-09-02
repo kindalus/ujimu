@@ -30,7 +30,15 @@ ENV UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu
 ENV UJIMU_PI_BUNDLE_DIR=/app/config/pi
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates coreutils \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    coreutils \
+    ocrmypdf \
+    poppler-utils \
+    qpdf \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-por \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @google/gemini-cli \
   && groupadd --system ujimu \

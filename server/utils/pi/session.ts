@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
 import { createChatFilePolicyExtension, createDerivationFilePolicyExtension } from './file-policy'
 import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
+import { createPdfOcrTools } from './pdf-ocr-tools'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
 export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation'
@@ -244,7 +245,10 @@ export function createUjimuPiEnabledToolNames(
 }
 
 export function createUjimuCustomToolsForTask(task: PiTaskName, cwd = process.cwd()): any[] {
-  return task === 'chat' || task === 'derivation' ? [] : [createPdfToMarkdownTool({ cwd })]
+  if (task === 'chat' || task === 'derivation') return []
+
+  const tools = [createPdfToMarkdownTool({ cwd })]
+  return task === 'ingestion' ? [...tools, ...createPdfOcrTools({ cwd })] : tools
 }
 
 async function resolveTaskModel(

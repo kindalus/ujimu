@@ -77,11 +77,17 @@ describe('Ujimu Pi session logging acceptance', () => {
 
     expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
       cwd: root,
-      tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown']
+      tools: [
+        'read', 'bash', 'edit', 'write', 'grep', 'find', 'ls',
+        'pdf_to_markdown', 'prepare_pdf_ocr', 'render_pdf_ocr_page'
+      ]
     }))
     expect(writeSessionCreatedMock).toHaveBeenCalledWith({
       task: 'ingestion',
-      tools: ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'pdf_to_markdown'],
+      tools: [
+        'read', 'bash', 'edit', 'write', 'grep', 'find', 'ls',
+        'pdf_to_markdown', 'prepare_pdf_ocr', 'render_pdf_ocr_page'
+      ],
       model: 'configured'
     })
   })

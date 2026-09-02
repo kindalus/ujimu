@@ -129,7 +129,7 @@ Known non-blocking warnings:
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `verified` | 2026-09-01 | Eligible events acquire one final decision, deterministic target, and retryable specialist derivation job. |
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
-| 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `in-progress` | 2026-09-02 | Add local PDF validation, OCR in Portuguese/English, and bounded page rendering without Gemini or publication. |
+| 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `planned` | 2026-09-02 | Require visual confirmation of every PDF page and reject incomplete documents before converted/wiki publication. |
 
 ## Visual OCR ingestion
@@ -151,12 +151,14 @@ Locked decisions:
 - Any absent or illegible page rejects the complete document before wiki ingestion.
 - Processing keeps `raw/` immutable and bounds transient work to one rendered page at a time.
 
-Slice 72 refinement:
+Slice 72 verification:
 
-- Expose separate `prepare_pdf_ocr` and `render_pdf_ocr_page` tools.
-- Derive the bounded workspace from the validated source SHA-256.
-- Treat structural validation, OCR, range, and timeout failures as sanitised closed failures.
-- Keep all outputs under `.ujimu/ocr/`; do not publish to `converted/` or `wiki/`.
+- Added separate `prepare_pdf_ocr` and `render_pdf_ocr_page` ingestion tools.
+- Derived a symlink-safe bounded workspace from the validated source SHA-256.
+- Added qpdf validation, OCRmyPDF normalisation with Tesseract `por+eng`, and Poppler text/page extraction.
+- Rendered one requested page at 300 DPI while keeping all output under `.ujimu/ocr/`.
+- Built the production image and processed a real image-only PDF with OCRmyPDF 16.7.0, qpdf 12.2.0, Poppler 25.03.0, and both language packs.
+- 316 tests, typecheck, build, and the high-severity dependency gate passed; the audit reported pre-existing moderate Tiptap advisories.
 
 Implementation order:
 
