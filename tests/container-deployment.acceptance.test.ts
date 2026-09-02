@@ -15,6 +15,15 @@ describe('Podman container deployment acceptance', () => {
     expect(dockerfile).toContain('npm install -g @google/gemini-cli')
     expect(dockerfile).toContain('ca-certificates')
     expect(dockerfile).toContain('coreutils')
+    for (const pdfTool of [
+      'ocrmypdf',
+      'poppler-utils',
+      'qpdf',
+      'tesseract-ocr-por',
+      'tesseract-ocr-eng'
+    ]) {
+      expect(dockerfile).toContain(pdfTool)
+    }
     expect(dockerfile).toContain('groupadd')
     expect(dockerfile).toContain('useradd')
     expect(dockerfile).toContain('USER ujimu')
