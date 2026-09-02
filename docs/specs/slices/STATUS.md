@@ -166,7 +166,7 @@ Slice 67 verification:
 
 Slice 68 verification:
 
-- Added a seven-day retrieval-hint table linked to the source analytics event.
+- Added a seven-day, paths-only retrieval-hint table linked to the source analytics event; question fields remain solely on that event.
 - Implemented exact fingerprint lookup before Sørensen–Dice character trigram matching at `0.85`.
 - Stored only validated wiki paths for answered events; no prior answer text enters storage or prompts.
 - Injected hints as non-authoritative candidates that the chat agent must re-read.

@@ -28,10 +28,12 @@ export function lookupRetrievalHints(
   if (!normalizedQuestion) return undefined
   const fingerprint = fingerprintQuestion(normalizedQuestion)
   const rows = database.prepare(`
-    SELECT fingerprint, normalized_question, wiki_paths_json, created_at
-    FROM question_retrieval_hints
-    WHERE specialist_id = ? AND expires_at > ?
-    ORDER BY created_at DESC
+    SELECT events.fingerprint, events.normalized_question,
+      hints.wiki_paths_json, hints.created_at
+    FROM question_retrieval_hints AS hints
+    JOIN question_analytics_events AS events ON events.id = hints.source_event_id
+    WHERE events.specialist_id = ? AND hints.expires_at > ?
+    ORDER BY hints.created_at DESC
   `).all(input.specialistId, nowIso) as unknown as RetrievalHintRow[]
 
   const exact = rows.find((row) => row.fingerprint === fingerprint)
@@ -50,15 +52,10 @@ export function storeRetrievalHints(database: DatabaseSync, input: StoreRetrieva
   if (wikiPaths.length === 0) return
 
   const source = database.prepare(`
-    SELECT specialist_id, outcome, normalized_question, fingerprint
+    SELECT outcome
     FROM question_analytics_events
     WHERE id = ?
-  `).get(input.sourceEventId) as {
-    specialist_id: string
-    outcome: string
-    normalized_question: string
-    fingerprint: string
-  } | undefined
+  `).get(input.sourceEventId) as { outcome: string } | undefined
   if (!source || source.outcome !== 'answered') return
 
   const now = input.now ?? new Date()
@@ -67,18 +64,14 @@ export function storeRetrievalHints(database: DatabaseSync, input: StoreRetrieva
   deleteExpiredHints(database, createdAt)
   database.prepare(`
     INSERT INTO question_retrieval_hints (
-      source_event_id, specialist_id, fingerprint, normalized_question,
-      wiki_paths_json, created_at, expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      source_event_id, wiki_paths_json, created_at, expires_at
+    ) VALUES (?, ?, ?, ?)
     ON CONFLICT (source_event_id) DO UPDATE SET
       wiki_paths_json = excluded.wiki_paths_json,
       created_at = excluded.created_at,
       expires_at = excluded.expires_at
   `).run(
     input.sourceEventId,
-    source.specialist_id,
-    source.fingerprint,
-    source.normalized_question,
     JSON.stringify(wikiPaths),
     createdAt,
     expiresAt

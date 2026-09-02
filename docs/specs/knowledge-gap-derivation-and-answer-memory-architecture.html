@@ -163,7 +163,7 @@
     <table>
       <tr><th>Tabela</th><th>Chave e campos essenciais</th></tr>
       <tr><td><code>question_analytics_events</code></td><td><code>id</code>; novo <code>documents_consulted_count</code>.</td></tr>
-      <tr><td><code>question_retrieval_cache</code></td><td><code>(specialist_id, fingerprint)</code>; evento origem, normalizada, caminhos JSON, citações JSON, expiração.</td></tr>
+      <tr><td><code>question_retrieval_hints</code></td><td>Evento origem, caminhos wiki JSON e expiração; fingerprint e pergunta normalizada permanecem apenas no evento ligado.</td></tr>
       <tr><td><code>question_analytics_event_actions</code></td><td><code>event_id</code> único; decisão, admin, job, estado, página e erro sanitizado.</td></tr>
     </table>
     <p>FKs com cascade seguem a eliminação de conversa/evento/especialidade.</p>

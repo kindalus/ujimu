@@ -171,8 +171,12 @@ describe('question analytics and content gaps acceptance', () => {
       question: 'Como calcular direitos aduaneiros?',
       now
     })).toBeUndefined()
-    expect(database.prepare('PRAGMA table_info(question_retrieval_hints)').all()
-      .map((column: any) => column.name)).not.toContain('answer')
+    const hintColumns = database.prepare('PRAGMA table_info(question_retrieval_hints)').all()
+      .map((column: any) => column.name)
+    expect(hintColumns).not.toContain('answer')
+    expect(hintColumns).not.toContain('normalized_question')
+    expect(hintColumns).not.toContain('question_text')
+    expect(hintColumns).not.toContain('fingerprint')
 
     let runnerHints: unknown
     await collectChatEvents(await createChatEventStreamFromBody(

@@ -629,16 +629,13 @@ const MIGRATIONS: Migration[] = [
     sql: `
       CREATE TABLE question_retrieval_hints (
         source_event_id TEXT PRIMARY KEY REFERENCES question_analytics_events(id) ON DELETE CASCADE,
-        specialist_id TEXT NOT NULL,
-        fingerprint TEXT NOT NULL,
-        normalized_question TEXT NOT NULL,
         wiki_paths_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
 
-      CREATE INDEX idx_question_retrieval_hints_lookup
-        ON question_retrieval_hints (specialist_id, fingerprint, expires_at);
+      CREATE INDEX idx_question_retrieval_hints_expiry
+        ON question_retrieval_hints (expires_at);
     `
   },
   {
