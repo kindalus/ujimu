@@ -12,7 +12,8 @@ Approved source decks:
 - PDF processing must not use Gemini.
 - Local OCR uses Portuguese and English language data.
 - The model configured by `UJIMU_PI_INGESTION_PROVIDER` and `UJIMU_PI_INGESTION_MODEL` performs visual confirmation.
-- Every PDF page must be visually confirmed, including pages with native text.
+- Every PDF page must be visually confirmed, including pages with native text, using one overview plus overlapping 300 DPI tiles below 2000×2000 pixels.
+- All required images and the current OCR text must be read successfully before the page can be confirmed.
 - Any missing or persistently illegible content rejects the complete document before wiki ingestion.
 - `raw/` remains immutable and canonical.
 - Processing is sequential and bounded to one rendered page at a time.

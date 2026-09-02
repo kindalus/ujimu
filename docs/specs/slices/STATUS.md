@@ -130,7 +130,7 @@ Known non-blocking warnings:
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
-| 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `planned` | 2026-09-02 | Require visual confirmation of every PDF page and reject incomplete documents before converted/wiki publication. |
+| 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `in-progress` | 2026-09-02 | Require visual confirmation of every PDF page and reject incomplete documents before converted/wiki publication. |
 
 ## Visual OCR ingestion
 
@@ -147,7 +147,7 @@ Locked decisions:
 
 - PDF OCR and visual review do not use Gemini.
 - Local OCR supports Portuguese and English.
-- The configured ingestion model visually confirms every page.
+- The configured ingestion model visually confirms every page through an overview and overlapping 300 DPI tiles below Pi's resize boundary.
 - Any absent or illegible page rejects the complete document before wiki ingestion.
 - Processing keeps `raw/` immutable and bounds transient work to one rendered page at a time.
 
@@ -159,6 +159,14 @@ Slice 72 verification:
 - Rendered one requested page at 300 DPI while keeping all output under `.ujimu/ocr/`.
 - Built the production image and processed a real image-only PDF with OCRmyPDF 16.7.0, qpdf 12.2.0, Poppler 25.03.0, and both language packs.
 - 316 tests, typecheck, build, and the high-severity dependency gate passed; the audit reported pre-existing moderate Tiptap advisories.
+
+Slice 73 refinement:
+
+- Render a page overview plus overlapping tiles smaller than 2000×2000 pixels.
+- Require successful reads of OCR text, overview, and every tile before accepting a page decision.
+- Persist the coverage ledger only through a dedicated confirmation tool.
+- Remove `bash` and the Gemini converter from ingestion sessions to prevent bypass.
+- Block `converted/` and `wiki/` publication until all expected PDF pages are publishable.
 
 Implementation order:
 
