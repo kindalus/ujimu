@@ -115,9 +115,19 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
 `])
     expect(prompts[0]).not.toContain(source.raw_path)
     expect(prompts[0]).not.toContain(source.checksum)
+    expect(prompts[0]).toContain('prepare_pdf_ocr')
+    expect(prompts[0]).toContain('render_pdf_ocr_page')
+    expect(prompts[0]).toContain('confirm_pdf_ocr_page')
+    expect(prompts[0]).toContain('overview and every overlapping 300 DPI tile')
+    expect(prompts[0]).toContain('PDF_OCR_VISUAL_REVIEW_FAILED')
+    expect(prompts[0]).not.toContain('Gemini')
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
-    expect(sessionOptions).toMatchObject({ cwd: specialist.paths.root, task: 'ingestion' })
+    expect(sessionOptions).toMatchObject({
+      cwd: specialist.paths.root,
+      task: 'ingestion',
+      pdfOcrCoverage: expect.objectContaining({ assertPublishable: expect.any(Function) })
+    })
     expect(sessionOptions).not.toHaveProperty('appendSystemPromptOverride')
     expect(sessionOptions).not.toHaveProperty('fileSystemPolicy')
     expect(sessionOptions).not.toHaveProperty('tools')

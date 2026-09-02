@@ -44,9 +44,15 @@ describe('local PDF OCR foundation acceptance', () => {
     const first = await runScript(fixture.root, ['page', 'raw/lei.pdf', '1'], fixture.bin)
     const firstPayload = JSON.parse(first.stdout) as Record<string, unknown>
     expect(firstPayload).toMatchObject({ status: 'rendered', page: 1, pageCount: 2 })
-    expect(firstPayload.imagePath).toMatch(/\/current\/page\.png$/)
+    expect(firstPayload.overviewPath).toMatch(/\/current\/overview\.png$/)
     expect(firstPayload.ocrTextPath).toMatch(/\/current\/page\.txt$/)
-    expect(firstPayload.imageSha256).toMatch(/^sha256:[a-f0-9]{64}$/)
+    expect(firstPayload.overviewSha256).toMatch(/^sha256:[a-f0-9]{64}$/)
+    expect(firstPayload.tiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: expect.stringMatching(/\/current\/tiles\/tile-\d{4}\.png$/),
+        sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/)
+      })
+    ]))
 
     const second = await runScript(fixture.root, ['page', 'raw/lei.pdf', '2'], fixture.bin)
     expect(second.code).toBe(0)
@@ -118,7 +124,12 @@ printf 'OCR text page %s\\n' "$page" > "$output"
 `)
   await fakeCommand(bin, 'pdftoppm', `
 printf 'pdftoppm %s\\n' "$*" >> '${log}'
-args=("$@"); count=$((\${#args[@]})); prefix="\${args[$((count-1))]}"; printf 'PNG page' > "\${prefix}.png"
+args=("$@"); count=$((\${#args[@]})); prefix="\${args[$((count-1))]}"
+python3 - "\${prefix}.png" <<'PY'
+from PIL import Image
+import sys
+Image.new('RGB', (2480, 3508), 'white').save(sys.argv[1])
+PY
 `)
   return { root, bin, log }
 }
