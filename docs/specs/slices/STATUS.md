@@ -129,7 +129,7 @@ Known non-blocking warnings:
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `verified` | 2026-09-01 | Eligible events acquire one final decision, deterministic target, and retryable specialist derivation job. |
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `verified` | 2026-09-01 | The Pi derivation runner restricts paths, validates OKF output, and restores target/index/log on failure. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
-| 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `planned` | 2026-09-02 | Add local PDF validation, OCR in Portuguese/English, and bounded page rendering without Gemini or publication. |
+| 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `in-progress` | 2026-09-02 | Add local PDF validation, OCR in Portuguese/English, and bounded page rendering without Gemini or publication. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `planned` | 2026-09-02 | Require visual confirmation of every PDF page and reject incomplete documents before converted/wiki publication. |
 
 ## Visual OCR ingestion
@@ -150,6 +150,13 @@ Locked decisions:
 - The configured ingestion model visually confirms every page.
 - Any absent or illegible page rejects the complete document before wiki ingestion.
 - Processing keeps `raw/` immutable and bounds transient work to one rendered page at a time.
+
+Slice 72 refinement:
+
+- Expose separate `prepare_pdf_ocr` and `render_pdf_ocr_page` tools.
+- Derive the bounded workspace from the validated source SHA-256.
+- Treat structural validation, OCR, range, and timeout failures as sanitised closed failures.
+- Keep all outputs under `.ujimu/ocr/`; do not publish to `converted/` or `wiki/`.
 
 Implementation order:
 
