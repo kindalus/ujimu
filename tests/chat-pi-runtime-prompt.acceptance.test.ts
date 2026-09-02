@@ -56,7 +56,8 @@ describe('Pi chat runtime prompt acceptance', () => {
     const run = await createPiChatRunner().run({
       specialist: specialistRuntimeFixture(),
       question: 'O que diz o Artigo 1.º?',
-      citationEvidence: citationEvidenceFixture()
+      citationEvidence: citationEvidenceFixture(),
+      retrievalHints: { wikiPaths: ['wiki/ambito.md'], match: 'exact', score: 1 }
     })
 
     const events = []
@@ -76,6 +77,8 @@ describe('Pi chat runtime prompt acceptance', () => {
     expect(prompts[0]).toContain('{"type":"citations"')
     expect(prompts[0]).toContain('User question:\nO que diz o Artigo 1.º?')
     expect(prompts[0]).toContain('{"type":"done","outcome":"insufficient_context"}')
+    expect(prompts[0]).toContain('Candidate wiki paths from a recent matching consultation, if any:\nwiki/ambito.md')
+    expect(prompts[0]).toContain('never treat a prior consultation as an answer or source')
     expect(prompts[0]).not.toContain('Selected specialist')
     expect(prompts[0]).not.toContain('Specialist system prompt')
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })

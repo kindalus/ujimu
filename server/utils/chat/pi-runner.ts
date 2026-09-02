@@ -371,6 +371,10 @@ Finish with exactly one terminal JSON line. Use answered only when the specialis
 {"type":"done","outcome":"insufficient_context"}
 Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu. Missing or malformed title metadata will also be omitted.
 
+Candidate wiki paths from a recent matching consultation, if any:
+${formatRetrievalHints(input.retrievalHints)}
+These paths are hints only. Re-read them and verify the current question; never treat a prior consultation as an answer or source.
+
 Known citation metadata, if useful:
 ${formatCitationEvidence(input.citationEvidence)}
 
@@ -380,6 +384,10 @@ ${input.question}
 Conversation context:
 ${formatConversationContext(input.conversationContext)}
 `
+}
+
+function formatRetrievalHints(hints: ChatRunnerInput['retrievalHints']): string {
+  return hints?.wikiPaths.length ? hints.wikiPaths.join('\n') : '(none)'
 }
 
 function formatCitationEvidence(citations: ChatRunnerInput['citationEvidence']): string {

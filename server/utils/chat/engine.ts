@@ -20,6 +20,7 @@ import {
 import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
+import { lookupRetrievalHints, storeRetrievalHints } from './retrieval-cache'
 import {
   ChatConversationBusyError,
   ChatConversationExpiredError,
@@ -185,6 +186,9 @@ export async function createChatEventStreamForSpecialist(
       : undefined
 
     const citationEvidence = await getCitationEvidence(specialist)
+    const retrievalHints = options.analytics
+      ? lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question)
+      : undefined
     await chatSession?.beginTurn()
 
     const runner = options.runner ?? createDefaultChatRunner(piChatEnabled)
@@ -193,6 +197,7 @@ export async function createChatEventStreamForSpecialist(
       question: input.question,
       ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
       citationEvidence,
+      ...(retrievalHints ? { retrievalHints } : {}),
       ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {}),
       ...(chatSession ? { piSessionManager: chatSession.manager } : {})
     }
@@ -641,6 +646,25 @@ async function* completeStreamResult(input: {
   }
 }
 
+function lookupRetrievalHintsSafely(
+  analytics: ChatAnalyticsOptions,
+  specialistId: string,
+  question: string
+) {
+  try {
+    return lookupRetrievalHints(analytics.database, {
+      specialistId,
+      question,
+      now: analytics.now
+    })
+  } catch {
+    console.error('[ujimu] retrieval hint lookup failed', {
+      code: 'RETRIEVAL_HINT_LOOKUP_FAILED'
+    })
+    return undefined
+  }
+}
+
 function scheduleQuestionAnalytics(
   analytics: StreamAnalyticsPersistence,
   outcome: ChatAnswerOutcome,
@@ -649,7 +673,7 @@ function scheduleQuestionAnalytics(
 ): void {
   setImmediate(() => {
     try {
-      recordQuestionAnalyticsEvent(analytics.database, {
+      const event = recordQuestionAnalyticsEvent(analytics.database, {
         specialistId: analytics.specialistId,
         outcome,
         question: analytics.question,
@@ -661,9 +685,16 @@ function scheduleQuestionAnalytics(
         consultedDocumentCount: consultedDocuments?.length,
         occurredAt: analytics.now
       })
+      if (event && outcome === 'answered' && consultedDocuments && consultedDocuments.length > 0) {
+        storeRetrievalHints(analytics.database, {
+          sourceEventId: event.id,
+          wikiPaths: consultedDocuments,
+          now: analytics.now
+        })
+      }
     } catch {
       console.error('[ujimu] telemetry task failed', {
-        code: 'QUESTION_ANALYTICS_WRITE_FAILED'
+        code: 'CHAT_TELEMETRY_WRITE_FAILED'
       })
     }
   })

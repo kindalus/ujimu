@@ -1,4 +1,5 @@
 import type { SpecialistRuntime } from '../specialists/schema'
+import type { RetrievalHints } from './retrieval-cache'
 
 export interface ChatCitation {
   sourceTitle: string
@@ -57,6 +58,7 @@ export interface ChatRunnerInput {
   question: string
   clientTimezone?: string
   citationEvidence: ChatCitation[]
+  retrievalHints?: RetrievalHints
   conversationContext?: ChatConversationContextMessage[]
   piSessionManager?: any
 }

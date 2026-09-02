@@ -125,7 +125,7 @@ Known non-blocking warnings:
 | 65 | [`65-reliable-gaps-nonblocking-telemetry.html`](./65-reliable-gaps-nonblocking-telemetry.html) | `verified` | 2026-09-01 | Terminal outcomes persist completed gaps; best-effort analytics cannot turn a delivered answer into a stream failure. |
 | 66 | [`66-read-only-chat-derived-policy.html`](./66-read-only-chat-derived-policy.html) | `verified` | 2026-09-01 | Chat exposes only read/search tools under AGENTS.md and wiki; existing specialist policies are backed up and upgraded idempotently. |
 | 67 | [`67-consulted-document-count.html`](./67-consulted-document-count.html) | `verified` | 2026-09-01 | Correlate successful Pi reads, deduplicate real wiki Markdown paths, and persist their count on question events. |
-| 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `planned` | — | Add exact and Sørensen–Dice retrieval hints with a seven-day lazy TTL, without caching answers. |
+| 68 | [`68-global-retrieval-hint-cache.html`](./68-global-retrieval-hint-cache.html) | `verified` | 2026-09-01 | Global wiki-path hints use exact then trigram Dice matching with a lazy seven-day TTL and never cache answers. |
 | 69 | [`69-derived-job-contract.html`](./69-derived-job-contract.html) | `planned` | — | Add the idempotent analytics-event decision and specialist derivation job contract. |
 | 70 | [`70-transactional-derived-execution.html`](./70-transactional-derived-execution.html) | `planned` | — | Execute one path-constrained derived-page job with validation and filesystem rollback. |
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `planned` | — | Let admins make an idempotent ignored/derived decision for eligible multi-source question events. |
@@ -134,7 +134,7 @@ Known non-blocking warnings:
 
 Status: `in_progress`
 
-The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–67 are verified; Slice 68 is next.
+The user approved the plan and Slice 65–71 order on 2026-09-01. Slices 65–68 are verified; Slice 69 is next.
 
 Approved originating decks:
 
@@ -163,6 +163,14 @@ Slice 67 verification:
 - Added migration `0021_consulted_document_count` with a zero default for prior events.
 - Persisted the count through the non-blocking Slice 65 telemetry path.
 - 303 tests, typecheck, build, and dependency audit passed.
+
+Slice 68 verification:
+
+- Added a seven-day retrieval-hint table linked to the source analytics event.
+- Implemented exact fingerprint lookup before Sørensen–Dice character trigram matching at `0.85`.
+- Stored only validated wiki paths for answered events; no prior answer text enters storage or prompts.
+- Injected hints as non-authoritative candidates that the chat agent must re-read.
+- 304 tests, typecheck, build, and dependency audit passed.
 
 Planned order:
 

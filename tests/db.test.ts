@@ -47,7 +47,8 @@ describe('initializeDatabase', () => {
       { version: '0018_editable_profile_contacts' },
       { version: '0019_persistent_pi_chat_sessions' },
       { version: '0020_specialist_hard_reset_jobs' },
-      { version: '0021_consulted_document_count' }
+      { version: '0021_consulted_document_count' },
+      { version: '0022_question_retrieval_hints' }
     ])
   })
 
@@ -64,7 +65,7 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(21)
+    expect(count.count).toBe(22)
   })
 
   it('opens connections in WAL mode with a busy timeout so writers never block readers', async () => {
@@ -100,7 +101,7 @@ describe('initializeDatabase', () => {
 
       // Closing an explicitly opened connection must not disturb the shared one.
       expect(await initializeDatabase()).toBe(first)
-      expect(first.prepare('SELECT COUNT(*) as count FROM schema_migrations').get()).toMatchObject({ count: 21 })
+      expect(first.prepare('SELECT COUNT(*) as count FROM schema_migrations').get()).toMatchObject({ count: 22 })
     } finally {
       restoreEnv('UJIMU_DATA_DIR', previousDataDir)
       restoreEnv('UJIMU_DB_PATH', previousDbPath)

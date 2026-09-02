@@ -14,6 +14,8 @@ import { createSessionToken } from '../server/utils/auth/session'
 import { createChatEventStreamFromBody } from '../server/utils/chat/engine'
 import type { ChatEngineRunner, ChatStreamEvent } from '../server/utils/chat/types'
 import { initializeDatabase } from '../server/utils/db'
+import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
+import { lookupRetrievalHints, storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
 import { scanSpecialistRawSources } from '../server/utils/ingestion/detect'
 import { writeIngestionState } from '../server/utils/ingestion/state'
 import { storeRawSource } from '../server/utils/ingestion/storage'
@@ -125,10 +127,73 @@ describe('question analytics and content gaps acceptance', () => {
     expect(events).toContainEqual({ type: 'done', grounded: true })
     expect(events.some((event) => event.type === 'error')).toBe(false)
     expect(log).toHaveBeenCalledWith('[ujimu] telemetry task failed', {
-      code: 'QUESTION_ANALYTICS_WRITE_FAILED'
+      code: 'CHAT_TELEMETRY_WRITE_FAILED'
     })
     expect(JSON.stringify(log.mock.calls)).not.toContain('Pergunta privada')
     log.mockRestore()
+    database.close()
+  })
+
+  it('returns exact then similar wiki hints and lazily expires them without storing answers', async () => {
+    const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
+    await createTempSpecialist('iva', dataDir)
+    await createIngestedSource(specialtiesRoot, 'iva')
+    const now = new Date('2026-09-01T10:00:00.000Z')
+    const event = recordQuestionAnalyticsEvent(database, {
+      specialistId: 'iva',
+      outcome: 'answered',
+      question: 'Qual é o prazo para entregar declaração mensal de IVA?',
+      occurredAt: now
+    })!
+    storeRetrievalHints(database, {
+      sourceEventId: event.id,
+      wikiPaths: ['wiki/prazos.md', 'wiki/iva.md', 'wiki/prazos.md', '../secret.md'],
+      now
+    })
+
+    expect(lookupRetrievalHints(database, {
+      specialistId: 'iva',
+      question: 'Qual é o prazo para entregar declaração mensal de IVA?',
+      now
+    })).toEqual({ wikiPaths: ['wiki/iva.md', 'wiki/prazos.md'], match: 'exact', score: 1 })
+
+    expect(lookupRetrievalHints(database, {
+      specialistId: 'iva',
+      question: 'Qual é o prazo para entrega da declaração mensal de IVA?',
+      now
+    })).toMatchObject({ wikiPaths: ['wiki/iva.md', 'wiki/prazos.md'], match: 'similar' })
+
+    expect(lookupRetrievalHints(database, {
+      specialistId: 'iva',
+      question: 'Como calcular direitos aduaneiros?',
+      now
+    })).toBeUndefined()
+    expect(database.prepare('PRAGMA table_info(question_retrieval_hints)').all()
+      .map((column: any) => column.name)).not.toContain('answer')
+
+    let runnerHints: unknown
+    await collectChatEvents(await createChatEventStreamFromBody(
+      { specialistId: 'iva', question: event.questionText },
+      {
+        specialtiesRoot,
+        analytics: { database, now },
+        runner: {
+          async run(input) {
+            runnerHints = input.retrievalHints
+            return { grounded: true, citations: [], deltas: toAsyncDeltas(['Resposta.']) }
+          }
+        }
+      }
+    ))
+    await waitForTelemetry()
+    expect(runnerHints).toEqual({ wikiPaths: ['wiki/iva.md', 'wiki/prazos.md'], match: 'exact', score: 1 })
+
+    expect(lookupRetrievalHints(database, {
+      specialistId: 'iva',
+      question: event.questionText,
+      now: new Date('2026-09-08T10:00:00.001Z')
+    })).toBeUndefined()
+    expect(database.prepare('SELECT COUNT(*) AS count FROM question_retrieval_hints').get()).toEqual({ count: 0 })
     database.close()
   })
 
