@@ -82,6 +82,7 @@ Mandatory PDF visual OCR workflow:
 - Before writing anything in converted/ or wiki/, process every pending PDF with prepare_pdf_ocr.
 - For each page from 1 through pageCount, call render_pdf_ocr_page, read its OCR text, overview and every overlapping 300 DPI tile, and compare all visible content.
 - Resolve OCR inconsistencies only from the page images. Preserve all legible wording, headings, articles, tables, notes, stamps, and visible structure; never guess unreadable characters.
+- Pages may contain two or more text columns. Detect visible column boundaries and reconstruct the reading order top-to-bottom within each column, then left-to-right unless the source clearly indicates another order. Never interleave lines from separate columns.
 - After reviewing each page, call confirm_pdf_ocr_page with confirmed, corrected, or illegible. For confirmed or corrected pages, append the complete reviewed page Markdown in order to draft.md inside that PDF's OCR workspace; do not rely on retaining every page in model context.
 - If any page is illegible, do not convert or ingest that PDF. Put it in failed[] with error_code PDF_OCR_VISUAL_REVIEW_FAILED.
 - Only after every PDF page is confirmed or corrected, call publish_pdf_ocr_markdown to atomically move the reviewed draft into converted/. Never write PDF conversions directly to converted/. Then ingest only that published Markdown into wiki/.
@@ -129,6 +130,8 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
     expect(prompts[0]).toContain('confirm_pdf_ocr_page')
     expect(prompts[0]).toContain('publish_pdf_ocr_markdown')
     expect(prompts[0]).toContain('overview and every overlapping 300 DPI tile')
+    expect(prompts[0]).toContain('Pages may contain two or more text columns')
+    expect(prompts[0]).toContain('Never interleave lines from separate columns')
     expect(prompts[0]).toContain('draft.md inside that PDF\'s OCR workspace')
     expect(prompts[0]).toContain('PDF_OCR_VISUAL_REVIEW_FAILED')
     expect(prompts[0]).toContain('Do not use Gemini')

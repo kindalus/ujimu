@@ -164,7 +164,7 @@ Slice 73 verification:
 
 - Added a page overview plus overlapping 300 DPI tiles bounded below Pi's 2000×2000 resize threshold.
 - Required successful reads of OCR text, overview, and every tile before a page can be confirmed, corrected, or rejected.
-- Added an application-owned coverage ledger and enforced contiguous page order against the prepared page count.
+- Added an application-owned coverage ledger, enforced contiguous page order, and required column-aware reading order without interleaving text from separate columns.
 - Removed `bash` and the Gemini converter from ingestion sessions and rejected non-image-capable ingestion models.
 - Blocked raw and unrelated writes, direct managed-PDF writes to `converted/`, and all converted/wiki publication before complete coverage.
 - Added `publish_pdf_ocr_markdown` for atomic promotion of the reviewed draft and required current-run publication in the final manifest.
