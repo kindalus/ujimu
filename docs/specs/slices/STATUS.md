@@ -71,7 +71,7 @@ Known non-blocking warnings:
 | 11 | [`11-security-ops-observability.html`](./11-security-ops-observability.html) | `verified` | 2026-05-16 | Security headers, healthz/readyz, sanitized daily JSONL operational logs, CI, and operations runbook. |
 | 12 | [`12-passkeys-post-mvp.html`](./12-passkeys-post-mvp.html) | `verified` | 2026-05-16 | Passkey registration/login/removal, OTP fallback, adapter contract, UI, migration, readiness, and operations documentation. |
 | 13 | [`13-pi-agent-pipeline.html`](./13-pi-agent-pipeline.html) | `verified` | 2026-05-18 | Three Pi sessions for conversion, ingestion, and consultation; Ujimu Pi agent config under `config/ujimu-pi-agent`; Markdown-first ingestion pipeline. |
-| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Gemini CLI-backed PDF conversion tool scoped to the conversion agent; full automated verification passed. |
+| 14 | [`14-pdf-to-markdown-gemini-tool.html`](./14-pdf-to-markdown-gemini-tool.html) | `verified` | 2026-05-17 | Historical Gemini CLI-backed PDF conversion, superseded and removed by Slice 74. |
 | 15 | [`15-podman-container-deployment.html`](./15-podman-container-deployment.html) | `verified` | 2026-05-19 | Podman-compatible image, prod/test env profiles, lifecycle scripts, persistent Pi/Ujimu mounts, and manual deployment documentation. |
 | 16 | [`16-ui-shell-drawer-foundation.html`](./16-ui-shell-drawer-foundation.html) | `verified` | 2026-05-21 | Shared `AppDrawer.vue` using Nuxt UI `UDrawer`; main chat page uses drawer with existing-route links only and desktop pin option. |
 | 17 | [`17-chat-workspace-nuxt-ui.html`](./17-chat-workspace-nuxt-ui.html) | `verified` | 2026-05-21 | Chat-first workspace using Nuxt UI chat components, parts adapter, bottom-anchored two-row Gemini-style prompt with specialist selector, specialist empty state, and no hero block. |
@@ -131,11 +131,11 @@ Known non-blocking warnings:
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
-| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `implemented` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `verified` | 2026-09-03 | Removed the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 
 ## Gemini dependency removal
 
-Status: `implemented`
+Status: `verified`
 
 Approved originating decks:
 
@@ -169,7 +169,8 @@ Implementation:
 - Removed the Gemini CLI installation, project model entry, API-key examples, PDF tool script, extension, wrapper, and session registration.
 - Manual PDF conversion now records `PDF_CONVERSION_REQUIRES_INGESTION` without creating Markdown; non-PDF conversion remains unchanged.
 - Removed obsolete Gemini conversion instructions and updated current operations documentation.
-- Focused acceptance tests, all 317 tests, typecheck, build, and the high-severity audit gate pass; container verification remains pending.
+- Focused acceptance tests, all 317 tests, typecheck, build, and the high-severity audit gate passed.
+- Production-compatible image `4996e8b2b136` built successfully; `gemini` is absent while OCRmyPDF, qpdf, Poppler, Tesseract, and `por+eng` remain available.
 
 ## Visual OCR ingestion
 
