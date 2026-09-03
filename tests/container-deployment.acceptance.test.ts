@@ -5,14 +5,14 @@ import { spawn } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 describe('Podman container deployment acceptance', () => {
-  it('defines a slim multi-stage Node 26 image with Gemini CLI, non-root runtime, and healthcheck', async () => {
+  it('defines a slim multi-stage Node 26 image with local OCR, non-root runtime, and healthcheck', async () => {
     const dockerfile = await readFile('Dockerfile', 'utf8')
 
     expect(dockerfile).toContain('FROM node:26-trixie-slim AS build')
     expect(dockerfile).toContain('FROM node:26-trixie-slim AS runtime')
     expect(dockerfile).toContain('npm ci')
     expect(dockerfile).toContain('npm run build')
-    expect(dockerfile).toContain('npm install -g @google/gemini-cli')
+    expect(dockerfile).not.toContain('@google/gemini-cli')
     expect(dockerfile).toContain('ca-certificates')
     expect(dockerfile).toContain('coreutils')
     for (const pdfTool of [
@@ -67,7 +67,7 @@ describe('Podman container deployment acceptance', () => {
       expect(envFile).toContain('UJIMU_PI_INGESTION_ENABLED=true')
       expect(envFile).toContain('UJIMU_PI_INGESTION_THINKING_LEVEL=')
       expect(envFile).toContain('UJIMU_PI_CHAT_ENABLED=true')
-      expect(envFile).toContain('GEMINI_API_KEY=')
+      expect(envFile).not.toContain('GEMINI_API_KEY')
     }
 
     expect(prod).toContain('UJIMU_HOST_PI_DIR=/srv/ujimu/prod/pi')

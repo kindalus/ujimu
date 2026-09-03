@@ -183,7 +183,7 @@ describe('three Pi agent pipeline acceptance', () => {
     expect(mismatchResponse.status).toBe(400)
   })
 
-  it('fails PDF conversion quickly when PDF tool prerequisites are unavailable', async () => {
+  it('directs manual PDF conversion to normal visual ingestion without creating Markdown', async () => {
     const { dataDir } = await createTempAdminData()
     await seedAdmin(dataDir)
     await createSpecialist(validSpecialist('iva'), { dataDir })
@@ -191,20 +191,21 @@ describe('three Pi agent pipeline acceptance', () => {
     const conversionModule = await import(routePath) as { default: unknown }
     const fetchAdmin = createAdminFetch(dataDir, conversionModule.default)
 
-    const previousGeminiApiKey = process.env.GEMINI_API_KEY
-    delete process.env.GEMINI_API_KEY
-    try {
-      await fetchAdmin(uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.pdf', '%PDF-1.7 placeholder', 'application/pdf'))
-      await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/sources/reload', { method: 'POST' }))
-      const response = await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/conversion/run', { method: 'POST' }))
+    await fetchAdmin(uploadRequest('http://local/api/admin/specialists/iva/raw', 'lei.pdf', '%PDF-1.7 placeholder', 'application/pdf'))
+    await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/sources/reload', { method: 'POST' }))
+    const response = await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/conversion/run', { method: 'POST' }))
 
-      expect(response.status).toBe(200)
-      const payload = await response.json() as { failed: number; sources: Array<{ conversion?: { error_message?: string } }> }
-      expect(payload.failed).toBe(1)
-      expect(payload.sources[0]?.conversion?.error_message).toContain('GEMINI_API_KEY_MISSING')
-    } finally {
-      restoreEnv('GEMINI_API_KEY', previousGeminiApiKey)
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      failed: number
+      sources: Array<{ conversion?: { error_code?: string; error_message?: string } }>
     }
+    expect(payload.failed).toBe(1)
+    expect(payload.sources[0]?.conversion).toMatchObject({
+      error_code: 'PDF_CONVERSION_REQUIRES_INGESTION',
+      error_message: 'PDF conversion requires the normal visual OCR ingestion workflow.'
+    })
+    await expect(readFile(join(dataDir, 'specialties', 'iva', 'raw', 'lei.pdf.md'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('requires the manual admin conversion endpoint and audits safe conversion counts', async () => {

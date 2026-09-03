@@ -131,11 +131,11 @@ Known non-blocking warnings:
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
-| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `grilled` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `acceptance-tested` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 
 ## Gemini dependency removal
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -157,6 +157,12 @@ Stress-tested decisions:
 - Remove only the Google/Gemini provider from mutable production model configuration; preserve unrelated providers and credentials.
 - Keep deployment backups of the prior environment and Pi configuration for rollback.
 - Text describing a visual style as “Gemini-style” is not a runtime dependency and stays unchanged.
+
+Acceptance-test baseline:
+
+- New removal coverage fails while the Dockerfile, API-key examples, model entry, tool files, and conversion-session registration still exist.
+- Manual PDF conversion test fails with the legacy `GEMINI_API_KEY_MISSING` result instead of `PDF_CONVERSION_REQUIRES_INGESTION`.
+- Container contract tests fail while the Gemini CLI and API-key entry remain.
 
 ## Visual OCR ingestion
 
