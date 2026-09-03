@@ -54,7 +54,7 @@ describe('transactional specialist initialization acceptance', () => {
           await writeFile(join(specialist.paths.root, 'AGENTS.md'), `# Legislação de IVA wiki
 
 This workspace is governed by the \`llm-wiki\` skill.
-Treat this specialist wiki as the only source of truth.
+Ground consultations exclusively in this specialist wiki; never use general model knowledge.
 If the wiki lacks sufficient evidence, do not guess.
 Cite the original document title and relevant articles.
 Do not expose physical or internal file paths to the user.

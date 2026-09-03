@@ -51,7 +51,7 @@ export async function assertSpecialistInitializedWorkspace(specialist: Specialis
   const agentsContent = await readFile(agentsPath, 'utf8')
   const requiredRules = [
     ['llm-wiki governance', /\bllm-wiki\b/iu],
-    ['wiki-only grounding', /only source of truth/iu],
+    ['wiki-only grounding', /(?:only source of truth|sole (?:authoritative )?source|ground(?:ed|ing)?\s+(?:consultations?\s+)?exclusively\s+(?:in|on)\s+(?:this specialist\s+)?wiki)/iu],
     ['insufficient evidence handling', /lacks sufficient evidence/iu],
     ['original source citations', /cite the original document title and relevant articles/iu],
     ['internal path protection', /do not expose physical or internal file paths to the user/iu],
