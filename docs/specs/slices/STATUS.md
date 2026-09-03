@@ -131,11 +131,11 @@ Known non-blocking warnings:
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
-| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `idea-refined` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `grilled` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 
 ## Gemini dependency removal
 
-Status: `idea-refined`
+Status: `grilled`
 
 Approved originating decks:
 
@@ -149,6 +149,14 @@ Locked scope:
 - Manual PDF conversion must fail with `PDF_CONVERSION_REQUIRES_INGESTION` and must not create Markdown.
 - Remove the Gemini CLI package, `GEMINI_API_KEY` contract, project-configured Gemini model, `pdf_to_markdown` script/wrappers/registration, active tests, and current operational instructions.
 - Preserve verified historical decks as a superseded implementation record.
+
+Stress-tested decisions:
+
+- A mixed manual conversion run continues processing non-PDF sources while each PDF records its own stable failure.
+- Previously failed PDFs remain retryable through normal ingestion.
+- Remove only the Google/Gemini provider from mutable production model configuration; preserve unrelated providers and credentials.
+- Keep deployment backups of the prior environment and Pi configuration for rollback.
+- Text describing a visual style as “Gemini-style” is not a runtime dependency and stays unchanged.
 
 ## Visual OCR ingestion
 
