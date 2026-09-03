@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-03
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -131,6 +131,24 @@ Known non-blocking warnings:
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
+| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `idea-refined` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+
+## Gemini dependency removal
+
+Status: `idea-refined`
+
+Approved originating decks:
+
+- [`../brainstorm-remove-gemini-dependency.html`](../brainstorm-remove-gemini-dependency.html)
+- [`../remove-gemini-dependency-architecture.html`](../remove-gemini-dependency-architecture.html)
+
+Locked scope:
+
+- The normal visual OCR ingestion pipeline is the only PDF processing path.
+- The manual conversion endpoint remains available for non-PDF formats.
+- Manual PDF conversion must fail with `PDF_CONVERSION_REQUIRES_INGESTION` and must not create Markdown.
+- Remove the Gemini CLI package, `GEMINI_API_KEY` contract, project-configured Gemini model, `pdf_to_markdown` script/wrappers/registration, active tests, and current operational instructions.
+- Preserve verified historical decks as a superseded implementation record.
 
 ## Visual OCR ingestion
 
