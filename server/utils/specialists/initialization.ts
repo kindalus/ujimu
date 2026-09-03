@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import { createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from './schema'
@@ -28,6 +28,41 @@ export function createPiSdkSpecialistInitializationRunner(): SpecialistInitializ
       await runPiSdkSpecialistInitialization(specialist, options)
     }
   }
+}
+
+const REQUIRED_CONSULTATION_POLICY_MARKER = '<!-- ujimu-required-consultation-policy-v1 -->'
+
+const REQUIRED_CONSULTATION_POLICY = `${REQUIRED_CONSULTATION_POLICY_MARKER}
+## Required Ujimu consultation policy
+
+These rules apply only to normal user consultations, not wiki initialization or source ingestion.
+
+- This workspace is governed by the \`llm-wiki\` skill.
+- Treat this specialist wiki as the only source of truth. Do not answer from general model knowledge.
+- If the wiki lacks sufficient evidence, state that the current context is insufficient and do not guess.
+- Ground every substantive answer in the wiki and cite the original document title and relevant articles.
+- Do not expose physical or internal file paths to the user.
+- Before emitting the final consultation answer, read and apply the \`unslop\` skill.
+- During normal user consultations, never create, edit, or delete \`wiki/derived/\`. Only an explicit derivation job initiated by an administrator may create or update derived knowledge.
+`
+
+export async function ensureRequiredSpecialistConsultationPolicy(specialist: SpecialistRuntime): Promise<boolean> {
+  const agentsPath = specialist.paths.root + '/AGENTS.md'
+  const content = await readFile(agentsPath, 'utf8').catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return undefined
+    throw error
+  })
+  if (content === undefined || content.includes(REQUIRED_CONSULTATION_POLICY_MARKER)) return false
+
+  const temporaryPath = `${agentsPath}.required-policy.tmp`
+  await writeFile(temporaryPath, `${content.trimEnd()}\n\n${REQUIRED_CONSULTATION_POLICY}`, 'utf8')
+  try {
+    await rename(temporaryPath, agentsPath)
+  } catch (error) {
+    await rm(temporaryPath, { force: true })
+    throw error
+  }
+  return true
 }
 
 export async function assertSpecialistInitializedWorkspace(specialist: SpecialistRuntime): Promise<void> {

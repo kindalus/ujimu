@@ -54,7 +54,6 @@ describe('transactional specialist initialization acceptance', () => {
           await writeFile(join(specialist.paths.root, 'AGENTS.md'), `# Legislação de IVA wiki
 
 This workspace is governed by the \`llm-wiki\` skill.
-Ground consultations exclusively in this specialist wiki; never use general model knowledge.
 If the wiki lacks sufficient evidence, do not guess.
 Cite the original document title and relevant articles.
 Do not expose physical or internal file paths to the user.
@@ -70,7 +69,10 @@ During normal user consultations, never create, edit, or delete \`wiki/derived/\
     expect(result).toMatchObject({ processed: 1, succeeded: 1, failed: 0 })
     const specialist = await getSpecialistById('iva', { dataDir })
     expect(specialist).toMatchObject({ id: 'iva', status: 'awaiting_sources', system_prompt: '' })
-    expect(await readFile(join(specialtiesRoot, 'iva', 'AGENTS.md'), 'utf8')).toContain('Legislação de IVA')
+    const agents = await readFile(join(specialtiesRoot, 'iva', 'AGENTS.md'), 'utf8')
+    expect(agents).toContain('Legislação de IVA')
+    expect(agents).toContain('<!-- ujimu-required-consultation-policy-v1 -->')
+    expect(agents).toContain('only source of truth')
     expect(await getPublicSpecialists({ dataDir })).toEqual([])
     database.close()
   })

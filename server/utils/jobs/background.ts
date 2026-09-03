@@ -9,7 +9,7 @@ import type { PiConversionRunner } from '../ingestion/conversion'
 import type { PiIngestionRunner } from '../ingestion/pi-runner'
 import { scanSpecialistRawSources } from '../ingestion/detect'
 import { runPendingIngestion } from '../ingestion/run'
-import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializationRunner, type SpecialistInitializationRunner } from '../specialists/initialization'
+import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializationRunner, ensureRequiredSpecialistConsultationPolicy, type SpecialistInitializationRunner } from '../specialists/initialization'
 import { loadSpecialistsFromDisk } from '../specialists/loader'
 import { editSpecialist, resetSpecialistWorkspace, rollbackSpecialistCreation } from '../specialists/manager'
 
@@ -370,6 +370,7 @@ async function runSpecialistInitializationJob(
 
   try {
     await (options.initializationRunner ?? createPiSdkSpecialistInitializationRunner()).initializeSpecialist(specialist)
+    await ensureRequiredSpecialistConsultationPolicy(specialist)
     await assertSpecialistInitializedWorkspace(specialist)
     await editSpecialist(specialist.id, { status: 'awaiting_sources' }, { dataDir })
   } catch (error) {
@@ -389,6 +390,7 @@ async function runSpecialistHardResetJob(
     purgeSpecialistAssociatedData(options.database, job.specialist_id)
     const specialist = await resetSpecialistWorkspace(job.specialist_id, { dataDir })
     await (options.initializationRunner ?? createPiSdkSpecialistInitializationRunner()).initializeSpecialist(specialist)
+    await ensureRequiredSpecialistConsultationPolicy(specialist)
     await assertSpecialistInitializedWorkspace(specialist)
     await scanSpecialistRawSources(specialist)
     await editSpecialist(specialist.id, { status: 'awaiting_sources' }, { dataDir })
