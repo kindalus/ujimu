@@ -78,7 +78,6 @@ Follow the llm-wiki contract exactly:
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 
 Mandatory PDF visual OCR workflow:
-- Do not use Gemini or pdf_to_markdown for PDF conversion.
 - Before writing anything in converted/ or wiki/, process every pending PDF with prepare_pdf_ocr.
 - For each page from 1 through pageCount, call render_pdf_ocr_page, read its OCR text, overview and every overlapping 300 DPI tile, and compare all visible content.
 - Resolve OCR inconsistencies only from the page images. Preserve all legible wording, headings, articles, tables, notes, stamps, and visible structure; never guess unreadable characters.
@@ -134,7 +133,6 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
     expect(prompts[0]).toContain('Never interleave lines from separate columns')
     expect(prompts[0]).toContain('draft.md inside that PDF\'s OCR workspace')
     expect(prompts[0]).toContain('PDF_OCR_VISUAL_REVIEW_FAILED')
-    expect(prompts[0]).toContain('Do not use Gemini')
 
     const sessionOptions = createUjimuPiSessionMock.mock.calls[0][0]
     expect(sessionOptions).toMatchObject({

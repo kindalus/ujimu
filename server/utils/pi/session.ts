@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { PdfOcrCoverageTracker } from '../ingestion/pdf-ocr-coverage'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
 import { createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
-import { createPdfToMarkdownTool } from './pdf-to-markdown-tool'
 import { createPdfOcrTools } from './pdf-ocr-tools'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
@@ -261,7 +260,7 @@ export function createUjimuCustomToolsForTask(
 ): any[] {
   if (task === 'chat' || task === 'derivation') return []
   if (task === 'ingestion') return createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })
-  return [createPdfToMarkdownTool({ cwd })]
+  return []
 }
 
 async function resolveTaskModel(

@@ -63,7 +63,6 @@ Configure these outside source control:
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
-- `GEMINI_API_KEY` — required when PDF-to-Markdown conversion through Gemini CLI is enabled. Keep it only in environment variables or a secret manager; never put it in `<UJIMU_CONFIG_DIR>/settings.json`, prompts, `.env` files committed to source control, or any versioned file.
 
 ## OTP delivery configuration
 
@@ -138,7 +137,7 @@ cp -R ~/.agents/skills/research config/pi/skills/research
 
 Ujimu now uses the Pi agent directly instead of wrapping file tools with a virtual `/data` mount or per-task allowlist. Each Pi session runs with its real current working directory set to the selected specialist root directory. Prompts and manifests refer to real relative paths such as `raw/`, `converted/`, `wiki/`, `AGENTS.md`, and `ingest/state.json`.
 
-Pi tools are scoped by task. Ingestion has file tools (`read`, `edit`, `write`, `grep`, `find`, `ls`) without `bash`, plus `prepare_pdf_ocr`, `render_pdf_ocr_page`, `confirm_pdf_ocr_page`, and `publish_pdf_ocr_markdown`. Its path policy keeps `raw/` immutable, blocks direct PDF writes to `converted/`, and blocks wiki publication until visual coverage passes. The legacy manual conversion task retains `pdf_to_markdown`. Ujimu loads its explicit skill bundle from `config/pi/skills`, bundled extensions from `config/pi/extensions`, and mutable configuration from `<UJIMU_CONFIG_DIR>`; it does not discover skills from global agent directories.
+Pi tools are scoped by task. Ingestion has file tools (`read`, `edit`, `write`, `grep`, `find`, `ls`) without `bash`, plus `prepare_pdf_ocr`, `render_pdf_ocr_page`, `confirm_pdf_ocr_page`, and `publish_pdf_ocr_markdown`. Its path policy keeps `raw/` immutable, blocks direct PDF writes to `converted/`, and blocks wiki publication until visual coverage passes. The manual conversion task retains only the local DOCX converter plus normal file tools for supported non-PDF formats. Ujimu loads its explicit skill bundle from `config/pi/skills`, bundled extensions from `config/pi/extensions`, and mutable configuration from `<UJIMU_CONFIG_DIR>`; it does not discover skills from global agent directories.
 
 If production needs a stronger isolation boundary, provide it outside the Pi harness, for example by running the application or tool execution in a container, VM, or equivalent runtime with the intended specialist directory mounted as the workspace.
 
@@ -162,26 +161,11 @@ SQLite remains sufficient for product-history recovery. Backing up the Pi sessio
 
 The normal source-processing path is now owned by the `llm-wiki` skill inside the ingestion agent session. The agent converts each pending source from `raw/` to `converted/<raw relative path>.md`, then ingests only from `converted/` into the OKF-compliant `wiki/`. Ujimu validates the resulting manifest, converted file paths/hashes, wiki page paths, and citation shape before updating `ingest/state.json`; it does not validate conversion fidelity or source content.
 
-The legacy DOCX/PDF conversion utilities and `/conversion/run` endpoint remain for transitional/manual use, but the background ingestion worker does not call them.
+The legacy non-PDF conversion utilities and `/conversion/run` endpoint remain for transitional/manual use, but the background ingestion worker does not call them.
 
-## Legacy Gemini PDF-to-Markdown conversion dependency
+## Manual PDF conversion
 
-Manual PDF conversion through the legacy `pdf_to_markdown` tool depends on the Gemini CLI in the production/container runtime:
-
-- `gemini` must be installed and available on `PATH`.
-- `GEMINI_API_KEY` must be set in the environment or secret manager.
-- `GEMINI_API_KEY` is sensitive and must not be written to `<UJIMU_CONFIG_DIR>/settings.json`, prompts, operational logs, or versioned files.
-
-Manual smoke test in a configured non-production environment:
-
-```bash
-command -v gemini
-test -n "$GEMINI_API_KEY"
-cd /path/to/specialist-root
-/path/to/ujimu/config/pi/tools/pdf_to_markdown.sh raw/small-sample.pdf
-```
-
-Expected result: the command prints JSON metadata only and creates `raw/small-sample.pdf.md`. This is not the normal ingestion-worker path. Do not run this smoke test in CI because it requires real Gemini credentials and an external service call.
+PDFs are not converted through `/conversion/run`. A pending PDF records `PDF_CONVERSION_REQUIRES_INGESTION` without creating Markdown. Run normal ingestion instead so every PDF page passes local OCR, visual confirmation, coverage validation, and atomic publication.
 
 ## Pi conversion, ingestion, and consultation smoke test
 
@@ -251,7 +235,7 @@ Inside the container both profiles use:
 /home/ujimu/.local/share/ujimu
 ```
 
-The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`, sets `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu`, and keeps bundled Pi resources under `/app/config/pi`. It includes Gemini CLI for the legacy manual converter, plus OCRmyPDF, Poppler, qpdf, Tesseract, and Portuguese/English language data for the local PDF OCR foundation. It exposes a `/healthz` Dockerfile healthcheck.
+The image creates and runs as internal user/group `ujimu:ujimu`, listens on internal port `3000`, defaults `TZ=Africa/Luanda`, sets `UJIMU_DATA_DIR=/home/ujimu/.local/share/ujimu`, sets `UJIMU_CONFIG_DIR=/home/ujimu/.config/ujimu`, and keeps bundled Pi resources under `/app/config/pi`. It includes OCRmyPDF, Poppler, qpdf, Tesseract, and Portuguese/English language data for the local PDF OCR foundation; no separate external PDF converter is installed. It exposes a `/healthz` Dockerfile healthcheck.
 
 Create real env files from the examples, keeping secrets out of Git:
 

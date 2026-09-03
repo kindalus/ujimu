@@ -41,7 +41,6 @@ RUN apt-get update \
     tesseract-ocr-eng \
     tesseract-ocr-por \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g @google/gemini-cli \
   && groupadd --system ujimu \
   && useradd --system --gid ujimu --home-dir /home/ujimu --create-home --shell /usr/sbin/nologin ujimu \
   && mkdir -p /home/ujimu/.config/ujimu /home/ujimu/.local/share/ujimu /app/config \

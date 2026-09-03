@@ -107,7 +107,7 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
     })).toThrowError(PdfOcrCoverageError)
   })
 
-  it('removes bash and the Gemini converter from ingestion while exposing page confirmation', async () => {
+  it('removes bash from ingestion while exposing page confirmation', async () => {
     const session = await import('../server/utils/pi/session')
     const tools = session.createUjimuCustomToolsForTask('ingestion')
     const toolNames = tools.map((tool: { name: string }) => tool.name)
@@ -117,7 +117,6 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
       'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
       'publish_pdf_ocr_markdown'
     ])
-    expect(toolNames).not.toContain('pdf_to_markdown')
   })
 })
 

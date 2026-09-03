@@ -131,11 +131,11 @@ Known non-blocking warnings:
 | 71 | [`71-admin-multisource-curation.html`](./71-admin-multisource-curation.html) | `verified` | 2026-09-01 | Admin analytics lists eligible multi-source events and exposes final ignore/derive decisions, status, and retry. |
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
-| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `acceptance-tested` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+| 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `implemented` | — | Remove the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 
 ## Gemini dependency removal
 
-Status: `acceptance-tested`
+Status: `implemented`
 
 Approved originating decks:
 
@@ -163,6 +163,13 @@ Acceptance-test baseline:
 - New removal coverage fails while the Dockerfile, API-key examples, model entry, tool files, and conversion-session registration still exist.
 - Manual PDF conversion test fails with the legacy `GEMINI_API_KEY_MISSING` result instead of `PDF_CONVERSION_REQUIRES_INGESTION`.
 - Container contract tests fail while the Gemini CLI and API-key entry remain.
+
+Implementation:
+
+- Removed the Gemini CLI installation, project model entry, API-key examples, PDF tool script, extension, wrapper, and session registration.
+- Manual PDF conversion now records `PDF_CONVERSION_REQUIRES_INGESTION` without creating Markdown; non-PDF conversion remains unchanged.
+- Removed obsolete Gemini conversion instructions and updated current operations documentation.
+- Focused acceptance tests, all 317 tests, typecheck, build, and the high-severity audit gate pass; container verification remains pending.
 
 ## Visual OCR ingestion
 

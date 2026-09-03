@@ -1,10 +1,8 @@
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentSessionLogCloseStatus } from '../agents/logs'
 import { createDocxToMarkdownTool } from '../pi/docx-to-markdown-tool'
-import { createPdfToMarkdownTool } from '../pi/pdf-to-markdown-tool'
 import { createUjimuPiSession } from '../pi/session'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { scanSpecialistRawSources } from './detect'
@@ -44,7 +42,7 @@ export class PiConversionDisabledError extends Error {
 
 export class PiConversionError extends Error {
   constructor(
-    public readonly code: 'CONVERSION_FAILED' | 'CONVERSION_OUTPUT_TOO_SMALL' | 'CONVERSION_OUTPUT_TOO_LARGE',
+    public readonly code: 'CONVERSION_FAILED' | 'CONVERSION_OUTPUT_TOO_SMALL' | 'CONVERSION_OUTPUT_TOO_LARGE' | 'PDF_CONVERSION_REQUIRES_INGESTION',
     message: string
   ) {
     super(message)
@@ -110,10 +108,10 @@ async function runPiSdkConversion(
   source: IngestionSourceRecord
 ): Promise<void> {
   if (/\.pdf$/i.test(source.raw_path)) {
-    await assertPdfConversionPrerequisites()
-    const tool = createPdfToMarkdownTool({ cwd: specialist.paths.root })
-    await tool.execute('pdf-conversion', { pdfPath: `raw/${source.raw_path}` })
-    return
+    throw new PiConversionError(
+      'PDF_CONVERSION_REQUIRES_INGESTION',
+      'PDF conversion requires the normal visual OCR ingestion workflow.'
+    )
   }
 
   if (/\.docx$/i.test(source.raw_path)) {
@@ -148,46 +146,10 @@ async function runPiSdkConversion(
   }
 }
 
-async function assertPdfConversionPrerequisites(): Promise<void> {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new PiConversionError('CONVERSION_FAILED', 'GEMINI_API_KEY_MISSING: GEMINI_API_KEY must be set in the environment.')
-  }
-
-  if (!(await commandExists('gemini'))) {
-    throw new PiConversionError('CONVERSION_FAILED', 'GEMINI_CLI_UNAVAILABLE: gemini CLI is not available on PATH.')
-  }
-}
-
-function commandExists(command: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', `command -v ${command} >/dev/null 2>&1`], { stdio: 'ignore' })
-    child.on('error', () => resolve(false))
-    child.on('close', (code) => resolve(code === 0))
-  })
-}
-
 function buildConversionPrompt(_specialist: SpecialistRuntime, source: IngestionSourceRecord): string {
   const markdownPath = source.conversion?.markdown_path ?? `${source.raw_path}.md`
   const inputPath = `raw/${source.raw_path}`
   const outputPath = `raw/${markdownPath}`
-
-  if (/\.pdf$/i.test(source.raw_path)) {
-    return `Convert exactly one uploaded PDF source into Markdown.
-
-Source:
-- input: ${inputPath}
-- output: ${outputPath}
-- original checksum: ${source.checksum}
-
-Rules:
-1. You must call the pdf_to_markdown tool with pdfPath set to ${JSON.stringify(`raw/${source.raw_path}`)}.
-2. The pdf_to_markdown tool is responsible for creating ${outputPath}.
-3. Do not read, edit, write, or manually convert the PDF with file tools.
-4. If pdf_to_markdown fails, fail clearly and do not attempt fallback conversion.
-5. Do not modify wiki/ or any file other than ${outputPath}.
-6. End after the tool reports successful conversion metadata.
-`
-  }
 
   return `Convert exactly one uploaded source into Markdown.
 

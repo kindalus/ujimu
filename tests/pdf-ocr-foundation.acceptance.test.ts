@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 const SCRIPT_PATH = join(process.cwd(), 'config', 'pi', 'tools', 'pdf_ocr.sh')
 
 describe('local PDF OCR foundation acceptance', () => {
-  it('prepares a validated por+eng OCR workspace without Gemini or publication', async () => {
+  it('prepares a validated por+eng OCR workspace without external conversion or publication', async () => {
     const fixture = await createFixture()
     const original = await readFile(join(fixture.root, 'raw', 'lei.pdf'))
 
@@ -34,7 +34,6 @@ describe('local PDF OCR foundation acceptance', () => {
     expect(calls).toContain('qpdf --check')
     expect(calls).toContain('ocrmypdf --skip-text --rotate-pages --deskew -l por+eng')
     expect(calls).toContain('pdftotext -layout')
-    expect(calls).not.toContain('gemini')
   })
 
   it('renders exactly one bounded page at 300 DPI and replaces the current artefacts', async () => {
