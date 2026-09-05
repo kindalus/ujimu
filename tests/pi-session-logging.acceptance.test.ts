@@ -81,16 +81,16 @@ describe('Ujimu Pi session logging acceptance', () => {
       cwd: root,
       tools: [
         'read', 'edit', 'write', 'grep', 'find', 'ls',
-        'sha256_file', 'prepare_pdf_ocr', 'render_pdf_ocr_page',
-        'confirm_pdf_ocr_page', 'publish_pdf_ocr_markdown'
+        'copy_raw_to_converted', 'sha256_file', 'prepare_pdf_ocr',
+        'render_pdf_ocr_page', 'confirm_pdf_ocr_page', 'publish_pdf_ocr_markdown'
       ]
     }))
     expect(writeSessionCreatedMock).toHaveBeenCalledWith({
       task: 'ingestion',
       tools: [
         'read', 'edit', 'write', 'grep', 'find', 'ls',
-        'sha256_file', 'prepare_pdf_ocr', 'render_pdf_ocr_page',
-        'confirm_pdf_ocr_page', 'publish_pdf_ocr_markdown'
+        'copy_raw_to_converted', 'sha256_file', 'prepare_pdf_ocr',
+        'render_pdf_ocr_page', 'confirm_pdf_ocr_page', 'publish_pdf_ocr_markdown'
       ],
       model: 'configured'
     })

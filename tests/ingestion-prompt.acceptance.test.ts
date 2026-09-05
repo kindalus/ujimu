@@ -74,6 +74,7 @@ Follow the llm-wiki contract exactly:
 - Ingest only from converted/ into wiki/.
 - Never modify, rename, or delete files in raw/.
 - Keep wiki/ OKF-compliant and update its index and log.
+- For Markdown and text passthrough, use copy_raw_to_converted with an agent-authored frontmatter prefix; never reproduce source bytes in model output.
 - Use sha256_file for source_sha256 and converted_sha256; never invent hashes.
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
@@ -125,6 +126,7 @@ Only include conversion_status values allowed by the llm-wiki skill. Put sources
 `])
     expect(prompts[0]).not.toContain(source.raw_path)
     expect(prompts[0]).not.toContain(source.checksum)
+    expect(prompts[0]).toContain('copy_raw_to_converted with an agent-authored frontmatter prefix')
     expect(prompts[0]).toContain('sha256_file for source_sha256 and converted_sha256')
     expect(prompts[0]).toContain('prepare_pdf_ocr')
     expect(prompts[0]).toContain('render_pdf_ocr_page')

@@ -114,7 +114,7 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
 
     expect(session.createUjimuPiEnabledToolNames(tools, 'ingestion')).toEqual([
       'read', 'edit', 'write', 'grep', 'find', 'ls',
-      'sha256_file', 'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
+      'copy_raw_to_converted', 'sha256_file', 'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
       'publish_pdf_ocr_markdown'
     ])
   })

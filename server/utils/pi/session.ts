@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { PdfOcrCoverageTracker } from '../ingestion/pdf-ocr-coverage'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
 import { createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
+import { createRawPassthroughTool } from './passthrough-tool'
 import { createPdfOcrTools } from './pdf-ocr-tools'
 import { createSha256FileTool } from './sha256-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
@@ -260,7 +261,9 @@ export function createUjimuCustomToolsForTask(
   pdfOcrCoverage?: PdfOcrCoverageTracker
 ): any[] {
   if (task === 'chat' || task === 'derivation') return []
-  if (task === 'ingestion') return [createSha256FileTool(cwd), ...createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })]
+  if (task === 'ingestion') {
+    return [createRawPassthroughTool(cwd), createSha256FileTool(cwd), ...createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })]
+  }
   return []
 }
 

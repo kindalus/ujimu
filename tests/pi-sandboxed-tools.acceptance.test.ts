@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -136,6 +136,44 @@ describe('task-scoped Pi tools acceptance', () => {
     await expect(tool.execute('hash-3', { path: 'wiki/page.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
     await expect(tool.execute('hash-4', { path: 'raw/escaped.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
     await expect(tool.execute('hash-5', { path: '../secret.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
+  })
+
+  it('copies large textual raw sources byte-for-byte into converted with agent-authored frontmatter', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-passthrough-'))
+    const outside = await mkdtemp(join(tmpdir(), 'ujimu-pi-passthrough-outside-'))
+    const source = 'Artigo 1.º ' + 'conteúdo legal '.repeat(20_000)
+    const prefix = '---\ntype: Converted Source\nconversion_status: passthrough\n---\n\n'
+    await mkdir(join(root, 'raw'))
+    await mkdir(join(root, 'converted'))
+    await mkdir(join(root, 'wiki'))
+    await writeFile(join(root, 'raw', 'source.original.md'), source)
+    await writeFile(join(outside, 'secret.md'), 'secret')
+    await symlink(join(outside, 'secret.md'), join(root, 'converted', 'escaped.md'))
+
+    const { createUjimuCustomToolsForTask } = await import('../server/utils/pi/session')
+    const tool = createUjimuCustomToolsForTask('ingestion', root)
+      .find((candidate: { name: string }) => candidate.name === 'copy_raw_to_converted')
+
+    await expect(tool.execute('copy-1', {
+      sourcePath: 'raw/source.original.md',
+      targetPath: 'converted/source.original.md.md',
+      prefix
+    })).resolves.toMatchObject({
+      details: {
+        sourcePath: 'raw/source.original.md',
+        targetPath: 'converted/source.original.md.md'
+      }
+    })
+    await expect(readFile(join(root, 'converted', 'source.original.md.md'), 'utf8')).resolves.toBe(prefix + source)
+    await expect(tool.execute('copy-2', {
+      sourcePath: 'wiki/page.md', targetPath: 'converted/bad.md', prefix
+    })).rejects.toMatchObject({ code: 'INVALID_PASSTHROUGH_PATH' })
+    await expect(tool.execute('copy-3', {
+      sourcePath: 'raw/source.original.md', targetPath: 'wiki/bad.md', prefix
+    })).rejects.toMatchObject({ code: 'INVALID_PASSTHROUGH_PATH' })
+    await expect(tool.execute('copy-4', {
+      sourcePath: 'raw/source.original.md', targetPath: 'converted/escaped.md', prefix
+    })).rejects.toMatchObject({ code: 'INVALID_PASSTHROUGH_PATH' })
   })
 
   it('blocks ingestion publication until PDF visual coverage is publishable', async () => {
