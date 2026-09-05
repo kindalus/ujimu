@@ -107,14 +107,14 @@ describe('enforced visual PDF OCR coverage acceptance', () => {
     })).toThrowError(PdfOcrCoverageError)
   })
 
-  it('removes bash from ingestion while exposing page confirmation', async () => {
+  it('removes bash from ingestion while exposing restricted hashing and page confirmation', async () => {
     const session = await import('../server/utils/pi/session')
     const tools = session.createUjimuCustomToolsForTask('ingestion')
     const toolNames = tools.map((tool: { name: string }) => tool.name)
 
     expect(session.createUjimuPiEnabledToolNames(tools, 'ingestion')).toEqual([
       'read', 'edit', 'write', 'grep', 'find', 'ls',
-      'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
+      'sha256_file', 'prepare_pdf_ocr', 'render_pdf_ocr_page', 'confirm_pdf_ocr_page',
       'publish_pdf_ocr_markdown'
     ])
   })

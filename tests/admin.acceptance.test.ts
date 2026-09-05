@@ -382,6 +382,71 @@ describe('admin specialist management acceptance', () => {
     database.close()
   })
 
+  it('fails the background job when a valid manifest processes no sources', async () => {
+    const { dataDir } = await createTempAdminData()
+    await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })
+    await createSpecialist(validSpecialist('iva'), { dataDir })
+    const fetchAdmin = createAdminFetch(dataDir, 'admin@example.com', {
+      UJIMU_PI_INGESTION_ENABLED: 'true'
+    })
+
+    await fetchAdmin(uploadRequest(
+      'http://local/api/admin/specialists/iva/raw',
+      'codigo-iva.md',
+      '# Código do IVA\n\nArtigo 1.º'
+    ))
+    const queued = await fetchAdmin(jsonRequest('http://local/api/admin/specialists/iva/ingestion/run', {
+      method: 'POST',
+      headers: sessionHeaders('admin-user')
+    }))
+    const queuedBody = await queued.json() as { job: { id: string } }
+    const database = await openAdminDatabase(dataDir)
+
+    const result = await runDueBackgroundJobs({
+      database,
+      dataDir,
+      piIngestionEnabled: true,
+      runner: {
+        async ingestSource() {
+          throw new Error('This test expects batch ingestion.')
+        },
+        async ingestSources(specialist, sources) {
+          const source = sources[0]!
+          return {
+            version: 2,
+            specialist_id: specialist.id,
+            processed: [],
+            failed: [{
+              raw_path: source.raw_path,
+              stage: 'conversion',
+              converted_path: source.conversion!.markdown_path,
+              conversion_status: 'failed' as const,
+              error_code: 'MARKDOWN_PASSTHROUGH_UNAVAILABLE',
+              error_message: 'The source could not be converted.'
+            }]
+          }
+        }
+      }
+    })
+
+    expect(result).toEqual({ processed: 1, succeeded: 0, failed: 1 })
+    expect(database.prepare(
+      'SELECT status, last_error_code FROM background_jobs WHERE id = ?'
+    ).get(queuedBody.job.id)).toMatchObject({
+      status: 'failed',
+      last_error_code: 'INGESTION_ALL_SOURCES_FAILED'
+    })
+    const specialist = await getSpecialistById('iva', { dataDir })
+    const state = await readIngestionState(specialist!.paths.ingestState)
+    expect(state.sources['codigo-iva.original.md']).toMatchObject({
+      status: 'failed',
+      error_code: 'MARKDOWN_PASSTHROUGH_UNAVAILABLE',
+      conversion: { status: 'failed' },
+      ingestion: { status: 'failed' }
+    })
+    database.close()
+  })
+
   it('lets the ingestion agent convert pending raw sources inside the recoverable ingestion job', async () => {
     const { dataDir } = await createTempAdminData()
     await seedUser(dataDir, { userId: 'admin-user', contacts: ['admin@example.com'] })

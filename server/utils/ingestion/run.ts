@@ -99,8 +99,9 @@ export async function runPendingIngestion(
   await mkdir(specialist.paths.converted, { recursive: true })
   const runner = options.runner ?? createPiSdkIngestionRunner()
 
+  let successfulBatchSources: number | undefined
   if (hasBatchIngestion(runner)) {
-    await processBatch({ specialist, state, sources: pendingSources, runner })
+    successfulBatchSources = await processBatch({ specialist, state, sources: pendingSources, runner })
   } else {
     for (const source of pendingSources) {
       await processSource({ specialist, state, source, runner })
@@ -108,6 +109,9 @@ export async function runPendingIngestion(
   }
 
   await writeIngestionState(specialist.paths.ingestState, state)
+  if (successfulBatchSources === 0) {
+    throw new PiIngestionError('INGESTION_ALL_SOURCES_FAILED', 'Pi ingestion did not process any sources.')
+  }
   return state
 }
 
@@ -144,7 +148,7 @@ async function processBatch(input: {
   state: IngestionState
   sources: IngestionSourceRecord[]
   runner: PiIngestionRunner & { ingestSources: NonNullable<PiIngestionRunner['ingestSources']> }
-}): Promise<void> {
+}): Promise<number> {
   const { specialist, state, sources, runner } = input
   const originalSources = new Map(sources.map((source) => [source.raw_path, cloneSource(source)]))
 
@@ -160,7 +164,7 @@ async function processBatch(input: {
     if (!manifest) {
       throw new PiIngestionError('INGESTION_MANIFEST_MISSING', 'Pi ingestion did not return an ingestion manifest.')
     }
-    await applyValidatedManifest(specialist, state, sources, manifest)
+    return await applyValidatedManifest(specialist, state, sources, manifest)
   } catch (error) {
     if (error instanceof PiIngestionError && error.code === 'INGESTION_MANIFEST_INVALID') {
       restoreOriginalSources(state, originalSources)
@@ -218,7 +222,7 @@ async function applyValidatedManifest(
   state: IngestionState,
   sources: IngestionSourceRecord[],
   manifest: IngestionManifest
-): Promise<void> {
+): Promise<number> {
   const validated = await validateManifest(specialist, sources, manifest)
   const now = new Date()
   const successfulByRawPath = new Map(validated.successes.map((entry) => [entry.raw_path, entry]))
@@ -241,6 +245,7 @@ async function applyValidatedManifest(
     const specialtiesRoot = dirname(specialist.paths.root)
     await editSpecialist(specialist.id, { status: 'active' }, { specialtiesRoot })
   }
+  return successful
 }
 
 async function validateManifest(

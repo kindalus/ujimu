@@ -40,6 +40,7 @@ export class PiIngestionError extends Error {
       | 'WIKI_OUTPUT_MISSING'
       | 'INGESTION_MANIFEST_MISSING'
       | 'INGESTION_MANIFEST_INVALID'
+      | 'INGESTION_ALL_SOURCES_FAILED'
       | 'PDF_OCR_COVERAGE_INCOMPLETE'
       | 'PDF_OCR_VISUAL_REVIEW_FAILED',
     message: string
@@ -189,6 +190,7 @@ Follow the llm-wiki contract exactly:
 - Ingest only from converted/ into wiki/.
 - Never modify, rename, or delete files in raw/.
 - Keep wiki/ OKF-compliant and update its index and log.
+- Use sha256_file for source_sha256 and converted_sha256; never invent hashes.
 
 Read AGENTS.md and ingest/state.json to identify pending or retryable sources. Do not ask follow-up questions.
 

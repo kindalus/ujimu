@@ -37,6 +37,7 @@ RUN apt-get update \
     poppler-utils \
     python3-pil \
     qpdf \
+    ripgrep \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-por \

@@ -108,6 +108,36 @@ describe('task-scoped Pi tools acceptance', () => {
     }))
   })
 
+  it('hashes only regular files under raw and converted during ingestion', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-hash-'))
+    const outside = await mkdtemp(join(tmpdir(), 'ujimu-pi-hash-outside-'))
+    await mkdir(join(root, 'raw'))
+    await mkdir(join(root, 'converted'))
+    await mkdir(join(root, 'wiki'))
+    await writeFile(join(root, 'raw', 'source.md'), 'abc')
+    await writeFile(join(root, 'converted', 'source.md'), 'converted')
+    await writeFile(join(root, 'wiki', 'page.md'), '# Page\n')
+    await writeFile(join(outside, 'secret.md'), 'secret')
+    await symlink(join(outside, 'secret.md'), join(root, 'raw', 'escaped.md'))
+
+    const { createUjimuCustomToolsForTask } = await import('../server/utils/pi/session')
+    const tool = createUjimuCustomToolsForTask('ingestion', root)
+      .find((candidate: { name: string }) => candidate.name === 'sha256_file')
+
+    await expect(tool.execute('hash-1', { path: 'raw/source.md' })).resolves.toMatchObject({
+      details: {
+        path: 'raw/source.md',
+        sha256: 'sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+      }
+    })
+    await expect(tool.execute('hash-2', { path: 'converted/source.md' })).resolves.toMatchObject({
+      details: { path: 'converted/source.md', sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/) }
+    })
+    await expect(tool.execute('hash-3', { path: 'wiki/page.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
+    await expect(tool.execute('hash-4', { path: 'raw/escaped.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
+    await expect(tool.execute('hash-5', { path: '../secret.md' })).rejects.toMatchObject({ code: 'INVALID_HASH_PATH' })
+  })
+
   it('blocks ingestion publication until PDF visual coverage is publishable', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-ingestion-policy-'))
     await mkdir(join(root, 'raw'))

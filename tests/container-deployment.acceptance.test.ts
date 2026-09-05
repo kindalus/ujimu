@@ -15,6 +15,7 @@ describe('Podman container deployment acceptance', () => {
     expect(dockerfile).not.toContain('@google/gemini-cli')
     expect(dockerfile).toContain('ca-certificates')
     expect(dockerfile).toContain('coreutils')
+    expect(dockerfile).toContain('ripgrep')
     for (const pdfTool of [
       'ocrmypdf',
       'poppler-utils',
