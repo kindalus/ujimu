@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>Arquitectura — Verificação de respostas derivadas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg:#090907; --panel:#171711; --panel2:#222219; --text:#f8f4e8; --muted:#aaa594; --line:#39372d; --accent:#f7ce1b; --ok:#8bd7a5; --warn:#efaa62; --danger:#e77b73; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; color:var(--text); font-family:'IBM Plex Sans',sans-serif; background:radial-gradient(circle at 14% 2%,rgba(247,206,27,.14),transparent 27%),linear-gradient(135deg,#090907,#17150d 72%,#0d0d09); }
+    .slide { display:none; width:100vw; height:100vh; padding:7vh 10vw; align-items:center; justify-content:center; }
+    .slide.active { display:flex; animation:enter .18s ease-out; }
+    @keyframes enter { from { opacity:.2; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .frame { width:min(1160px,100%); }
+    h1,h2 { margin:0 0 1.15rem; line-height:1.02; letter-spacing:-.045em; }
+    h1 { font-size:clamp(2.8rem,6vw,5.7rem); font-weight:700; }
+    h2 { font-size:clamp(2rem,4vw,3.6rem); font-weight:700; }
+    p,li,td,th { font-size:clamp(.94rem,1.24vw,1.09rem); line-height:1.43; }
+    p,li,td { color:var(--muted); }
+    ul { display:grid; gap:.54rem; margin:0; padding-left:1.2rem; }
+    .eyebrow { margin-bottom:1rem; color:var(--accent); font:600 .79rem/1.4 'IBM Plex Mono',monospace; letter-spacing:.13em; text-transform:uppercase; }
+    .panel { padding:1.18rem; border:1px solid var(--line); border-radius:20px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 24px 80px rgba(0,0,0,.24); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .good { border-color:color-mix(in srgb,var(--ok) 45%,var(--line)); }
+    .warn { border-color:color-mix(in srgb,var(--warn) 48%,var(--line)); }
+    .danger { border-color:color-mix(in srgb,var(--danger) 48%,var(--line)); }
+    .kicker { color:var(--text); font-weight:600; }
+    code { color:#fff0a0; font-family:'IBM Plex Mono',monospace; font-size:.91em; }
+    .flow { display:flex; align-items:stretch; gap:.48rem; }
+    .node { flex:1; min-width:0; padding:.9rem; border:1px solid var(--line); border-radius:18px; background:var(--panel2); }
+    .node b { display:block; margin-bottom:.3rem; color:var(--text); }
+    .node span { color:var(--muted); line-height:1.32; }
+    .arrow { align-self:center; color:var(--accent); font:600 1.2rem 'IBM Plex Mono',monospace; }
+    table { width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:var(--panel); }
+    th,td { padding:.68rem .8rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--text); font-weight:600; }
+    tr:last-child td { border-bottom:0; }
+    .pill { display:inline-flex; margin-top:1rem; padding:.38rem .72rem; border:1px solid var(--line); border-radius:999px; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .counter { position:fixed; right:2rem; bottom:1.4rem; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .bar { position:fixed; left:0; bottom:0; height:3px; width:calc((var(--idx) + 1) / var(--total) * 100%); background:var(--accent); transition:width .18s ease; }
+    @media (max-width:900px) { .slide { padding:5vh 6vw; } .grid,.three { grid-template-columns:1fr; } .flow { display:grid; grid-template-columns:1fr; } .arrow { display:none; } }
+    @media print { body { overflow:visible; } .slide { display:flex; break-after:page; } .counter,.bar { display:none; } }
+  </style>
+</head>
+<body style="--idx:0;--total:13">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Arquitectura mínima · Zafir</div>
+    <h1>Auditoria probabilística de derived</h1>
+    <p>Uma pipeline durável, posterior ao chat e isolada por especialidade, sem alterar o skill nem a resposta já entregue.</p>
+    <span class="pill">Origem: brainstorm-derived-answer-quality-verification.html</span>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Direcção aprovada</div>
+    <h2>Preservar a arquitectura actual</h2>
+    <div class="grid">
+      <div class="panel"><p><span class="kicker">Chat runner.</span> Continua a observar os paths realmente lidos.</p></div>
+      <div class="panel"><p><span class="kicker">Engine.</span> Fecha o stream e agenda trabalho sem bloquear o cliente.</p></div>
+      <div class="panel"><p><span class="kicker">SQLite.</span> Guarda fila, veredictos e quarentena.</p></div>
+      <div class="panel"><p><span class="kicker">Worker Pi.</span> Reutiliza modelos e políticas por tarefa.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Sequência principal</div>
+    <h2>Do fecho ao veredicto</h2>
+    <div class="flow">
+      <div class="node"><b>1. Entregar</b><span>Texto, citações e <code>done</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>2. Registar</b><span>Evento e paths derived.</span></div><div class="arrow">→</div>
+      <div class="node"><b>3. Seleccionar</b><span>Primeira revisão ou 10% estáveis.</span></div><div class="arrow">→</div>
+      <div class="node"><b>4. Enfileirar</b><span>Payload privado e transitório.</span></div><div class="arrow">→</div>
+      <div class="node"><b>5. Verificar</b><span>Baseline, juízo e eventual reparação.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Sorteio e idempotência</div>
+    <h2>Decisão reproduzível por evento</h2>
+    <ul>
+      <li>Elegível apenas se <code>consultedDocuments</code> contiver <code>wiki/derived/*.md</code>.</li>
+      <li>Hash uniforme do event ID selecciona exactamente a faixa configurada de 10%.</li>
+      <li>Uma revisão de página ainda não verificada força a selecção.</li>
+      <li><code>event_id UNIQUE</code> impede jobs duplicados em retries.</li>
+      <li>O hash do conteúdo distingue criação, recriação e nova revisão.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Persistência</div>
+    <h2>Duas tabelas, duas responsabilidades</h2>
+    <table>
+      <tr><th>Tabela</th><th>Responsabilidade</th></tr>
+      <tr><td><code>answer_verifications</code></td><td>Fila, event ID, payload transitório, tentativas, nível, razão, paths negativos e instantes.</td></tr>
+      <tr><td><code>derived_page_quality</code></td><td>Especialidade + path, hash da revisão, estado <code>verified | review_required | quarantined</code> e última verificação.</td></tr>
+    </table>
+    <p>Respostas e contexto são apagados no estado terminal; ficam apenas hashes, veredicto e justificação sanitizada.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Fila e exclusão</div>
+    <h2>Usar o lock de especialidade existente</h2>
+    <ul>
+      <li>A verificação nasce em <code>answer_verifications</code> mesmo quando há outro job activo.</li>
+      <li>Um promotor liga o registo mais antigo a <code>background_jobs</code> quando a especialidade fica livre.</li>
+      <li>O novo tipo <code>answer_verification</code> passa pelo lock e retry já existentes.</li>
+      <li>Após cada job, o worker promove o próximo registo pendente.</li>
+      <li>Ingestão, derivação, reset e reparação nunca escrevem concorrentemente.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Capacidades Pi</div>
+    <h2>Três tarefas, três políticas</h2>
+    <table>
+      <tr><th>Tarefa</th><th>Modelo</th><th>Capacidade</th></tr>
+      <tr><td><code>answer_verification</code></td><td>Predefinido</td><td>Read-only; <code>wiki/derived/</code> bloqueada em código.</td></tr>
+      <tr><td><code>answer_judgement</code></td><td>Ingestão</td><td>Lê AGENTS, wiki e converted; emite JSON validado.</td></tr>
+      <tr><td><code>derived_repair</code></td><td>Ingestão</td><td>Escreve apenas numa cópia transitória sem <code>raw/</code>.</td></tr>
+    </table>
+    <p>Todos os prompts vivem no Ujimu. Nenhum ficheiro do skill é modificado.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Contrato do juiz</div>
+    <h2>Output estreito e validado</h2>
+    <pre class="panel"><code>{
+  "level": "FIEL | MUITO_ALINHADO | ALINHADO | POUCO_ALINHADO | NAO_ALINHADO",
+  "reason": "explicação curta",
+  "confidence": "high | medium | low"
+}</code></pre>
+    <p><code>ALINHADO</code> ou inferior abre uma segunda sessão de atribuição; comparação e culpa não são decididas no mesmo passo.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Atribuição e quarentena</div>
+    <h2>Bloquear apenas com contribuição negativa</h2>
+    <ul>
+      <li>Atribuição devolve paths derived negativos, ou lista vazia, com evidência.</li>
+      <li>Paths têm de pertencer às derivações realmente consultadas.</li>
+      <li>Um resultado negativo muda a página para <code>quarantined</code> antes da reparação.</li>
+      <li>Chat remove-a das hints e a política de ficheiros bloqueia a leitura directa.</li>
+      <li>Se o baseline for pior, nenhuma página é bloqueada ou recriada.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Reparação isolada</div>
+    <h2>Preparar fora da wiki activa</h2>
+    <div class="flow">
+      <div class="node"><b>Copiar</b><span>AGENTS, wiki e converted para <code>.ujimu/verification/</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Recriar</b><span>Target e novas páginas necessárias.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Responder</b><span>Testar a candidata no workspace transitório.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Julgar</b><span>Exigir <code>FIEL</code> ou <code>MUITO_ALINHADO</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Promover</b><span>Ficheiros validados; índice por último.</span></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Fontes e rollback</div>
+    <h2>Nunca inventar cobertura</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Permitido.</span> Criar novas páginas wiki a partir de material já existente em <code>converted/</code>.</p></div>
+      <div class="panel danger"><p><span class="kicker">Proibido.</span> Ler ou alterar <code>raw/</code>, escrever converted, ou obter fontes externas.</p></div>
+      <div class="panel warn"><p><span class="kicker">Sem evidência.</span> Terminar em <code>NEEDS_ADMIN_SOURCE</code> e manter quarentena.</p></div>
+      <div class="panel"><p><span class="kicker">Falha.</span> Não promover a candidata; apagar staging e conservar a versão anterior bloqueada.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Falhas, privacidade e limites</div>
+    <h2>A auditoria nunca regressa ao cliente</h2>
+    <ul>
+      <li>Falhas são recuperáveis, sanitizadas e limitadas a três tentativas.</li>
+      <li>O cliente não recebe eventos, atrasos ou alterações retroactivas.</li>
+      <li>Payload completo permanece privado e só enquanto necessário ao job.</li>
+      <li>Sem UI administrativa nesta extensão; estado fica disponível no SQLite e logs técnicos.</li>
+      <li>Sem garantia preventiva: uma resposta incorrecta pode motivar a própria auditoria.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Gate de arquitectura</div>
+    <h2>Arquitectura aprovada</h2>
+    <div class="panel good"><p>Extensão mínima sobre telemetria, SQLite, background jobs e sessões Pi existentes. A fila preserva exclusão por especialidade; políticas de ferramenta garantem baseline sem derived e reparação sem raw; staging impede publicação antes da verificação.</p></div>
+    <p>O utilizador aprovou este desenho. Próximo passo autorizado: slices verticais com testes de aceitação antes do código.</p>
+    <span class="pill">Iteração 2 — arquitectura aprovada em 2026-09-07; sem mudança no skill</span>
+  </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">13</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let index = 0;
+    const current = document.getElementById('current');
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', String(total));
+    function go(next) {
+      slides[index].classList.remove('active');
+      index = Math.max(0, Math.min(next, total - 1));
+      slides[index].classList.add('active');
+      current.textContent = String(index + 1);
+      document.body.style.setProperty('--idx', String(index));
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1); }
+      if (event.key === 'ArrowLeft') go(index - 1);
+    });
+    document.addEventListener('click', event => go(event.clientX > innerWidth / 2 ? index + 1 : index - 1));
+  </script>
+</body>
+</html>
