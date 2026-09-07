@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title>Brainstorm — Verificação de respostas derivadas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    :root { --bg:#090907; --panel:#171711; --panel2:#222219; --text:#f8f4e8; --muted:#aaa594; --line:#39372d; --accent:#f7ce1b; --ok:#8bd7a5; --warn:#efaa62; --danger:#e77b73; }
+    * { box-sizing:border-box; }
+    body { margin:0; overflow:hidden; color:var(--text); font-family:'IBM Plex Sans',sans-serif; background:radial-gradient(circle at 86% 3%,rgba(247,206,27,.15),transparent 28%),linear-gradient(135deg,#090907,#17150d 70%,#0d0d09); }
+    .slide { display:none; width:100vw; height:100vh; padding:7vh 10vw; align-items:center; justify-content:center; }
+    .slide.active { display:flex; animation:enter .18s ease-out; }
+    @keyframes enter { from { opacity:.2; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .frame { width:min(1140px,100%); }
+    h1,h2 { margin:0 0 1.15rem; line-height:1.02; letter-spacing:-.045em; }
+    h1 { font-size:clamp(2.8rem,6vw,5.7rem); font-weight:700; }
+    h2 { font-size:clamp(2rem,4vw,3.6rem); font-weight:700; }
+    p,li,td,th { font-size:clamp(.96rem,1.28vw,1.12rem); line-height:1.45; }
+    p,li,td { color:var(--muted); }
+    ul { display:grid; gap:.58rem; margin:0; padding-left:1.2rem; }
+    .eyebrow { margin-bottom:1rem; color:var(--accent); font:600 .79rem/1.4 'IBM Plex Mono',monospace; letter-spacing:.13em; text-transform:uppercase; }
+    .panel { padding:1.25rem; border:1px solid var(--line); border-radius:20px; background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)); box-shadow:0 24px 80px rgba(0,0,0,.24); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .good { border-color:color-mix(in srgb,var(--ok) 45%,var(--line)); }
+    .warn { border-color:color-mix(in srgb,var(--warn) 48%,var(--line)); }
+    .danger { border-color:color-mix(in srgb,var(--danger) 48%,var(--line)); }
+    .kicker { color:var(--text); font-weight:600; }
+    code { color:#fff0a0; font-family:'IBM Plex Mono',monospace; font-size:.91em; }
+    .flow { display:flex; align-items:stretch; gap:.5rem; }
+    .node { flex:1; min-width:0; padding:.95rem; border:1px solid var(--line); border-radius:18px; background:var(--panel2); }
+    .node b { display:block; margin-bottom:.32rem; color:var(--text); }
+    .node span { color:var(--muted); line-height:1.35; }
+    .arrow { align-self:center; color:var(--accent); font:600 1.2rem 'IBM Plex Mono',monospace; }
+    table { width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:var(--panel); }
+    th,td { padding:.7rem .82rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--text); font-weight:600; }
+    tr:last-child td { border-bottom:0; }
+    .pill { display:inline-flex; margin-top:1rem; padding:.38rem .72rem; border:1px solid var(--line); border-radius:999px; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .counter { position:fixed; right:2rem; bottom:1.4rem; color:var(--muted); font:.82rem 'IBM Plex Mono',monospace; }
+    .bar { position:fixed; left:0; bottom:0; height:3px; width:calc((var(--idx) + 1) / var(--total) * 100%); background:var(--accent); transition:width .18s ease; }
+    @media (max-width:900px) { .slide { padding:5vh 6vw; } .grid,.three { grid-template-columns:1fr; } .flow { display:grid; grid-template-columns:1fr; } .arrow { display:none; } }
+    @media print { body { overflow:visible; } .slide { display:flex; break-after:page; } .counter,.bar { display:none; } }
+  </style>
+</head>
+<body style="--idx:0;--total:10">
+  <section class="slide active"><div class="frame">
+    <div class="eyebrow">Brainstorm vivo · iteração 1</div>
+    <h1>Verificação de respostas derivadas</h1>
+    <p>Auditar uma amostra de respostas depois da entrega, detectar derivações prejudiciais e repará-las sem aumentar a latência do cliente.</p>
+    <span class="pill">Extensão brown-field · sem mudanças no skill llm-wiki</span>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Objectivo e valor</div>
+    <h2>Transformar utilização real em controlo de qualidade</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Utilizador.</span> Mantém a resposta rápida baseada em derived, sem esperar pela auditoria.</p></div>
+      <div class="panel good"><p><span class="kicker">Wiki.</span> Descobre páginas que degradam respostas e corrige-as com evidência.</p></div>
+      <div class="panel"><p><span class="kicker">Operação.</span> Mede alinhamento de forma persistente e auditável.</p></div>
+      <div class="panel"><p><span class="kicker">Sucesso.</span> Toda a amostra elegível produz veredicto ou falha recuperável.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Contexto governante</div>
+    <h2>Estender mecanismos já verificados</h2>
+    <ul>
+      <li><code>AGENTS.md</code> governa segurança, privacidade, wiki-only e citações; não existe <code>docs/wiki/</code>.</li>
+      <li>Slices 65–68 já entregam telemetria pós-resposta, caminhos consultados e pistas globais.</li>
+      <li>Slices 69–71 já entregam jobs de derivação, escrita restrita, rollback e curadoria administrativa.</li>
+      <li>Chat continua read-only; qualquer reparação ocorre fora da sessão que responde ao cliente.</li>
+      <li><code>raw/</code> permanece imutável e não é lido na consulta ou verificação.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Gatilho acordado</div>
+    <h2>Derived consultada activa o sorteio</h2>
+    <div class="flow">
+      <div class="node"><b>Resposta entregue</b><span>O stream fecha sem esperar.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Observação</b><span>Há path sob <code>wiki/derived/</code>?</span></div><div class="arrow">→</div>
+      <div class="node"><b>Amostra</b><span>10% por evento elegível.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Primeira versão</b><span>Verificação obrigatória após criar ou recriar.</span></div>
+    </div>
+    <p>O sorteio será estável por event ID para impedir amostragem duplicada em retries.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Verificação independente</div>
+    <h2>Responder de novo sem derived</h2>
+    <ul>
+      <li>Usar o modelo de chat predefinido e o mesmo contexto funcional da pergunta.</li>
+      <li>Bloquear <code>wiki/derived/</code> na política de ferramentas, não apenas no prompt.</li>
+      <li>Remover páginas derivadas das retrieval hints.</li>
+      <li>Continuar limitado a <code>AGENTS.md</code> e <code>wiki/</code>, sem escrita.</li>
+      <li>A resposta de controlo não é mostrada ao cliente nem tomada automaticamente como verdade.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Juízo de alinhamento</div>
+    <h2>Cinco níveis com significado fixo</h2>
+    <table>
+      <tr><th>Nível</th><th>Critério</th></tr>
+      <tr><td><code>FIEL</code></td><td>Mesmas conclusões, valores, condições e fundamento.</td></tr>
+      <tr><td><code>MUITO_ALINHADO</code></td><td>Diferenças menores sem impacto jurídico ou prático.</td></tr>
+      <tr><td><code>ALINHADO</code></td><td>Conclusão igual, mas com omissões ou diferenças relevantes.</td></tr>
+      <tr><td><code>POUCO_ALINHADO</code></td><td>Diferenças capazes de alterar a decisão do utilizador.</td></tr>
+      <tr><td><code>NAO_ALINHADO</code></td><td>Contradição factual, jurídica ou numérica.</td></tr>
+    </table>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Atribuição</div>
+    <h2>Diferença não prova culpa da derived</h2>
+    <ul>
+      <li><code>FIEL</code> e <code>MUITO_ALINHADO</code> encerram a verificação.</li>
+      <li><code>ALINHADO</code> ou inferior inicia uma análise separada pelo modelo de ingestão.</li>
+      <li>A análise recebe pergunta, respostas, citações e listas de páginas consultadas.</li>
+      <li>Pode concluir que a resposta sem derived é pior ou que nenhuma derived contribuiu negativamente.</li>
+      <li>O resultado estruturado identifica paths e explica a contribuição negativa com evidência.</li>
+    </ul>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Reparação segura</div>
+    <h2>Quarentena, candidata e promoção</h2>
+    <div class="flow">
+      <div class="node"><b>Quarentena</b><span>Derived prejudicial deixa de ser elegível.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Recriar</b><span>Modelo de ingestão prepara candidata.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Completar</b><span>Pode criar wiki pages a partir de <code>converted/</code>.</span></div><div class="arrow">→</div>
+      <div class="node"><b>Promover</b><span>Só após nova verificação favorável.</span></div>
+    </div>
+    <p>Se faltar documento oficial, o job termina em <code>NEEDS_ADMIN_SOURCE</code>; nunca inventa nem altera <code>raw/</code>.</p>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Limites e protecções</div>
+    <h2>O que esta funcionalidade não promete</h2>
+    <div class="grid">
+      <div class="panel warn"><p><span class="kicker">Pós-entrega.</span> Detecta problemas depois de uma resposta já ter sido entregue.</p></div>
+      <div class="panel warn"><p><span class="kicker">Modelos.</span> Comparação automática não substitui revisão jurídica humana.</p></div>
+      <div class="panel"><p><span class="kicker">Privacidade.</span> Respostas completas são transitórias; persistem veredicto, paths, razões e versões.</p></div>
+      <div class="panel"><p><span class="kicker">Anti-loop.</span> Uma verificação por evento, uma reparação por versão e tentativas limitadas.</p></div>
+    </div>
+  </div></section>
+
+  <section class="slide"><div class="frame">
+    <div class="eyebrow">Decisões e questões abertas</div>
+    <h2>Iteração 1 registada</h2>
+    <div class="grid">
+      <div class="panel good"><p><span class="kicker">Decidido.</span> 10%, pós-resposta, baseline sem derived, juiz de ingestão, cinco níveis, atribuição antes de reparar, promoção validada e zero mudanças no skill.</p></div>
+      <div class="panel"><p><span class="kicker">Arquitectura por fechar.</span> Persistência transitória, fila independente, quarentena efectiva e serialização com ingestão.</p></div>
+      <div class="panel good"><p><span class="kicker">Contexto confirmado.</span> Não existem políticas ou fontes governantes adicionais fora do repositório.</p></div>
+      <div class="panel"><p><span class="kicker">Não incluído por agora.</span> Nova interface administrativa, alteração da taxa em UI ou revisão retroactiva de todas as respostas.</p></div>
+    </div>
+    <span class="pill">Log: 2026-09-07 — âmbito aprovado pelo utilizador; autorizado o desenho técnico.</span>
+  </div></section>
+
+  <div class="counter"><span id="current">1</span> / <span id="total">10</span></div><div class="bar"></div>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let index = 0;
+    const current = document.getElementById('current');
+    const total = slides.length;
+    document.getElementById('total').textContent = String(total);
+    document.body.style.setProperty('--total', String(total));
+    function go(next) {
+      slides[index].classList.remove('active');
+      index = Math.max(0, Math.min(next, total - 1));
+      slides[index].classList.add('active');
+      current.textContent = String(index + 1);
+      document.body.style.setProperty('--idx', String(index));
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); go(index + 1); }
+      if (event.key === 'ArrowLeft') go(index - 1);
+    });
+    document.addEventListener('click', event => go(event.clientX > innerWidth / 2 ? index + 1 : index - 1));
+  </script>
+</body>
+</html>
