@@ -162,6 +162,7 @@ ${input.question}
 Read AGENTS.md, wiki/index.md, relevant wiki pages, and converted sources only when needed to integrate source detail into the wiki. Do not read raw/.
 If evidence is insufficient, stop without writing.
 Otherwise create exactly ${input.targetPath}, add valid OKF frontmatter including source_pages, and update only wiki/index.md and wiki/log.md.
+The frontmatter tags array must include the exact literal tag derived, for example: tags: [derived]. Translated alternatives do not satisfy the contract.
 Do not include conversation history or any prior answer. Do not write any other path.`
 }
 
