@@ -1,6 +1,6 @@
 # Derived answer quality verification plan
 
-Status: approved on 2026-09-07
+Status: completed and verified on 2026-09-07
 
 Approved source decks:
 
@@ -36,7 +36,7 @@ Audit a deterministic 10% sample of completed answers that consulted derived wik
 
 1. Slice 75 — verified: sampling, durable backlog, source-only default-model baseline.
 2. Slice 76 — verified: ingestion-model alignment, attribution, and effective quarantine.
-3. Slice 77 — staged repair, post-repair verification, and safe promotion.
+3. Slice 77 — verified: staged repair, post-repair verification, and safe promotion.
 
 ## Dependency graph
 

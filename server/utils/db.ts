@@ -759,7 +759,7 @@ const MIGRATIONS: Migration[] = [
         id TEXT PRIMARY KEY,
         event_id TEXT NOT NULL UNIQUE REFERENCES question_analytics_events(id) ON DELETE CASCADE,
         specialist_id TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'baseline_ready', 'repair_pending', 'succeeded', 'failed', 'needs_admin_source')),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'queued', 'running', 'succeeded', 'failed', 'needs_admin_source')),
         sample_reason TEXT NOT NULL CHECK (sample_reason IN ('first_revision', 'random')),
         original_answer TEXT,
         original_citations_json TEXT,
@@ -772,6 +772,8 @@ const MIGRATIONS: Migration[] = [
         alignment_reason TEXT,
         alignment_confidence TEXT CHECK (alignment_confidence IS NULL OR alignment_confidence IN ('high', 'medium', 'low')),
         negative_derived_pages_json TEXT,
+        attribution_reason TEXT,
+        repair_reason TEXT,
         last_error_code TEXT,
         last_error_message TEXT,
         job_id TEXT UNIQUE REFERENCES background_jobs(id) ON DELETE SET NULL,
@@ -790,10 +792,24 @@ const MIGRATIONS: Migration[] = [
         wiki_path TEXT NOT NULL,
         revision_sha256 TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('pending', 'verified', 'review_required', 'quarantined')),
-        verification_id TEXT REFERENCES answer_verifications(id) ON DELETE CASCADE,
+        verification_id TEXT REFERENCES answer_verifications(id) ON DELETE SET NULL,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (specialist_id, wiki_path)
       );
+
+      CREATE TRIGGER preserve_derived_page_quality_before_verification_delete
+      BEFORE DELETE ON answer_verifications
+      BEGIN
+        UPDATE background_jobs
+        SET status = 'cancelled', locked_at = NULL, locked_by = NULL,
+          updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+        WHERE id = OLD.job_id AND status IN ('queued', 'running');
+        UPDATE derived_page_quality
+        SET status = CASE WHEN status = 'pending' THEN 'review_required' ELSE status END,
+          verification_id = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE verification_id = OLD.id;
+      END;
     `
   }
 ]

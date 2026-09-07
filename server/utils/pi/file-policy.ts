@@ -174,6 +174,39 @@ export function createDerivationFilePolicyExtension(cwd: string, targetPath: str
   }
 }
 
+export function createDerivedRepairFilePolicyExtension(cwd: string, targetPaths: string[]): {
+  name: string
+  hidden: boolean
+  factory: (pi: any) => void
+} {
+  const writeTargets = [...targetPaths, 'wiki/index.md', 'wiki/log.md']
+  const createdPaths = new Set<string>()
+  return {
+    name: 'ujimu-derived-repair-file-policy',
+    hidden: true,
+    factory(pi) {
+      pi.on('tool_call', async (event: { toolName?: unknown; input?: { path?: unknown } }) => {
+        const toolName = typeof event.toolName === 'string' ? event.toolName : ''
+        const requestedPath = typeof event.input?.path === 'string' ? event.input.path : '.'
+        if (toolName === 'write' || toolName === 'edit') {
+          if (await isDerivationWritePathAllowed(cwd, requestedPath, writeTargets)) return undefined
+          const resolvedPath = resolve(cwd, requestedPath)
+          if (createdPaths.has(resolvedPath)) return undefined
+          if (toolName === 'write' && await isNewRepairWikiPageAllowed(cwd, requestedPath)) {
+            createdPaths.add(resolvedPath)
+            return undefined
+          }
+          return { block: true, reason: 'Write path is not allowed for this derived repair.' }
+        }
+        if (CHAT_FILE_TOOLS.has(toolName) && await isDerivationReadPathAllowed(cwd, requestedPath)) {
+          return undefined
+        }
+        return { block: true, reason: 'Tool or path is not allowed for this derived repair.' }
+      })
+    }
+  }
+}
+
 export async function isDerivationReadPathAllowed(cwd: string, requestedPath: string): Promise<boolean> {
   try {
     const root = await realpath(cwd)
@@ -229,6 +262,20 @@ export async function isChatPathAllowed(cwd: string, requestedPath: string): Pro
 
     if (!isWithin(root, wiki)) return false
     return requested === agents || isWithin(wiki, requested)
+  } catch {
+    return false
+  }
+}
+
+async function isNewRepairWikiPageAllowed(cwd: string, requestedPath: string): Promise<boolean> {
+  try {
+    const root = await realpath(cwd)
+    const wiki = await realpath(resolve(root, 'wiki'))
+    const derived = await realpath(resolve(wiki, 'derived'))
+    const target = resolve(root, requestedPath)
+    if (!isWithin(wiki, target) || isWithin(derived, target) || extname(target).toLowerCase() !== '.md') return false
+    if (await lstat(target).catch(() => undefined)) return false
+    return hasSafeExistingParent(wiki, target)
   } catch {
     return false
   }

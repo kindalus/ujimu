@@ -192,6 +192,7 @@ describe('task-scoped Pi tools acceptance', () => {
     await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/derived/answer.md' } })).resolves.toBeUndefined()
     await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/index.md' } })).resolves.toBeUndefined()
     await expect(handler?.({ toolName: 'write', input: { path: 'wiki/articles/new.md' } })).resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/articles/new.md' } })).resolves.toBeUndefined()
     await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/articles/existing.md' } })).resolves.toMatchObject({ block: true })
     await expect(handler?.({ toolName: 'write', input: { path: 'converted/new.md' } })).resolves.toMatchObject({ block: true })
     await expect(handler?.({ toolName: 'read', input: { path: 'raw/secret.md' } })).resolves.toMatchObject({ block: true })

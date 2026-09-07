@@ -119,7 +119,7 @@ describe('staged derived repair acceptance', () => {
           return { level: 'ALINHADO', reason: 'Ainda falta uma condição.', confidence: 'high' }
         }
       }
-    })).rejects.toMatchObject<Partial<DerivedRepairExecutionError>>({ code: 'DERIVED_REPAIR_NOT_ACCEPTED' })
+    })).rejects.toMatchObject({ code: 'DERIVED_REPAIR_NOT_ACCEPTED' } satisfies Partial<DerivedRepairExecutionError>)
 
     await expect(readFile(join(fixture.root, 'wiki', 'derived', 'answer.md'), 'utf8')).resolves.toBe(OLD_DERIVED)
     await expect(access(join(fixture.root, 'wiki', 'articles', 'new.md'))).rejects.toThrow()

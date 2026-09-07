@@ -87,39 +87,39 @@
 ### Task 7: Create an isolated repair workspace
 
 **Acceptance criteria:**
-- [ ] Staging contains only AGENTS, wiki, and converted content.
-- [ ] The active specialist wiki remains byte-identical during candidate preparation.
-- [ ] Repair cannot read or write raw or escape staging.
+- [x] Staging contains only AGENTS, wiki, and converted content.
+- [x] The active specialist wiki remains byte-identical during candidate preparation.
+- [x] Repair cannot read or write raw or escape staging.
 
-**Verification:** Filesystem and file-policy acceptance tests.
+**Verification:** Filesystem and file-policy acceptance tests passed.
 
 **Dependencies:** Slice 76
 
 ### Task 8: Recreate and validate a candidate
 
 **Acceptance criteria:**
-- [ ] The ingestion model can replace the target and create missing wiki pages from converted evidence.
-- [ ] Existing non-target wiki pages cannot be edited.
-- [ ] Invalid output or missing evidence produces a stable recoverable result.
+- [x] The ingestion model can replace the target and create missing wiki pages from converted evidence.
+- [x] Existing non-target wiki pages cannot be edited.
+- [x] Invalid output or missing evidence produces a stable recoverable result.
 
-**Verification:** Repair-runner acceptance tests.
+**Verification:** Repair-runner acceptance tests passed.
 
 **Dependencies:** Task 7
 
 ### Task 9: Verify and promote the candidate
 
 **Acceptance criteria:**
-- [ ] A candidate answer is compared with the stored baseline.
-- [ ] Only `FIEL` or `MUITO_ALINHADO` promotes files and clears quarantine.
-- [ ] Failure removes staging, clears transient private data, and leaves the prior page quarantined.
+- [x] A candidate answer is compared with the stored baseline.
+- [x] Only `FIEL` or `MUITO_ALINHADO` promotes files and clears quarantine.
+- [x] Failure removes staging, clears transient private data, and leaves the prior page quarantined.
 
-**Verification:** End-to-end verification pipeline tests and real production smoke test.
+**Verification:** End-to-end verification pipeline tests passed; production smoke remains the deployment gate.
 
 **Dependencies:** Task 8
 
 ### Slice 77 checkpoint
 
-- [ ] Operations documentation, slice deck, and `STATUS.md` are current.
-- [ ] Full tests, typecheck, build, and dependency audit pass.
+- [x] Operations documentation, slice deck, and `STATUS.md` are current.
+- [x] Full tests, typecheck, build, and dependency audit pass.
 - [ ] Production deploy and real tool-call verification pass.
-- [ ] No `llm-wiki` skill file changed.
+- [x] No `llm-wiki` skill file changed.

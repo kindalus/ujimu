@@ -134,7 +134,32 @@ Known non-blocking warnings:
 | 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `verified` | 2026-09-03 | Removed the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
-| 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `acceptance-tested` | — | Red tests cover raw-free staging, active-wiki isolation, new evidence pages, post-check rejection, explicit missing-source outcome, promotion, and quarantine release. |
+| 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
+
+## Derived answer quality verification
+
+Status: `verified`
+
+Approved originating decks:
+
+- [`../brainstorm-derived-answer-quality-verification.html`](../brainstorm-derived-answer-quality-verification.html)
+- [`../derived-answer-quality-verification-architecture.html`](../derived-answer-quality-verification-architecture.html)
+
+Implementation order:
+
+1. Slice 75 persists first-revision and deterministic 10% samples after response delivery, then produces a default-model baseline with derived pages blocked by the file policy.
+2. Slice 76 uses the ingestion model for five-level alignment and separate negative attribution, then filters and blocks quarantined paths in later consultations.
+3. Slice 77 repairs all negatively contributing paths in a raw-free staging workspace, tests the candidate answer, and promotes only `FIEL` or `MUITO_ALINHADO` results.
+
+Verified guarantees:
+
+- Verification never delays or alters the response already delivered to the client.
+- Model output and attributed paths are validated before state or files change.
+- A negatively contributing derived page is quarantined before repair and remains blocked after failure or missing official evidence.
+- Staging contains copied `AGENTS.md`, `wiki/`, and `converted/` content, never `raw/`; only targets, index/log, and new referenced wiki Markdown pages may change.
+- Transient answers and conversation context are cleared on every terminal result.
+- No `llm-wiki` skill file changed.
+- 340 tests, typecheck, production build, and the high-severity dependency-audit gate passed; 36 pre-existing moderate Tiptap advisories remain tracked.
 
 ## Gemini dependency removal
 

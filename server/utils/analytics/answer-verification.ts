@@ -14,8 +14,6 @@ export type AnswerVerificationStatus =
   | 'pending'
   | 'queued'
   | 'running'
-  | 'baseline_ready'
-  | 'repair_pending'
   | 'succeeded'
   | 'failed'
   | 'needs_admin_source'
@@ -49,10 +47,15 @@ export interface NegativeDerivedAttribution {
   reason: string
 }
 
+export type DerivedRepairOutcome =
+  | { status: 'accepted'; revisions: DerivedPageRevision[] }
+  | { status: 'needs_admin_source'; reason: string }
+
 export interface AnswerVerificationExecutionResult {
   baseline: AnswerVerificationBaseline
   judgement: AnswerAlignmentJudgement
   attribution?: NegativeDerivedAttribution
+  repair?: DerivedRepairOutcome
 }
 
 export interface AnswerVerificationRecord {
@@ -68,6 +71,8 @@ export interface AnswerVerificationRecord {
   baseline: AnswerVerificationBaseline | null
   judgement: AnswerAlignmentJudgement | null
   negativeDerivedPaths: string[]
+  attributionReason: string | null
+  repairReason: string | null
   jobId: string | null
   createdAt: string
   updatedAt: string
@@ -100,6 +105,8 @@ export async function enqueueDerivedAnswerVerification(
 
   const quality = readPageQuality(database, event.specialist_id, derivedPages.map((page) => page.path))
   const firstRevision = derivedPages.some((page) => quality.get(page.path)?.revision_sha256 !== page.revisionSha256)
+  const quarantinedPath = derivedPages.some((page) => quality.get(page.path)?.status === 'quarantined')
+  if (quarantinedPath) return undefined
   const pendingCurrentRevision = derivedPages.some((page) => {
     const record = quality.get(page.path)
     return record?.revision_sha256 === page.revisionSha256 && record.status === 'pending'
@@ -234,6 +241,72 @@ export function markAnswerVerificationRunning(database: DatabaseSync, verificati
   `).run(now.toISOString(), verificationId)
 }
 
+export function quarantineAttributedDerivedPages(
+  database: DatabaseSync,
+  input: {
+    verificationId: string
+    baseline: AnswerVerificationBaseline
+    judgement: AnswerAlignmentJudgement
+    attribution: NegativeDerivedAttribution
+    now?: Date
+  }
+): void {
+  const verification = readAnswerVerification(database, input.verificationId)
+  if (!verification || verification.status !== 'running') {
+    throw new Error('Answer verification is not running.')
+  }
+  assertExecutionResult(
+    { baseline: input.baseline, judgement: input.judgement, attribution: input.attribution },
+    verification.derivedPages.map((page) => page.path),
+    false
+  )
+  const negativePaths = [...new Set(input.attribution.negativeDerivedPaths)].sort()
+  if (negativePaths.length === 0) return
+  const negative = new Set(negativePaths)
+  const now = (input.now ?? new Date()).toISOString()
+
+  database.exec('BEGIN IMMEDIATE')
+  try {
+    database.prepare(`
+      UPDATE answer_verifications
+      SET baseline_answer = ?, baseline_citations_json = ?, baseline_documents_json = ?,
+        alignment_level = ?, alignment_reason = ?, alignment_confidence = ?,
+        negative_derived_pages_json = ?, attribution_reason = ?, updated_at = ?
+      WHERE id = ? AND status = 'running'
+    `).run(
+      input.baseline.answer,
+      JSON.stringify(input.baseline.citations),
+      JSON.stringify(input.baseline.consultedDocuments),
+      input.judgement.level,
+      input.judgement.reason,
+      input.judgement.confidence,
+      JSON.stringify(negativePaths),
+      input.attribution.reason,
+      now,
+      input.verificationId
+    )
+    for (const page of verification.derivedPages) {
+      database.prepare(`
+        UPDATE derived_page_quality
+        SET status = ?, updated_at = ?
+        WHERE specialist_id = ? AND wiki_path = ?
+          AND revision_sha256 = ? AND verification_id = ?
+      `).run(
+        negative.has(page.path) ? 'quarantined' : 'review_required',
+        now,
+        verification.specialistId,
+        page.path,
+        page.revisionSha256,
+        verification.id
+      )
+    }
+    database.exec('COMMIT')
+  } catch (error) {
+    database.exec('ROLLBACK')
+    throw error
+  }
+}
+
 export function completeAnswerVerification(
   database: DatabaseSync,
   input: { verificationId: string; result: AnswerVerificationExecutionResult; now?: Date }
@@ -247,8 +320,9 @@ export function completeAnswerVerification(
   const now = (input.now ?? new Date()).toISOString()
   const favourable = input.result.judgement.level === 'FIEL' || input.result.judgement.level === 'MUITO_ALINHADO'
   const negativePaths = [...new Set(input.result.attribution?.negativeDerivedPaths ?? [])].sort()
-  const needsRepair = negativePaths.length > 0
-  const finalStatus: AnswerVerificationStatus = needsRepair ? 'repair_pending' : 'succeeded'
+  const acceptedRepair = input.result.repair?.status === 'accepted' ? input.result.repair : undefined
+  const needsAdminSource = input.result.repair?.status === 'needs_admin_source'
+  const finalStatus: AnswerVerificationStatus = needsAdminSource ? 'needs_admin_source' : 'succeeded'
 
   database.exec('BEGIN IMMEDIATE')
   try {
@@ -256,44 +330,45 @@ export function completeAnswerVerification(
       UPDATE answer_verifications
       SET status = ?, baseline_answer = ?, baseline_citations_json = ?,
         baseline_documents_json = ?, alignment_level = ?, alignment_reason = ?,
-        alignment_confidence = ?, negative_derived_pages_json = ?,
-        original_answer = CASE WHEN ? THEN original_answer ELSE NULL END,
-        original_citations_json = CASE WHEN ? THEN original_citations_json ELSE NULL END,
-        conversation_context_json = CASE WHEN ? THEN conversation_context_json ELSE NULL END,
-        updated_at = ?, completed_at = CASE WHEN ? THEN NULL ELSE ? END
+        alignment_confidence = ?, negative_derived_pages_json = ?, attribution_reason = ?,
+        repair_reason = ?, original_answer = NULL, original_citations_json = NULL,
+        conversation_context_json = NULL, updated_at = ?, completed_at = ?
       WHERE id = ? AND status = 'running'
     `).run(
       finalStatus,
-      needsRepair ? input.result.baseline.answer : null,
-      needsRepair ? JSON.stringify(input.result.baseline.citations) : null,
-      needsRepair ? JSON.stringify(input.result.baseline.consultedDocuments) : null,
+      null,
+      null,
+      null,
       input.result.judgement.level,
       input.result.judgement.reason,
       input.result.judgement.confidence,
       JSON.stringify(negativePaths),
-      needsRepair ? 1 : 0,
-      needsRepair ? 1 : 0,
-      needsRepair ? 1 : 0,
+      input.result.attribution?.reason ?? null,
+      input.result.repair?.status === 'needs_admin_source' ? input.result.repair.reason : null,
       now,
-      needsRepair ? 1 : 0,
       now,
       input.verificationId
     )
 
     const negative = new Set(negativePaths)
+    const acceptedRevisions = new Map(acceptedRepair?.revisions.map((page) => [page.path, page.revisionSha256]) ?? [])
     for (const page of verification.derivedPages) {
-      const status = negative.has(page.path)
-        ? 'quarantined'
-        : favourable
-          ? 'verified'
-          : 'review_required'
+      const acceptedRevision = acceptedRevisions.get(page.path)
+      const status = acceptedRevision
+        ? 'verified'
+        : negative.has(page.path)
+          ? 'quarantined'
+          : favourable
+            ? 'verified'
+            : 'review_required'
       database.prepare(`
         UPDATE derived_page_quality
-        SET status = ?, updated_at = ?
+        SET status = ?, revision_sha256 = ?, updated_at = ?
         WHERE specialist_id = ? AND wiki_path = ?
           AND revision_sha256 = ? AND verification_id = ?
       `).run(
         status,
+        acceptedRevision ?? page.revisionSha256,
         now,
         verification.specialistId,
         page.path,
@@ -342,7 +417,9 @@ export function markAnswerVerificationFailed(
     UPDATE answer_verifications
     SET status = 'failed', last_error_code = ?, last_error_message = ?,
       original_answer = NULL, original_citations_json = NULL,
-      conversation_context_json = NULL, updated_at = ?, completed_at = ?
+      conversation_context_json = NULL, baseline_answer = NULL,
+      baseline_citations_json = NULL, baseline_documents_json = NULL,
+      updated_at = ?, completed_at = ?
     WHERE id = ?
   `).run(input.code.slice(0, 80), 'Answer verification failed.', now, now, input.verificationId)
   database.prepare(`
@@ -423,13 +500,19 @@ function mapVerificationRow(value: unknown): AnswerVerificationRecord {
       ? { level: row.alignment_level, reason: row.alignment_reason, confidence: row.alignment_confidence }
       : null,
     negativeDerivedPaths: parseJsonArray<string>(row.negative_derived_pages_json),
+    attributionReason: typeof row.attribution_reason === 'string' ? row.attribution_reason : null,
+    repairReason: typeof row.repair_reason === 'string' ? row.repair_reason : null,
     jobId: row.job_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
 }
 
-function assertExecutionResult(result: AnswerVerificationExecutionResult, allowedDerivedPaths: string[]): void {
+function assertExecutionResult(
+  result: AnswerVerificationExecutionResult,
+  allowedDerivedPaths: string[],
+  requireRepair = true
+): void {
   if (!isAlignmentLevel(result.judgement?.level) || !isConfidence(result.judgement?.confidence)) {
     throw new Error('Answer verification judgement is invalid.')
   }
@@ -449,6 +532,26 @@ function assertExecutionResult(result: AnswerVerificationExecutionResult, allowe
     ) {
       throw new Error('Answer verification attribution path is invalid.')
     }
+  }
+  const negativePaths = [...new Set(result.attribution?.negativeDerivedPaths ?? [])].sort()
+  if (requireRepair && negativePaths.length > 0 && !result.repair) {
+    throw new Error('Negative derived attribution requires a repair outcome.')
+  }
+  if (result.repair && negativePaths.length === 0) {
+    throw new Error('Answer verification repair has no negative derived page.')
+  }
+  if (result.repair?.status === 'accepted') {
+    const repairedPaths = [...new Set(result.repair.revisions.map((page) => page.path))].sort()
+    if (
+      repairedPaths.length !== negativePaths.length ||
+      repairedPaths.some((path, index) => path !== negativePaths[index]) ||
+      result.repair.revisions.some((page) => !isBoundedText(page.revisionSha256))
+    ) {
+      throw new Error('Accepted derived repair revisions are invalid.')
+    }
+  }
+  if (result.repair?.status === 'needs_admin_source' && !isBoundedText(result.repair.reason)) {
+    throw new Error('Derived repair missing-source reason is invalid.')
   }
 }
 

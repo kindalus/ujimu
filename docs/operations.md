@@ -58,8 +58,8 @@ Configure these outside source control:
 - `UJIMU_PI_BUNDLE_DIR` — optional override for bundled Pi resources; defaults to `config/pi` and stores product skills, tools, extensions, and seed config files.
 - `UJIMU_PI_CONVERSION_ENABLED` — legacy/manual conversion endpoint flag; the normal ingestion worker no longer depends on this flag.
 - `UJIMU_PI_INGESTION_ENABLED` — set to `true` only where admins may let the ingestion agent convert `raw/` into `converted/` and ingest into specialist wikis.
-- `UJIMU_PI_INGESTION_PROVIDER` and `UJIMU_PI_INGESTION_MODEL` — optional model override shared by ingestion and administrative derivation jobs; there is no separate derivation provider configuration.
-- `UJIMU_PI_INGESTION_THINKING_LEVEL` — optional ingestion-only override; accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Missing or empty input preserves `defaultThinkingLevel` from `<UJIMU_CONFIG_DIR>/settings.json`; invalid input aborts session creation. The Pi SDK may clamp a valid level to the selected model's capabilities.
+- `UJIMU_PI_INGESTION_PROVIDER` and `UJIMU_PI_INGESTION_MODEL` — optional model override shared by ingestion, administrative derivation, answer-alignment judgement, attribution, and derived-page repair jobs. The independent control answer and repaired-candidate answer continue to use the default chat model.
+- `UJIMU_PI_INGESTION_THINKING_LEVEL` — optional reasoning override for ingestion, answer judgement, attribution, and derived repair; accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Missing or empty input preserves `defaultThinkingLevel` from `<UJIMU_CONFIG_DIR>/settings.json`; invalid input aborts session creation. The Pi SDK may clamp a valid level to the selected model's capabilities.
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
@@ -156,6 +156,18 @@ Each conversation directory is private to the application user and contains the 
 Anonymous sessions become inaccessible after 24 hours without a committed turn. Registered sessions become inaccessible after 30 days; their visible SQLite history remains and is used to reconstruct a less rich Pi session when the conversation resumes. Startup reconciliation handles interrupted turns, and an hourly in-process cleanup removes expired directories. Explicit conversation deletion removes its registered JSONL before deleting SQLite history. Specialist deletion removes all anonymous and registered session directories for that specialist.
 
 SQLite remains sufficient for product-history recovery. Backing up the Pi session tree is optional: omitting it loses native tool and compaction context but not registered conversation history. If it is backed up, apply the same access controls as the SQLite backup.
+
+### Derived-answer quality verification
+
+After a completed answer consults one or more `wiki/derived/*.md` pages, Ujimu schedules a private quality check for the first observed revision and for a deterministic 10% sample of later eligible answers. Scheduling and all model work happen after the client stream completes.
+
+The default chat model produces an independent control answer under a code-enforced policy that blocks `wiki/derived/`. The ingestion model then assigns one of five alignment levels. `FIEL` and `MUITO_ALINHADO` end the check. `ALINHADO`, `POUCO_ALINHADO`, and `NAO_ALINHADO` trigger a separate attribution pass; a derived path is quarantined only when that pass identifies a negative contribution and the path belonged to the original read set.
+
+Quarantined paths are removed from retrieval hints and blocked by the normal chat file policy. Repair runs in `.ujimu/verification/<verification-id>/`, which contains copies of `AGENTS.md`, `wiki/`, and `converted/` but no `raw/`. The ingestion model may recreate the affected derived pages and add new non-derived wiki Markdown pages backed by existing converted material. It cannot edit other existing wiki pages or write converted/raw content.
+
+A repaired candidate is answered by the default model and judged again by the ingestion model. Only `FIEL` or `MUITO_ALINHADO` promotes the staged files and releases quarantine. Missing official evidence records `needs_admin_source`; failed or rejected repair keeps the previous page quarantined. Verification jobs retry at most three times. Full answers and conversation context are transient SQLite job data and are cleared at every terminal outcome; retained records contain only status, alignment, sanitised reasons, page paths, and revision hashes.
+
+No public or admin API exposes verification payloads. Inspect aggregate status directly in SQLite only during controlled operations, and never copy questions or answers into operational logs.
 
 ### Agent-owned conversion during ingestion
 

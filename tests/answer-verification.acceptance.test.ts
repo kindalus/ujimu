@@ -6,6 +6,8 @@ import type { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import {
   enqueueDerivedAnswerVerification,
+  markAnswerVerificationRunning,
+  quarantineAttributedDerivedPages,
   readAnswerVerification,
   readQuarantinedDerivedPaths,
   type AnswerVerificationBaseline,
@@ -165,43 +167,36 @@ describe('derived answer verification sampling and baseline acceptance', () => {
     fixture.database.close()
   })
 
-  it('quarantines only a negatively attributed derived page from the original answer', async () => {
+  it('quarantines an attributed page before its repair starts', async () => {
     const fixture = await createFixture()
     const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
     const verification = await enqueueDerivedAnswerVerification(fixture.database, {
       sourceEventId: event.id,
       specialistRoot: fixture.root,
-      originalAnswer: 'Resposta derivada.',
-      originalCitations: [],
-      conversationContext: [],
+      originalAnswer: 'Resposta derivada.', originalCitations: [], conversationContext: [],
       consultedDocuments: ['wiki/derived/resposta.md']
     })
-    const baseline: AnswerVerificationBaseline = {
-      answer: 'Resposta de controlo.', citations: [], consultedDocuments: ['wiki/articles/artigo-1.md']
-    }
-    await runDueBackgroundJobs({
-      database: fixture.database,
-      answerVerificationRunner: {
-        async run(): Promise<AnswerVerificationExecutionResult> {
-          return {
-            baseline,
-            judgement: { level: 'ALINHADO', reason: 'Existe uma omissão relevante.', confidence: 'high' },
-            attribution: {
-              negativeDerivedPaths: ['wiki/derived/resposta.md'],
-              reason: 'A derived omitiu uma condição legal.'
-            }
-          }
-        }
+    markAnswerVerificationRunning(fixture.database, verification!.id)
+    quarantineAttributedDerivedPages(fixture.database, {
+      verificationId: verification!.id,
+      baseline: { answer: 'Controlo.', citations: [], consultedDocuments: [] },
+      judgement: { level: 'NAO_ALINHADO', reason: 'Contradição.', confidence: 'high' },
+      attribution: {
+        negativeDerivedPaths: ['wiki/derived/resposta.md'], reason: 'A derived prejudicou a resposta.'
       }
     })
 
-    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
-      status: 'repair_pending',
-      originalAnswer: 'Resposta derivada.',
-      baseline,
-      negativeDerivedPaths: ['wiki/derived/resposta.md']
-    })
     expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual(['wiki/derived/resposta.md'])
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
+      status: 'running', negativeDerivedPaths: ['wiki/derived/resposta.md']
+    })
+
+    fixture.database.prepare('DELETE FROM question_analytics_events WHERE id = ?').run(event.id)
+    expect(readAnswerVerification(fixture.database, verification!.id)).toBeUndefined()
+    expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual(['wiki/derived/resposta.md'])
+    expect(fixture.database.prepare('SELECT status FROM background_jobs WHERE id = ?').get(verification!.jobId)).toEqual({
+      status: 'cancelled'
+    })
     fixture.database.close()
   })
 
@@ -272,7 +267,8 @@ describe('derived answer verification sampling and baseline acceptance', () => {
     })
 
     expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
-      status: 'needs_admin_source', originalAnswer: null, baseline: null
+      status: 'needs_admin_source', originalAnswer: null, baseline: null,
+      repairReason: 'Falta o diploma oficial.'
     })
     expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual(['wiki/derived/resposta.md'])
     fixture.database.close()

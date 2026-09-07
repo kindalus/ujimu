@@ -1,18 +1,20 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { AnswerVerificationJob, AnswerVerificationJobRunner } from '../jobs/background'
 import { normalizeConsultedWikiDocumentPath } from '../pi/file-policy'
-import { createUjimuPiSession } from '../pi/session'
+import { createUjimuPiSession, type PiTaskName } from '../pi/session'
 import { loadSpecialistsFromDisk } from '../specialists/loader'
 import { getCitationEvidence } from '../chat/context'
 import { lookupRetrievalHints, type RetrievalHints } from '../chat/retrieval-cache'
 import type { ChatCitation, ChatConversationContextMessage } from '../chat/types'
 import {
+  quarantineAttributedDerivedPages,
   readAnswerVerification,
   type AnswerAlignmentJudgement,
   type AnswerVerificationBaseline,
   type AnswerVerificationExecutionResult,
   type NegativeDerivedAttribution
 } from './answer-verification'
+import { runPiDerivedRepairAgent, runStagedDerivedRepair } from './derived-repair-runner'
 
 export class AnswerVerificationExecutionError extends Error {
   public readonly code = 'ANSWER_VERIFICATION_OUTPUT_INVALID'
@@ -87,6 +89,45 @@ export function createPiAnswerVerificationJobRunner(options: {
           verification.derivedPages.map((page) => page.path)
         ))
       }
+      if (result.attribution?.negativeDerivedPaths.length) {
+        quarantineAttributedDerivedPages(options.database, {
+          verificationId: verification.id,
+          baseline,
+          judgement,
+          attribution: result.attribution
+        })
+        result.repair = await runStagedDerivedRepair({
+          specialistRoot: specialist.paths.root,
+          verificationId: verification.id,
+          question: event.question_text,
+          originalAnswer: verification.originalAnswer,
+          baseline,
+          negativeDerivedPaths: result.attribution.negativeDerivedPaths,
+          adapters: {
+            repair: runPiDerivedRepairAgent,
+            answer: ({ cwd, question, targetPaths }) => runSourceOnlyAnswer({
+              cwd,
+              task: 'answer_candidate',
+              prompt: buildCandidateAnswerPrompt({
+                question,
+                citationEvidence,
+                conversationContext: verification.conversationContext,
+                targetPaths
+              })
+            }),
+            judge: async ({ cwd, question, candidate, baseline: control, targetPaths }) => runJudgementSession({
+              cwd,
+              prompt: buildAlignmentJudgementPrompt({
+                question,
+                deliveredAnswer: candidate.answer,
+                deliveredCitations: candidate.citations,
+                deliveredDocuments: targetPaths,
+                baseline: control
+              })
+            }).then(parseAlignmentJudgement)
+          }
+        })
+      }
       return result
     }
   }
@@ -110,6 +151,33 @@ The answer must be European Portuguese using pre-1990 orthography. Citations may
 
 Candidate non-derived wiki paths from a matching consultation:
 ${hintPaths.length > 0 ? hintPaths.join('\n') : '(none)'}
+
+Known citation metadata:
+${input.citationEvidence.length > 0 ? input.citationEvidence.map((citation) => JSON.stringify(citation)).join('\n') : '(none)'}
+
+User question:
+${input.question}
+
+Conversation context:
+${formatConversationContext(input.conversationContext)}
+`
+}
+
+export function buildCandidateAnswerPrompt(input: {
+  question: string
+  citationEvidence: ChatCitation[]
+  conversationContext: ChatConversationContextMessage[]
+  targetPaths: string[]
+}): string {
+  return `Answer the user question from this repaired specialist workspace.
+Read the local schema, wiki/index.md, and the repaired derived targets before expanding only as needed. The wiki is the only source of truth.
+
+Return exactly one JSON object and no markdown fence:
+{"answer":"...","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
+The answer must be European Portuguese using pre-1990 orthography.
+
+Repaired targets:
+${input.targetPaths.join('\n')}
 
 Known citation metadata:
 ${input.citationEvidence.length > 0 ? input.citationEvidence.map((citation) => JSON.stringify(citation)).join('\n') : '(none)'}
@@ -230,10 +298,14 @@ export function parseNegativeAttribution(text: string, allowedDerivedPaths: stri
   }
 }
 
-async function runSourceOnlyAnswer(input: { cwd: string; prompt: string }): Promise<AnswerVerificationBaseline> {
+async function runSourceOnlyAnswer(input: {
+  cwd: string
+  prompt: string
+  task?: Extract<PiTaskName, 'answer_verification' | 'answer_candidate'>
+}): Promise<AnswerVerificationBaseline> {
   const { session } = await createUjimuPiSession({
     cwd: input.cwd,
-    task: 'answer_verification'
+    task: input.task ?? 'answer_verification'
   })
   let streamedText = ''
   let finalText = ''

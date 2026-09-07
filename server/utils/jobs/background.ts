@@ -276,7 +276,9 @@ export async function runDueBackgroundJobs(
       recordHardResetAudit(options.database, locked, 'failed', error)
       result.failed += 1
     }
-    await promotePendingAnswerVerifications(options.database, new Date())
+    if (await promotePendingAnswerVerifications(options.database, new Date())) {
+      scheduleDueBackgroundJobs()
+    }
   }
 
   return result
@@ -547,9 +549,9 @@ function markJobFailed(database: DatabaseSync, job: BackgroundJobRecord, error: 
     )
 }
 
-async function promotePendingAnswerVerifications(database: DatabaseSync, now: Date): Promise<void> {
+async function promotePendingAnswerVerifications(database: DatabaseSync, now: Date): Promise<boolean> {
   const verification = await import('../analytics/answer-verification')
-  verification.promotePendingAnswerVerificationJobs(database, { now })
+  return verification.promotePendingAnswerVerificationJobs(database, { now }).length > 0
 }
 
 async function retryAnswerVerificationJob(

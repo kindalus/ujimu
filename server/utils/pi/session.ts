@@ -2,13 +2,13 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PdfOcrCoverageTracker } from '../ingestion/pdf-ocr-coverage'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
-import { createAnswerJudgementFilePolicyExtension, createAnswerVerificationFilePolicyExtension, createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
+import { createAnswerJudgementFilePolicyExtension, createAnswerVerificationFilePolicyExtension, createChatFilePolicyExtension, createDerivationFilePolicyExtension, createDerivedRepairFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
 import { createRawPassthroughTool } from './passthrough-tool'
 import { createPdfOcrTools } from './pdf-ocr-tools'
 import { createSha256FileTool } from './sha256-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
-export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation' | 'answer_verification' | 'answer_judgement'
+export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation' | 'answer_verification' | 'answer_judgement' | 'answer_candidate' | 'derived_repair'
 export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
@@ -27,6 +27,7 @@ export interface CreateUjimuPiSessionOptions {
   sessionManager?: any
   derivationTargetPath?: string
   blockedWikiPaths?: string[]
+  repairTargetPaths?: string[]
   pdfOcrCoverage?: PdfOcrCoverageTracker
   agentLog?: {
     dataDir?: string
@@ -69,7 +70,11 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
         ? { extensionFactories: [createAnswerVerificationFilePolicyExtension(options.cwd)] }
         : options.task === 'answer_judgement'
           ? { extensionFactories: [createAnswerJudgementFilePolicyExtension(options.cwd)] }
-          : options.task === 'derivation'
+          : options.task === 'answer_candidate'
+            ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] }
+            : options.task === 'derived_repair'
+              ? { extensionFactories: [createDerivedRepairFilePolicyExtension(options.cwd, requireRepairTargets(options))] }
+              : options.task === 'derivation'
         ? { extensionFactories: [createDerivationFilePolicyExtension(options.cwd, requireDerivationTarget(options))] }
         : options.task === 'ingestion' && options.pdfOcrCoverage
           ? { extensionFactories: [createIngestionPublicationPolicyExtension(options.cwd, options.pdfOcrCoverage)] }
@@ -249,8 +254,10 @@ export function createUjimuPiEnabledToolNames(
   task?: PiTaskName
 ): string[] {
   return [...new Set([
-    ...(task === 'chat' || task === 'answer_verification' || task === 'answer_judgement'
+    ...(task === 'chat' || task === 'answer_verification' || task === 'answer_judgement' || task === 'answer_candidate'
       ? UJIMU_PI_CHAT_TOOL_NAMES
+      : task === 'derived_repair'
+        ? UJIMU_PI_DERIVATION_TOOL_NAMES
       : task === 'ingestion'
         ? UJIMU_PI_INGESTION_TOOL_NAMES
         : task === 'derivation'
@@ -265,7 +272,7 @@ export function createUjimuCustomToolsForTask(
   cwd = process.cwd(),
   pdfOcrCoverage?: PdfOcrCoverageTracker
 ): any[] {
-  if (task === 'chat' || task === 'derivation' || task === 'answer_verification' || task === 'answer_judgement') return []
+  if (task === 'chat' || task === 'derivation' || task === 'answer_verification' || task === 'answer_judgement' || task === 'answer_candidate' || task === 'derived_repair') return []
   if (task === 'ingestion') {
     return [createRawPassthroughTool(cwd), createSha256FileTool(cwd), ...createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })]
   }
@@ -298,7 +305,7 @@ async function resolveTaskModel(
 }
 
 function resolveTaskThinkingLevel(task: PiTaskName): UjimuPiThinkingLevel | undefined {
-  if (task !== 'ingestion' && task !== 'answer_judgement') return undefined
+  if (task !== 'ingestion' && task !== 'answer_judgement' && task !== 'derived_repair') return undefined
 
   const configured = process.env[UJIMU_PI_INGESTION_THINKING_LEVEL_ENV]?.trim()
   if (!configured) return undefined
@@ -322,6 +329,13 @@ function requireDerivationTarget(options: CreateUjimuPiSessionOptions): string {
     throw new Error('A derivation target path is required for Pi derivation sessions.')
   }
   return options.derivationTargetPath
+}
+
+function requireRepairTargets(options: CreateUjimuPiSessionOptions): string[] {
+  if (!options.repairTargetPaths?.length) {
+    throw new Error('At least one derived repair target path is required for Pi repair sessions.')
+  }
+  return options.repairTargetPaths
 }
 
 function resolveConfiguredModel(modelRuntime: any, provider: string, model: string): unknown {
