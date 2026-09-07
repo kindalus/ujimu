@@ -25,6 +25,31 @@ export function createChatFilePolicyExtension(cwd: string): {
   }
 }
 
+export function createAnswerVerificationFilePolicyExtension(cwd: string): {
+  name: string
+  hidden: boolean
+  factory: (pi: any) => void
+} {
+  return {
+    name: 'ujimu-answer-verification-file-policy',
+    hidden: true,
+    factory(pi) {
+      pi.on('tool_call', async (event: { toolName?: unknown; input?: { path?: unknown } }) => {
+        if (typeof event.toolName !== 'string' || !CHAT_FILE_TOOLS.has(event.toolName)) {
+          return { block: true, reason: 'Tool is not available during answer verification.' }
+        }
+
+        const requestedPath = typeof event.input?.path === 'string' ? event.input.path : '.'
+        if (
+          await isAnswerVerificationReadPathAllowed(cwd, requestedPath) &&
+          (event.toolName !== 'grep' || await isAnswerVerificationGrepPathAllowed(cwd, requestedPath))
+        ) return undefined
+        return { block: true, reason: 'Derived pages are not available during answer verification.' }
+      })
+    }
+  }
+}
+
 export async function normalizeConsultedWikiDocumentPath(
   cwd: string,
   requestedPath: string
@@ -156,6 +181,21 @@ export async function isDerivationWritePathAllowed(
   }
 }
 
+export async function isAnswerVerificationReadPathAllowed(cwd: string, requestedPath: string): Promise<boolean> {
+  try {
+    const root = await realpath(cwd)
+    const requested = await realpath(resolve(root, requestedPath))
+    const agents = await realpath(resolve(root, 'AGENTS.md')).catch(() => '')
+    const wiki = await realpath(resolve(root, 'wiki'))
+    const derived = await realpath(resolve(wiki, 'derived')).catch(() => resolve(wiki, 'derived'))
+
+    if (!isWithin(root, wiki)) return false
+    return requested === agents || (isWithin(wiki, requested) && !isWithin(derived, requested))
+  } catch {
+    return false
+  }
+}
+
 export async function isChatPathAllowed(cwd: string, requestedPath: string): Promise<boolean> {
   try {
     const root = await realpath(cwd)
@@ -165,6 +205,17 @@ export async function isChatPathAllowed(cwd: string, requestedPath: string): Pro
 
     if (!isWithin(root, wiki)) return false
     return requested === agents || isWithin(wiki, requested)
+  } catch {
+    return false
+  }
+}
+
+async function isAnswerVerificationGrepPathAllowed(cwd: string, requestedPath: string): Promise<boolean> {
+  try {
+    const root = await realpath(cwd)
+    const requested = await realpath(resolve(root, requestedPath))
+    const wiki = await realpath(resolve(root, 'wiki'))
+    return requested !== wiki
   } catch {
     return false
   }

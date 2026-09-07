@@ -5,41 +5,41 @@
 ### Task 1: Persist verification intent and page revision quality
 
 **Acceptance criteria:**
-- [ ] SQLite stores one verification per question event and quality state per specialist/path/revision.
-- [ ] Transient payload and terminal result fields are distinct.
-- [ ] Specialist deletion and hard reset remove associated quality data.
+- [x] SQLite stores one verification per question event and quality state per specialist/path/revision.
+- [x] Transient payload and terminal result fields are distinct.
+- [x] Specialist deletion and hard reset remove associated quality data.
 
-**Verification:** Focused database and analytics acceptance tests.
+**Verification:** Focused database and analytics acceptance tests passed.
 
 **Dependencies:** None
 
 ### Task 2: Select completed derived answers
 
 **Acceptance criteria:**
-- [ ] Answers without a derived read never enqueue a verification.
-- [ ] The event-ID selection is stable at 10%, and an unseen revision forces selection.
-- [ ] Retries cannot duplicate the event or revision intent.
+- [x] Answers without a derived read never enqueue a verification.
+- [x] The event-ID selection is stable at 10%, and an unseen revision forces selection.
+- [x] Retries cannot duplicate the event or revision intent.
 
-**Verification:** Analytics acceptance tests with fixed event IDs and file contents.
+**Verification:** Analytics acceptance tests with fixed event IDs and file contents passed.
 
 **Dependencies:** Task 1
 
 ### Task 3: Enforce and run the source-only baseline
 
 **Acceptance criteria:**
-- [ ] The baseline task uses the default model and read-only tools.
-- [ ] `wiki/derived/`, traversal aliases, and symlink aliases are blocked.
-- [ ] The worker records the baseline without exposing it to the client.
+- [x] The baseline task uses the default model and read-only tools.
+- [x] `wiki/derived/`, traversal aliases, and symlink aliases are blocked.
+- [x] The worker records the baseline without exposing it to the client.
 
-**Verification:** Pi policy, session, and background-worker acceptance tests.
+**Verification:** Pi policy, session, and background-worker acceptance tests passed.
 
 **Dependencies:** Tasks 1–2
 
 ### Slice 75 checkpoint
 
-- [ ] Slice deck and `STATUS.md` are updated.
-- [ ] Full tests, typecheck, and build pass.
-- [ ] Spec, stress-test, acceptance tests, and implementation are separate commits.
+- [x] Slice deck and `STATUS.md` are updated.
+- [x] Full tests, typecheck, and build pass.
+- [x] Spec, stress-test, acceptance tests, and implementation are separate commits.
 
 ## Slice 76 — Alignment, attribution, and quarantine
 

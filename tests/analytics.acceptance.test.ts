@@ -155,7 +155,7 @@ describe('question analytics and content gaps acceptance', () => {
 
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
     expect(database.prepare('SELECT COUNT(*) AS count FROM answer_verifications').get()).toEqual({ count: 0 })
-    await waitForTelemetry()
+    await waitForVerification(database)
     expect(database.prepare(`
       SELECT status, original_answer, derived_pages_json
       FROM answer_verifications
@@ -817,6 +817,14 @@ async function waitForClockTick(): Promise<void> {
 
 async function waitForTelemetry(): Promise<void> {
   await new Promise((resolve) => setImmediate(resolve))
+}
+
+async function waitForVerification(database: DatabaseSync): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const row = database.prepare('SELECT id FROM answer_verifications LIMIT 1').get()
+    if (row) return
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
 }
 
 function restoreEnv(key: string, value: string | undefined): void {

@@ -2,13 +2,13 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PdfOcrCoverageTracker } from '../ingestion/pdf-ocr-coverage'
 import { createAgentSessionLogger, type AgentSessionLogger, type AgentSessionLogTask } from '../agents/logs'
-import { createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
+import { createAnswerVerificationFilePolicyExtension, createChatFilePolicyExtension, createDerivationFilePolicyExtension, createIngestionPublicationPolicyExtension } from './file-policy'
 import { createRawPassthroughTool } from './passthrough-tool'
 import { createPdfOcrTools } from './pdf-ocr-tools'
 import { createSha256FileTool } from './sha256-tool'
 import { ensureUjimuPiConfigDir, resolveUjimuPiBundleDir, resolveUjimuPiAgentDir } from './paths'
 
-export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation'
+export type PiTaskName = AgentSessionLogTask | 'chat' | 'derivation' | 'answer_verification'
 export type UjimuPiToolName = 'read' | 'bash' | 'edit' | 'write' | 'grep' | 'find' | 'ls'
 
 const UJIMU_PI_DEFAULT_TOOL_NAMES: UjimuPiToolName[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']
@@ -64,7 +64,9 @@ export async function createUjimuPiSession(options: CreateUjimuPiSessionOptions)
     additionalExtensionPaths: [join(bundledPiDir, 'extensions')],
     ...(options.task === 'chat'
       ? { extensionFactories: [createChatFilePolicyExtension(options.cwd)] }
-      : options.task === 'derivation'
+      : options.task === 'answer_verification'
+        ? { extensionFactories: [createAnswerVerificationFilePolicyExtension(options.cwd)] }
+        : options.task === 'derivation'
         ? { extensionFactories: [createDerivationFilePolicyExtension(options.cwd, requireDerivationTarget(options))] }
         : options.task === 'ingestion' && options.pdfOcrCoverage
           ? { extensionFactories: [createIngestionPublicationPolicyExtension(options.cwd, options.pdfOcrCoverage)] }
@@ -244,7 +246,7 @@ export function createUjimuPiEnabledToolNames(
   task?: PiTaskName
 ): string[] {
   return [...new Set([
-    ...(task === 'chat'
+    ...(task === 'chat' || task === 'answer_verification'
       ? UJIMU_PI_CHAT_TOOL_NAMES
       : task === 'ingestion'
         ? UJIMU_PI_INGESTION_TOOL_NAMES
@@ -260,7 +262,7 @@ export function createUjimuCustomToolsForTask(
   cwd = process.cwd(),
   pdfOcrCoverage?: PdfOcrCoverageTracker
 ): any[] {
-  if (task === 'chat' || task === 'derivation') return []
+  if (task === 'chat' || task === 'derivation' || task === 'answer_verification') return []
   if (task === 'ingestion') {
     return [createRawPassthroughTool(cwd), createSha256FileTool(cwd), ...createPdfOcrTools({ cwd, coverage: pdfOcrCoverage })]
   }

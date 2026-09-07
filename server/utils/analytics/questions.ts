@@ -288,6 +288,8 @@ export function markQuestionCandidateReviewed(
 }
 
 export function deleteQuestionAnalyticsForSpecialist(database: DatabaseSync, specialistId: string): void {
+  database.prepare('DELETE FROM derived_page_quality WHERE specialist_id = ?').run(specialistId)
+  database.prepare('DELETE FROM answer_verifications WHERE specialist_id = ?').run(specialistId)
   database.prepare('DELETE FROM question_analytics_events WHERE specialist_id = ?').run(specialistId)
   database.prepare('DELETE FROM question_analytics_reviews WHERE specialist_id = ?').run(specialistId)
 }

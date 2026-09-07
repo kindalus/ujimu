@@ -3,8 +3,10 @@ import type { SpecialistPathOptions } from '../specialists/paths'
 import type { SpecialistRuntime } from '../specialists/schema'
 import { canUseSpecialist, resolveSpecialistAccessSubjectFromUser } from '../specialists/access'
 import { getSpecialistById } from '../specialists/registry'
+import { scheduleDueBackgroundJobs } from '../jobs/background'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowedWithFallback } from '../quota/usage'
+import { enqueueDerivedAnswerVerification } from '../analytics/answer-verification'
 import { recordQuestionAnalyticsEvent } from '../analytics/questions'
 import {
   buildConversationContext,
@@ -207,7 +209,7 @@ export async function createChatEventStreamForSpecialist(
       runnerInput,
       history: historyPersistence,
       chatSession,
-      analytics: buildAnalyticsPersistence()
+      analytics: buildAnalyticsPersistence(conversationContext)
     })
   } catch (error) {
     await chatSession?.rollback().catch(() => undefined)
@@ -215,13 +217,17 @@ export async function createChatEventStreamForSpecialist(
     throw error
   }
 
-  function buildAnalyticsPersistence(): StreamAnalyticsPersistence | undefined {
+  function buildAnalyticsPersistence(
+    conversationContext: ChatConversationContextMessage[] | undefined
+  ): StreamAnalyticsPersistence | undefined {
     if (!options.analytics) return undefined
 
     return {
       database: options.analytics.database,
       specialistId: specialist.id,
+      specialistRoot: specialist.paths.root,
       question: input.question,
+      conversationContext: conversationContext ?? [],
       userTimezone: input.clientTimezone,
       visitorId: options.analytics.visitorId,
       userId: options.analytics.userId,
@@ -410,7 +416,9 @@ interface StreamHistoryPersistence {
 interface StreamAnalyticsPersistence {
   database: DatabaseSync
   specialistId: string
+  specialistRoot: string
   question: string
+  conversationContext: ChatConversationContextMessage[]
   userTimezone?: string
   visitorId?: string
   userId?: string
@@ -632,7 +640,14 @@ async function* completeStreamResult(input: {
   }
 
   if (input.analytics && input.analyticsOutcome) {
-    scheduleQuestionAnalytics(input.analytics, input.analyticsOutcome, input.consultedDocuments, persisted)
+    scheduleQuestionAnalytics(
+      input.analytics,
+      input.analyticsOutcome,
+      input.answer,
+      input.citations,
+      input.consultedDocuments,
+      persisted
+    )
   }
 
   const totalTokens = normalizeTotalTokens(input.totalTokens)
@@ -668,10 +683,12 @@ function lookupRetrievalHintsSafely(
 function scheduleQuestionAnalytics(
   analytics: StreamAnalyticsPersistence,
   outcome: ChatAnswerOutcome,
+  answer: string,
+  citations: ChatCitation[],
   consultedDocuments: string[] | undefined,
   persisted?: { conversationId: string; userMessageId: string }
 ): void {
-  setImmediate(() => {
+  setImmediate(async () => {
     try {
       const event = recordQuestionAnalyticsEvent(analytics.database, {
         specialistId: analytics.specialistId,
@@ -691,6 +708,16 @@ function scheduleQuestionAnalytics(
           wikiPaths: consultedDocuments,
           now: analytics.now
         })
+        const verification = await enqueueDerivedAnswerVerification(analytics.database, {
+          sourceEventId: event.id,
+          specialistRoot: analytics.specialistRoot,
+          originalAnswer: answer,
+          originalCitations: citations,
+          conversationContext: analytics.conversationContext,
+          consultedDocuments,
+          now: analytics.now
+        })
+        if (verification) scheduleDueBackgroundJobs()
       }
     } catch {
       console.error('[ujimu] telemetry task failed', {

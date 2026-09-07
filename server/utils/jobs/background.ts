@@ -13,7 +13,7 @@ import { assertSpecialistInitializedWorkspace, createPiSdkSpecialistInitializati
 import { loadSpecialistsFromDisk } from '../specialists/loader'
 import { editSpecialist, resetSpecialistWorkspace, rollbackSpecialistCreation } from '../specialists/manager'
 
-export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset' | 'specialist_derivation'
+export type BackgroundJobType = 'specialist_initialization' | 'specialist_ingestion' | 'specialist_hard_reset' | 'specialist_derivation' | 'answer_verification'
 export type BackgroundJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 export interface BackgroundJobRecord {
@@ -47,6 +47,17 @@ export interface DerivationJobRunner {
   run(job: DerivationJob): Promise<void>
 }
 
+export interface AnswerVerificationJob {
+  id: string
+  verificationId: string
+  sourceEventId: string
+  specialistId: string
+}
+
+export interface AnswerVerificationJobRunner {
+  run(job: AnswerVerificationJob): Promise<import('../analytics/answer-verification').AnswerVerificationBaseline>
+}
+
 export interface RunDueBackgroundJobsOptions {
   database: DatabaseSync
   dataDir?: string
@@ -55,6 +66,7 @@ export interface RunDueBackgroundJobsOptions {
   conversionRunner?: PiConversionRunner
   initializationRunner?: SpecialistInitializationRunner
   derivationRunner?: DerivationJobRunner
+  answerVerificationRunner?: AnswerVerificationJobRunner
   runner?: PiIngestionRunner
   now?: Date
   limit?: number
@@ -106,6 +118,17 @@ export function enqueueSpecialistDerivationJob(
   })
 }
 
+export function enqueueAnswerVerificationBackgroundJob(
+  database: DatabaseSync,
+  input: { specialistId: string; verificationId: string; now?: Date }
+): BackgroundJobRecord {
+  return enqueueSpecialistJob(database, {
+    specialistId: input.specialistId,
+    type: 'answer_verification',
+    ...(input.now ? { now: input.now } : {})
+  })
+}
+
 export function enqueueSpecialistHardResetJob(
   database: DatabaseSync,
   input: { specialistId: string; requestedByUserId: string; requestedByContact: string; now?: Date }
@@ -140,7 +163,7 @@ function enqueueSpecialistJob(
 ): BackgroundJobRecord {
   const active = findActiveSpecialistJob(database, input.specialistId)
   if (active) {
-    if (active.type === input.type && input.type !== 'specialist_hard_reset' &&
+    if (active.type === input.type && input.type !== 'specialist_hard_reset' && input.type !== 'answer_verification' &&
       (input.type !== 'specialist_derivation' || active.derivation_event_id === input.derivationEventId)) return active
     throw new BackgroundJobConflictError()
   }
@@ -210,7 +233,7 @@ function enqueueSpecialistJob(
       )
   } catch (error) {
     const activeAfterConflict = findActiveSpecialistJob(database, input.specialistId)
-    if (activeAfterConflict && activeAfterConflict.type === input.type && input.type !== 'specialist_hard_reset' &&
+    if (activeAfterConflict && activeAfterConflict.type === input.type && input.type !== 'specialist_hard_reset' && input.type !== 'answer_verification' &&
       (input.type !== 'specialist_derivation' || activeAfterConflict.derivation_event_id === input.derivationEventId)) return activeAfterConflict
     if (activeAfterConflict) throw new BackgroundJobConflictError()
     throw error
@@ -224,6 +247,7 @@ export async function runDueBackgroundJobs(
 ): Promise<RunDueBackgroundJobsResult> {
   const now = options.now ?? new Date()
   const workerId = options.workerId ?? defaultWorkerId()
+  await promotePendingAnswerVerifications(options.database, now)
   const jobs = findDueJobs(options.database, {
     now,
     limit: options.limit ?? 10,
@@ -243,9 +267,11 @@ export async function runDueBackgroundJobs(
       result.succeeded += 1
     } catch (error) {
       markJobFailed(options.database, locked, error, new Date())
+      await markAnswerVerificationJobFailed(options.database, locked, error)
       recordHardResetAudit(options.database, locked, 'failed', error)
       result.failed += 1
     }
+    await promotePendingAnswerVerifications(options.database, new Date())
   }
 
   return result
@@ -336,6 +362,25 @@ async function runBackgroundJob(
     await runSpecialistHardResetJob(job, options)
     return
   }
+  if (job.type === 'answer_verification') {
+    const verification = await import('../analytics/answer-verification')
+    const verificationJob = verification.readAnswerVerificationJob(options.database, job.id)
+    if (!verificationJob) {
+      throw createJobError('ANSWER_VERIFICATION_JOB_INVALID', 'Answer verification job is incomplete.')
+    }
+    verification.markAnswerVerificationRunning(options.database, verificationJob.verificationId)
+    const runner = options.answerVerificationRunner ??
+      (await import('../analytics/answer-verification-runner')).createPiAnswerVerificationJobRunner({
+        database: options.database,
+        dataDir: options.dataDir
+      })
+    const baseline = await runner.run(verificationJob)
+    verification.completeAnswerVerificationBaseline(options.database, {
+      verificationId: verificationJob.verificationId,
+      baseline
+    })
+    return
+  }
   if (job.type === 'specialist_derivation') {
     if (!job.derivation_event_id || !job.derivation_target_path) {
       throw createJobError('DERIVATION_JOB_INVALID', 'Derivation job is incomplete.')
@@ -403,6 +448,8 @@ async function runSpecialistHardResetJob(
 function purgeSpecialistAssociatedData(database: DatabaseSync, specialistId: string): void {
   database.exec('BEGIN')
   try {
+    database.prepare('DELETE FROM derived_page_quality WHERE specialist_id = ?').run(specialistId)
+    database.prepare('DELETE FROM answer_verifications WHERE specialist_id = ?').run(specialistId)
     database.prepare('DELETE FROM question_analytics_reviews WHERE specialist_id = ?').run(specialistId)
     database.prepare('DELETE FROM question_analytics_events WHERE specialist_id = ?').run(specialistId)
     database.prepare('DELETE FROM conversations WHERE specialist_id = ?').run(specialistId)
@@ -484,11 +531,35 @@ function markJobFailed(database: DatabaseSync, job: BackgroundJobRecord, error: 
     `)
     .run(
       resolveErrorCode(error),
-      job.type === 'specialist_derivation' ? 'Derivation job failed.' : sanitizeErrorMessage(error),
+      job.type === 'specialist_derivation'
+        ? 'Derivation job failed.'
+        : job.type === 'answer_verification'
+          ? 'Answer verification job failed.'
+          : sanitizeErrorMessage(error),
       now,
       now,
       job.id
     )
+}
+
+async function promotePendingAnswerVerifications(database: DatabaseSync, now: Date): Promise<void> {
+  const verification = await import('../analytics/answer-verification')
+  verification.promotePendingAnswerVerificationJobs(database, { now })
+}
+
+async function markAnswerVerificationJobFailed(
+  database: DatabaseSync,
+  job: BackgroundJobRecord,
+  error: unknown
+): Promise<void> {
+  if (job.type !== 'answer_verification') return
+  const verification = await import('../analytics/answer-verification')
+  const verificationJob = verification.readAnswerVerificationJob(database, job.id)
+  if (!verificationJob) return
+  verification.markAnswerVerificationFailed(database, {
+    verificationId: verificationJob.verificationId,
+    code: resolveErrorCode(error)
+  })
 }
 
 async function rollbackSpecialistInitialization(dataDir: string, specialistId: string): Promise<void> {

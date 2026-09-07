@@ -103,7 +103,7 @@ describe('initializeDatabase', () => {
 
       // Closing an explicitly opened connection must not disturb the shared one.
       expect(await initializeDatabase()).toBe(first)
-      expect(first.prepare('SELECT COUNT(*) as count FROM schema_migrations').get()).toMatchObject({ count: 23 })
+      expect(first.prepare('SELECT COUNT(*) as count FROM schema_migrations').get()).toMatchObject({ count: 24 })
     } finally {
       restoreEnv('UJIMU_DATA_DIR', previousDataDir)
       restoreEnv('UJIMU_DB_PATH', previousDbPath)
