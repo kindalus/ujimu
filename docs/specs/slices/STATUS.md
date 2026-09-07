@@ -133,7 +133,7 @@ Known non-blocking warnings:
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
 | 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `verified` | 2026-09-03 | Removed the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
-| 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `planned` | — | Judge alignment with the ingestion model, attribute negative derived influence, and enforce quarantine in later chats. |
+| 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `idea-refined` | — | Scope refined: validated five-level judgement, separate negative attribution, and code-enforced quarantine without wiki writes. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `planned` | — | Rebuild quarantined derived pages in staging, validate against the baseline, and promote only accepted candidates. |
 
 ## Gemini dependency removal
