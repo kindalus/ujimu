@@ -1,0 +1,219 @@
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { DatabaseSync } from 'node:sqlite'
+import { describe, expect, it } from 'vitest'
+import {
+  enqueueDerivedAnswerVerification,
+  readAnswerVerification,
+  type AnswerVerificationBaseline
+} from '../server/utils/analytics/answer-verification'
+import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
+import { initializeDatabase } from '../server/utils/db'
+import {
+  enqueueSpecialistDerivationJob,
+  runDueBackgroundJobs
+} from '../server/utils/jobs/background'
+import {
+  buildSourceOnlyAnswerPrompt
+} from '../server/utils/analytics/answer-verification-runner'
+import { isAnswerVerificationReadPathAllowed } from '../server/utils/pi/file-policy'
+
+const NOT_SAMPLED_EVENT_ID = '00000000-0000-4000-8000-000000000000'
+const SAMPLED_EVENT_ID = '00000000-0000-4000-8000-000000000001'
+const SECOND_NOT_SAMPLED_EVENT_ID = '00000000-0000-4000-8000-000000000002'
+
+describe('derived answer verification sampling and baseline acceptance', () => {
+  it('forces one first-revision check, then applies a stable ten-percent event sample', async () => {
+    const fixture = await createFixture()
+    const firstEvent = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const first = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: firstEvent.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta entregue.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+
+    expect(first).toMatchObject({ sampleReason: 'first_revision', status: 'queued' })
+    expect(first?.derivedPages).toEqual([{
+      path: 'wiki/derived/resposta.md',
+      revisionSha256: sha256('# Resposta derivada\n')
+    }])
+
+    await expect(enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: firstEvent.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta entregue.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })).resolves.toEqual(first)
+
+    const whilePending = insertEvent(fixture.database, SECOND_NOT_SAMPLED_EVENT_ID)
+    await expect(enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: whilePending.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Outra resposta.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })).resolves.toBeUndefined()
+
+    fixture.database.prepare(`
+      UPDATE derived_page_quality
+      SET status = 'verified', verification_id = NULL
+      WHERE specialist_id = 'iva' AND wiki_path = 'wiki/derived/resposta.md'
+    `).run()
+
+    const sampled = insertEvent(fixture.database, SAMPLED_EVENT_ID)
+    await expect(enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: sampled.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta sorteada.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })).resolves.toMatchObject({ sampleReason: 'random', status: 'pending' })
+
+    const notSampled = insertEvent(fixture.database, SECOND_NOT_SAMPLED_EVENT_ID + '-new')
+    await expect(enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: notSampled.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta fora da amostra.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })).resolves.toBeUndefined()
+
+    await expect(enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: insertEvent(fixture.database, 'event-without-derived').id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta comum.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/articles/artigo-1.md']
+    })).resolves.toBeUndefined()
+    fixture.database.close()
+  })
+
+  it('keeps a selected verification pending behind another specialist job and runs it next', async () => {
+    const fixture = await createFixture()
+    const blockingEvent = insertEvent(fixture.database, 'blocking-event')
+    enqueueSpecialistDerivationJob(fixture.database, {
+      specialistId: 'iva',
+      eventId: blockingEvent.id,
+      targetPath: 'wiki/derived/blocking.md',
+      requestedByUserId: 'admin',
+      requestedByContact: 'admin@example.com'
+    })
+    const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const verification = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: event.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta privada.',
+      originalCitations: [],
+      conversationContext: [{ role: 'user', content: 'Contexto anterior.' }],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+    expect(verification).toMatchObject({ status: 'pending', jobId: null })
+
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      derivationRunner: { async run() {} }
+    })
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({ status: 'queued' })
+
+    const seen: unknown[] = []
+    const baseline: AnswerVerificationBaseline = {
+      answer: 'Resposta sem derived.',
+      citations: [],
+      consultedDocuments: ['wiki/articles/artigo-1.md']
+    }
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      answerVerificationRunner: {
+        async run(job) {
+          seen.push(job)
+          return baseline
+        }
+      }
+    })
+
+    expect(seen).toEqual([expect.objectContaining({
+      verificationId: verification!.id,
+      specialistId: 'iva',
+      sourceEventId: event.id
+    })])
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
+      status: 'baseline_ready',
+      baseline
+    })
+    fixture.database.close()
+  })
+
+  it('builds the independent prompt without leaking the delivered answer', () => {
+    const prompt = buildSourceOnlyAnswerPrompt({
+      question: 'Quanto se ganha por hora extra?',
+      citationEvidence: [],
+      retrievalHints: {
+        wikiPaths: ['wiki/derived/resposta.md', 'wiki/articles/artigo-188.md'],
+        match: 'exact',
+        score: 1
+      },
+      conversationContext: [{ role: 'user', content: 'O meu salário-base é 100 000 Kz.' }]
+    })
+
+    expect(prompt).toContain('Quanto se ganha por hora extra?')
+    expect(prompt).toContain('wiki/articles/artigo-188.md')
+    expect(prompt).not.toContain('wiki/derived/resposta.md')
+    expect(prompt).not.toContain('Resposta entregue')
+    expect(prompt).toContain('O meu salário-base é 100 000 Kz.')
+  })
+
+  it('blocks direct, traversal, and symlink reads of derived pages for the baseline task', async () => {
+    const fixture = await createFixture()
+    const outside = await mkdtemp(join(tmpdir(), 'ujimu-verification-outside-'))
+    await writeFile(join(outside, 'outside.md'), '# Outside\n')
+    await symlink(join(fixture.root, 'wiki', 'derived'), join(fixture.root, 'wiki', 'derived-alias'))
+    await symlink(join(outside, 'outside.md'), join(fixture.root, 'wiki', 'escaped.md'))
+
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, 'AGENTS.md')).resolves.toBe(true)
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, 'wiki/articles/artigo-1.md')).resolves.toBe(true)
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, 'wiki/derived/resposta.md')).resolves.toBe(false)
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, 'wiki/derived-alias/resposta.md')).resolves.toBe(false)
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, 'wiki/escaped.md')).resolves.toBe(false)
+    await expect(isAnswerVerificationReadPathAllowed(fixture.root, '../outside.md')).resolves.toBe(false)
+    fixture.database.close()
+  })
+})
+
+async function createFixture(): Promise<{ root: string; database: DatabaseSync }> {
+  const root = await mkdtemp(join(tmpdir(), 'ujimu-answer-verification-'))
+  await mkdir(join(root, 'wiki', 'derived'), { recursive: true })
+  await mkdir(join(root, 'wiki', 'articles'), { recursive: true })
+  await mkdir(join(root, 'converted'), { recursive: true })
+  await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
+  await writeFile(join(root, 'wiki', 'derived', 'resposta.md'), '# Resposta derivada\n')
+  await writeFile(join(root, 'wiki', 'articles', 'artigo-1.md'), '# Artigo 1\n')
+  const database = await initializeDatabase({ dbPath: join(root, 'ujimu.sqlite') })
+  database.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').run('admin', '2026-09-07T00:00:00.000Z')
+  return { root, database }
+}
+
+function insertEvent(database: DatabaseSync, id: string) {
+  const event = recordQuestionAnalyticsEvent(database, {
+    specialistId: 'iva',
+    outcome: 'answered',
+    question: `Pergunta ${id}`,
+    consultedDocumentCount: 1
+  })!
+  database.prepare('UPDATE question_analytics_events SET id = ? WHERE id = ?').run(id, event.id)
+  return { ...event, id }
+}
+
+function sha256(value: string): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`
+}

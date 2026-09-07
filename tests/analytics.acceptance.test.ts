@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
@@ -134,6 +134,36 @@ describe('question analytics and content gaps acceptance', () => {
     })
     expect(JSON.stringify(log.mock.calls)).not.toContain('Pergunta privada')
     log.mockRestore()
+    database.close()
+  })
+
+  it('queues derived-answer verification only after the client stream has completed', async () => {
+    const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
+    const specialist = await createTempSpecialist('iva', dataDir)
+    await createIngestedSource(specialtiesRoot, 'iva')
+    await mkdir(join(specialist.paths.wiki, 'derived'), { recursive: true })
+    await writeFile(join(specialist.paths.wiki, 'derived', 'resposta.md'), '# Resposta derivada\n')
+
+    const events = await collectChatEvents(await createChatEventStreamFromBody(
+      { specialistId: 'iva', question: 'Pergunta verificada depois da resposta' },
+      {
+        specialtiesRoot,
+        runner: fakeRunner(['Resposta concluída.'], ['wiki/derived/resposta.md']),
+        analytics: { database, now: new Date('2026-09-07T12:00:00.000Z') }
+      }
+    ))
+
+    expect(events.at(-1)).toEqual({ type: 'done', grounded: true })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM answer_verifications').get()).toEqual({ count: 0 })
+    await waitForTelemetry()
+    expect(database.prepare(`
+      SELECT status, original_answer, derived_pages_json
+      FROM answer_verifications
+    `).get()).toMatchObject({
+      status: 'queued',
+      original_answer: 'Resposta concluída.',
+      derived_pages_json: expect.stringContaining('wiki/derived/resposta.md')
+    })
     database.close()
   })
 

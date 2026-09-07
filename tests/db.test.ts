@@ -49,7 +49,8 @@ describe('initializeDatabase', () => {
       { version: '0020_specialist_hard_reset_jobs' },
       { version: '0021_consulted_document_count' },
       { version: '0022_question_retrieval_hints' },
-      { version: '0023_derivation_job_contract' }
+      { version: '0023_derivation_job_contract' },
+      { version: '0024_derived_answer_verification' }
     ])
   })
 
@@ -66,7 +67,7 @@ describe('initializeDatabase', () => {
       .get() as { count: number }
     second.close()
 
-    expect(count.count).toBe(23)
+    expect(count.count).toBe(24)
   })
 
   it('opens connections in WAL mode with a busy timeout so writers never block readers', async () => {

@@ -89,6 +89,33 @@ describe('task-scoped Pi tools acceptance', () => {
     await expect(toolCallHandler?.({ toolName: 'write', input: { path: 'wiki/page.md' } })).resolves.toMatchObject({ block: true })
   })
 
+  it('gives answer verification read-only tools with derived pages blocked', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-answer-verification-'))
+    await mkdir(join(root, 'wiki', 'derived'), { recursive: true })
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
+    await writeFile(join(root, 'wiki', 'page.md'), '# Page\n')
+    await writeFile(join(root, 'wiki', 'derived', 'answer.md'), '# Derived\n')
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({ cwd: root, task: 'answer_verification' })
+
+    expect(defaultResourceLoaderMock).toHaveBeenCalledWith(expect.objectContaining({
+      extensionFactories: [expect.objectContaining({ name: 'ujimu-answer-verification-file-policy', hidden: true })]
+    }))
+    expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+      tools: ['read', 'grep', 'find', 'ls'],
+      customTools: []
+    }))
+
+    const loaderOptions = defaultResourceLoaderMock.mock.calls[0][0]
+    let toolCallHandler: ((event: unknown) => Promise<unknown>) | undefined
+    loaderOptions.extensionFactories[0].factory({
+      on: (_event: string, handler: (event: unknown) => Promise<unknown>) => { toolCallHandler = handler }
+    })
+    await expect(toolCallHandler?.({ toolName: 'read', input: { path: 'wiki/page.md' } })).resolves.toBeUndefined()
+    await expect(toolCallHandler?.({ toolName: 'read', input: { path: 'wiki/derived/answer.md' } })).resolves.toMatchObject({ block: true })
+  })
+
   it('installs an exact derivation policy with no bash or conversion tool', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-derivation-'))
     const { createUjimuPiSession } = await import('../server/utils/pi/session')
