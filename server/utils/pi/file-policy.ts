@@ -3,7 +3,7 @@ import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 
 const CHAT_FILE_TOOLS = new Set(['read', 'grep', 'find', 'ls'])
 
-export function createChatFilePolicyExtension(cwd: string): {
+export function createChatFilePolicyExtension(cwd: string, blockedWikiPaths: string[] = []): {
   name: string
   hidden: boolean
   factory: (pi: any) => void
@@ -18,7 +18,10 @@ export function createChatFilePolicyExtension(cwd: string): {
         }
 
         const requestedPath = typeof event.input?.path === 'string' ? event.input.path : '.'
-        if (await isChatPathAllowed(cwd, requestedPath)) return undefined
+        if (
+          await isChatPathAllowed(cwd, requestedPath) &&
+          !(await isBlockedChatPath(cwd, requestedPath, blockedWikiPaths, event.toolName === 'grep'))
+        ) return undefined
         return { block: true, reason: 'Path is not available during chat consultations.' }
       })
     }
@@ -45,6 +48,27 @@ export function createAnswerVerificationFilePolicyExtension(cwd: string): {
           (event.toolName !== 'grep' || await isAnswerVerificationGrepPathAllowed(cwd, requestedPath))
         ) return undefined
         return { block: true, reason: 'Derived pages are not available during answer verification.' }
+      })
+    }
+  }
+}
+
+export function createAnswerJudgementFilePolicyExtension(cwd: string): {
+  name: string
+  hidden: boolean
+  factory: (pi: any) => void
+} {
+  return {
+    name: 'ujimu-answer-judgement-file-policy',
+    hidden: true,
+    factory(pi) {
+      pi.on('tool_call', async (event: { toolName?: unknown; input?: { path?: unknown } }) => {
+        if (typeof event.toolName !== 'string' || !CHAT_FILE_TOOLS.has(event.toolName)) {
+          return { block: true, reason: 'Tool is not available during answer judgement.' }
+        }
+        const requestedPath = typeof event.input?.path === 'string' ? event.input.path : '.'
+        if (await isDerivationReadPathAllowed(cwd, requestedPath)) return undefined
+        return { block: true, reason: 'Path is not available during answer judgement.' }
       })
     }
   }
@@ -207,6 +231,26 @@ export async function isChatPathAllowed(cwd: string, requestedPath: string): Pro
     return requested === agents || isWithin(wiki, requested)
   } catch {
     return false
+  }
+}
+
+async function isBlockedChatPath(
+  cwd: string,
+  requestedPath: string,
+  blockedWikiPaths: string[],
+  blockAncestor: boolean
+): Promise<boolean> {
+  if (blockedWikiPaths.length === 0) return false
+  try {
+    const root = await realpath(cwd)
+    const requested = await realpath(resolve(root, requestedPath))
+    for (const blockedPath of blockedWikiPaths) {
+      const blocked = await realpath(resolve(root, blockedPath)).catch(() => '')
+      if (blocked && (requested === blocked || (blockAncestor && isWithin(requested, blocked)))) return true
+    }
+    return false
+  } catch {
+    return true
   }
 }
 

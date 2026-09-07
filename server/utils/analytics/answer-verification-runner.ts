@@ -6,7 +6,13 @@ import { loadSpecialistsFromDisk } from '../specialists/loader'
 import { getCitationEvidence } from '../chat/context'
 import { lookupRetrievalHints, type RetrievalHints } from '../chat/retrieval-cache'
 import type { ChatCitation, ChatConversationContextMessage } from '../chat/types'
-import { readAnswerVerification, type AnswerVerificationBaseline } from './answer-verification'
+import {
+  readAnswerVerification,
+  type AnswerAlignmentJudgement,
+  type AnswerVerificationBaseline,
+  type AnswerVerificationExecutionResult,
+  type NegativeDerivedAttribution
+} from './answer-verification'
 
 export class AnswerVerificationExecutionError extends Error {
   public readonly code = 'ANSWER_VERIFICATION_OUTPUT_INVALID'
@@ -43,7 +49,10 @@ export function createPiAnswerVerificationJobRunner(options: {
         specialistId: specialist.id,
         question: event.question_text
       })
-      return runSourceOnlyAnswer({
+      if (!verification.originalAnswer) {
+        throw new AnswerVerificationExecutionError('Delivered answer is unavailable for verification.')
+      }
+      const baseline = await runSourceOnlyAnswer({
         cwd: specialist.paths.root,
         prompt: buildSourceOnlyAnswerPrompt({
           question: event.question_text,
@@ -52,6 +61,33 @@ export function createPiAnswerVerificationJobRunner(options: {
           conversationContext: verification.conversationContext
         })
       })
+      const judgement = await runJudgementSession({
+        cwd: specialist.paths.root,
+        prompt: buildAlignmentJudgementPrompt({
+          question: event.question_text,
+          deliveredAnswer: verification.originalAnswer,
+          deliveredCitations: verification.originalCitations,
+          deliveredDocuments: verification.derivedPages.map((page) => page.path),
+          baseline
+        })
+      }).then(parseAlignmentJudgement)
+      const result: AnswerVerificationExecutionResult = { baseline, judgement }
+      if (requiresAttribution(judgement.level)) {
+        result.attribution = await runJudgementSession({
+          cwd: specialist.paths.root,
+          prompt: buildNegativeAttributionPrompt({
+            question: event.question_text,
+            deliveredAnswer: verification.originalAnswer,
+            baseline,
+            judgement,
+            allowedDerivedPaths: verification.derivedPages.map((page) => page.path)
+          })
+        }).then((output) => parseNegativeAttribution(
+          output,
+          verification.derivedPages.map((page) => page.path)
+        ))
+      }
+      return result
     }
   }
 }
@@ -84,6 +120,114 @@ ${input.question}
 Conversation context:
 ${formatConversationContext(input.conversationContext)}
 `
+}
+
+export function buildAlignmentJudgementPrompt(input: {
+  question: string
+  deliveredAnswer: string
+  deliveredCitations: ChatCitation[]
+  deliveredDocuments: string[]
+  baseline: AnswerVerificationBaseline
+}): string {
+  return `Compare two answers to the same specialist question using the available specialist evidence when needed.
+The source-only answer is a control, not an oracle. Judge semantic, factual, legal, numerical, conditional, and citation alignment. Do not prefer an answer merely because it is longer.
+
+Return exactly one JSON object and no markdown fence:
+{"level":"FIEL|MUITO_ALINHADO|ALINHADO|POUCO_ALINHADO|NAO_ALINHADO","reason":"...","confidence":"high|medium|low"}
+Definitions:
+- FIEL: same conclusions, values, conditions, and legal basis.
+- MUITO_ALINHADO: minor differences without legal or practical impact.
+- ALINHADO: same main conclusion with relevant omissions or differences.
+- POUCO_ALINHADO: differences could change the user's decision.
+- NAO_ALINHADO: factual, legal, or numerical contradiction.
+
+Question:
+${input.question}
+
+Delivered answer:
+${input.deliveredAnswer}
+
+Delivered citations:
+${JSON.stringify(input.deliveredCitations)}
+
+Derived pages read by the delivered answer:
+${input.deliveredDocuments.join('\n')}
+
+Source-only control answer:
+${input.baseline.answer}
+
+Control citations:
+${JSON.stringify(input.baseline.citations)}
+
+Non-derived pages read by the control:
+${input.baseline.consultedDocuments.join('\n')}
+`
+}
+
+export function buildNegativeAttributionPrompt(input: {
+  question: string
+  deliveredAnswer: string
+  baseline: AnswerVerificationBaseline
+  judgement: AnswerAlignmentJudgement
+  allowedDerivedPaths: string[]
+}): string {
+  return `Determine whether any allowed derived page contributed negatively to the delivered answer.
+A difference alone is not proof. The source-only control may be worse. Read the named derived pages and supporting non-derived evidence as needed. Return an empty path list when no derived page is demonstrably harmful.
+
+Return exactly one JSON object and no markdown fence:
+{"negativeDerivedPaths":["wiki/derived/example.md"],"reason":"..."}
+Only paths in the allowlist below are valid.
+
+Question:
+${input.question}
+
+Delivered answer:
+${input.deliveredAnswer}
+
+Source-only control answer:
+${input.baseline.answer}
+
+Alignment judgement:
+${JSON.stringify(input.judgement)}
+
+Allowed derived paths:
+${input.allowedDerivedPaths.join('\n')}
+`
+}
+
+export function parseAlignmentJudgement(text: string): AnswerAlignmentJudgement {
+  const parsed = parseJsonObject(text)
+  const level = parsed.level
+  const reason = parsed.reason
+  const confidence = parsed.confidence
+  if (
+    !['FIEL', 'MUITO_ALINHADO', 'ALINHADO', 'POUCO_ALINHADO', 'NAO_ALINHADO'].includes(String(level)) ||
+    !isBoundedText(reason) ||
+    !['high', 'medium', 'low'].includes(String(confidence))
+  ) {
+    throw new AnswerVerificationExecutionError('Alignment judgement fields are invalid.')
+  }
+  return {
+    level: level as AnswerAlignmentJudgement['level'],
+    reason: reason.trim(),
+    confidence: confidence as AnswerAlignmentJudgement['confidence']
+  }
+}
+
+export function parseNegativeAttribution(text: string, allowedDerivedPaths: string[]): NegativeDerivedAttribution {
+  const parsed = parseJsonObject(text)
+  if (!Array.isArray(parsed.negativeDerivedPaths) || !isBoundedText(parsed.reason)) {
+    throw new AnswerVerificationExecutionError('Negative attribution fields are invalid.')
+  }
+  const allowed = new Set(allowedDerivedPaths)
+  const paths = parsed.negativeDerivedPaths
+  if (paths.some((path) => typeof path !== 'string' || !allowed.has(path))) {
+    throw new AnswerVerificationExecutionError('Negative attribution contains a path outside the allowlist.')
+  }
+  return {
+    negativeDerivedPaths: [...new Set(paths as string[])].sort(),
+    reason: parsed.reason.trim()
+  }
 }
 
 async function runSourceOnlyAnswer(input: { cwd: string; prompt: string }): Promise<AnswerVerificationBaseline> {
@@ -141,6 +285,40 @@ async function runSourceOnlyAnswer(input: { cwd: string; prompt: string }): Prom
   }
 }
 
+async function runJudgementSession(input: { cwd: string; prompt: string }): Promise<string> {
+  const { session } = await createUjimuPiSession({
+    cwd: input.cwd,
+    task: 'answer_judgement',
+    modelEnvPrefix: 'UJIMU_PI_INGESTION'
+  })
+  let streamedText = ''
+  let finalText = ''
+  const unsubscribe = session.subscribe((event: any) => {
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+      if (typeof event.assistantMessageEvent.delta === 'string') streamedText += event.assistantMessageEvent.delta
+      return
+    }
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_end') {
+      if (typeof event.assistantMessageEvent.content === 'string') finalText = event.assistantMessageEvent.content
+      return
+    }
+    if (event?.type === 'message_end' && event.message?.role === 'assistant') {
+      finalText = extractAssistantText(event.message) || finalText
+      return
+    }
+    if (event?.type === 'agent_end') finalText = extractLatestAssistantText(event.messages) || finalText
+  })
+  try {
+    await session.prompt(input.prompt)
+    const text = (finalText || streamedText).trim()
+    if (!text) throw new AnswerVerificationExecutionError('Judgement model returned no output.')
+    return text
+  } finally {
+    unsubscribe?.()
+    session.dispose()
+  }
+}
+
 function parseSourceOnlyAnswer(text: string): Omit<AnswerVerificationBaseline, 'consultedDocuments'> {
   let parsed: unknown
   try {
@@ -160,6 +338,24 @@ function parseSourceOnlyAnswer(text: string): Omit<AnswerVerificationBaseline, '
     throw new AnswerVerificationExecutionError('Source-only citations are invalid.')
   }
   return { answer: value.answer.trim(), citations }
+}
+
+function parseJsonObject(text: string): Record<string, any> {
+  try {
+    const parsed = JSON.parse(text.trim())
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+  } catch {
+    // Normalized below.
+  }
+  throw new AnswerVerificationExecutionError('Model output was not a JSON object.')
+}
+
+function requiresAttribution(level: AnswerAlignmentJudgement['level']): boolean {
+  return level === 'ALINHADO' || level === 'POUCO_ALINHADO' || level === 'NAO_ALINHADO'
+}
+
+function isBoundedText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 2000
 }
 
 function isCitation(value: unknown): value is ChatCitation {

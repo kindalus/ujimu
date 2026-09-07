@@ -15,6 +15,7 @@ export type AnswerVerificationStatus =
   | 'queued'
   | 'running'
   | 'baseline_ready'
+  | 'repair_pending'
   | 'succeeded'
   | 'failed'
   | 'needs_admin_source'
@@ -30,6 +31,30 @@ export interface AnswerVerificationBaseline {
   consultedDocuments: string[]
 }
 
+export type AnswerAlignmentLevel =
+  | 'FIEL'
+  | 'MUITO_ALINHADO'
+  | 'ALINHADO'
+  | 'POUCO_ALINHADO'
+  | 'NAO_ALINHADO'
+
+export interface AnswerAlignmentJudgement {
+  level: AnswerAlignmentLevel
+  reason: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface NegativeDerivedAttribution {
+  negativeDerivedPaths: string[]
+  reason: string
+}
+
+export interface AnswerVerificationExecutionResult {
+  baseline: AnswerVerificationBaseline
+  judgement: AnswerAlignmentJudgement
+  attribution?: NegativeDerivedAttribution
+}
+
 export interface AnswerVerificationRecord {
   id: string
   sourceEventId: string
@@ -41,6 +66,8 @@ export interface AnswerVerificationRecord {
   conversationContext: ChatConversationContextMessage[]
   derivedPages: DerivedPageRevision[]
   baseline: AnswerVerificationBaseline | null
+  judgement: AnswerAlignmentJudgement | null
+  negativeDerivedPaths: string[]
   jobId: string | null
   createdAt: string
   updatedAt: string
@@ -207,19 +234,100 @@ export function markAnswerVerificationRunning(database: DatabaseSync, verificati
   `).run(now.toISOString(), verificationId)
 }
 
-export function completeAnswerVerificationBaseline(
+export function completeAnswerVerification(
   database: DatabaseSync,
-  input: { verificationId: string; baseline: AnswerVerificationBaseline; now?: Date }
+  input: { verificationId: string; result: AnswerVerificationExecutionResult; now?: Date }
+): void {
+  const verification = readAnswerVerification(database, input.verificationId)
+  if (!verification || verification.status !== 'running') {
+    throw new Error('Answer verification is not running.')
+  }
+  assertExecutionResult(input.result, verification.derivedPages.map((page) => page.path))
+
+  const now = (input.now ?? new Date()).toISOString()
+  const favourable = input.result.judgement.level === 'FIEL' || input.result.judgement.level === 'MUITO_ALINHADO'
+  const negativePaths = [...new Set(input.result.attribution?.negativeDerivedPaths ?? [])].sort()
+  const needsRepair = negativePaths.length > 0
+  const finalStatus: AnswerVerificationStatus = needsRepair ? 'repair_pending' : 'succeeded'
+
+  database.exec('BEGIN IMMEDIATE')
+  try {
+    database.prepare(`
+      UPDATE answer_verifications
+      SET status = ?, baseline_answer = ?, baseline_citations_json = ?,
+        baseline_documents_json = ?, alignment_level = ?, alignment_reason = ?,
+        alignment_confidence = ?, negative_derived_pages_json = ?,
+        original_answer = CASE WHEN ? THEN original_answer ELSE NULL END,
+        original_citations_json = CASE WHEN ? THEN original_citations_json ELSE NULL END,
+        conversation_context_json = CASE WHEN ? THEN conversation_context_json ELSE NULL END,
+        updated_at = ?, completed_at = CASE WHEN ? THEN NULL ELSE ? END
+      WHERE id = ? AND status = 'running'
+    `).run(
+      finalStatus,
+      needsRepair ? input.result.baseline.answer : null,
+      needsRepair ? JSON.stringify(input.result.baseline.citations) : null,
+      needsRepair ? JSON.stringify(input.result.baseline.consultedDocuments) : null,
+      input.result.judgement.level,
+      input.result.judgement.reason,
+      input.result.judgement.confidence,
+      JSON.stringify(negativePaths),
+      needsRepair ? 1 : 0,
+      needsRepair ? 1 : 0,
+      needsRepair ? 1 : 0,
+      now,
+      needsRepair ? 1 : 0,
+      now,
+      input.verificationId
+    )
+
+    const negative = new Set(negativePaths)
+    for (const page of verification.derivedPages) {
+      const status = negative.has(page.path)
+        ? 'quarantined'
+        : favourable
+          ? 'verified'
+          : 'review_required'
+      database.prepare(`
+        UPDATE derived_page_quality
+        SET status = ?, updated_at = ?
+        WHERE specialist_id = ? AND wiki_path = ?
+          AND revision_sha256 = ? AND verification_id = ?
+      `).run(
+        status,
+        now,
+        verification.specialistId,
+        page.path,
+        page.revisionSha256,
+        verification.id
+      )
+    }
+    database.exec('COMMIT')
+  } catch (error) {
+    database.exec('ROLLBACK')
+    throw error
+  }
+}
+
+export function readQuarantinedDerivedPaths(database: DatabaseSync, specialistId: string): string[] {
+  return (database.prepare(`
+    SELECT wiki_path
+    FROM derived_page_quality
+    WHERE specialist_id = ? AND status = 'quarantined'
+    ORDER BY wiki_path
+  `).all(specialistId) as Array<{ wiki_path: string }>).map((row) => row.wiki_path)
+}
+
+export function markAnswerVerificationRetryQueued(
+  database: DatabaseSync,
+  input: { verificationId: string; code: string; now?: Date }
 ): void {
   database.prepare(`
     UPDATE answer_verifications
-    SET status = 'baseline_ready', baseline_answer = ?, baseline_citations_json = ?,
-      baseline_documents_json = ?, updated_at = ?
-    WHERE id = ? AND status = 'running'
+    SET status = 'queued', last_error_code = ?, last_error_message = ?, updated_at = ?
+    WHERE id = ?
   `).run(
-    input.baseline.answer,
-    JSON.stringify(input.baseline.citations),
-    JSON.stringify(input.baseline.consultedDocuments),
+    input.code.slice(0, 80),
+    'Answer verification attempt failed and will be retried.',
     (input.now ?? new Date()).toISOString(),
     input.verificationId
   )
@@ -311,10 +419,49 @@ function mapVerificationRow(value: unknown): AnswerVerificationRecord {
     conversationContext: parseJsonArray<ChatConversationContextMessage>(row.conversation_context_json),
     derivedPages: parseJsonArray<DerivedPageRevision>(row.derived_pages_json),
     baseline,
+    judgement: isAlignmentLevel(row.alignment_level) && isConfidence(row.alignment_confidence) && typeof row.alignment_reason === 'string'
+      ? { level: row.alignment_level, reason: row.alignment_reason, confidence: row.alignment_confidence }
+      : null,
+    negativeDerivedPaths: parseJsonArray<string>(row.negative_derived_pages_json),
     jobId: row.job_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
+}
+
+function assertExecutionResult(result: AnswerVerificationExecutionResult, allowedDerivedPaths: string[]): void {
+  if (!isAlignmentLevel(result.judgement?.level) || !isConfidence(result.judgement?.confidence)) {
+    throw new Error('Answer verification judgement is invalid.')
+  }
+  if (!isBoundedText(result.judgement.reason)) {
+    throw new Error('Answer verification judgement reason is invalid.')
+  }
+  const requiresAttribution = ['ALINHADO', 'POUCO_ALINHADO', 'NAO_ALINHADO'].includes(result.judgement.level)
+  if (requiresAttribution !== Boolean(result.attribution)) {
+    throw new Error('Answer verification attribution is invalid for its judgement.')
+  }
+  if (result.attribution) {
+    if (!isBoundedText(result.attribution.reason)) throw new Error('Answer verification attribution reason is invalid.')
+    const allowed = new Set(allowedDerivedPaths)
+    if (
+      !Array.isArray(result.attribution.negativeDerivedPaths) ||
+      result.attribution.negativeDerivedPaths.some((path) => typeof path !== 'string' || !allowed.has(path))
+    ) {
+      throw new Error('Answer verification attribution path is invalid.')
+    }
+  }
+}
+
+function isAlignmentLevel(value: unknown): value is AnswerAlignmentLevel {
+  return ['FIEL', 'MUITO_ALINHADO', 'ALINHADO', 'POUCO_ALINHADO', 'NAO_ALINHADO'].includes(String(value))
+}
+
+function isConfidence(value: unknown): value is AnswerAlignmentJudgement['confidence'] {
+  return value === 'high' || value === 'medium' || value === 'low'
+}
+
+function isBoundedText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 2000
 }
 
 function parseJsonArray<T>(value: unknown): T[] {

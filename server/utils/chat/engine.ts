@@ -6,7 +6,7 @@ import { getSpecialistById } from '../specialists/registry'
 import { scheduleDueBackgroundJobs } from '../jobs/background'
 import type { QuotaSubject } from '../quota/policy'
 import { assertQuotaAllowedWithFallback } from '../quota/usage'
-import { enqueueDerivedAnswerVerification } from '../analytics/answer-verification'
+import { enqueueDerivedAnswerVerification, readQuarantinedDerivedPaths } from '../analytics/answer-verification'
 import { recordQuestionAnalyticsEvent } from '../analytics/questions'
 import {
   buildConversationContext,
@@ -118,6 +118,7 @@ export async function createChatEventStreamForSpecialist(
   options: CreateChatEventStreamOptions = {}
 ): Promise<AsyncIterable<ChatStreamEvent>> {
   const historyUserId = resolveHistoryUserId(options.history)
+  const qualityDatabase = options.analytics?.database ?? options.history?.database ?? options.quota?.database
   const piChatEnabled = isPiChatEnabled(options.piChatEnabled)
   const persistentChatSessions = options.persistentChatSessions ?? !options.runner
   const regeneration = input.regenerateLast && historyUserId
@@ -188,8 +189,11 @@ export async function createChatEventStreamForSpecialist(
       : undefined
 
     const citationEvidence = await getCitationEvidence(specialist)
+    const blockedWikiPaths = qualityDatabase
+      ? readQuarantinedDerivedPathsSafely(qualityDatabase, specialist.id)
+      : []
     const retrievalHints = options.analytics
-      ? lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question)
+      ? lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question, blockedWikiPaths)
       : undefined
     await chatSession?.beginTurn()
 
@@ -200,6 +204,7 @@ export async function createChatEventStreamForSpecialist(
       ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
       citationEvidence,
       ...(retrievalHints ? { retrievalHints } : {}),
+      ...(blockedWikiPaths.length > 0 ? { blockedWikiPaths } : {}),
       ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {}),
       ...(chatSession ? { piSessionManager: chatSession.manager } : {})
     }
@@ -664,19 +669,32 @@ async function* completeStreamResult(input: {
 function lookupRetrievalHintsSafely(
   analytics: ChatAnalyticsOptions,
   specialistId: string,
-  question: string
+  question: string,
+  blockedWikiPaths: string[]
 ) {
   try {
     return lookupRetrievalHints(analytics.database, {
       specialistId,
       question,
-      now: analytics.now
+      now: analytics.now,
+      blockedWikiPaths
     })
   } catch {
     console.error('[ujimu] retrieval hint lookup failed', {
       code: 'RETRIEVAL_HINT_LOOKUP_FAILED'
     })
     return undefined
+  }
+}
+
+function readQuarantinedDerivedPathsSafely(database: DatabaseSync, specialistId: string): string[] {
+  try {
+    return readQuarantinedDerivedPaths(database, specialistId)
+  } catch {
+    console.error('[ujimu] derived page quarantine lookup failed', {
+      code: 'DERIVED_PAGE_QUARANTINE_LOOKUP_FAILED'
+    })
+    return []
   }
 }
 

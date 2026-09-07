@@ -45,6 +45,7 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
   const { session } = await createUjimuPiSession({
     cwd,
     task: 'chat',
+    ...(input.blockedWikiPaths?.length ? { blockedWikiPaths: input.blockedWikiPaths } : {}),
     ...(input.piSessionManager ? { sessionManager: input.piSessionManager } : {})
   })
 

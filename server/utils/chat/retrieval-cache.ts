@@ -18,9 +18,10 @@ const SIMILARITY_THRESHOLD = 0.85
 
 export function lookupRetrievalHints(
   database: DatabaseSync,
-  input: { specialistId: string; question: string; now?: Date }
+  input: { specialistId: string; question: string; now?: Date; blockedWikiPaths?: string[] }
 ): RetrievalHints | undefined {
   const now = input.now ?? new Date()
+  const blockedWikiPaths = new Set(input.blockedWikiPaths ?? [])
   const nowIso = now.toISOString()
   deleteExpiredHints(database, nowIso)
 
@@ -37,14 +38,14 @@ export function lookupRetrievalHints(
   `).all(input.specialistId, nowIso) as unknown as RetrievalHintRow[]
 
   const exact = rows.find((row) => row.fingerprint === fingerprint)
-  if (exact) return toHints(exact, 'exact', 1)
+  if (exact) return toHints(exact, 'exact', 1, blockedWikiPaths)
 
   let best: { row: RetrievalHintRow; score: number } | undefined
   for (const row of rows) {
     const score = sorensenDiceTrigramSimilarity(normalizedQuestion, row.normalized_question)
     if (score >= SIMILARITY_THRESHOLD && (!best || score > best.score)) best = { row, score }
   }
-  return best ? toHints(best.row, 'similar', best.score) : undefined
+  return best ? toHints(best.row, 'similar', best.score, blockedWikiPaths) : undefined
 }
 
 export function storeRetrievalHints(database: DatabaseSync, input: StoreRetrievalHintsInput): void {
@@ -98,11 +99,18 @@ interface RetrievalHintRow {
   created_at: string
 }
 
-function toHints(row: RetrievalHintRow, match: RetrievalHints['match'], score: number): RetrievalHints | undefined {
+function toHints(
+  row: RetrievalHintRow,
+  match: RetrievalHints['match'],
+  score: number,
+  blockedWikiPaths: Set<string>
+): RetrievalHints | undefined {
   try {
     const parsed = JSON.parse(row.wiki_paths_json)
     if (!Array.isArray(parsed)) return undefined
-    const wikiPaths = parsed.filter((path): path is string => typeof path === 'string' && isWikiMarkdownPath(path))
+    const wikiPaths = parsed.filter((path): path is string =>
+      typeof path === 'string' && isWikiMarkdownPath(path) && !blockedWikiPaths.has(path)
+    )
     return wikiPaths.length > 0 ? { wikiPaths, match, score } : undefined
   } catch {
     return undefined

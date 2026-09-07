@@ -59,6 +59,7 @@ export interface ChatRunnerInput {
   clientTimezone?: string
   citationEvidence: ChatCitation[]
   retrievalHints?: RetrievalHints
+  blockedWikiPaths?: string[]
   conversationContext?: ChatConversationContextMessage[]
   piSessionManager?: any
 }

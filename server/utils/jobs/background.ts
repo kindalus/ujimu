@@ -55,7 +55,7 @@ export interface AnswerVerificationJob {
 }
 
 export interface AnswerVerificationJobRunner {
-  run(job: AnswerVerificationJob): Promise<import('../analytics/answer-verification').AnswerVerificationBaseline>
+  run(job: AnswerVerificationJob): Promise<import('../analytics/answer-verification').AnswerVerificationExecutionResult>
 }
 
 export interface RunDueBackgroundJobsOptions {
@@ -266,6 +266,11 @@ export async function runDueBackgroundJobs(
       recordHardResetAudit(options.database, locked, 'completed')
       result.succeeded += 1
     } catch (error) {
+      if (await retryAnswerVerificationJob(options.database, locked, error)) {
+        result.failed += 1
+        scheduleDueBackgroundJobs()
+        continue
+      }
       markJobFailed(options.database, locked, error, new Date())
       await markAnswerVerificationJobFailed(options.database, locked, error)
       recordHardResetAudit(options.database, locked, 'failed', error)
@@ -374,10 +379,10 @@ async function runBackgroundJob(
         database: options.database,
         dataDir: options.dataDir
       })
-    const baseline = await runner.run(verificationJob)
-    verification.completeAnswerVerificationBaseline(options.database, {
+    const result = await runner.run(verificationJob)
+    verification.completeAnswerVerification(options.database, {
       verificationId: verificationJob.verificationId,
-      baseline
+      result
     })
     return
   }
@@ -545,6 +550,30 @@ function markJobFailed(database: DatabaseSync, job: BackgroundJobRecord, error: 
 async function promotePendingAnswerVerifications(database: DatabaseSync, now: Date): Promise<void> {
   const verification = await import('../analytics/answer-verification')
   verification.promotePendingAnswerVerificationJobs(database, { now })
+}
+
+async function retryAnswerVerificationJob(
+  database: DatabaseSync,
+  job: BackgroundJobRecord,
+  error: unknown
+): Promise<boolean> {
+  if (job.type !== 'answer_verification' || job.attempts >= job.max_attempts) return false
+  const verification = await import('../analytics/answer-verification')
+  const verificationJob = verification.readAnswerVerificationJob(database, job.id)
+  if (!verificationJob) return false
+  const now = new Date().toISOString()
+  database.prepare(`
+    UPDATE background_jobs
+    SET status = 'queued', locked_at = NULL, locked_by = NULL,
+      last_error_code = ?, last_error_message = ?, updated_at = ?, completed_at = NULL
+    WHERE id = ? AND status = 'running'
+  `).run(resolveErrorCode(error), 'Answer verification attempt failed and will be retried.', now, job.id)
+  verification.markAnswerVerificationRetryQueued(database, {
+    verificationId: verificationJob.verificationId,
+    code: resolveErrorCode(error),
+    now: new Date(now)
+  })
+  return true
 }
 
 async function markAnswerVerificationJobFailed(

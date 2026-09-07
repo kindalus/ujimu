@@ -193,6 +193,7 @@ describe('question analytics and content gaps acceptance', () => {
     ))
 
     expect(blockedWikiPaths).toEqual(['wiki/derived/bloqueada.md'])
+    await waitForTelemetry()
     database.close()
   })
 

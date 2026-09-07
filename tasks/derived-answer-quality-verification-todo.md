@@ -46,41 +46,41 @@
 ### Task 4: Judge alignment with validated output
 
 **Acceptance criteria:**
-- [ ] The ingestion model receives both answers and their retrieval evidence.
-- [ ] Exactly five alignment values and bounded reason/confidence fields are accepted.
-- [ ] Invalid output retries without changing page quality.
+- [x] The ingestion model receives both answers and their retrieval evidence.
+- [x] Exactly five alignment values and bounded reason/confidence fields are accepted.
+- [x] Invalid output retries three times without quarantining a page.
 
-**Verification:** Verification-runner acceptance tests.
+**Verification:** Verification-runner acceptance tests passed.
 
 **Dependencies:** Slice 75
 
 ### Task 5: Attribute negative derived influence
 
 **Acceptance criteria:**
-- [ ] Attribution runs only for `ALINHADO` or lower.
-- [ ] Only derived paths consulted by the original answer can be returned.
-- [ ] Empty attribution completes without quarantine or repair.
+- [x] Attribution runs only for `ALINHADO` or lower.
+- [x] Only derived paths consulted by the original answer can be returned.
+- [x] Empty attribution completes without quarantine or repair.
 
-**Verification:** State-transition and hostile-output acceptance tests.
+**Verification:** State-transition and hostile-output acceptance tests passed.
 
 **Dependencies:** Task 4
 
 ### Task 6: Enforce quarantine in chat
 
 **Acceptance criteria:**
-- [ ] Negative paths become quarantined before repair begins.
-- [ ] Retrieval hints omit quarantined paths.
-- [ ] Chat file policy blocks direct and aliased reads of quarantined paths.
+- [x] Negative paths become quarantined before repair begins.
+- [x] Retrieval hints omit quarantined paths.
+- [x] Chat file policy blocks direct and aliased reads of quarantined paths.
 
-**Verification:** Retrieval-cache, Pi policy, and chat acceptance tests.
+**Verification:** Retrieval-cache, Pi policy, and chat acceptance tests passed.
 
 **Dependencies:** Task 5
 
 ### Slice 76 checkpoint
 
-- [ ] Slice deck and `STATUS.md` are updated.
-- [ ] Full tests, typecheck, and build pass.
-- [ ] Spec, stress-test, acceptance tests, and implementation are separate commits.
+- [x] Slice deck and `STATUS.md` are updated.
+- [x] Full tests, typecheck, and build pass.
+- [x] Spec, stress-test, acceptance tests, and implementation are separate commits.
 
 ## Slice 77 — Staged repair and promotion
 

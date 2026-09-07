@@ -216,21 +216,21 @@ describe('derived answer verification sampling and baseline acceptance', () => {
       conversationContext: [],
       consultedDocuments: ['wiki/derived/resposta.md']
     })
-    await runDueBackgroundJobs({
-      database: fixture.database,
-      answerVerificationRunner: {
-        async run(): Promise<AnswerVerificationExecutionResult> {
-          return {
-            baseline: { answer: 'Controlo.', citations: [], consultedDocuments: [] },
-            judgement: { level: 'NAO_ALINHADO', reason: 'Contradição.', confidence: 'high' },
-            attribution: {
-              negativeDerivedPaths: ['wiki/derived/inventada.md'],
-              reason: 'Path hostil.'
-            }
+    const runner = {
+      async run(): Promise<AnswerVerificationExecutionResult> {
+        return {
+          baseline: { answer: 'Controlo.', citations: [], consultedDocuments: [] },
+          judgement: { level: 'NAO_ALINHADO' as const, reason: 'Contradição.', confidence: 'high' as const },
+          attribution: {
+            negativeDerivedPaths: ['wiki/derived/inventada.md'],
+            reason: 'Path hostil.'
           }
         }
       }
-    })
+    }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await runDueBackgroundJobs({ database: fixture.database, answerVerificationRunner: runner })
+    }
 
     expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({ status: 'failed' })
     expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual([])
