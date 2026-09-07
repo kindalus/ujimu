@@ -160,6 +160,7 @@ Verified guarantees:
 - Transient answers and conversation context are cleared on every terminal result.
 - No `llm-wiki` skill file changed.
 - 340 tests, typecheck, production build, and the high-severity dependency-audit gate passed; 36 pre-existing moderate Tiptap advisories remain tracked.
+- Production deployment `55a5dfe` passed health, SQLite quick-check, and two forced first-revision audits: one `FIEL` and one `MUITO_ALINHADO`, both high confidence. The source-only controls read no derived page, both quality rows are verified, no jobs remain active, and all transient answers/context were cleared.
 
 ## Gemini dependency removal
 

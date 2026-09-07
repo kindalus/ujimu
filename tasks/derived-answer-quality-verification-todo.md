@@ -121,5 +121,5 @@
 
 - [x] Operations documentation, slice deck, and `STATUS.md` are current.
 - [x] Full tests, typecheck, build, and dependency audit pass.
-- [ ] Production deploy and real tool-call verification pass.
+- [x] Production deploy and real tool-call verification pass.
 - [x] No `llm-wiki` skill file changed.
