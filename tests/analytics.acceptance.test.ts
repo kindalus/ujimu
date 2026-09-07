@@ -167,6 +167,35 @@ describe('question analytics and content gaps acceptance', () => {
     database.close()
   })
 
+  it('passes quarantined derived paths to the chat runner', async () => {
+    const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
+    await createTempSpecialist('iva', dataDir)
+    await createIngestedSource(specialtiesRoot, 'iva')
+    database.prepare(`
+      INSERT INTO derived_page_quality (
+        specialist_id, wiki_path, revision_sha256, status, verification_id, updated_at
+      ) VALUES ('iva', 'wiki/derived/bloqueada.md', 'sha256:test', 'quarantined', NULL, ?)
+    `).run(new Date().toISOString())
+    let blockedWikiPaths: unknown
+
+    await collectChatEvents(await createChatEventStreamFromBody(
+      { specialistId: 'iva', question: 'Pergunta sem a página bloqueada' },
+      {
+        specialtiesRoot,
+        analytics: { database },
+        runner: {
+          async run(input) {
+            blockedWikiPaths = input.blockedWikiPaths
+            return { grounded: true, citations: [], deltas: toAsyncDeltas(['Resposta.']) }
+          }
+        }
+      }
+    ))
+
+    expect(blockedWikiPaths).toEqual(['wiki/derived/bloqueada.md'])
+    database.close()
+  })
+
   it('returns exact then similar wiki hints and lazily expires them without storing answers', async () => {
     const { dataDir, specialtiesRoot, database } = await createTempAnalyticsData()
     await createTempSpecialist('iva', dataDir)

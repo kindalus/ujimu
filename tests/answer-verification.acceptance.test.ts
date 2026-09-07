@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest'
 import {
   enqueueDerivedAnswerVerification,
   readAnswerVerification,
-  type AnswerVerificationBaseline
+  readQuarantinedDerivedPaths,
+  type AnswerVerificationBaseline,
+  type AnswerVerificationExecutionResult
 } from '../server/utils/analytics/answer-verification'
 import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
 import { initializeDatabase } from '../server/utils/db'
@@ -16,8 +18,11 @@ import {
   runDueBackgroundJobs
 } from '../server/utils/jobs/background'
 import {
-  buildSourceOnlyAnswerPrompt
+  buildSourceOnlyAnswerPrompt,
+  parseAlignmentJudgement,
+  parseNegativeAttribution
 } from '../server/utils/analytics/answer-verification-runner'
+import { lookupRetrievalHints, storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
 import { isAnswerVerificationReadPathAllowed } from '../server/utils/pi/file-policy'
 
 const NOT_SAMPLED_EVENT_ID = '00000000-0000-4000-8000-000000000000'
@@ -132,12 +137,16 @@ describe('derived answer verification sampling and baseline acceptance', () => {
       citations: [],
       consultedDocuments: ['wiki/articles/artigo-1.md']
     }
+    const result: AnswerVerificationExecutionResult = {
+      baseline,
+      judgement: { level: 'FIEL', reason: 'Mesma resposta.', confidence: 'high' }
+    }
     await runDueBackgroundJobs({
       database: fixture.database,
       answerVerificationRunner: {
         async run(job) {
           seen.push(job)
-          return baseline
+          return result
         }
       }
     })
@@ -148,10 +157,120 @@ describe('derived answer verification sampling and baseline acceptance', () => {
       sourceEventId: event.id
     })])
     expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
-      status: 'baseline_ready',
-      baseline
+      status: 'succeeded',
+      baseline: null,
+      originalAnswer: null,
+      judgement: result.judgement
     })
     fixture.database.close()
+  })
+
+  it('quarantines only a negatively attributed derived page from the original answer', async () => {
+    const fixture = await createFixture()
+    const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const verification = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: event.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta derivada.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+    const baseline: AnswerVerificationBaseline = {
+      answer: 'Resposta de controlo.', citations: [], consultedDocuments: ['wiki/articles/artigo-1.md']
+    }
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      answerVerificationRunner: {
+        async run(): Promise<AnswerVerificationExecutionResult> {
+          return {
+            baseline,
+            judgement: { level: 'ALINHADO', reason: 'Existe uma omissão relevante.', confidence: 'high' },
+            attribution: {
+              negativeDerivedPaths: ['wiki/derived/resposta.md'],
+              reason: 'A derived omitiu uma condição legal.'
+            }
+          }
+        }
+      }
+    })
+
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
+      status: 'repair_pending',
+      originalAnswer: 'Resposta derivada.',
+      baseline,
+      negativeDerivedPaths: ['wiki/derived/resposta.md']
+    })
+    expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual(['wiki/derived/resposta.md'])
+    fixture.database.close()
+  })
+
+  it('rejects attribution paths that were not consulted without quarantining them', async () => {
+    const fixture = await createFixture()
+    const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const verification = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: event.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta derivada.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      answerVerificationRunner: {
+        async run(): Promise<AnswerVerificationExecutionResult> {
+          return {
+            baseline: { answer: 'Controlo.', citations: [], consultedDocuments: [] },
+            judgement: { level: 'NAO_ALINHADO', reason: 'Contradição.', confidence: 'high' },
+            attribution: {
+              negativeDerivedPaths: ['wiki/derived/inventada.md'],
+              reason: 'Path hostil.'
+            }
+          }
+        }
+      }
+    })
+
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({ status: 'failed' })
+    expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual([])
+    fixture.database.close()
+  })
+
+  it('filters quarantined derived paths from matching retrieval hints', async () => {
+    const fixture = await createFixture()
+    const event = insertEvent(fixture.database, 'hint-event')
+    storeRetrievalHints(fixture.database, {
+      sourceEventId: event.id,
+      wikiPaths: ['wiki/derived/resposta.md', 'wiki/articles/artigo-1.md']
+    })
+    fixture.database.prepare(`
+      INSERT INTO derived_page_quality (
+        specialist_id, wiki_path, revision_sha256, status, verification_id, updated_at
+      ) VALUES ('iva', 'wiki/derived/resposta.md', 'sha256:test', 'quarantined', NULL, ?)
+    `).run(new Date().toISOString())
+
+    expect(lookupRetrievalHints(fixture.database, {
+      specialistId: 'iva',
+      question: event.questionText,
+      blockedWikiPaths: readQuarantinedDerivedPaths(fixture.database, 'iva')
+    })).toEqual({ wikiPaths: ['wiki/articles/artigo-1.md'], match: 'exact', score: 1 })
+    fixture.database.close()
+  })
+
+  it('validates bounded five-level judgements and allowlisted attribution output', () => {
+    expect(parseAlignmentJudgement('{"level":"MUITO_ALINHADO","reason":"Diferença de estilo.","confidence":"medium"}')).toEqual({
+      level: 'MUITO_ALINHADO', reason: 'Diferença de estilo.', confidence: 'medium'
+    })
+    expect(() => parseAlignmentJudgement('{"level":"PERFEITO","reason":"x","confidence":"high"}')).toThrow()
+    expect(parseNegativeAttribution(
+      '{"negativeDerivedPaths":["wiki/derived/resposta.md"],"reason":"Omissão."}',
+      ['wiki/derived/resposta.md']
+    )).toEqual({ negativeDerivedPaths: ['wiki/derived/resposta.md'], reason: 'Omissão.' })
+    expect(() => parseNegativeAttribution(
+      '{"negativeDerivedPaths":["wiki/derived/inventada.md"],"reason":"x"}',
+      ['wiki/derived/resposta.md']
+    )).toThrow()
   })
 
   it('builds the independent prompt without leaking the delivered answer', () => {
