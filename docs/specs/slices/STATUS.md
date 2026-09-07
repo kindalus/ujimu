@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-09-03
+Last updated: 2026-09-07
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -132,6 +132,9 @@ Known non-blocking warnings:
 | 72 | [`72-local-pdf-ocr-foundation.html`](./72-local-pdf-ocr-foundation.html) | `verified` | 2026-09-02 | Local qpdf/OCRmyPDF/Tesseract por+eng preparation and bounded 300 DPI page rendering passed real container verification. |
 | 73 | [`73-enforced-visual-ocr-coverage.html`](./73-enforced-visual-ocr-coverage.html) | `verified` | 2026-09-02 | Every PDF page requires OCR text, overview, and sub-2000px 300 DPI tiles before atomic converted/wiki publication. |
 | 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `verified` | 2026-09-03 | Removed the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
+| 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `planned` | — | Persist sampled derived-answer checks and generate an independent default-model baseline with derived pages blocked in code. |
+| 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `planned` | — | Judge alignment with the ingestion model, attribute negative derived influence, and enforce quarantine in later chats. |
+| 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `planned` | — | Rebuild quarantined derived pages in staging, validate against the baseline, and promote only accepted candidates. |
 
 ## Gemini dependency removal
 
