@@ -359,6 +359,7 @@ function normalizeOutputText(text: string): string {
 export function buildChatPrompt(input: ChatRunnerInput): string {
   return `Answer the user question using this specialist workspace.
 
+Follow the llm-wiki Query workflow, including derived-first retrieval. Read the local schema and wiki/index.md before candidate pages.
 The current working directory is the specialist root. Use the available tools normally.
 If you include machine-readable citations, emit them as JSON lines in one of these optional shapes:
 {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
@@ -373,7 +374,7 @@ Otherwise answer in plain text; missing or malformed citations will simply be om
 
 Candidate wiki paths from a recent matching consultation, if any:
 ${formatRetrievalHints(input.retrievalHints)}
-These paths are hints only. Re-read them and verify the current question; never treat a prior consultation as an answer or source.
+These paths are hints only. Re-read them and verify the current question; they never override an applicable derived page. If that derived page fully supports the answer and its citations, do not read other pages merely to reconfirm it.
 
 Known citation metadata, if useful:
 ${formatCitationEvidence(input.citationEvidence)}

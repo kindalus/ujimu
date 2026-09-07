@@ -7,6 +7,14 @@ import { describe, expect, it } from 'vitest'
 const SCRIPT_PATH = join(process.cwd(), 'scripts', 'sync-llm-wiki.mjs')
 
 describe('llm-wiki external skill sync acceptance', () => {
+  it('bundles the derived-first query retrieval contract', async () => {
+    const operations = await readFile('config/pi/skills/llm-wiki/references/operations.md', 'utf8')
+
+    expect(operations).toContain('read the most directly applicable derived page before any non-derived candidate page')
+    expect(operations).toContain('stop retrieval and answer from it')
+    expect(operations).toContain('Do not read its `source_pages` or other pages merely to reconfirm')
+  })
+
   it('copies the external llm-wiki skill only when it is missing', async () => {
     const workspace = await mkdtemp(join(tmpdir(), 'ujimu-llm-wiki-sync-'))
     const source = join(workspace, 'external', 'skills', 'llm-wiki')
