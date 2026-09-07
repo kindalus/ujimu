@@ -69,6 +69,7 @@ export interface AnswerVerificationRecord {
   conversationContext: ChatConversationContextMessage[]
   derivedPages: DerivedPageRevision[]
   baseline: AnswerVerificationBaseline | null
+  controlDocuments: string[]
   judgement: AnswerAlignmentJudgement | null
   negativeDerivedPaths: string[]
   attributionReason: string | null
@@ -338,7 +339,7 @@ export function completeAnswerVerification(
       finalStatus,
       null,
       null,
-      null,
+      JSON.stringify(input.result.baseline.consultedDocuments),
       input.result.judgement.level,
       input.result.judgement.reason,
       input.result.judgement.confidence,
@@ -418,8 +419,7 @@ export function markAnswerVerificationFailed(
     SET status = 'failed', last_error_code = ?, last_error_message = ?,
       original_answer = NULL, original_citations_json = NULL,
       conversation_context_json = NULL, baseline_answer = NULL,
-      baseline_citations_json = NULL, baseline_documents_json = NULL,
-      updated_at = ?, completed_at = ?
+      baseline_citations_json = NULL, updated_at = ?, completed_at = ?
     WHERE id = ?
   `).run(input.code.slice(0, 80), 'Answer verification failed.', now, now, input.verificationId)
   database.prepare(`
@@ -496,6 +496,7 @@ function mapVerificationRow(value: unknown): AnswerVerificationRecord {
     conversationContext: parseJsonArray<ChatConversationContextMessage>(row.conversation_context_json),
     derivedPages: parseJsonArray<DerivedPageRevision>(row.derived_pages_json),
     baseline,
+    controlDocuments: parseJsonArray<string>(row.baseline_documents_json),
     judgement: isAlignmentLevel(row.alignment_level) && isConfidence(row.alignment_confidence) && typeof row.alignment_reason === 'string'
       ? { level: row.alignment_level, reason: row.alignment_reason, confidence: row.alignment_confidence }
       : null,

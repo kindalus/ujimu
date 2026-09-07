@@ -161,6 +161,7 @@ describe('derived answer verification sampling and baseline acceptance', () => {
     expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
       status: 'succeeded',
       baseline: null,
+      controlDocuments: ['wiki/articles/artigo-1.md'],
       originalAnswer: null,
       judgement: result.judgement
     })
