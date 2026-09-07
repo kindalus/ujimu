@@ -159,6 +159,44 @@ describe('task-scoped Pi tools acceptance', () => {
     }))
   })
 
+  it('allows derived repair writes only to targets, index, log, and new staging wiki pages', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-derived-repair-'))
+    await mkdir(join(root, 'wiki', 'derived'), { recursive: true })
+    await mkdir(join(root, 'wiki', 'articles'), { recursive: true })
+    await mkdir(join(root, 'converted'))
+    await writeFile(join(root, 'AGENTS.md'), '# Specialist\n')
+    await writeFile(join(root, 'wiki', 'derived', 'answer.md'), '# Derived\n')
+    await writeFile(join(root, 'wiki', 'articles', 'existing.md'), '# Existing\n')
+    await writeFile(join(root, 'wiki', 'index.md'), '# Index\n')
+    await writeFile(join(root, 'wiki', 'log.md'), '# Log\n')
+    await writeFile(join(root, 'converted', 'source.md'), '# Source\n')
+    const { createUjimuPiSession } = await import('../server/utils/pi/session')
+
+    await createUjimuPiSession({
+      cwd: root,
+      task: 'derived_repair',
+      repairTargetPaths: ['wiki/derived/answer.md']
+    })
+
+    expect(defaultResourceLoaderMock).toHaveBeenCalledWith(expect.objectContaining({
+      extensionFactories: [expect.objectContaining({ name: 'ujimu-derived-repair-file-policy', hidden: true })]
+    }))
+    expect(createAgentSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+      tools: ['read', 'edit', 'write', 'grep', 'find', 'ls'], customTools: []
+    }))
+    const loaderOptions = defaultResourceLoaderMock.mock.calls[0][0]
+    let handler: ((event: any) => Promise<unknown>) | undefined
+    loaderOptions.extensionFactories[0].factory({
+      on: (_event: string, callback: (event: any) => Promise<unknown>) => { handler = callback }
+    })
+    await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/derived/answer.md' } })).resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/index.md' } })).resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'write', input: { path: 'wiki/articles/new.md' } })).resolves.toBeUndefined()
+    await expect(handler?.({ toolName: 'edit', input: { path: 'wiki/articles/existing.md' } })).resolves.toMatchObject({ block: true })
+    await expect(handler?.({ toolName: 'write', input: { path: 'converted/new.md' } })).resolves.toMatchObject({ block: true })
+    await expect(handler?.({ toolName: 'read', input: { path: 'raw/secret.md' } })).resolves.toMatchObject({ block: true })
+  })
+
   it('installs an exact derivation policy with no bash or conversion tool', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ujimu-pi-derivation-'))
     const { createUjimuPiSession } = await import('../server/utils/pi/session')

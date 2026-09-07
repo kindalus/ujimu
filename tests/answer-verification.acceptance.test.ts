@@ -205,6 +205,79 @@ describe('derived answer verification sampling and baseline acceptance', () => {
     fixture.database.close()
   })
 
+  it('clears quarantine only after an accepted repair revision', async () => {
+    const fixture = await createFixture()
+    const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const verification = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: event.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta derivada.',
+      originalCitations: [],
+      conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      answerVerificationRunner: {
+        async run(): Promise<AnswerVerificationExecutionResult> {
+          return {
+            baseline: { answer: 'Controlo.', citations: [], consultedDocuments: [] },
+            judgement: { level: 'NAO_ALINHADO', reason: 'Contradição.', confidence: 'high' },
+            attribution: {
+              negativeDerivedPaths: ['wiki/derived/resposta.md'], reason: 'A derived prejudicou a resposta.'
+            },
+            repair: {
+              status: 'accepted',
+              revisions: [{ path: 'wiki/derived/resposta.md', revisionSha256: 'sha256:repaired' }]
+            }
+          }
+        }
+      }
+    })
+
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
+      status: 'succeeded', originalAnswer: null, baseline: null
+    })
+    expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual([])
+    expect(fixture.database.prepare(`
+      SELECT revision_sha256, status FROM derived_page_quality
+      WHERE specialist_id = 'iva' AND wiki_path = 'wiki/derived/resposta.md'
+    `).get()).toEqual({ revision_sha256: 'sha256:repaired', status: 'verified' })
+    fixture.database.close()
+  })
+
+  it('keeps a harmful page quarantined when repair needs an administrator source', async () => {
+    const fixture = await createFixture()
+    const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)
+    const verification = await enqueueDerivedAnswerVerification(fixture.database, {
+      sourceEventId: event.id,
+      specialistRoot: fixture.root,
+      originalAnswer: 'Resposta derivada.', originalCitations: [], conversationContext: [],
+      consultedDocuments: ['wiki/derived/resposta.md']
+    })
+    await runDueBackgroundJobs({
+      database: fixture.database,
+      answerVerificationRunner: {
+        async run(): Promise<AnswerVerificationExecutionResult> {
+          return {
+            baseline: { answer: 'Sem contexto.', citations: [], consultedDocuments: [] },
+            judgement: { level: 'POUCO_ALINHADO', reason: 'Falta evidência.', confidence: 'high' },
+            attribution: {
+              negativeDerivedPaths: ['wiki/derived/resposta.md'], reason: 'A derived excede a fonte.'
+            },
+            repair: { status: 'needs_admin_source', reason: 'Falta o diploma oficial.' }
+          }
+        }
+      }
+    })
+
+    expect(readAnswerVerification(fixture.database, verification!.id)).toMatchObject({
+      status: 'needs_admin_source', originalAnswer: null, baseline: null
+    })
+    expect(readQuarantinedDerivedPaths(fixture.database, 'iva')).toEqual(['wiki/derived/resposta.md'])
+    fixture.database.close()
+  })
+
   it('rejects attribution paths that were not consulted without quarantining them', async () => {
     const fixture = await createFixture()
     const event = insertEvent(fixture.database, NOT_SAMPLED_EVENT_ID)

@@ -134,7 +134,7 @@ Known non-blocking warnings:
 | 74 | [`74-remove-gemini-dependency.html`](./74-remove-gemini-dependency.html) | `verified` | 2026-09-03 | Removed the Gemini CLI, API-key contract, configured model, and `pdf_to_markdown`; manual PDFs must use normal visual OCR ingestion. |
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
-| 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `grilled` | — | Stress-tested batch repair, new-page references, explicit missing-source outcome, strict post-check, ordered promotion, and rollback. |
+| 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `acceptance-tested` | — | Red tests cover raw-free staging, active-wiki isolation, new evidence pages, post-check rejection, explicit missing-source outcome, promotion, and quarantine release. |
 
 ## Gemini dependency removal
 
