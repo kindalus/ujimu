@@ -136,6 +136,24 @@ Known non-blocking warnings:
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
+| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `planned` | — | Approved local E5 fallback with threshold 0.92, margin 0.003, startup warm-up, feature flag, and explicit audit exception. |
+
+## Semantic retrieval runtime
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-semantic-retrieval-runtime.html`](../brainstorm-semantic-retrieval-runtime.html)
+- [`../semantic-retrieval-runtime-architecture.html`](../semantic-retrieval-runtime-architecture.html)
+
+Locked scope:
+
+- Preserve exact fingerprint and trigram Dice matching before the semantic fallback.
+- Use `Xenova/multilingual-e5-small` INT8 locally with score `0.92`, top-two margin `0.003`, and no remote model access at runtime.
+- Gate the feature with `UJIMU_SEMANTIC_RETRIEVAL_ENABLED`, warm the model at startup, and degrade to lexical retrieval if loading or inference fails.
+- Keep candidate vectors in a bounded in-memory cache; never persist query embeddings or send question text to an external embedding service.
+- Accept only `GHSA-f88m-g3jw-g9cj` and `GHSA-xcpc-8h2w-3j85` until a compatible safe dependency release exists; continue rejecting every other high or critical advisory.
 
 ## Embedding retrieval calibration
 

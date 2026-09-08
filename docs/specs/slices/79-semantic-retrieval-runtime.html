@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Slice 79 — Retrieval semântico no runtime</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Space+Grotesk:wght@600;700&display=swap");
+:root{--bg:#090907;--panel:#171711;--text:#faf8ef;--muted:#b7b3a5;--line:#3a382f;--accent:#f7ce1b;--good:#8bd7a5}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:radial-gradient(circle at 88% 3%,#302b0e 0,transparent 31%),var(--bg);color:var(--text);font-family:Manrope,sans-serif}
+.slide{display:none;width:100vw;height:100vh;padding:8vh 12vw;align-items:center}
+.slide.active{display:flex}
+.frame{width:min(1100px,100%);padding:clamp(30px,5vw,58px);border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,#ffffff0d,#ffffff04)}
+h1,h2{margin:0;line-height:.98;letter-spacing:-.045em;font-family:"Space Grotesk",sans-serif}
+h1{font-size:clamp(3rem,7vw,6rem)}
+h2{font-size:clamp(2.2rem,5vw,4rem)}
+p,li{color:var(--muted);font-size:1.08rem;line-height:1.5}
+.lead{max-width:900px;margin:22px 0 0;font-size:1.28rem}
+.k{margin-bottom:14px;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px}
+.card{padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.card b{display:block;margin-bottom:6px;color:var(--accent)}
+.card p{margin:0;font-size:.98rem}
+ul{display:grid;gap:10px;margin:24px 0 0;padding-left:1.2rem}
+.good{color:var(--good)}
+code{color:#fff0a0}
+.counter{position:fixed;right:28px;bottom:22px;color:var(--muted);font-size:.8rem}
+.status{position:fixed;left:28px;bottom:22px;color:var(--accent);font-size:.8rem}
+@media(max-width:850px){.slide{padding:5vh 6vw}.grid{grid-template-columns:1fr}.frame{padding:26px}}
+@media print{body{overflow:visible}.slide{display:flex;break-after:page}.counter,.status{display:none}}
+</style>
+</head>
+<body>
+<section class="slide active"><div class="frame"><div class="k">Slice 79 · planeado</div><h1>Fallback semântico E5</h1><p class="lead">Relacionar paráfrases com threshold <code>0.92</code>, margem <code>0.003</code> e rollback por flag.</p></div></section>
+<section class="slide"><div class="frame"><div class="k">Origem aprovada</div><h2>Contexto vinculativo</h2><div class="grid"><div class="card"><b>Brainstorm</b><p><code>../brainstorm-semantic-retrieval-runtime.html</code></p></div><div class="card"><b>Arquitectura</b><p><code>../semantic-retrieval-runtime-architecture.html</code></p></div><div class="card"><b>Calibração</b><p><code>../../experiments/embedding-retrieval-calibration/report.md</code></p></div><div class="card"><b>Risco aceite</b><p>Dois advisories high explicitamente permitidos até existir versão segura.</p></div></div></div></section>
+<section class="slide"><div class="frame"><div class="k">Âmbito</div><h2>Integração mínima</h2><ul><li>Adicionar Transformers 4.2.0 e fixar lockfile.</li><li>Carregar E5 INT8 apenas quando a flag estiver activa.</li><li>Aplicar exacto, trigramas e só depois embeddings.</li><li>Pré-aquecer no arranque e degradar para lexical em falha.</li><li>Documentar e testar a pré-instalação do modelo persistente.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Contrato semântico</div><h2>Aceitar apenas candidato isolado</h2><ul><li>Score mínimo <code>0.92</code>.</li><li>Diferença mínima de <code>0.003</code> para o segundo candidato.</li><li>Agrupar perguntas candidatas iguais e unir apenas paths válidos.</li><li>Bloquear paths em quarentena antes do matching.</li><li>Marcar o resultado interno como <code>semantic</code>.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Privacidade e limites</div><h2>Vectores transitórios</h2><ul><li>Modelo local sem chamadas externas no runtime.</li><li>Até 500 candidatos recentes por consulta sem match lexical.</li><li>Até 2 000 vectores candidatos em memória, sem texto.</li><li>O vector da pergunta não entra em cache.</li><li>Erros não registam perguntas, paths ou credenciais.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Sucesso</div><h2>Condições observáveis</h2><ul><li>Flag desligada preserva exactamente o comportamento actual.</li><li>Paráfrase acima dos dois limites recebe o hint correcto.</li><li>Score ou margem insuficiente não produz hint.</li><li>Modelo ausente ou inválido não impede o chat.</li><li>Contentor encontra o runtime nativo e o modelo no volume persistente.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Audit e operação</div><h2>Excepção estreita</h2><ul><li>CI aceita apenas <code>GHSA-f88m-g3jw-g9cj</code> e <code>GHSA-xcpc-8h2w-3j85</code>.</li><li>Qualquer outro high ou critical falha o build.</li><li>Readiness informa flag e estado de carga.</li><li>Produção só liga a flag depois de validar o hash dos pesos.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Exclusões</div><h2>Não entra neste slice</h2><ul><li>Vector DB ou embeddings persistidos.</li><li>Serviço remoto de embeddings.</li><li>Alteração do threshold lexical.</li><li>Uso semântico no baseline de verificação de respostas derived.</li><li>Qualquer mudança em <code>raw/</code> ou no skill <code>llm-wiki</code>.</li></ul></div></section>
+<div class="status">planeado</div>
+<div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+<script>const slides=[...document.querySelectorAll('.slide')];let i=0;const total=document.getElementById('total'),current=document.getElementById('current');total.textContent=slides.length;function go(n){slides[i].classList.remove('active');i=Math.max(0,Math.min(n,slides.length-1));slides[i].classList.add('active');current.textContent=i+1}addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(i+1)}if(e.key==='ArrowLeft')go(i-1)});addEventListener('click',e=>go(i+(e.clientX>innerWidth/2?1:-1)));</script>
+</body>
+</html>
