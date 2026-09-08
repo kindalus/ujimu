@@ -1,6 +1,6 @@
 # Ujimu slice implementation status
 
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 This file is the canonical progress tracker for implementation slices. Keep it current whenever a slice is refined, grilled, acceptance-tested, implemented, or verified.
 
@@ -135,6 +135,23 @@ Known non-blocking warnings:
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
+| 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `planned` | — | Approved isolated calibration with 100 positive and 100 hard-negative synthetic cases; no runtime integration. |
+
+## Embedding retrieval calibration
+
+Status: `planned`
+
+Approved originating decks:
+
+- [`../brainstorm-embedding-retrieval-calibration.html`](../brainstorm-embedding-retrieval-calibration.html)
+- [`../embedding-retrieval-calibration-architecture.html`](../embedding-retrieval-calibration-architecture.html)
+
+Locked scope:
+
+- Evaluate 100 positive and 100 negative public/synthetic cases across labour, VAT, invoicing, and customs topics.
+- Compare multilingual E5 INT8 with the current trigram baseline using pairwise classification and ranked retrieval.
+- Select score and margin by best F1, and report five-fold stratified cross-validation separately from full-corpus calibration.
+- Keep the experiment outside the application runtime, root dependencies, production data/configuration, and `raw/`.
 
 ## Derived answer quality verification
 
