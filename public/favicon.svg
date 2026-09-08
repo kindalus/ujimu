@@ -1,5 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ujimu">
-  <rect width="64" height="64" rx="13" fill="#131310"/>
-  <rect x="8" y="9" width="3" height="46" rx="1.5" fill="#F5C518"/>
-  <path d="M23 15v22c0 8 4 12 10 12s10-4 10-12V15h8v23c0 12-7 19-18 19S15 50 15 38V15z" fill="#F2F1EA"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 64 64"
+   role="img"
+   aria-label="Ujimu"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="favicon.svg"
+   inkscape:version="1.4.2 (ebf0e940, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="18.764406"
+     inkscape:cx="32.774818"
+     inkscape:cy="34.107128"
+     inkscape:window-width="2560"
+     inkscape:window-height="1387"
+     inkscape:window-x="1728"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <rect
+     width="64"
+     height="64"
+     rx="13"
+     fill="#131310"
+     id="rect1" />
+  <rect
+     x="8"
+     y="9"
+     width="8"
+     height="46"
+     rx="4"
+     fill="#f5c518"
+     id="rect2"
+     style="stroke-width:1.63299" />
+  <path
+     d="m 29,13 v 22 c 0,8 4,12 10,12 6,0 10,-4 10,-12 V 13 h 8 V 36 C 57,48 50,55 39,55 28,55 21,48 21,36 V 13 Z"
+     fill="#f2f1ea"
+     id="path2" />
 </svg>
