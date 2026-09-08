@@ -136,11 +136,11 @@ Known non-blocking warnings:
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
-| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `implemented` | — | Hybrid E5 matching, bounded vector cache, startup warm-up, readiness, feature flag, native tracing, operations, and exact audit exception are implemented; full verification is pending. |
+| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `verified` | 2026-09-08 | Hybrid E5 fallback is active in production at 0.92/0.003; 353 tests, typecheck, build, local model/container smoke, AMD64 warm-up, and a real semantic hint passed. |
 
 ## Semantic retrieval runtime
 
-Status: `implemented`
+Status: `verified`
 
 Approved originating decks:
 
@@ -179,6 +179,15 @@ Implementation result:
 - Up to 500 grouped candidates are ranked; identical path sets compete once, and up to 2,000 candidate vectors use an in-memory `Float32Array` LRU without cached question text.
 - `@huggingface/transformers@4.2.0` is lockfile-pinned; Nitro traces the native ONNX runtime.
 - `npm run audit:high` accepts only the two user-approved advisory chains and fails on any new high/critical or stale exception.
+
+Verification:
+
+- All 353 project tests, typecheck, the 132 MB local Nitro build, the guarded high-severity audit, and 1,079 registry signatures passed.
+- A real local E5 smoke selected the weekly-hours hint after a trigram miss; the final Podman image warmed the model successfully with the cache mounted read-only.
+- Production commit `0fb94db` runs on AMD64 with the feature flag enabled, the expected ONNX SHA-256, the native Linux x64 binding, healthy HTTP checks, and SQLite `quick_check=ok`.
+- The production question `Em cada semana, quantas horas normais pode cumprir um empregado no máximo?` had a maximum known trigram score of `0.5245901639344263`, received the weekly-hours derived path in the Pi prompt, returned HTTP 200 with no stream error, and consulted only that derived page.
+- The resulting analytics event is `76a15018-4dfb-40b7-825f-ffda8403a50f`, with outcome `answered`, one consulted document, and the same derived path stored as its retrieval hint.
+- The production model process used about 508 MB after warm-up. A dangling-image-only prune recovered 3.05 GB after deployment without removing tagged rollback images or containers; 6.6 GB remained free.
 
 ## Embedding retrieval calibration
 
