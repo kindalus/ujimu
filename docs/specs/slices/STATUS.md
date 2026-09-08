@@ -136,11 +136,11 @@ Known non-blocking warnings:
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
-| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `grilled` | — | Approved local E5 fallback with threshold 0.92, margin 0.003, startup warm-up, feature flag, and explicit audit exception. |
+| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `acceptance-tested` | — | Eight failing acceptance checks specify hybrid matching, bounded vectors, startup warm-up, operations, native tracing, and the exact audit exception. |
 
 ## Semantic retrieval runtime
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -164,6 +164,12 @@ Refinement and stress-test decisions:
 - Semantic lookup considers at most 500 recent grouped candidates and retains at most 2,000 candidate vectors without their text.
 - The audit allowlist is recursive, accepts only the two user-approved advisory URLs, rejects new high/critical findings, and fails when an accepted advisory disappears so the exception is removed.
 - The unavailable `grill-me` skill was replaced by this explicit stress test in the active harness.
+
+Acceptance-test state:
+
+- `tests/semantic-retrieval.acceptance.test.ts` specifies ordering, grouping, quarantine filtering, thresholds, candidate-only vector caching, and sanitised failure.
+- `tests/semantic-retrieval-operations.acceptance.test.ts` specifies the pinned dependency, feature flag, local model contract, readiness, native tracing, operations documentation, and recursive two-advisory audit exception.
+- The focused run fails because the semantic runtime, plugin, audit gate, package/configuration changes, and operations contract do not exist yet.
 
 ## Embedding retrieval calibration
 
