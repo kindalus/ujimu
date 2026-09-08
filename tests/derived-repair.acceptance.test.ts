@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  buildDerivedRepairPrompt,
   DerivedRepairExecutionError,
   runStagedDerivedRepair
 } from '../server/utils/analytics/derived-repair-runner'
@@ -52,6 +53,18 @@ Condição legal recuperada de converted.
 `
 
 describe('staged derived repair acceptance', () => {
+  it('requires repaired pages to use content-indicative declarative titles', () => {
+    const prompt = buildDerivedRepairPrompt({
+      question: 'Quanto se ganha por hora extra?',
+      originalAnswer: 'Resposta antiga.',
+      baseline: { answer: 'Resposta correcta.', citations: [], consultedDocuments: [] },
+      targetPaths: ['wiki/derived/answer.md']
+    })
+
+    expect(prompt).toContain("The title must not repeat the user's question verbatim or use an interrogative form")
+    expect(prompt).toContain("a concise, declarative title that identifies the synthesis's substantive subject and principal conclusion")
+  })
+
   it('repairs outside the active wiki and promotes only a favourably checked candidate', async () => {
     const fixture = await createRepairFixture()
     const result = await runStagedDerivedRepair({

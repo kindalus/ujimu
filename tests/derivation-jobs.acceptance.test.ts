@@ -133,6 +133,8 @@ describe('derivation job contract acceptance', () => {
     expect(prompt).toContain('Question:\nQual é o prazo?')
     expect(prompt).toContain('create exactly wiki/derived/prazo-event1.md')
     expect(prompt).toContain('tags: [derived]')
+    expect(prompt).toContain("The title must not repeat the user's question verbatim or use an interrogative form")
+    expect(prompt).toContain("a concise, declarative title that identifies the synthesis's substantive subject and principal conclusion")
     expect(prompt).toContain('update only wiki/index.md and wiki/log.md')
     expect(prompt).toContain('Do not include conversation history or any prior answer')
     expect(prompt).not.toContain('Resposta anterior')

@@ -163,6 +163,7 @@ Read AGENTS.md, wiki/index.md, relevant wiki pages, and converted sources only w
 If evidence is insufficient, stop without writing.
 Otherwise create exactly ${input.targetPath}, add valid OKF frontmatter including source_pages, and update only wiki/index.md and wiki/log.md.
 The frontmatter tags array must include the exact literal tag derived, for example: tags: [derived]. Translated alternatives do not satisfy the contract.
+The title must not repeat the user's question verbatim or use an interrogative form. Write a concise, declarative title that identifies the synthesis's substantive subject and principal conclusion, so the page is understandable without the original question.
 Do not include conversation history or any prior answer. Do not write any other path.`
 }
 

@@ -164,6 +164,7 @@ export function buildDerivedRepairPrompt(input: {
 Use the llm-wiki skill and current AGENTS.md. Read wiki and converted evidence as needed. There is no raw directory and raw material is forbidden.
 Recreate every target below. You may update only those targets, wiki/index.md, wiki/log.md, and create new non-derived wiki Markdown pages when converted evidence must first be integrated. Do not edit any other existing page.
 Every repaired target must remain valid Derived Analysis with source_pages and the literal derived tag. Every newly created page must be linked by a repaired target.
+The title must not repeat the user's question verbatim or use an interrogative form. Write a concise, declarative title that identifies the synthesis's substantive subject and principal conclusion, so the page is understandable without the original question.
 
 If the available converted evidence is insufficient, change no file and return exactly:
 {"status":"needs_admin_source","reason":"..."}
