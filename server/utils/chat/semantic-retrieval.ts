@@ -61,12 +61,12 @@ export async function lookupRetrievalHintsWithSemantic(
   if (candidates.length === 0) return undefined
 
   try {
-    const ranked = deduplicateRankedCandidates(
+    const ranked = groupRankedCandidatesByPaths(
       await withTimeout((options.rankSemanticCandidates ?? defaultRankSemanticCandidates)({
         question: input.question,
         candidates
       }), options.timeoutMs ?? LOOKUP_TIMEOUT_MS),
-      new Set(candidates.map(({ key }) => key))
+      candidates
     )
     const best = ranked[0]
     if (!best) return undefined
@@ -230,17 +230,25 @@ function assertVectors(vectors: number[][], count: number, dimensions: number): 
   }
 }
 
-function deduplicateRankedCandidates(
+function groupRankedCandidatesByPaths(
   ranked: RankedSemanticCandidate[],
-  allowedKeys: Set<string>
+  candidates: SemanticRetrievalCandidate[]
 ): RankedSemanticCandidate[] {
+  const candidateByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]))
   const bestByKey = new Map<string, number>()
   for (const candidate of ranked) {
-    if (!allowedKeys.has(candidate.candidateKey) || !Number.isFinite(candidate.score)) continue
+    if (!candidateByKey.has(candidate.candidateKey) || !Number.isFinite(candidate.score)) continue
     const score = Math.max(-1, Math.min(1, candidate.score))
     if (score > (bestByKey.get(candidate.candidateKey) ?? -Infinity)) bestByKey.set(candidate.candidateKey, score)
   }
-  return [...bestByKey].map(([candidateKey, score]) => ({ candidateKey, score }))
+
+  const bestByPaths = new Map<string, RankedSemanticCandidate>()
+  for (const [candidateKey, score] of bestByKey) {
+    const pathKey = JSON.stringify(candidateByKey.get(candidateKey)!.wikiPaths)
+    const current = bestByPaths.get(pathKey)
+    if (!current || score > current.score) bestByPaths.set(pathKey, { candidateKey, score })
+  }
+  return [...bestByPaths.values()]
     .sort((left, right) => right.score - left.score || left.candidateKey.localeCompare(right.candidateKey))
 }
 

@@ -158,7 +158,7 @@ Locked scope:
 Refinement and stress-test decisions:
 
 - Disabled, exact, and qualifying lexical paths must never load or call the embedding model.
-- Duplicate normalized candidate questions are grouped before ranking so they cannot create a zero top-two margin.
+- Duplicate normalized questions are grouped before ranking, and ranked candidates with identical path sets form one suggestion so equivalent hints cannot create a false zero top-two margin.
 - Runtime model loading is local-only and verifies the known ONNX SHA-256 before creating the pipeline.
 - A failed warm-up is observable in readiness but leaves chat on the lexical path; errors never include question text or candidate paths.
 - Semantic lookup considers at most 500 recent grouped candidates and retains at most 2,000 candidate vectors without their text.
@@ -176,7 +176,7 @@ Implementation result:
 
 - Exact and trigram Dice matching remain synchronous first choices; only a miss reaches the local E5 ranker.
 - E5 uses score `0.92`, top-two margin `0.003`, known INT8 weight hash, remote-disabled runtime loading, startup warm-up, and lexical fallback.
-- Up to 500 grouped candidates are ranked; up to 2,000 candidate vectors use an in-memory `Float32Array` LRU without cached question text.
+- Up to 500 grouped candidates are ranked; identical path sets compete once, and up to 2,000 candidate vectors use an in-memory `Float32Array` LRU without cached question text.
 - `@huggingface/transformers@4.2.0` is lockfile-pinned; Nitro traces the native ONNX runtime.
 - `npm run audit:high` accepts only the two user-approved advisory chains and fails on any new high/critical or stale exception.
 

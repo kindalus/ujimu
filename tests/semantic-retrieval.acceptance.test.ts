@@ -41,6 +41,7 @@ describe('semantic retrieval acceptance', () => {
     const now = new Date('2026-09-08T10:00:00.000Z')
     seedHint(database, 'laboral', 'Qual é o limite máximo de horas de trabalho por semana?', ['wiki/derived/horas.md'], now)
     seedHint(database, 'laboral', 'Qual é o limite máximo de horas de trabalho por semana?', ['wiki/trabalho.md'], now)
+    seedHint(database, 'laboral', 'Quantas horas semanais são permitidas no trabalho normal?', ['wiki/trabalho.md'], now)
     seedHint(database, 'laboral', 'Como é remunerado o trabalho prestado em horas extraordinárias?', ['wiki/horas-extra.md'], now)
     let candidates: SemanticRetrievalCandidate[] = []
 
@@ -61,7 +62,7 @@ describe('semantic retrieval acceptance', () => {
     })
 
     expect(insufficientMargin).toBeUndefined()
-    expect(candidates).toHaveLength(2)
+    expect(candidates).toHaveLength(3)
     expect(candidates.find(({ question }) => question.includes('limite máximo')))
       .toMatchObject({ wikiPaths: ['wiki/trabalho.md'] })
 
@@ -75,7 +76,9 @@ describe('semantic retrieval acceptance', () => {
       async rankSemanticCandidates(input) {
         return input.candidates.map((candidate) => ({
           candidateKey: candidate.key,
-          score: candidate.question.includes('limite máximo') ? 0.919 : 0.8
+          score: candidate.question.includes('limite máximo')
+            ? 0.919
+            : candidate.question.includes('horas semanais') ? 0.918 : 0.8
         }))
       }
     })
@@ -91,7 +94,9 @@ describe('semantic retrieval acceptance', () => {
       async rankSemanticCandidates(input) {
         return input.candidates.map((candidate) => ({
           candidateKey: candidate.key,
-          score: candidate.question.includes('limite máximo') ? 0.93 : 0.92
+          score: candidate.question.includes('limite máximo')
+            ? 0.93
+            : candidate.question.includes('horas semanais') ? 0.929 : 0.92
         }))
       }
     })
