@@ -25,10 +25,12 @@ interface CalibrationCorpus {
 }
 
 interface Metrics {
+  evaluatedCases: number
   truePositives: number
   trueNegatives: number
   falsePositives: number
   falseNegatives: number
+  wrongMatches: number
   precision: number
   recall: number
   f1: number
@@ -40,7 +42,8 @@ function readJson<T>(path: string): T {
 }
 
 function expectMetrics(metrics: Metrics, evaluatedCases: number): void {
-  expect(metrics.truePositives + metrics.trueNegatives + metrics.falsePositives + metrics.falseNegatives)
+  expect(metrics.evaluatedCases).toBe(evaluatedCases)
+  expect(metrics.truePositives + metrics.trueNegatives + metrics.falsePositives + metrics.falseNegatives - metrics.wrongMatches)
     .toBe(evaluatedCases)
   for (const value of [metrics.precision, metrics.recall, metrics.f1, metrics.accuracy]) {
     expect(value).toBeGreaterThanOrEqual(0)
@@ -55,7 +58,7 @@ describe('embedding retrieval calibration acceptance', () => {
     expect(corpus.schemaVersion).toBe(1)
     expect(corpus.model).toEqual({
       id: 'Xenova/multilingual-e5-small',
-      dtype: 'q8',
+      dtype: 'int8',
       dimensions: 384,
       prefix: 'query:'
     })
@@ -110,9 +113,12 @@ describe('embedding retrieval calibration acceptance', () => {
     })
     expect(result.model).toMatchObject({
       id: 'Xenova/multilingual-e5-small',
-      dtype: 'q8',
+      dtype: 'int8',
       dimensions: 384,
-      prefix: 'query:'
+      prefix: 'query:',
+      runtimePackage: '@huggingface/transformers',
+      runtimeVersion: '3.8.1',
+      weightsSha256: expect.stringMatching(/^[a-f0-9]{64}$/)
     })
 
     for (const method of ['embedding', 'trigram']) {

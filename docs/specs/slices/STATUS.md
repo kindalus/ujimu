@@ -135,11 +135,11 @@ Known non-blocking warnings:
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
-| 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `acceptance-tested` | — | Four failing acceptance checks require the 200-case corpus, isolated runner, structured results, and report. |
+| 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
 
 ## Embedding retrieval calibration
 
-Status: `acceptance-tested`
+Status: `verified`
 
 Approved originating decks:
 
@@ -164,7 +164,18 @@ Refinement and stress-test decisions:
 Acceptance-test state:
 
 - `tests/embedding-retrieval-calibration.acceptance.test.ts` has four checks for corpus balance/privacy, dependency-free validation, pairwise/ranking metrics, and the published report.
-- The focused run fails because the corpus, runner, results, and report do not exist yet.
+- The initial focused run failed because the corpus, runner, results, and report did not exist yet.
+- After implementation, all four focused acceptance checks pass.
+
+Implementation result:
+
+- E5 pairwise best-F1 threshold: `0.9127194589055693`; five-fold F1: `0.8294930875576036`.
+- E5 ranked best-F1 threshold: `0.9061727645372892`; top-two margin: `0.004086153382154123`; five-fold F1: `0.7867298578199052`.
+- Ranked E5 outperformed calibrated trigram Dice by `0.21956567871542765` F1, but still produced 28 false positives, including four wrong matches, and 17 false negatives across the held-out folds.
+- The current trigram runtime threshold of `0.85` returned no positive synthetic paraphrases and no false positives.
+- The isolated `@huggingface/transformers@3.8.1` install still reports two high-severity advisories, so the experiment does not clear production adoption.
+- Model weights were `4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c`; inference ran with the network disabled and only the public cache mounted read-only.
+- All 345 project tests, typecheck, production build, root high-severity audit gate, root registry signatures, and the corpus validator passed.
 
 ## Derived answer quality verification
 

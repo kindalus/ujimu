@@ -1,0 +1,1519 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "id": "Xenova/multilingual-e5-small",
+    "dtype": "int8",
+    "dimensions": 384,
+    "prefix": "query:"
+  },
+  "specialties": [
+    "customs",
+    "invoicing",
+    "labour",
+    "vat"
+  ],
+  "intents": [
+    {
+      "id": "customs-value",
+      "specialty": "customs",
+      "canonical": "Como se determina o valor aduaneiro de uma mercadoria importada?"
+    },
+    {
+      "id": "tariff-classification",
+      "specialty": "customs",
+      "canonical": "Como determinar o código pautal aplicável a uma mercadoria?"
+    },
+    {
+      "id": "import-duty-calculation",
+      "specialty": "customs",
+      "canonical": "Como se calculam os direitos aduaneiros de uma importação?"
+    },
+    {
+      "id": "proof-of-origin",
+      "specialty": "customs",
+      "canonical": "Que documento comprova a origem de uma mercadoria importada?"
+    },
+    {
+      "id": "import-declaration-documents",
+      "specialty": "customs",
+      "canonical": "Que documentos são exigidos para apresentar uma declaração de importação?"
+    },
+    {
+      "id": "invoice-issue-deadline",
+      "specialty": "invoicing",
+      "canonical": "Qual é o prazo legal para emitir uma factura?"
+    },
+    {
+      "id": "credit-note-correction",
+      "specialty": "invoicing",
+      "canonical": "Quando deve ser usada uma nota de crédito para corrigir uma factura?"
+    },
+    {
+      "id": "invoice-retention",
+      "specialty": "invoicing",
+      "canonical": "Durante quanto tempo devem ser conservadas as facturas?"
+    },
+    {
+      "id": "invoice-numbering",
+      "specialty": "invoicing",
+      "canonical": "As facturas têm de seguir uma numeração sequencial?"
+    },
+    {
+      "id": "proforma-validity",
+      "specialty": "invoicing",
+      "canonical": "Uma factura pro forma tem valor fiscal como factura definitiva?"
+    },
+    {
+      "id": "weekly-hours",
+      "specialty": "labour",
+      "canonical": "Qual é o limite máximo de horas de trabalho por semana?"
+    },
+    {
+      "id": "overtime-pay",
+      "specialty": "labour",
+      "canonical": "Como é remunerado o trabalho prestado em horas extraordinárias?"
+    },
+    {
+      "id": "annual-leave-duration",
+      "specialty": "labour",
+      "canonical": "Quantos dias de férias anuais tem direito o trabalhador?"
+    },
+    {
+      "id": "maternity-leave-duration",
+      "specialty": "labour",
+      "canonical": "Qual é a duração da licença de maternidade?"
+    },
+    {
+      "id": "termination-notice",
+      "specialty": "labour",
+      "canonical": "Qual é o prazo de aviso prévio para terminar o contrato de trabalho?"
+    },
+    {
+      "id": "vat-standard-rate",
+      "specialty": "vat",
+      "canonical": "Qual é a taxa normal de IVA aplicável?"
+    },
+    {
+      "id": "vat-monthly-return-deadline",
+      "specialty": "vat",
+      "canonical": "Qual é o prazo para entregar a declaração mensal de IVA?"
+    },
+    {
+      "id": "vat-input-deduction",
+      "specialty": "vat",
+      "canonical": "Quais são as condições para deduzir o IVA suportado nas compras?"
+    },
+    {
+      "id": "vat-exemptions",
+      "specialty": "vat",
+      "canonical": "Que operações estão isentas de IVA?"
+    },
+    {
+      "id": "vat-invoice-elements",
+      "specialty": "vat",
+      "canonical": "Que elementos obrigatórios deve conter uma factura para efeitos de IVA?"
+    }
+  ],
+  "cases": [
+    {
+      "id": "customs-value-p1",
+      "intentId": "customs-value",
+      "label": "positive",
+      "query": "De que forma é apurado o valor aduaneiro dos bens importados?",
+      "fold": 0
+    },
+    {
+      "id": "customs-value-p2",
+      "intentId": "customs-value",
+      "label": "positive",
+      "query": "Qual é a base para estabelecer o valor de uma mercadoria na alfândega?",
+      "fold": 1
+    },
+    {
+      "id": "customs-value-p3",
+      "intentId": "customs-value",
+      "label": "positive",
+      "query": "Como calcular o valor que a alfândega atribui aos produtos que entram no país?",
+      "fold": 2
+    },
+    {
+      "id": "customs-value-p4",
+      "intentId": "customs-value",
+      "label": "positive",
+      "query": "Que método se usa para fixar o valor aduaneiro de uma importação?",
+      "fold": 3
+    },
+    {
+      "id": "customs-value-p5",
+      "intentId": "customs-value",
+      "label": "positive",
+      "query": "Ao importar mercadoria, como é determinado o respectivo valor aduaneiro?",
+      "fold": 4
+    },
+    {
+      "id": "customs-value-n1",
+      "intentId": "customs-value",
+      "label": "negative",
+      "query": "Que taxa de câmbio deve constar da declaração aduaneira?",
+      "fold": 0
+    },
+    {
+      "id": "customs-value-n2",
+      "intentId": "customs-value",
+      "label": "negative",
+      "query": "O frete internacional deve aparecer separado na factura comercial?",
+      "fold": 1
+    },
+    {
+      "id": "customs-value-n3",
+      "intentId": "customs-value",
+      "label": "negative",
+      "query": "Como se declara uma relação entre o comprador e o vendedor estrangeiro?",
+      "fold": 2
+    },
+    {
+      "id": "customs-value-n4",
+      "intentId": "customs-value",
+      "label": "negative",
+      "query": "Quando é obrigatória uma inspecção antes do embarque?",
+      "fold": 3
+    },
+    {
+      "id": "customs-value-n5",
+      "intentId": "customs-value",
+      "label": "negative",
+      "query": "Em que momento são cobradas despesas de armazenagem portuária?",
+      "fold": 4
+    },
+    {
+      "id": "tariff-classification-p1",
+      "intentId": "tariff-classification",
+      "label": "positive",
+      "query": "Como descubro a posição pautal correcta de um produto?",
+      "fold": 0
+    },
+    {
+      "id": "tariff-classification-p2",
+      "intentId": "tariff-classification",
+      "label": "positive",
+      "query": "Que código da pauta aduaneira corresponde à mercadoria que pretendo importar?",
+      "fold": 1
+    },
+    {
+      "id": "tariff-classification-p3",
+      "intentId": "tariff-classification",
+      "label": "positive",
+      "query": "Como classificar um artigo na nomenclatura pautal?",
+      "fold": 2
+    },
+    {
+      "id": "tariff-classification-p4",
+      "intentId": "tariff-classification",
+      "label": "positive",
+      "query": "Qual é o procedimento para identificar o código pautal de um bem?",
+      "fold": 3
+    },
+    {
+      "id": "tariff-classification-p5",
+      "intentId": "tariff-classification",
+      "label": "positive",
+      "query": "Em que rubrica aduaneira deve ser enquadrado um produto importado?",
+      "fold": 4
+    },
+    {
+      "id": "tariff-classification-n1",
+      "intentId": "tariff-classification",
+      "label": "negative",
+      "query": "Como se contesta uma classificação pautal feita pela alfândega?",
+      "fold": 0
+    },
+    {
+      "id": "tariff-classification-n2",
+      "intentId": "tariff-classification",
+      "label": "negative",
+      "query": "Quando entra em vigor uma actualização da nomenclatura aduaneira?",
+      "fold": 1
+    },
+    {
+      "id": "tariff-classification-n3",
+      "intentId": "tariff-classification",
+      "label": "negative",
+      "query": "É possível pedir uma informação pautal vinculativa antes da importação?",
+      "fold": 2
+    },
+    {
+      "id": "tariff-classification-n4",
+      "intentId": "tariff-classification",
+      "label": "negative",
+      "query": "A alfândega pode exigir amostras do produto para análise?",
+      "fold": 3
+    },
+    {
+      "id": "tariff-classification-n5",
+      "intentId": "tariff-classification",
+      "label": "negative",
+      "query": "Como corrigir uma descrição incompleta da mercadoria na declaração?",
+      "fold": 4
+    },
+    {
+      "id": "import-duty-calculation-p1",
+      "intentId": "import-duty-calculation",
+      "label": "positive",
+      "query": "Qual é a fórmula para apurar os direitos de importação?",
+      "fold": 0
+    },
+    {
+      "id": "import-duty-calculation-p2",
+      "intentId": "import-duty-calculation",
+      "label": "positive",
+      "query": "Como saber quanto vou pagar de direitos aduaneiros pela mercadoria?",
+      "fold": 1
+    },
+    {
+      "id": "import-duty-calculation-p3",
+      "intentId": "import-duty-calculation",
+      "label": "positive",
+      "query": "Sobre que montante e taxa são calculados os direitos na alfândega?",
+      "fold": 2
+    },
+    {
+      "id": "import-duty-calculation-p4",
+      "intentId": "import-duty-calculation",
+      "label": "positive",
+      "query": "Como faço o cálculo do imposto aduaneiro devido na importação?",
+      "fold": 3
+    },
+    {
+      "id": "import-duty-calculation-p5",
+      "intentId": "import-duty-calculation",
+      "label": "positive",
+      "query": "De que elementos depende o valor dos direitos a pagar por bens importados?",
+      "fold": 4
+    },
+    {
+      "id": "import-duty-calculation-n1",
+      "intentId": "import-duty-calculation",
+      "label": "negative",
+      "query": "Como é calculado o IVA cobrado na importação?",
+      "fold": 0
+    },
+    {
+      "id": "import-duty-calculation-n2",
+      "intentId": "import-duty-calculation",
+      "label": "negative",
+      "query": "Que emolumentos administrativos são pagos no desalfandegamento?",
+      "fold": 1
+    },
+    {
+      "id": "import-duty-calculation-n3",
+      "intentId": "import-duty-calculation",
+      "label": "negative",
+      "query": "Quais mercadorias beneficiam de isenção de direitos aduaneiros?",
+      "fold": 2
+    },
+    {
+      "id": "import-duty-calculation-n4",
+      "intentId": "import-duty-calculation",
+      "label": "negative",
+      "query": "Quando se aplicam direitos anti-dumping a produtos importados?",
+      "fold": 3
+    },
+    {
+      "id": "import-duty-calculation-n5",
+      "intentId": "import-duty-calculation",
+      "label": "negative",
+      "query": "A alfândega pode exigir uma garantia antes de libertar a mercadoria?",
+      "fold": 4
+    },
+    {
+      "id": "proof-of-origin-p1",
+      "intentId": "proof-of-origin",
+      "label": "positive",
+      "query": "Como posso provar o país de origem dos bens na alfândega?",
+      "fold": 0
+    },
+    {
+      "id": "proof-of-origin-p2",
+      "intentId": "proof-of-origin",
+      "label": "positive",
+      "query": "Qual é o certificado usado para demonstrar a origem da mercadoria?",
+      "fold": 1
+    },
+    {
+      "id": "proof-of-origin-p3",
+      "intentId": "proof-of-origin",
+      "label": "positive",
+      "query": "Que prova de origem deve acompanhar uma importação?",
+      "fold": 2
+    },
+    {
+      "id": "proof-of-origin-p4",
+      "intentId": "proof-of-origin",
+      "label": "positive",
+      "query": "Que documento atesta onde foram produzidos os artigos importados?",
+      "fold": 3
+    },
+    {
+      "id": "proof-of-origin-p5",
+      "intentId": "proof-of-origin",
+      "label": "positive",
+      "query": "Como se comprova perante a alfândega a origem dos produtos?",
+      "fold": 4
+    },
+    {
+      "id": "proof-of-origin-n1",
+      "intentId": "proof-of-origin",
+      "label": "negative",
+      "query": "Qual é a diferença entre origem preferencial e não preferencial?",
+      "fold": 0
+    },
+    {
+      "id": "proof-of-origin-n2",
+      "intentId": "proof-of-origin",
+      "label": "negative",
+      "query": "Durante quanto tempo é válido um certificado de origem?",
+      "fold": 1
+    },
+    {
+      "id": "proof-of-origin-n3",
+      "intentId": "proof-of-origin",
+      "label": "negative",
+      "query": "O exportador pode emitir uma declaração de origem na factura?",
+      "fold": 2
+    },
+    {
+      "id": "proof-of-origin-n4",
+      "intentId": "proof-of-origin",
+      "label": "negative",
+      "query": "Como é feita a verificação posterior de uma prova de origem?",
+      "fold": 3
+    },
+    {
+      "id": "proof-of-origin-n5",
+      "intentId": "proof-of-origin",
+      "label": "negative",
+      "query": "O que fazer quando se perde o original do certificado de origem?",
+      "fold": 4
+    },
+    {
+      "id": "import-declaration-documents-p1",
+      "intentId": "import-declaration-documents",
+      "label": "positive",
+      "query": "Que papéis preciso entregar à alfândega para declarar uma importação?",
+      "fold": 0
+    },
+    {
+      "id": "import-declaration-documents-p2",
+      "intentId": "import-declaration-documents",
+      "label": "positive",
+      "query": "Quais documentos devem instruir o despacho aduaneiro de entrada?",
+      "fold": 1
+    },
+    {
+      "id": "import-declaration-documents-p3",
+      "intentId": "import-declaration-documents",
+      "label": "positive",
+      "query": "O que tem de acompanhar a declaração aduaneira de mercadorias importadas?",
+      "fold": 2
+    },
+    {
+      "id": "import-declaration-documents-p4",
+      "intentId": "import-declaration-documents",
+      "label": "positive",
+      "query": "Que documentação é necessária para desalfandegar uma importação?",
+      "fold": 3
+    },
+    {
+      "id": "import-declaration-documents-p5",
+      "intentId": "import-declaration-documents",
+      "label": "positive",
+      "query": "Quais são os documentos de suporte obrigatórios numa declaração de importação?",
+      "fold": 4
+    },
+    {
+      "id": "import-declaration-documents-n1",
+      "intentId": "import-declaration-documents",
+      "label": "negative",
+      "query": "Quem pode actuar como despachante aduaneiro em nome do importador?",
+      "fold": 0
+    },
+    {
+      "id": "import-declaration-documents-n2",
+      "intentId": "import-declaration-documents",
+      "label": "negative",
+      "query": "Qual é o prazo para entregar a declaração depois da chegada da carga?",
+      "fold": 1
+    },
+    {
+      "id": "import-declaration-documents-n3",
+      "intentId": "import-declaration-documents",
+      "label": "negative",
+      "query": "Que produtos precisam de licença de importação prévia?",
+      "fold": 2
+    },
+    {
+      "id": "import-declaration-documents-n4",
+      "intentId": "import-declaration-documents",
+      "label": "negative",
+      "query": "Como se corrige uma declaração aduaneira já submetida?",
+      "fold": 3
+    },
+    {
+      "id": "import-declaration-documents-n5",
+      "intentId": "import-declaration-documents",
+      "label": "negative",
+      "query": "Que autoridade autoriza a entrada de mercadorias sujeitas a restrições?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-issue-deadline-p1",
+      "intentId": "invoice-issue-deadline",
+      "label": "positive",
+      "query": "Até quando deve ser passada a factura depois da venda?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-issue-deadline-p2",
+      "intentId": "invoice-issue-deadline",
+      "label": "positive",
+      "query": "Quantos dias há para emitir uma factura após fornecer o bem ou serviço?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-issue-deadline-p3",
+      "intentId": "invoice-issue-deadline",
+      "label": "positive",
+      "query": "Em que prazo o vendedor tem de facturar uma operação?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-issue-deadline-p4",
+      "intentId": "invoice-issue-deadline",
+      "label": "positive",
+      "query": "Quando deve ser emitida a factura relativa a uma transmissão de bens?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-issue-deadline-p5",
+      "intentId": "invoice-issue-deadline",
+      "label": "positive",
+      "query": "Qual é a data limite para facturar um serviço prestado?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-issue-deadline-n1",
+      "intentId": "invoice-issue-deadline",
+      "label": "negative",
+      "query": "Quando deve ser emitida uma guia de remessa?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-issue-deadline-n2",
+      "intentId": "invoice-issue-deadline",
+      "label": "negative",
+      "query": "É obrigatório passar recibo logo que o cliente paga?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-issue-deadline-n3",
+      "intentId": "invoice-issue-deadline",
+      "label": "negative",
+      "query": "Que documento se emite quando o cliente faz um adiantamento?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-issue-deadline-n4",
+      "intentId": "invoice-issue-deadline",
+      "label": "negative",
+      "query": "Uma factura periódica pode reunir várias entregas do mesmo mês?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-issue-deadline-n5",
+      "intentId": "invoice-issue-deadline",
+      "label": "negative",
+      "query": "Como se anula uma factura emitida por engano?",
+      "fold": 4
+    },
+    {
+      "id": "credit-note-correction-p1",
+      "intentId": "credit-note-correction",
+      "label": "positive",
+      "query": "Em que situações se corrige uma factura através de nota de crédito?",
+      "fold": 0
+    },
+    {
+      "id": "credit-note-correction-p2",
+      "intentId": "credit-note-correction",
+      "label": "positive",
+      "query": "Como rectificar com uma nota de crédito uma factura já emitida?",
+      "fold": 1
+    },
+    {
+      "id": "credit-note-correction-p3",
+      "intentId": "credit-note-correction",
+      "label": "positive",
+      "query": "Quando é necessário emitir nota de crédito por erro na facturação?",
+      "fold": 2
+    },
+    {
+      "id": "credit-note-correction-p4",
+      "intentId": "credit-note-correction",
+      "label": "positive",
+      "query": "Uma factura com valor excessivo deve ser corrigida por nota de crédito?",
+      "fold": 3
+    },
+    {
+      "id": "credit-note-correction-p5",
+      "intentId": "credit-note-correction",
+      "label": "positive",
+      "query": "Que correcções numa factura exigem uma nota de crédito?",
+      "fold": 4
+    },
+    {
+      "id": "credit-note-correction-n1",
+      "intentId": "credit-note-correction",
+      "label": "negative",
+      "query": "Em que casos se emite uma nota de débito?",
+      "fold": 0
+    },
+    {
+      "id": "credit-note-correction-n2",
+      "intentId": "credit-note-correction",
+      "label": "negative",
+      "query": "Quanto tempo há para devolver dinheiro ao cliente depois de uma correcção?",
+      "fold": 1
+    },
+    {
+      "id": "credit-note-correction-n3",
+      "intentId": "credit-note-correction",
+      "label": "negative",
+      "query": "O cliente tem de aceitar formalmente uma anulação de venda?",
+      "fold": 2
+    },
+    {
+      "id": "credit-note-correction-n4",
+      "intentId": "credit-note-correction",
+      "label": "negative",
+      "query": "As notas de crédito usam a mesma série numérica das facturas?",
+      "fold": 3
+    },
+    {
+      "id": "credit-note-correction-n5",
+      "intentId": "credit-note-correction",
+      "label": "negative",
+      "query": "Como ajustar o inventário depois da devolução de mercadoria?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-retention-p1",
+      "intentId": "invoice-retention",
+      "label": "positive",
+      "query": "Qual é o período obrigatório de arquivo das facturas?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-retention-p2",
+      "intentId": "invoice-retention",
+      "label": "positive",
+      "query": "Por quantos anos uma empresa tem de guardar os documentos de facturação?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-retention-p3",
+      "intentId": "invoice-retention",
+      "label": "positive",
+      "query": "Até quando é necessário conservar uma factura emitida ou recebida?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-retention-p4",
+      "intentId": "invoice-retention",
+      "label": "positive",
+      "query": "Quanto tempo devem ficar arquivados os comprovativos de facturação?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-retention-p5",
+      "intentId": "invoice-retention",
+      "label": "positive",
+      "query": "Qual é o prazo legal de retenção das facturas da empresa?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-retention-n1",
+      "intentId": "invoice-retention",
+      "label": "negative",
+      "query": "As facturas podem ser arquivadas apenas em formato digital?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-retention-n2",
+      "intentId": "invoice-retention",
+      "label": "negative",
+      "query": "Em que local devem ser guardados os documentos fiscais?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-retention-n3",
+      "intentId": "invoice-retention",
+      "label": "negative",
+      "query": "Como se dá acesso ao arquivo durante uma inspecção?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-retention-n4",
+      "intentId": "invoice-retention",
+      "label": "negative",
+      "query": "É obrigatório manter cópias de segurança do arquivo de facturação?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-retention-n5",
+      "intentId": "invoice-retention",
+      "label": "negative",
+      "query": "Que requisitos garantem a legibilidade de uma factura digitalizada?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-numbering-p1",
+      "intentId": "invoice-numbering",
+      "label": "positive",
+      "query": "A numeração das facturas deve ser seguida e sem saltos?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-numbering-p2",
+      "intentId": "invoice-numbering",
+      "label": "positive",
+      "query": "É obrigatório numerar as facturas por ordem consecutiva?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-numbering-p3",
+      "intentId": "invoice-numbering",
+      "label": "positive",
+      "query": "Como funciona a sequência numérica obrigatória das facturas?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-numbering-p4",
+      "intentId": "invoice-numbering",
+      "label": "positive",
+      "query": "Podem existir interrupções na numeração dos documentos de facturação?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-numbering-p5",
+      "intentId": "invoice-numbering",
+      "label": "positive",
+      "query": "A lei exige números sucessivos para cada factura emitida?",
+      "fold": 4
+    },
+    {
+      "id": "invoice-numbering-n1",
+      "intentId": "invoice-numbering",
+      "label": "negative",
+      "query": "É permitido criar uma nova série de facturação a meio do ano?",
+      "fold": 0
+    },
+    {
+      "id": "invoice-numbering-n2",
+      "intentId": "invoice-numbering",
+      "label": "negative",
+      "query": "A numeração pode recomeçar quando muda o exercício?",
+      "fold": 1
+    },
+    {
+      "id": "invoice-numbering-n3",
+      "intentId": "invoice-numbering",
+      "label": "negative",
+      "query": "Cada estabelecimento pode utilizar uma série própria?",
+      "fold": 2
+    },
+    {
+      "id": "invoice-numbering-n4",
+      "intentId": "invoice-numbering",
+      "label": "negative",
+      "query": "Como justificar números anulados numa série documental?",
+      "fold": 3
+    },
+    {
+      "id": "invoice-numbering-n5",
+      "intentId": "invoice-numbering",
+      "label": "negative",
+      "query": "O programa que atribui números às facturas precisa de certificação?",
+      "fold": 4
+    },
+    {
+      "id": "proforma-validity-p1",
+      "intentId": "proforma-validity",
+      "label": "positive",
+      "query": "A factura pro forma é aceite como documento fiscal definitivo?",
+      "fold": 0
+    },
+    {
+      "id": "proforma-validity-p2",
+      "intentId": "proforma-validity",
+      "label": "positive",
+      "query": "Uma pro forma produz os mesmos efeitos fiscais de uma factura?",
+      "fold": 1
+    },
+    {
+      "id": "proforma-validity-p3",
+      "intentId": "proforma-validity",
+      "label": "positive",
+      "query": "Pode usar-se uma factura pro forma para cumprir a obrigação de facturar?",
+      "fold": 2
+    },
+    {
+      "id": "proforma-validity-p4",
+      "intentId": "proforma-validity",
+      "label": "positive",
+      "query": "A pro forma substitui legalmente a factura final?",
+      "fold": 3
+    },
+    {
+      "id": "proforma-validity-p5",
+      "intentId": "proforma-validity",
+      "label": "positive",
+      "query": "Uma factura pro forma serve como comprovativo fiscal da operação?",
+      "fold": 4
+    },
+    {
+      "id": "proforma-validity-n1",
+      "intentId": "proforma-validity",
+      "label": "negative",
+      "query": "Que informação deve constar de um orçamento comercial?",
+      "fold": 0
+    },
+    {
+      "id": "proforma-validity-n2",
+      "intentId": "proforma-validity",
+      "label": "negative",
+      "query": "Qual é a diferença entre factura-recibo e recibo?",
+      "fold": 1
+    },
+    {
+      "id": "proforma-validity-n3",
+      "intentId": "proforma-validity",
+      "label": "negative",
+      "query": "As facturas pro forma precisam de numeração própria?",
+      "fold": 2
+    },
+    {
+      "id": "proforma-validity-n4",
+      "intentId": "proforma-validity",
+      "label": "negative",
+      "query": "Que documento comprova o pagamento feito pelo cliente?",
+      "fold": 3
+    },
+    {
+      "id": "proforma-validity-n5",
+      "intentId": "proforma-validity",
+      "label": "negative",
+      "query": "Como se regista contabilisticamente uma proposta ainda não aceite?",
+      "fold": 4
+    },
+    {
+      "id": "weekly-hours-p1",
+      "intentId": "weekly-hours",
+      "label": "positive",
+      "query": "Quantas horas pode um trabalhador cumprir no máximo numa semana?",
+      "fold": 0
+    },
+    {
+      "id": "weekly-hours-p2",
+      "intentId": "weekly-hours",
+      "label": "positive",
+      "query": "Qual é a duração semanal máxima permitida para o trabalho?",
+      "fold": 1
+    },
+    {
+      "id": "weekly-hours-p3",
+      "intentId": "weekly-hours",
+      "label": "positive",
+      "query": "Numa semana, até quantas horas se pode trabalhar legalmente?",
+      "fold": 2
+    },
+    {
+      "id": "weekly-hours-p4",
+      "intentId": "weekly-hours",
+      "label": "positive",
+      "query": "Que limite semanal existe para o período normal de trabalho?",
+      "fold": 3
+    },
+    {
+      "id": "weekly-hours-p5",
+      "intentId": "weekly-hours",
+      "label": "positive",
+      "query": "O horário normal de um empregado pode chegar a quantas horas semanais?",
+      "fold": 4
+    },
+    {
+      "id": "weekly-hours-n1",
+      "intentId": "weekly-hours",
+      "label": "negative",
+      "query": "A pausa para almoço conta como tempo de trabalho?",
+      "fold": 0
+    },
+    {
+      "id": "weekly-hours-n2",
+      "intentId": "weekly-hours",
+      "label": "negative",
+      "query": "O empregador pode alterar unilateralmente o turno do trabalhador?",
+      "fold": 1
+    },
+    {
+      "id": "weekly-hours-n3",
+      "intentId": "weekly-hours",
+      "label": "negative",
+      "query": "Como se define um contrato de trabalho a tempo parcial?",
+      "fold": 2
+    },
+    {
+      "id": "weekly-hours-n4",
+      "intentId": "weekly-hours",
+      "label": "negative",
+      "query": "Que registo de assiduidade a empresa deve manter?",
+      "fold": 3
+    },
+    {
+      "id": "weekly-hours-n5",
+      "intentId": "weekly-hours",
+      "label": "negative",
+      "query": "O tempo gasto no trajecto para o emprego integra o horário laboral?",
+      "fold": 4
+    },
+    {
+      "id": "overtime-pay-p1",
+      "intentId": "overtime-pay",
+      "label": "positive",
+      "query": "Quanto recebe o trabalhador por cada hora extra?",
+      "fold": 0
+    },
+    {
+      "id": "overtime-pay-p2",
+      "intentId": "overtime-pay",
+      "label": "positive",
+      "query": "Que acréscimo salarial se aplica ao trabalho extraordinário?",
+      "fold": 1
+    },
+    {
+      "id": "overtime-pay-p3",
+      "intentId": "overtime-pay",
+      "label": "positive",
+      "query": "Como se calcula o pagamento devido por horas extraordinárias?",
+      "fold": 2
+    },
+    {
+      "id": "overtime-pay-p4",
+      "intentId": "overtime-pay",
+      "label": "positive",
+      "query": "As horas feitas além do horário normal são pagas de que maneira?",
+      "fold": 3
+    },
+    {
+      "id": "overtime-pay-p5",
+      "intentId": "overtime-pay",
+      "label": "positive",
+      "query": "Qual é a remuneração legal do trabalho suplementar?",
+      "fold": 4
+    },
+    {
+      "id": "overtime-pay-n1",
+      "intentId": "overtime-pay",
+      "label": "negative",
+      "query": "O trabalhador pode recusar-se a fazer horas extraordinárias?",
+      "fold": 0
+    },
+    {
+      "id": "overtime-pay-n2",
+      "intentId": "overtime-pay",
+      "label": "negative",
+      "query": "Quem deve autorizar a realização de trabalho suplementar?",
+      "fold": 1
+    },
+    {
+      "id": "overtime-pay-n3",
+      "intentId": "overtime-pay",
+      "label": "negative",
+      "query": "Qual é o número máximo de horas extraordinárias permitido?",
+      "fold": 2
+    },
+    {
+      "id": "overtime-pay-n4",
+      "intentId": "overtime-pay",
+      "label": "negative",
+      "query": "As horas extra podem ser trocadas por descanso compensatório?",
+      "fold": 3
+    },
+    {
+      "id": "overtime-pay-n5",
+      "intentId": "overtime-pay",
+      "label": "negative",
+      "query": "Como deve a empresa registar o trabalho extraordinário realizado?",
+      "fold": 4
+    },
+    {
+      "id": "annual-leave-duration-p1",
+      "intentId": "annual-leave-duration",
+      "label": "positive",
+      "query": "Qual é a duração legal das férias de um empregado por ano?",
+      "fold": 0
+    },
+    {
+      "id": "annual-leave-duration-p2",
+      "intentId": "annual-leave-duration",
+      "label": "positive",
+      "query": "A quantos dias de descanso anual tem direito quem trabalha?",
+      "fold": 1
+    },
+    {
+      "id": "annual-leave-duration-p3",
+      "intentId": "annual-leave-duration",
+      "label": "positive",
+      "query": "Quantos dias úteis de férias devem ser concedidos anualmente?",
+      "fold": 2
+    },
+    {
+      "id": "annual-leave-duration-p4",
+      "intentId": "annual-leave-duration",
+      "label": "positive",
+      "query": "Qual é o período mínimo de férias anuais do trabalhador?",
+      "fold": 3
+    },
+    {
+      "id": "annual-leave-duration-p5",
+      "intentId": "annual-leave-duration",
+      "label": "positive",
+      "query": "Por cada ano de serviço, quantos dias de férias são devidos?",
+      "fold": 4
+    },
+    {
+      "id": "annual-leave-duration-n1",
+      "intentId": "annual-leave-duration",
+      "label": "negative",
+      "query": "Quem escolhe as datas em que o trabalhador goza férias?",
+      "fold": 0
+    },
+    {
+      "id": "annual-leave-duration-n2",
+      "intentId": "annual-leave-duration",
+      "label": "negative",
+      "query": "É possível acumular férias de um ano para o seguinte?",
+      "fold": 1
+    },
+    {
+      "id": "annual-leave-duration-n3",
+      "intentId": "annual-leave-duration",
+      "label": "negative",
+      "query": "Como se calcula a remuneração durante as férias?",
+      "fold": 2
+    },
+    {
+      "id": "annual-leave-duration-n4",
+      "intentId": "annual-leave-duration",
+      "label": "negative",
+      "query": "O que acontece se o trabalhador adoecer durante as férias?",
+      "fold": 3
+    },
+    {
+      "id": "annual-leave-duration-n5",
+      "intentId": "annual-leave-duration",
+      "label": "negative",
+      "query": "As férias anuais podem ser repartidas por vários períodos?",
+      "fold": 4
+    },
+    {
+      "id": "maternity-leave-duration-p1",
+      "intentId": "maternity-leave-duration",
+      "label": "positive",
+      "query": "Durante quanto tempo a trabalhadora pode ficar de licença por maternidade?",
+      "fold": 0
+    },
+    {
+      "id": "maternity-leave-duration-p2",
+      "intentId": "maternity-leave-duration",
+      "label": "positive",
+      "query": "Quantos dias dura a licença concedida pelo nascimento de um filho?",
+      "fold": 1
+    },
+    {
+      "id": "maternity-leave-duration-p3",
+      "intentId": "maternity-leave-duration",
+      "label": "positive",
+      "query": "Qual é o período legal de ausência por maternidade?",
+      "fold": 2
+    },
+    {
+      "id": "maternity-leave-duration-p4",
+      "intentId": "maternity-leave-duration",
+      "label": "positive",
+      "query": "Por quanto tempo se prolonga a licença da mãe trabalhadora?",
+      "fold": 3
+    },
+    {
+      "id": "maternity-leave-duration-p5",
+      "intentId": "maternity-leave-duration",
+      "label": "positive",
+      "query": "A licença de maternidade corresponde a quantos dias de dispensa?",
+      "fold": 4
+    },
+    {
+      "id": "maternity-leave-duration-n1",
+      "intentId": "maternity-leave-duration",
+      "label": "negative",
+      "query": "Que pausas para amamentação são concedidas depois do regresso ao trabalho?",
+      "fold": 0
+    },
+    {
+      "id": "maternity-leave-duration-n2",
+      "intentId": "maternity-leave-duration",
+      "label": "negative",
+      "query": "O pai trabalhador tem direito a licença pelo nascimento do filho?",
+      "fold": 1
+    },
+    {
+      "id": "maternity-leave-duration-n3",
+      "intentId": "maternity-leave-duration",
+      "label": "negative",
+      "query": "A trabalhadora grávida pode ser despedida durante a gestação?",
+      "fold": 2
+    },
+    {
+      "id": "maternity-leave-duration-n4",
+      "intentId": "maternity-leave-duration",
+      "label": "negative",
+      "query": "Que protecção existe quando a gravidez envolve risco clínico?",
+      "fold": 3
+    },
+    {
+      "id": "maternity-leave-duration-n5",
+      "intentId": "maternity-leave-duration",
+      "label": "negative",
+      "query": "A adopção de uma criança dá direito a licença laboral?",
+      "fold": 4
+    },
+    {
+      "id": "termination-notice-p1",
+      "intentId": "termination-notice",
+      "label": "positive",
+      "query": "Com quanto tempo de antecedência deve ser comunicada a cessação do contrato?",
+      "fold": 0
+    },
+    {
+      "id": "termination-notice-p2",
+      "intentId": "termination-notice",
+      "label": "positive",
+      "query": "Quantos dias de aviso são necessários antes de acabar o vínculo laboral?",
+      "fold": 1
+    },
+    {
+      "id": "termination-notice-p3",
+      "intentId": "termination-notice",
+      "label": "positive",
+      "query": "Que antecedência deve respeitar quem denuncia o contrato de trabalho?",
+      "fold": 2
+    },
+    {
+      "id": "termination-notice-p4",
+      "intentId": "termination-notice",
+      "label": "positive",
+      "query": "Qual é o período legal entre o aviso e o fim do contrato?",
+      "fold": 3
+    },
+    {
+      "id": "termination-notice-p5",
+      "intentId": "termination-notice",
+      "label": "positive",
+      "query": "Ao rescindir o contrato, que prazo de pré-aviso tem de ser cumprido?",
+      "fold": 4
+    },
+    {
+      "id": "termination-notice-n1",
+      "intentId": "termination-notice",
+      "label": "negative",
+      "query": "O que constitui justa causa para despedimento?",
+      "fold": 0
+    },
+    {
+      "id": "termination-notice-n2",
+      "intentId": "termination-notice",
+      "label": "negative",
+      "query": "Como se calcula a compensação devida no fim do contrato?",
+      "fold": 1
+    },
+    {
+      "id": "termination-notice-n3",
+      "intentId": "termination-notice",
+      "label": "negative",
+      "query": "Que passos compõem um processo disciplinar laboral?",
+      "fold": 2
+    },
+    {
+      "id": "termination-notice-n4",
+      "intentId": "termination-notice",
+      "label": "negative",
+      "query": "A declaração de demissão precisa de ser entregue por escrito?",
+      "fold": 3
+    },
+    {
+      "id": "termination-notice-n5",
+      "intentId": "termination-notice",
+      "label": "negative",
+      "query": "Quem emite o certificado de trabalho depois da cessação?",
+      "fold": 4
+    },
+    {
+      "id": "vat-standard-rate-p1",
+      "intentId": "vat-standard-rate",
+      "label": "positive",
+      "query": "Qual é a percentagem da taxa geral de IVA?",
+      "fold": 0
+    },
+    {
+      "id": "vat-standard-rate-p2",
+      "intentId": "vat-standard-rate",
+      "label": "positive",
+      "query": "A taxa padrão do imposto sobre o valor acrescentado é de quanto?",
+      "fold": 1
+    },
+    {
+      "id": "vat-standard-rate-p3",
+      "intentId": "vat-standard-rate",
+      "label": "positive",
+      "query": "Que taxa de IVA se aplica quando não existe taxa especial?",
+      "fold": 2
+    },
+    {
+      "id": "vat-standard-rate-p4",
+      "intentId": "vat-standard-rate",
+      "label": "positive",
+      "query": "Quanto representa o IVA à taxa normal?",
+      "fold": 3
+    },
+    {
+      "id": "vat-standard-rate-p5",
+      "intentId": "vat-standard-rate",
+      "label": "positive",
+      "query": "Qual é a alíquota normal usada no cálculo do IVA?",
+      "fold": 4
+    },
+    {
+      "id": "vat-standard-rate-n1",
+      "intentId": "vat-standard-rate",
+      "label": "negative",
+      "query": "Que bens beneficiam de uma taxa reduzida de IVA?",
+      "fold": 0
+    },
+    {
+      "id": "vat-standard-rate-n2",
+      "intentId": "vat-standard-rate",
+      "label": "negative",
+      "query": "Como se determina o local de tributação de um serviço?",
+      "fold": 1
+    },
+    {
+      "id": "vat-standard-rate-n3",
+      "intentId": "vat-standard-rate",
+      "label": "negative",
+      "query": "Que valores integram a base tributável do IVA?",
+      "fold": 2
+    },
+    {
+      "id": "vat-standard-rate-n4",
+      "intentId": "vat-standard-rate",
+      "label": "negative",
+      "query": "Quando se aplica a inversão do sujeito passivo?",
+      "fold": 3
+    },
+    {
+      "id": "vat-standard-rate-n5",
+      "intentId": "vat-standard-rate",
+      "label": "negative",
+      "query": "Em que data se considera exigível o imposto numa venda?",
+      "fold": 4
+    },
+    {
+      "id": "vat-monthly-return-deadline-p1",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "positive",
+      "query": "Até que data deve ser submetida a declaração periódica mensal do IVA?",
+      "fold": 0
+    },
+    {
+      "id": "vat-monthly-return-deadline-p2",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "positive",
+      "query": "Quando termina o prazo de entrega da declaração mensal de imposto?",
+      "fold": 1
+    },
+    {
+      "id": "vat-monthly-return-deadline-p3",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "positive",
+      "query": "Quantos dias há para apresentar a declaração periódica de IVA do mês?",
+      "fold": 2
+    },
+    {
+      "id": "vat-monthly-return-deadline-p4",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "positive",
+      "query": "Em que data o contribuinte deve declarar mensalmente o IVA?",
+      "fold": 3
+    },
+    {
+      "id": "vat-monthly-return-deadline-p5",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "positive",
+      "query": "Qual é a data limite para enviar a declaração mensal do imposto sobre o valor acrescentado?",
+      "fold": 4
+    },
+    {
+      "id": "vat-monthly-return-deadline-n1",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "negative",
+      "query": "Qual é o prazo para pagar o IVA já declarado?",
+      "fold": 0
+    },
+    {
+      "id": "vat-monthly-return-deadline-n2",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "negative",
+      "query": "Como se substitui uma declaração periódica com erros?",
+      "fold": 1
+    },
+    {
+      "id": "vat-monthly-return-deadline-n3",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "negative",
+      "query": "Quando deve ser apresentada a declaração anual de informação fiscal?",
+      "fold": 2
+    },
+    {
+      "id": "vat-monthly-return-deadline-n4",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "negative",
+      "query": "Em que momento começa a obrigação de declarar depois do registo da empresa?",
+      "fold": 3
+    },
+    {
+      "id": "vat-monthly-return-deadline-n5",
+      "intentId": "vat-monthly-return-deadline",
+      "label": "negative",
+      "query": "Quem está dispensado de apresentar declarações periódicas de IVA?",
+      "fold": 4
+    },
+    {
+      "id": "vat-input-deduction-p1",
+      "intentId": "vat-input-deduction",
+      "label": "positive",
+      "query": "Quando pode uma empresa descontar o IVA pago aos fornecedores?",
+      "fold": 0
+    },
+    {
+      "id": "vat-input-deduction-p2",
+      "intentId": "vat-input-deduction",
+      "label": "positive",
+      "query": "Que requisitos permitem exercer o direito à dedução do IVA de entrada?",
+      "fold": 1
+    },
+    {
+      "id": "vat-input-deduction-p3",
+      "intentId": "vat-input-deduction",
+      "label": "positive",
+      "query": "Em que condições o IVA suportado numa aquisição é dedutível?",
+      "fold": 2
+    },
+    {
+      "id": "vat-input-deduction-p4",
+      "intentId": "vat-input-deduction",
+      "label": "positive",
+      "query": "Como saber se o imposto pago nas compras pode ser recuperado por dedução?",
+      "fold": 3
+    },
+    {
+      "id": "vat-input-deduction-p5",
+      "intentId": "vat-input-deduction",
+      "label": "positive",
+      "query": "O que é necessário para abater o IVA das despesas ao imposto liquidado?",
+      "fold": 4
+    },
+    {
+      "id": "vat-input-deduction-n1",
+      "intentId": "vat-input-deduction",
+      "label": "negative",
+      "query": "Como se calcula o pro rata de dedução numa actividade mista?",
+      "fold": 0
+    },
+    {
+      "id": "vat-input-deduction-n2",
+      "intentId": "vat-input-deduction",
+      "label": "negative",
+      "query": "Em que casos se pede o reembolso de crédito de IVA?",
+      "fold": 1
+    },
+    {
+      "id": "vat-input-deduction-n3",
+      "intentId": "vat-input-deduction",
+      "label": "negative",
+      "query": "Que regularização se faz ao IVA de bens do activo imobilizado?",
+      "fold": 2
+    },
+    {
+      "id": "vat-input-deduction-n4",
+      "intentId": "vat-input-deduction",
+      "label": "negative",
+      "query": "Quais despesas estão excluídas do direito à dedução?",
+      "fold": 3
+    },
+    {
+      "id": "vat-input-deduction-n5",
+      "intentId": "vat-input-deduction",
+      "label": "negative",
+      "query": "Quando caduca um crédito de IVA não utilizado?",
+      "fold": 4
+    },
+    {
+      "id": "vat-exemptions-p1",
+      "intentId": "vat-exemptions",
+      "label": "positive",
+      "query": "Em que vendas ou serviços não é cobrado IVA por isenção?",
+      "fold": 0
+    },
+    {
+      "id": "vat-exemptions-p2",
+      "intentId": "vat-exemptions",
+      "label": "positive",
+      "query": "Quais actividades beneficiam de isenção do imposto sobre o valor acrescentado?",
+      "fold": 1
+    },
+    {
+      "id": "vat-exemptions-p3",
+      "intentId": "vat-exemptions",
+      "label": "positive",
+      "query": "Como identificar uma operação legalmente isenta de IVA?",
+      "fold": 2
+    },
+    {
+      "id": "vat-exemptions-p4",
+      "intentId": "vat-exemptions",
+      "label": "positive",
+      "query": "A que transacções se aplica a dispensa de liquidação de IVA?",
+      "fold": 3
+    },
+    {
+      "id": "vat-exemptions-p5",
+      "intentId": "vat-exemptions",
+      "label": "positive",
+      "query": "Que tipos de operação ficam fora da cobrança de IVA por isenção?",
+      "fold": 4
+    },
+    {
+      "id": "vat-exemptions-n1",
+      "intentId": "vat-exemptions",
+      "label": "negative",
+      "query": "Um contribuinte pode renunciar voluntariamente a uma isenção?",
+      "fold": 0
+    },
+    {
+      "id": "vat-exemptions-n2",
+      "intentId": "vat-exemptions",
+      "label": "negative",
+      "query": "Qual é a diferença entre isenção e taxa zero?",
+      "fold": 1
+    },
+    {
+      "id": "vat-exemptions-n3",
+      "intentId": "vat-exemptions",
+      "label": "negative",
+      "query": "Como se prova que uma exportação saiu efectivamente do país?",
+      "fold": 2
+    },
+    {
+      "id": "vat-exemptions-n4",
+      "intentId": "vat-exemptions",
+      "label": "negative",
+      "query": "As operações isentas devem constar da declaração periódica?",
+      "fold": 3
+    },
+    {
+      "id": "vat-exemptions-n5",
+      "intentId": "vat-exemptions",
+      "label": "negative",
+      "query": "Como se localiza para IVA um serviço prestado ao estrangeiro?",
+      "fold": 4
+    },
+    {
+      "id": "vat-invoice-elements-p1",
+      "intentId": "vat-invoice-elements",
+      "label": "positive",
+      "query": "Que dados fiscais têm de aparecer numa factura sujeita a IVA?",
+      "fold": 0
+    },
+    {
+      "id": "vat-invoice-elements-p2",
+      "intentId": "vat-invoice-elements",
+      "label": "positive",
+      "query": "Quais informações são obrigatórias numa factura para cumprir as regras do IVA?",
+      "fold": 1
+    },
+    {
+      "id": "vat-invoice-elements-p3",
+      "intentId": "vat-invoice-elements",
+      "label": "positive",
+      "query": "O que deve constar do documento de facturação para efeitos do imposto?",
+      "fold": 2
+    },
+    {
+      "id": "vat-invoice-elements-p4",
+      "intentId": "vat-invoice-elements",
+      "label": "positive",
+      "query": "Que menções não podem faltar numa factura com IVA?",
+      "fold": 3
+    },
+    {
+      "id": "vat-invoice-elements-p5",
+      "intentId": "vat-invoice-elements",
+      "label": "positive",
+      "query": "Quais são os requisitos formais de uma factura válida em matéria de IVA?",
+      "fold": 4
+    },
+    {
+      "id": "vat-invoice-elements-n1",
+      "intentId": "vat-invoice-elements",
+      "label": "negative",
+      "query": "Uma factura electrónica precisa de assinatura digital?",
+      "fold": 0
+    },
+    {
+      "id": "vat-invoice-elements-n2",
+      "intentId": "vat-invoice-elements",
+      "label": "negative",
+      "query": "A factura pode ser emitida numa língua estrangeira?",
+      "fold": 1
+    },
+    {
+      "id": "vat-invoice-elements-n3",
+      "intentId": "vat-invoice-elements",
+      "label": "negative",
+      "query": "É obrigatório colocar o logótipo da empresa no documento?",
+      "fold": 2
+    },
+    {
+      "id": "vat-invoice-elements-n4",
+      "intentId": "vat-invoice-elements",
+      "label": "negative",
+      "query": "Como se emite uma segunda via de uma factura perdida?",
+      "fold": 3
+    },
+    {
+      "id": "vat-invoice-elements-n5",
+      "intentId": "vat-invoice-elements",
+      "label": "negative",
+      "query": "O código QR tem de ser impresso em todos os documentos comerciais?",
+      "fold": 4
+    }
+  ]
+}

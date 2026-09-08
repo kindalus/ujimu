@@ -1,0 +1,3631 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-08T08:08:40.024Z",
+  "corpus": {
+    "sha256": "cd53503f1d555631e72aca7f54b7dfe90d36923d2e9d6baf914bc54f96c029af",
+    "intents": 20,
+    "cases": 200,
+    "positives": 100,
+    "negatives": 100,
+    "folds": 5
+  },
+  "model": {
+    "id": "Xenova/multilingual-e5-small",
+    "dtype": "int8",
+    "dimensions": 384,
+    "prefix": "query:",
+    "runtimePackage": "@huggingface/transformers",
+    "runtimeVersion": "3.8.1",
+    "weightsSha256": "4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c"
+  },
+  "timings": {
+    "modelLoadMs": 567.25,
+    "embeddingMs": 305.54,
+    "texts": 220,
+    "averageEmbeddingMs": 1.389
+  },
+  "currentTrigramPolicy": {
+    "threshold": 0.85,
+    "margin": 0,
+    "pairwise": {
+      "evaluatedCases": 200,
+      "truePositives": 0,
+      "trueNegatives": 100,
+      "falsePositives": 0,
+      "falseNegatives": 100,
+      "wrongMatches": 0,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "accuracy": 0.5
+    },
+    "retrieval": {
+      "evaluatedCases": 200,
+      "truePositives": 0,
+      "trueNegatives": 100,
+      "falsePositives": 0,
+      "falseNegatives": 100,
+      "wrongMatches": 0,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "accuracy": 0.5
+    }
+  },
+  "pairwise": {
+    "embedding": {
+      "threshold": 0.9127194589055693,
+      "fullCorpus": {
+        "evaluatedCases": 200,
+        "truePositives": 91,
+        "trueNegatives": 78,
+        "falsePositives": 22,
+        "falseNegatives": 9,
+        "wrongMatches": 0,
+        "precision": 0.8053097345132744,
+        "recall": 0.91,
+        "f1": 0.8544600938967136,
+        "accuracy": 0.845
+      },
+      "crossValidation": {
+        "folds": [
+          {
+            "fold": 0,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9127194589055693,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 17,
+              "trueNegatives": 13,
+              "falsePositives": 7,
+              "falseNegatives": 3,
+              "wrongMatches": 0,
+              "precision": 0.7083333333333334,
+              "recall": 0.85,
+              "f1": 0.7727272727272727,
+              "accuracy": 0.75
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "customs-value-n1",
+                "targetIntentId": "customs-value",
+                "score": 0.9210990986900495
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n1",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.9289293471669539
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p1",
+                "targetIntentId": "proof-of-origin",
+                "score": 0.9009613673623884
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n1",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.915912460415452
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n1",
+                "targetIntentId": "overtime-pay",
+                "score": 0.9462603299363096
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n1",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.9288155742609696
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p1",
+                "targetIntentId": "termination-notice",
+                "score": 0.9121072859704253
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-standard-rate-n1",
+                "targetIntentId": "vat-standard-rate",
+                "score": 0.9136189294005423
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n1",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.9578163109646635
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p1",
+                "targetIntentId": "vat-input-deduction",
+                "score": 0.9061727645372892
+              }
+            ]
+          },
+          {
+            "fold": 1,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 20,
+              "trueNegatives": 17,
+              "falsePositives": 3,
+              "falseNegatives": 0,
+              "wrongMatches": 0,
+              "precision": 0.8695652173913043,
+              "recall": 1,
+              "f1": 0.9302325581395349,
+              "accuracy": 0.925
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n2",
+                "targetIntentId": "invoice-retention",
+                "score": 0.9123122357266455
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n2",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.9074196543819104
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n2",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.9092333632502129
+              }
+            ]
+          },
+          {
+            "fold": 2,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 18,
+              "trueNegatives": 13,
+              "falsePositives": 7,
+              "falseNegatives": 2,
+              "wrongMatches": 0,
+              "precision": 0.72,
+              "recall": 0.9,
+              "f1": 0.8,
+              "accuracy": 0.775
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p3",
+                "targetIntentId": "tariff-classification",
+                "score": 0.9000623538565375
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n3",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.9147535686564822
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n3",
+                "targetIntentId": "import-declaration-documents",
+                "score": 0.9240196752570793
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proforma-validity-n3",
+                "targetIntentId": "proforma-validity",
+                "score": 0.9236393220919221
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n3",
+                "targetIntentId": "overtime-pay",
+                "score": 0.9405172705716719
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n3",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.9094953474949903
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p3",
+                "targetIntentId": "termination-notice",
+                "score": 0.8999195943682319
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-standard-rate-n3",
+                "targetIntentId": "vat-standard-rate",
+                "score": 0.919632752418635
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n3",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.9133826547629293
+              }
+            ]
+          },
+          {
+            "fold": 3,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 20,
+              "trueNegatives": 14,
+              "falsePositives": 6,
+              "falseNegatives": 0,
+              "wrongMatches": 0,
+              "precision": 0.7692307692307693,
+              "recall": 1,
+              "f1": 0.8695652173913043,
+              "accuracy": 0.85
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n4",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.9198708976349166
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n4",
+                "targetIntentId": "credit-note-correction",
+                "score": 0.9345824544533952
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n4",
+                "targetIntentId": "invoice-retention",
+                "score": 0.9252850546035463
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n4",
+                "targetIntentId": "overtime-pay",
+                "score": 0.9241106741919136
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n4",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.9121355724573064
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-exemptions-n4",
+                "targetIntentId": "vat-exemptions",
+                "score": 0.9160995203159241
+              }
+            ]
+          },
+          {
+            "fold": 4,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9174869605565266,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 15,
+              "trueNegatives": 16,
+              "falsePositives": 4,
+              "falseNegatives": 5,
+              "wrongMatches": 0,
+              "precision": 0.7894736842105263,
+              "recall": 0.75,
+              "f1": 0.7692307692307693,
+              "accuracy": 0.775
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p5",
+                "targetIntentId": "tariff-classification",
+                "score": 0.8711749008553573
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p5",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.9128984130154608
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p5",
+                "targetIntentId": "proof-of-origin",
+                "score": 0.9063512344761209
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-numbering-p5",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.913858250849692
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n5",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.9282199125977328
+              },
+              {
+                "type": "false_negative",
+                "caseId": "overtime-pay-p5",
+                "targetIntentId": "overtime-pay",
+                "score": 0.9062148744339199
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n5",
+                "targetIntentId": "overtime-pay",
+                "score": 0.9343428738870045
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n5",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.9327840119536281
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n5",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.9333249366942777
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "evaluatedCases": 200,
+          "truePositives": 90,
+          "trueNegatives": 73,
+          "falsePositives": 27,
+          "falseNegatives": 10,
+          "wrongMatches": 0,
+          "precision": 0.7692307692307693,
+          "recall": 0.9,
+          "f1": 0.8294930875576036,
+          "accuracy": 0.815
+        }
+      },
+      "bySpecialty": {
+        "customs": {
+          "evaluatedCases": 50,
+          "truePositives": 21,
+          "trueNegatives": 20,
+          "falsePositives": 5,
+          "falseNegatives": 4,
+          "wrongMatches": 0,
+          "precision": 0.8076923076923077,
+          "recall": 0.84,
+          "f1": 0.8235294117647058,
+          "accuracy": 0.82
+        },
+        "invoicing": {
+          "evaluatedCases": 50,
+          "truePositives": 25,
+          "trueNegatives": 20,
+          "falsePositives": 5,
+          "falseNegatives": 0,
+          "wrongMatches": 0,
+          "precision": 0.8333333333333334,
+          "recall": 1,
+          "f1": 0.9090909090909091,
+          "accuracy": 0.9
+        },
+        "labour": {
+          "evaluatedCases": 50,
+          "truePositives": 22,
+          "trueNegatives": 19,
+          "falsePositives": 6,
+          "falseNegatives": 3,
+          "wrongMatches": 0,
+          "precision": 0.7857142857142857,
+          "recall": 0.88,
+          "f1": 0.8301886792452831,
+          "accuracy": 0.82
+        },
+        "vat": {
+          "evaluatedCases": 50,
+          "truePositives": 23,
+          "trueNegatives": 19,
+          "falsePositives": 6,
+          "falseNegatives": 2,
+          "wrongMatches": 0,
+          "precision": 0.7931034482758621,
+          "recall": 0.92,
+          "f1": 0.8518518518518519,
+          "accuracy": 0.84
+        }
+      },
+      "scoreDistribution": {
+        "positive": {
+          "min": 0.8711749008553573,
+          "p25": 0.9272707314884922,
+          "median": 0.9407211802847876,
+          "p75": 0.9490492738669174,
+          "max": 0.9705814953721978
+        },
+        "negative": {
+          "min": 0.8488160740119961,
+          "p25": 0.8719979671433324,
+          "median": 0.8957147002717261,
+          "p75": 0.9092988593114072,
+          "max": 0.9578163109646635
+        }
+      },
+      "errors": [
+        {
+          "type": "false_positive",
+          "caseId": "customs-value-n1",
+          "targetIntentId": "customs-value",
+          "score": 0.9210990986900495
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p3",
+          "targetIntentId": "tariff-classification",
+          "score": 0.9000623538565375
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p5",
+          "targetIntentId": "tariff-classification",
+          "score": 0.8711749008553573
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n1",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.9289293471669539
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n3",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.9147535686564822
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n4",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.9198708976349166
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p1",
+          "targetIntentId": "proof-of-origin",
+          "score": 0.9009613673623884
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p5",
+          "targetIntentId": "proof-of-origin",
+          "score": 0.9063512344761209
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n3",
+          "targetIntentId": "import-declaration-documents",
+          "score": 0.9240196752570793
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n4",
+          "targetIntentId": "credit-note-correction",
+          "score": 0.9345824544533952
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n4",
+          "targetIntentId": "invoice-retention",
+          "score": 0.9252850546035463
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n1",
+          "targetIntentId": "invoice-numbering",
+          "score": 0.915912460415452
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n5",
+          "targetIntentId": "invoice-numbering",
+          "score": 0.9282199125977328
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proforma-validity-n3",
+          "targetIntentId": "proforma-validity",
+          "score": 0.9236393220919221
+        },
+        {
+          "type": "false_negative",
+          "caseId": "overtime-pay-p5",
+          "targetIntentId": "overtime-pay",
+          "score": 0.9062148744339199
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n1",
+          "targetIntentId": "overtime-pay",
+          "score": 0.9462603299363096
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n3",
+          "targetIntentId": "overtime-pay",
+          "score": 0.9405172705716719
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n4",
+          "targetIntentId": "overtime-pay",
+          "score": 0.9241106741919136
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n5",
+          "targetIntentId": "overtime-pay",
+          "score": 0.9343428738870045
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n1",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.9288155742609696
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n5",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.9327840119536281
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p1",
+          "targetIntentId": "termination-notice",
+          "score": 0.9121072859704253
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p3",
+          "targetIntentId": "termination-notice",
+          "score": 0.8999195943682319
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-standard-rate-n1",
+          "targetIntentId": "vat-standard-rate",
+          "score": 0.9136189294005423
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-standard-rate-n3",
+          "targetIntentId": "vat-standard-rate",
+          "score": 0.919632752418635
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n1",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.9578163109646635
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n3",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.9133826547629293
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n5",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.9333249366942777
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p1",
+          "targetIntentId": "vat-input-deduction",
+          "score": 0.9061727645372892
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p2",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.908471049361121
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-exemptions-n4",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.9160995203159241
+        }
+      ]
+    },
+    "trigram": {
+      "threshold": 0.2708333333333333,
+      "fullCorpus": {
+        "evaluatedCases": 200,
+        "truePositives": 84,
+        "trueNegatives": 66,
+        "falsePositives": 34,
+        "falseNegatives": 16,
+        "wrongMatches": 0,
+        "precision": 0.711864406779661,
+        "recall": 0.84,
+        "f1": 0.7706422018348624,
+        "accuracy": 0.75
+      },
+      "crossValidation": {
+        "folds": [
+          {
+            "fold": 0,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.27722772277227725,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 14,
+              "trueNegatives": 11,
+              "falsePositives": 9,
+              "falseNegatives": 6,
+              "wrongMatches": 0,
+              "precision": 0.6086956521739131,
+              "recall": 0.7,
+              "f1": 0.6511627906976745,
+              "accuracy": 0.625
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "tariff-classification-n1",
+                "targetIntentId": "tariff-classification",
+                "score": 0.2807017543859649
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n1",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.43478260869565216
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-issue-deadline-p1",
+                "targetIntentId": "invoice-issue-deadline",
+                "score": 0.2222222222222222
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n1",
+                "targetIntentId": "credit-note-correction",
+                "score": 0.28865979381443296
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p1",
+                "targetIntentId": "invoice-retention",
+                "score": 0.2708333333333333
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n1",
+                "targetIntentId": "invoice-retention",
+                "score": 0.4
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n1",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.35294117647058826
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n1",
+                "targetIntentId": "overtime-pay",
+                "score": 0.5178571428571429
+              },
+              {
+                "type": "false_negative",
+                "caseId": "annual-leave-duration-p1",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.2376237623762376
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n1",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.40816326530612246
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p1",
+                "targetIntentId": "termination-notice",
+                "score": 0.24
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n1",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.6206896551724138
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p1",
+                "targetIntentId": "vat-input-deduction",
+                "score": 0.2413793103448276
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-exemptions-p1",
+                "targetIntentId": "vat-exemptions",
+                "score": 0.23529411764705882
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n1",
+                "targetIntentId": "vat-invoice-elements",
+                "score": 0.29357798165137616
+              }
+            ]
+          },
+          {
+            "fold": 1,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.23529411764705882,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 15,
+              "trueNegatives": 13,
+              "falsePositives": 7,
+              "falseNegatives": 5,
+              "wrongMatches": 0,
+              "precision": 0.6818181818181818,
+              "recall": 0.75,
+              "f1": 0.7142857142857143,
+              "accuracy": 0.7
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "proof-of-origin-n2",
+                "targetIntentId": "proof-of-origin",
+                "score": 0.24528301886792453
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-declaration-documents-p2",
+                "targetIntentId": "import-declaration-documents",
+                "score": 0.2184873949579832
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n2",
+                "targetIntentId": "import-declaration-documents",
+                "score": 0.2833333333333333
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n2",
+                "targetIntentId": "credit-note-correction",
+                "score": 0.29457364341085274
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n2",
+                "targetIntentId": "invoice-retention",
+                "score": 0.24742268041237114
+              },
+              {
+                "type": "false_positive",
+                "caseId": "weekly-hours-n2",
+                "targetIntentId": "weekly-hours",
+                "score": 0.24299065420560748
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p2",
+                "targetIntentId": "termination-notice",
+                "score": 0.2184873949579832
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-standard-rate-p2",
+                "targetIntentId": "vat-standard-rate",
+                "score": 0.19148936170212766
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n2",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.24489795918367346
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p2",
+                "targetIntentId": "vat-input-deduction",
+                "score": 0.23140495867768596
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-exemptions-p2",
+                "targetIntentId": "vat-exemptions",
+                "score": 0.22641509433962265
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n2",
+                "targetIntentId": "vat-invoice-elements",
+                "score": 0.2545454545454545
+              }
+            ]
+          },
+          {
+            "fold": 2,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.20408163265306123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 19,
+              "trueNegatives": 10,
+              "falsePositives": 10,
+              "falseNegatives": 1,
+              "wrongMatches": 0,
+              "precision": 0.6551724137931034,
+              "recall": 0.95,
+              "f1": 0.7755102040816326,
+              "accuracy": 0.725
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "customs-value-p3",
+                "targetIntentId": "customs-value",
+                "score": 0.15384615384615385
+              },
+              {
+                "type": "false_positive",
+                "caseId": "customs-value-n3",
+                "targetIntentId": "customs-value",
+                "score": 0.29508196721311475
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n3",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.4
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proof-of-origin-n3",
+                "targetIntentId": "proof-of-origin",
+                "score": 0.30357142857142855
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n3",
+                "targetIntentId": "import-declaration-documents",
+                "score": 0.3669724770642202
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proforma-validity-n3",
+                "targetIntentId": "proforma-validity",
+                "score": 0.3541666666666667
+              },
+              {
+                "type": "false_positive",
+                "caseId": "weekly-hours-n3",
+                "targetIntentId": "weekly-hours",
+                "score": 0.3
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n3",
+                "targetIntentId": "overtime-pay",
+                "score": 0.41818181818181815
+              },
+              {
+                "type": "false_positive",
+                "caseId": "maternity-leave-duration-n3",
+                "targetIntentId": "maternity-leave-duration",
+                "score": 0.2553191489361702
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n3",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.3669724770642202
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n3",
+                "targetIntentId": "vat-invoice-elements",
+                "score": 0.2608695652173913
+              }
+            ]
+          },
+          {
+            "fold": 3,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.20408163265306123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 19,
+              "trueNegatives": 7,
+              "falsePositives": 13,
+              "falseNegatives": 1,
+              "wrongMatches": 0,
+              "precision": 0.59375,
+              "recall": 0.95,
+              "f1": 0.7307692307692307,
+              "accuracy": 0.65
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n4",
+                "targetIntentId": "import-duty-calculation",
+                "score": 0.3669724770642202
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proof-of-origin-n4",
+                "targetIntentId": "proof-of-origin",
+                "score": 0.32727272727272727
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n4",
+                "targetIntentId": "import-declaration-documents",
+                "score": 0.2631578947368421
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-issue-deadline-n4",
+                "targetIntentId": "invoice-issue-deadline",
+                "score": 0.25
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n4",
+                "targetIntentId": "credit-note-correction",
+                "score": 0.43478260869565216
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n4",
+                "targetIntentId": "invoice-retention",
+                "score": 0.2962962962962963
+              },
+              {
+                "type": "false_negative",
+                "caseId": "overtime-pay-p4",
+                "targetIntentId": "overtime-pay",
+                "score": 0.16216216216216217
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n4",
+                "targetIntentId": "overtime-pay",
+                "score": 0.23423423423423423
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n4",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.38
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-standard-rate-n4",
+                "targetIntentId": "vat-standard-rate",
+                "score": 0.23684210526315788
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n4",
+                "targetIntentId": "vat-monthly-return-deadline",
+                "score": 0.27586206896551724
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-input-deduction-n4",
+                "targetIntentId": "vat-input-deduction",
+                "score": 0.23076923076923078
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-exemptions-n4",
+                "targetIntentId": "vat-exemptions",
+                "score": 0.47619047619047616
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n4",
+                "targetIntentId": "vat-invoice-elements",
+                "score": 0.2803738317757009
+              }
+            ]
+          },
+          {
+            "fold": 4,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.3047619047619048,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 15,
+              "trueNegatives": 14,
+              "falsePositives": 6,
+              "falseNegatives": 5,
+              "wrongMatches": 0,
+              "precision": 0.7142857142857143,
+              "recall": 0.75,
+              "f1": 0.7317073170731707,
+              "accuracy": 0.725
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p5",
+                "targetIntentId": "tariff-classification",
+                "score": 0.06837606837606838
+              },
+              {
+                "type": "false_positive",
+                "caseId": "tariff-classification-n5",
+                "targetIntentId": "tariff-classification",
+                "score": 0.3508771929824561
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-issue-deadline-n5",
+                "targetIntentId": "invoice-issue-deadline",
+                "score": 0.3855421686746988
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p5",
+                "targetIntentId": "invoice-retention",
+                "score": 0.2828282828282828
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-numbering-p5",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.20408163265306123
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n5",
+                "targetIntentId": "invoice-numbering",
+                "score": 0.35185185185185186
+              },
+              {
+                "type": "false_negative",
+                "caseId": "weekly-hours-p5",
+                "targetIntentId": "weekly-hours",
+                "score": 0.2882882882882883
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n5",
+                "targetIntentId": "overtime-pay",
+                "score": 0.5344827586206896
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n5",
+                "targetIntentId": "annual-leave-duration",
+                "score": 0.30927835051546393
+              },
+              {
+                "type": "false_positive",
+                "caseId": "maternity-leave-duration-n5",
+                "targetIntentId": "maternity-leave-duration",
+                "score": 0.3953488372093023
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p5",
+                "targetIntentId": "vat-input-deduction",
+                "score": 0.24193548387096775
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "evaluatedCases": 200,
+          "truePositives": 82,
+          "trueNegatives": 55,
+          "falsePositives": 45,
+          "falseNegatives": 18,
+          "wrongMatches": 0,
+          "precision": 0.6456692913385826,
+          "recall": 0.82,
+          "f1": 0.7224669603524229,
+          "accuracy": 0.685
+        }
+      },
+      "bySpecialty": {
+        "customs": {
+          "evaluatedCases": 50,
+          "truePositives": 22,
+          "trueNegatives": 15,
+          "falsePositives": 10,
+          "falseNegatives": 3,
+          "wrongMatches": 0,
+          "precision": 0.6875,
+          "recall": 0.88,
+          "f1": 0.7719298245614035,
+          "accuracy": 0.74
+        },
+        "invoicing": {
+          "evaluatedCases": 50,
+          "truePositives": 23,
+          "trueNegatives": 16,
+          "falsePositives": 9,
+          "falseNegatives": 2,
+          "wrongMatches": 0,
+          "precision": 0.71875,
+          "recall": 0.92,
+          "f1": 0.8070175438596491,
+          "accuracy": 0.78
+        },
+        "labour": {
+          "evaluatedCases": 50,
+          "truePositives": 21,
+          "trueNegatives": 17,
+          "falsePositives": 8,
+          "falseNegatives": 4,
+          "wrongMatches": 0,
+          "precision": 0.7241379310344828,
+          "recall": 0.84,
+          "f1": 0.7777777777777778,
+          "accuracy": 0.76
+        },
+        "vat": {
+          "evaluatedCases": 50,
+          "truePositives": 18,
+          "trueNegatives": 18,
+          "falsePositives": 7,
+          "falseNegatives": 7,
+          "wrongMatches": 0,
+          "precision": 0.72,
+          "recall": 0.72,
+          "f1": 0.72,
+          "accuracy": 0.72
+        }
+      },
+      "scoreDistribution": {
+        "positive": {
+          "min": 0.06837606837606838,
+          "p25": 0.3057823129251701,
+          "median": 0.40192307692307694,
+          "p75": 0.47560499609679935,
+          "max": 0.6929133858267716
+        },
+        "negative": {
+          "min": 0.023255813953488372,
+          "p25": 0.14860728497092135,
+          "median": 0.2341383937128618,
+          "p75": 0.2962962962962963,
+          "max": 0.6206896551724138
+        }
+      },
+      "errors": [
+        {
+          "type": "false_negative",
+          "caseId": "customs-value-p3",
+          "targetIntentId": "customs-value",
+          "score": 0.15384615384615385
+        },
+        {
+          "type": "false_positive",
+          "caseId": "customs-value-n3",
+          "targetIntentId": "customs-value",
+          "score": 0.29508196721311475
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p5",
+          "targetIntentId": "tariff-classification",
+          "score": 0.06837606837606838
+        },
+        {
+          "type": "false_positive",
+          "caseId": "tariff-classification-n1",
+          "targetIntentId": "tariff-classification",
+          "score": 0.2807017543859649
+        },
+        {
+          "type": "false_positive",
+          "caseId": "tariff-classification-n5",
+          "targetIntentId": "tariff-classification",
+          "score": 0.3508771929824561
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n1",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.43478260869565216
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n3",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.4
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n4",
+          "targetIntentId": "import-duty-calculation",
+          "score": 0.3669724770642202
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proof-of-origin-n3",
+          "targetIntentId": "proof-of-origin",
+          "score": 0.30357142857142855
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proof-of-origin-n4",
+          "targetIntentId": "proof-of-origin",
+          "score": 0.32727272727272727
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-declaration-documents-p2",
+          "targetIntentId": "import-declaration-documents",
+          "score": 0.2184873949579832
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n2",
+          "targetIntentId": "import-declaration-documents",
+          "score": 0.2833333333333333
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n3",
+          "targetIntentId": "import-declaration-documents",
+          "score": 0.3669724770642202
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-issue-deadline-p1",
+          "targetIntentId": "invoice-issue-deadline",
+          "score": 0.2222222222222222
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-issue-deadline-n5",
+          "targetIntentId": "invoice-issue-deadline",
+          "score": 0.3855421686746988
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n1",
+          "targetIntentId": "credit-note-correction",
+          "score": 0.28865979381443296
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n2",
+          "targetIntentId": "credit-note-correction",
+          "score": 0.29457364341085274
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n4",
+          "targetIntentId": "credit-note-correction",
+          "score": 0.43478260869565216
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n1",
+          "targetIntentId": "invoice-retention",
+          "score": 0.4
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n4",
+          "targetIntentId": "invoice-retention",
+          "score": 0.2962962962962963
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-numbering-p5",
+          "targetIntentId": "invoice-numbering",
+          "score": 0.20408163265306123
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n1",
+          "targetIntentId": "invoice-numbering",
+          "score": 0.35294117647058826
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n5",
+          "targetIntentId": "invoice-numbering",
+          "score": 0.35185185185185186
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proforma-validity-n3",
+          "targetIntentId": "proforma-validity",
+          "score": 0.3541666666666667
+        },
+        {
+          "type": "false_positive",
+          "caseId": "weekly-hours-n3",
+          "targetIntentId": "weekly-hours",
+          "score": 0.3
+        },
+        {
+          "type": "false_negative",
+          "caseId": "overtime-pay-p4",
+          "targetIntentId": "overtime-pay",
+          "score": 0.16216216216216217
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n1",
+          "targetIntentId": "overtime-pay",
+          "score": 0.5178571428571429
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n3",
+          "targetIntentId": "overtime-pay",
+          "score": 0.41818181818181815
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n5",
+          "targetIntentId": "overtime-pay",
+          "score": 0.5344827586206896
+        },
+        {
+          "type": "false_negative",
+          "caseId": "annual-leave-duration-p1",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.2376237623762376
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n1",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.40816326530612246
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n4",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.38
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n5",
+          "targetIntentId": "annual-leave-duration",
+          "score": 0.30927835051546393
+        },
+        {
+          "type": "false_positive",
+          "caseId": "maternity-leave-duration-n5",
+          "targetIntentId": "maternity-leave-duration",
+          "score": 0.3953488372093023
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p1",
+          "targetIntentId": "termination-notice",
+          "score": 0.24
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p2",
+          "targetIntentId": "termination-notice",
+          "score": 0.2184873949579832
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-standard-rate-p2",
+          "targetIntentId": "vat-standard-rate",
+          "score": 0.19148936170212766
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n1",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.6206896551724138
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n3",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.3669724770642202
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n4",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.27586206896551724
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n5",
+          "targetIntentId": "vat-monthly-return-deadline",
+          "score": 0.2962962962962963
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p1",
+          "targetIntentId": "vat-input-deduction",
+          "score": 0.2413793103448276
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p2",
+          "targetIntentId": "vat-input-deduction",
+          "score": 0.23140495867768596
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p5",
+          "targetIntentId": "vat-input-deduction",
+          "score": 0.24193548387096775
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p1",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.23529411764705882
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p2",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.22641509433962265
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p4",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.25882352941176473
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-exemptions-n4",
+          "targetIntentId": "vat-exemptions",
+          "score": 0.47619047619047616
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-invoice-elements-n1",
+          "targetIntentId": "vat-invoice-elements",
+          "score": 0.29357798165137616
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-invoice-elements-n4",
+          "targetIntentId": "vat-invoice-elements",
+          "score": 0.2803738317757009
+        }
+      ]
+    }
+  },
+  "retrieval": {
+    "embedding": {
+      "threshold": 0.9061727645372892,
+      "margin": 0.004086153382154123,
+      "fullCorpus": {
+        "evaluatedCases": 200,
+        "truePositives": 90,
+        "trueNegatives": 72,
+        "falsePositives": 32,
+        "falseNegatives": 10,
+        "wrongMatches": 4,
+        "precision": 0.7377049180327869,
+        "recall": 0.9,
+        "f1": 0.8108108108108109,
+        "accuracy": 0.81
+      },
+      "fullCorpusTop1Accuracy": 0.94,
+      "crossValidation": {
+        "folds": [
+          {
+            "fold": 0,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9127194589055693,
+            "margin": 0.004563975179252777,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 15,
+              "trueNegatives": 16,
+              "falsePositives": 5,
+              "falseNegatives": 5,
+              "wrongMatches": 1,
+              "precision": 0.75,
+              "recall": 0.75,
+              "f1": 0.75,
+              "accuracy": 0.775
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n1",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.9289293471669539,
+                "margin": 0.011032087590818307
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p1",
+                "expectedIntentId": "proof-of-origin",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.9009613673623884,
+                "margin": 0.019030338003367397
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-issue-deadline-p1",
+                "expectedIntentId": "invoice-issue-deadline",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.9390719004772055,
+                "margin": 0.01239903003704268
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p1",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.9411756681888628,
+                "margin": 0.004086153382154123
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n1",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.9462603299363096,
+                "margin": 0.03967298555265797
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n1",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.9288155742609696,
+                "margin": 0.027864281169244554
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p1",
+                "expectedIntentId": "termination-notice",
+                "topIntentId": "termination-notice",
+                "bestScore": 0.9121072859704253,
+                "margin": 0.008106790179898571
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n1",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.9578163109646635,
+                "margin": 0.04423726734742839
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p1",
+                "expectedIntentId": "vat-input-deduction",
+                "topIntentId": "vat-input-deduction",
+                "bestScore": 0.9061727645372892,
+                "margin": 0.012679593891594454
+              }
+            ]
+          },
+          {
+            "fold": 1,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "margin": 0.004086153382154123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 19,
+              "trueNegatives": 15,
+              "falsePositives": 5,
+              "falseNegatives": 1,
+              "wrongMatches": 0,
+              "precision": 0.7916666666666666,
+              "recall": 0.95,
+              "f1": 0.8636363636363636,
+              "accuracy": 0.85
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p2",
+                "expectedIntentId": "import-duty-calculation",
+                "topIntentId": "customs-value",
+                "bestScore": 0.9410203234924747,
+                "margin": 0.00006133783690942529
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n2",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.9360534083564955,
+                "margin": 0.023629910268492038
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n2",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.9123122357266455,
+                "margin": 0.01280847915473382
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n2",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.9074196543819104,
+                "margin": 0.02498483522789985
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n2",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.9092333632502129,
+                "margin": 0.03216868693426855
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n2",
+                "topIntentId": "invoice-issue-deadline",
+                "bestScore": 0.9183406745005269,
+                "margin": 0.010232285562123966
+              }
+            ]
+          },
+          {
+            "fold": 2,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "margin": 0.004086153382154123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 16,
+              "trueNegatives": 15,
+              "falsePositives": 6,
+              "falseNegatives": 4,
+              "wrongMatches": 1,
+              "precision": 0.7272727272727273,
+              "recall": 0.8,
+              "f1": 0.7619047619047619,
+              "accuracy": 0.775
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p3",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "tariff-classification",
+                "bestScore": 0.9000623538565375,
+                "margin": 0.05145071625940012
+              },
+              {
+                "type": "false_positive",
+                "caseId": "tariff-classification-n3",
+                "topIntentId": "import-declaration-documents",
+                "bestScore": 0.912661513126012,
+                "margin": 0.007609408752947688
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "import-declaration-documents-p3",
+                "expectedIntentId": "import-declaration-documents",
+                "topIntentId": "customs-value",
+                "bestScore": 0.9472598348530288,
+                "margin": 0.0141064147196861
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n3",
+                "topIntentId": "import-declaration-documents",
+                "bestScore": 0.9240196752570793,
+                "margin": 0.026367883612945064
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proforma-validity-p3",
+                "expectedIntentId": "proforma-validity",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.9176704753602558,
+                "margin": 0.00018351480372924556
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proforma-validity-n3",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.939846937371678,
+                "margin": 0.016207615279755894
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n3",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.9405172705716719,
+                "margin": 0.020425748644066433
+              },
+              {
+                "type": "false_negative",
+                "caseId": "termination-notice-p3",
+                "expectedIntentId": "termination-notice",
+                "topIntentId": "termination-notice",
+                "bestScore": 0.8999195943682319,
+                "margin": 0.02088921776253494
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n3",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.9133826547629293,
+                "margin": 0.009827797035661612
+              }
+            ]
+          },
+          {
+            "fold": 3,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9061727645372892,
+            "margin": 0.004086153382154123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 19,
+              "trueNegatives": 14,
+              "falsePositives": 6,
+              "falseNegatives": 1,
+              "wrongMatches": 0,
+              "precision": 0.76,
+              "recall": 0.95,
+              "f1": 0.8444444444444444,
+              "accuracy": 0.825
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n4",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.9198708976349166,
+                "margin": 0.025155742638300893
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p4",
+                "expectedIntentId": "proof-of-origin",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.9249074425046717,
+                "margin": 0.000935718541760111
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n4",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.9345824544533952,
+                "margin": 0.006912997006773947
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n4",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.9252850546035463,
+                "margin": 0.012745168511399063
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n4",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.9241106741919136,
+                "margin": 0.022939722992832978
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n4",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.9121355724573064,
+                "margin": 0.025161418950234493
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-exemptions-n4",
+                "topIntentId": "vat-exemptions",
+                "bestScore": 0.9160995203159241,
+                "margin": 0.020043964304554907
+              }
+            ]
+          },
+          {
+            "fold": 4,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.9155145535167903,
+            "margin": 0.004086153382154123,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 14,
+              "trueNegatives": 16,
+              "falsePositives": 6,
+              "falseNegatives": 6,
+              "wrongMatches": 2,
+              "precision": 0.7,
+              "recall": 0.7,
+              "f1": 0.7,
+              "accuracy": 0.75
+            },
+            "errors": [
+              {
+                "type": "wrong_match",
+                "caseId": "tariff-classification-p5",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "customs-value",
+                "bestScore": 0.9230390908684565,
+                "margin": 0.010276506253726003
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p5",
+                "expectedIntentId": "import-duty-calculation",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.9128984130154608,
+                "margin": 0.01052576487749235
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p5",
+                "expectedIntentId": "proof-of-origin",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.9063512344761209,
+                "margin": 0.030711723135411373
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-retention-p5",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "invoice-issue-deadline",
+                "bestScore": 0.9499847112701347,
+                "margin": 0.028806902926679756
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-numbering-p5",
+                "expectedIntentId": "invoice-numbering",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.913858250849692,
+                "margin": 0.00878332699895601
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n5",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.9282199125977328,
+                "margin": 0.017687283304932633
+              },
+              {
+                "type": "false_negative",
+                "caseId": "overtime-pay-p5",
+                "expectedIntentId": "overtime-pay",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.9062148744339199,
+                "margin": 0.02315502316223439
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n5",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.9343428738870045,
+                "margin": 0.0631771579279522
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n5",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.9327840119536281,
+                "margin": 0.04555644733000719
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n5",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.9333249366942777,
+                "margin": 0.015538064003805085
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "evaluatedCases": 200,
+          "truePositives": 83,
+          "trueNegatives": 76,
+          "falsePositives": 28,
+          "falseNegatives": 17,
+          "wrongMatches": 4,
+          "precision": 0.7477477477477478,
+          "recall": 0.83,
+          "f1": 0.7867298578199052,
+          "accuracy": 0.795
+        }
+      },
+      "bySpecialty": {
+        "customs": {
+          "evaluatedCases": 50,
+          "truePositives": 19,
+          "trueNegatives": 18,
+          "falsePositives": 9,
+          "falseNegatives": 6,
+          "wrongMatches": 2,
+          "precision": 0.6785714285714286,
+          "recall": 0.76,
+          "f1": 0.7169811320754716,
+          "accuracy": 0.74
+        },
+        "invoicing": {
+          "evaluatedCases": 50,
+          "truePositives": 22,
+          "trueNegatives": 19,
+          "falsePositives": 8,
+          "falseNegatives": 3,
+          "wrongMatches": 2,
+          "precision": 0.7333333333333333,
+          "recall": 0.88,
+          "f1": 0.8,
+          "accuracy": 0.82
+        },
+        "labour": {
+          "evaluatedCases": 50,
+          "truePositives": 24,
+          "trueNegatives": 16,
+          "falsePositives": 9,
+          "falseNegatives": 1,
+          "wrongMatches": 0,
+          "precision": 0.7272727272727273,
+          "recall": 0.96,
+          "f1": 0.8275862068965517,
+          "accuracy": 0.8
+        },
+        "vat": {
+          "evaluatedCases": 50,
+          "truePositives": 25,
+          "trueNegatives": 19,
+          "falsePositives": 6,
+          "falseNegatives": 0,
+          "wrongMatches": 0,
+          "precision": 0.8064516129032258,
+          "recall": 1,
+          "f1": 0.8928571428571429,
+          "accuracy": 0.88
+        }
+      },
+      "errors": [
+        {
+          "type": "false_positive",
+          "caseId": "customs-value-n5",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.9138568895509761,
+          "margin": 0.02329707015053817
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p3",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "tariff-classification",
+          "bestScore": 0.9000623538565375,
+          "margin": 0.05145071625940012
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "tariff-classification-p5",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "customs-value",
+          "bestScore": 0.9230390908684565,
+          "margin": 0.010276506253726003
+        },
+        {
+          "type": "false_positive",
+          "caseId": "tariff-classification-n3",
+          "topIntentId": "import-declaration-documents",
+          "bestScore": 0.912661513126012,
+          "margin": 0.007609408752947688
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-duty-calculation-p2",
+          "expectedIntentId": "import-duty-calculation",
+          "topIntentId": "customs-value",
+          "bestScore": 0.9410203234924747,
+          "margin": 0.00006133783690942529
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n1",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.9289293471669539,
+          "margin": 0.011032087590818307
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n4",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.9198708976349166,
+          "margin": 0.025155742638300893
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p1",
+          "expectedIntentId": "proof-of-origin",
+          "topIntentId": "proof-of-origin",
+          "bestScore": 0.9009613673623884,
+          "margin": 0.019030338003367397
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p4",
+          "expectedIntentId": "proof-of-origin",
+          "topIntentId": "proof-of-origin",
+          "bestScore": 0.9249074425046717,
+          "margin": 0.000935718541760111
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "import-declaration-documents-p3",
+          "expectedIntentId": "import-declaration-documents",
+          "topIntentId": "customs-value",
+          "bestScore": 0.9472598348530288,
+          "margin": 0.0141064147196861
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n1",
+          "topIntentId": "customs-value",
+          "bestScore": 0.9146581943447065,
+          "margin": 0.004319943111665503
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n2",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.9360534083564955,
+          "margin": 0.023629910268492038
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n3",
+          "topIntentId": "import-declaration-documents",
+          "bestScore": 0.9240196752570793,
+          "margin": 0.026367883612945064
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-issue-deadline-p1",
+          "expectedIntentId": "invoice-issue-deadline",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.9390719004772055,
+          "margin": 0.01239903003704268
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n4",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.9345824544533952,
+          "margin": 0.006912997006773947
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-retention-p5",
+          "expectedIntentId": "invoice-retention",
+          "topIntentId": "invoice-issue-deadline",
+          "bestScore": 0.9499847112701347,
+          "margin": 0.028806902926679756
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n2",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.9123122357266455,
+          "margin": 0.01280847915473382
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n4",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.9252850546035463,
+          "margin": 0.012745168511399063
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n2",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.9074196543819104,
+          "margin": 0.02498483522789985
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n5",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.9282199125977328,
+          "margin": 0.017687283304932633
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proforma-validity-p3",
+          "expectedIntentId": "proforma-validity",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.9176704753602558,
+          "margin": 0.00018351480372924556
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proforma-validity-n3",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.939846937371678,
+          "margin": 0.016207615279755894
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n1",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.9462603299363096,
+          "margin": 0.03967298555265797
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n3",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.9405172705716719,
+          "margin": 0.020425748644066433
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n4",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.9241106741919136,
+          "margin": 0.022939722992832978
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n5",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.9343428738870045,
+          "margin": 0.0631771579279522
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n1",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.9288155742609696,
+          "margin": 0.027864281169244554
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n2",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.9092333632502129,
+          "margin": 0.03216868693426855
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n4",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.9121355724573064,
+          "margin": 0.025161418950234493
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n5",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.9327840119536281,
+          "margin": 0.04555644733000719
+        },
+        {
+          "type": "false_positive",
+          "caseId": "maternity-leave-duration-n1",
+          "topIntentId": "maternity-leave-duration",
+          "bestScore": 0.9091226804127638,
+          "margin": 0.024764918714044626
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p3",
+          "expectedIntentId": "termination-notice",
+          "topIntentId": "termination-notice",
+          "bestScore": 0.8999195943682319,
+          "margin": 0.02088921776253494
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n1",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.9578163109646635,
+          "margin": 0.04423726734742839
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n3",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.9133826547629293,
+          "margin": 0.009827797035661612
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n5",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.9333249366942777,
+          "margin": 0.015538064003805085
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-input-deduction-n5",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.9114039029613178,
+          "margin": 0.00725785807397028
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-exemptions-n4",
+          "topIntentId": "vat-exemptions",
+          "bestScore": 0.9160995203159241,
+          "margin": 0.020043964304554907
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-invoice-elements-n2",
+          "topIntentId": "invoice-issue-deadline",
+          "bestScore": 0.9183406745005269,
+          "margin": 0.010232285562123966
+        }
+      ]
+    },
+    "trigram": {
+      "threshold": 0.34951456310679613,
+      "margin": 0.05212903225806448,
+      "fullCorpus": {
+        "evaluatedCases": 200,
+        "truePositives": 58,
+        "trueNegatives": 72,
+        "falsePositives": 34,
+        "falseNegatives": 42,
+        "wrongMatches": 6,
+        "precision": 0.6304347826086957,
+        "recall": 0.58,
+        "f1": 0.6041666666666666,
+        "accuracy": 0.65
+      },
+      "fullCorpusTop1Accuracy": 0.7,
+      "crossValidation": {
+        "folds": [
+          {
+            "fold": 0,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.34951456310679613,
+            "margin": 0.05212903225806448,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 10,
+              "trueNegatives": 12,
+              "falsePositives": 10,
+              "falseNegatives": 10,
+              "wrongMatches": 2,
+              "precision": 0.5,
+              "recall": 0.5,
+              "f1": 0.5,
+              "accuracy": 0.55
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p1",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "tariff-classification",
+                "bestScore": 0.3047619047619048,
+                "margin": 0.06713814238566718
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n1",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.43478260869565216,
+                "margin": 0.14906832298136646
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p1",
+                "expectedIntentId": "proof-of-origin",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.2777777777777778,
+                "margin": 0.07975797579757976
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n1",
+                "topIntentId": "customs-value",
+                "bestScore": 0.4132231404958678,
+                "margin": 0.07693995465515979
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-issue-deadline-p1",
+                "expectedIntentId": "invoice-issue-deadline",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.4954128440366973,
+                "margin": 0.10366026671710965
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-issue-deadline-n1",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.42,
+                "margin": 0.21545454545454543
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p1",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.32727272727272727,
+                "margin": 0.012665985699693572
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n1",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.4,
+                "margin": 0.16699029126213594
+              },
+              {
+                "type": "false_positive",
+                "caseId": "weekly-hours-n1",
+                "topIntentId": "termination-notice",
+                "bestScore": 0.4,
+                "margin": 0.14193548387096777
+              },
+              {
+                "type": "false_negative",
+                "caseId": "overtime-pay-p1",
+                "expectedIntentId": "overtime-pay",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.3695652173913043,
+                "margin": 0.046332894158981064
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n1",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.5178571428571429,
+                "margin": 0.21597035040431273
+              },
+              {
+                "type": "false_negative",
+                "caseId": "annual-leave-duration-p1",
+                "expectedIntentId": "annual-leave-duration",
+                "topIntentId": "maternity-leave-duration",
+                "bestScore": 0.3956043956043956,
+                "margin": 0.03916875204003917
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n1",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.40816326530612246,
+                "margin": 0.12244897959183676
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "termination-notice-p1",
+                "expectedIntentId": "termination-notice",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.41379310344827586,
+                "margin": 0.11691810344827586
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n1",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.6206896551724138,
+                "margin": 0.19030990833697076
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p1",
+                "expectedIntentId": "vat-input-deduction",
+                "topIntentId": "vat-input-deduction",
+                "bestScore": 0.2413793103448276,
+                "margin": 0.021040327293980143
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-exemptions-p1",
+                "expectedIntentId": "vat-exemptions",
+                "topIntentId": "vat-exemptions",
+                "bestScore": 0.23529411764705882,
+                "margin": 0.019077901430842592
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-invoice-elements-p1",
+                "expectedIntentId": "vat-invoice-elements",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.36538461538461536,
+                "margin": 0.01676076217360617
+              }
+            ]
+          },
+          {
+            "fold": 1,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.27722772277227725,
+            "margin": 0.05212903225806448,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 9,
+              "trueNegatives": 15,
+              "falsePositives": 7,
+              "falseNegatives": 11,
+              "wrongMatches": 2,
+              "precision": 0.5625,
+              "recall": 0.45,
+              "f1": 0.5,
+              "accuracy": 0.6
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p2",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "customs-value",
+                "bestScore": 0.4122137404580153,
+                "margin": 0.04713437537865023
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p2",
+                "expectedIntentId": "import-duty-calculation",
+                "topIntentId": "customs-value",
+                "bestScore": 0.4262295081967213,
+                "margin": 0.00517687661777394
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proof-of-origin-p2",
+                "expectedIntentId": "proof-of-origin",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.3508771929824561,
+                "margin": 0.014428594851615018
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proof-of-origin-n2",
+                "topIntentId": "invoice-retention",
+                "bestScore": 0.40816326530612246,
+                "margin": 0.16288024643819793
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-declaration-documents-p2",
+                "expectedIntentId": "import-declaration-documents",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.26666666666666666,
+                "margin": 0.025287356321839066
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n2",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.7169811320754716,
+                "margin": 0.32922603003465534
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p2",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.35514018691588783,
+                "margin": 0.00030147723846846164
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-numbering-p2",
+                "expectedIntentId": "invoice-numbering",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.3333333333333333,
+                "margin": 0.02721088435374147
+              },
+              {
+                "type": "false_positive",
+                "caseId": "maternity-leave-duration-n2",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.4,
+                "margin": 0.19661016949152543
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "termination-notice-p2",
+                "expectedIntentId": "termination-notice",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.3063063063063063,
+                "margin": 0.08781891134832309
+              },
+              {
+                "type": "false_positive",
+                "caseId": "termination-notice-n2",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.3106796116504854,
+                "margin": 0.10697590794678172
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "vat-standard-rate-p2",
+                "expectedIntentId": "vat-standard-rate",
+                "topIntentId": "customs-value",
+                "bestScore": 0.31666666666666665,
+                "margin": 0.07276422764227641
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-standard-rate-n2",
+                "topIntentId": "customs-value",
+                "bestScore": 0.411214953271028,
+                "margin": 0.0974894630749496
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p2",
+                "expectedIntentId": "vat-input-deduction",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.26785714285714285,
+                "margin": 0.03645218417945689
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-exemptions-p2",
+                "expectedIntentId": "vat-exemptions",
+                "topIntentId": "customs-value",
+                "bestScore": 0.2537313432835821,
+                "margin": 0.027316248943959454
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-invoice-elements-p2",
+                "expectedIntentId": "vat-invoice-elements",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.3880597014925373,
+                "margin": 0.018828932261768072
+              }
+            ]
+          },
+          {
+            "fold": 2,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.34951456310679613,
+            "margin": 0.05308352849336456,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 11,
+              "trueNegatives": 17,
+              "falsePositives": 4,
+              "falseNegatives": 9,
+              "wrongMatches": 1,
+              "precision": 0.7333333333333333,
+              "recall": 0.55,
+              "f1": 0.6285714285714286,
+              "accuracy": 0.7
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "customs-value-p3",
+                "expectedIntentId": "customs-value",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.19672131147540983,
+                "margin": 0.01184736189557789
+              },
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p3",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "tariff-classification",
+                "bestScore": 0.27722772277227725,
+                "margin": 0.12628432654586216
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p3",
+                "expectedIntentId": "import-duty-calculation",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.2831858407079646,
+                "margin": 0.08318584070796459
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-declaration-documents-p3",
+                "expectedIntentId": "import-declaration-documents",
+                "topIntentId": "customs-value",
+                "bestScore": 0.4444444444444444,
+                "margin": 0.018214936247723135
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n3",
+                "topIntentId": "import-declaration-documents",
+                "bestScore": 0.3669724770642202,
+                "margin": 0.06109012412304371
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-issue-deadline-p3",
+                "expectedIntentId": "invoice-issue-deadline",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.4421052631578947,
+                "margin": 0.08654970760233915
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-retention-p3",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "invoice-issue-deadline",
+                "bestScore": 0.37254901960784315,
+                "margin": 0.04197050721114892
+              },
+              {
+                "type": "false_negative",
+                "caseId": "proforma-validity-p3",
+                "expectedIntentId": "proforma-validity",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.3898305084745763,
+                "margin": 0.022858031410356083
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proforma-validity-n3",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.4835164835164835,
+                "margin": 0.12934981684981683
+              },
+              {
+                "type": "false_positive",
+                "caseId": "weekly-hours-n3",
+                "topIntentId": "termination-notice",
+                "bestScore": 0.42990654205607476,
+                "margin": 0.12990654205607477
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-monthly-return-deadline-p3",
+                "expectedIntentId": "vat-monthly-return-deadline",
+                "topIntentId": "import-declaration-documents",
+                "bestScore": 0.496,
+                "margin": 0.02753153153153154
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-invoice-elements-p3",
+                "expectedIntentId": "vat-invoice-elements",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.5161290322580645,
+                "margin": 0.05212903225806448
+              }
+            ]
+          },
+          {
+            "fold": 3,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.27722772277227725,
+            "margin": 0.055297593921485866,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 13,
+              "trueNegatives": 10,
+              "falsePositives": 11,
+              "falseNegatives": 7,
+              "wrongMatches": 1,
+              "precision": 0.5416666666666666,
+              "recall": 0.65,
+              "f1": 0.5909090909090909,
+              "accuracy": 0.575
+            },
+            "errors": [
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p4",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "vat-monthly-return-deadline",
+                "bestScore": 0.3619047619047619,
+                "margin": 0.0015444015444015524
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-duty-calculation-n4",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.3669724770642202,
+                "margin": 0.08395360913969191
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proof-of-origin-n4",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.32727272727272727,
+                "margin": 0.10085763293310462
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n4",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.4077669902912621,
+                "margin": 0.08344266596693778
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-issue-deadline-p4",
+                "expectedIntentId": "invoice-issue-deadline",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.45901639344262296,
+                "margin": 0.14833678179213755
+              },
+              {
+                "type": "false_positive",
+                "caseId": "credit-note-correction-n4",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.43478260869565216,
+                "margin": 0.0981489453293155
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-retention-n4",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.3770491803278688,
+                "margin": 0.07516238787503865
+              },
+              {
+                "type": "false_negative",
+                "caseId": "invoice-numbering-p4",
+                "expectedIntentId": "invoice-numbering",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.38095238095238093,
+                "margin": 0.05308352849336456
+              },
+              {
+                "type": "false_positive",
+                "caseId": "proforma-validity-n4",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.4444444444444444,
+                "margin": 0.21802935010482177
+              },
+              {
+                "type": "false_positive",
+                "caseId": "weekly-hours-n4",
+                "topIntentId": "maternity-leave-duration",
+                "bestScore": 0.2926829268292683,
+                "margin": 0.09488072902707048
+              },
+              {
+                "type": "false_negative",
+                "caseId": "overtime-pay-p4",
+                "expectedIntentId": "overtime-pay",
+                "topIntentId": "weekly-hours",
+                "bestScore": 0.24761904761904763,
+                "margin": 0.06371100164203614
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n4",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.38,
+                "margin": 0.09717171717171719
+              },
+              {
+                "type": "false_negative",
+                "caseId": "maternity-leave-duration-p4",
+                "expectedIntentId": "maternity-leave-duration",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.34285714285714286,
+                "margin": 0.04812030075187973
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-input-deduction-n4",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.29473684210526313,
+                "margin": 0.06396761133603235
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-exemptions-p4",
+                "expectedIntentId": "vat-exemptions",
+                "topIntentId": "vat-standard-rate",
+                "bestScore": 0.2988505747126437,
+                "margin": 0.01624187906046981
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-exemptions-n4",
+                "topIntentId": "vat-exemptions",
+                "bestScore": 0.47619047619047616,
+                "margin": 0.19792960662525877
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-invoice-elements-p4",
+                "expectedIntentId": "vat-invoice-elements",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.30434782608695654,
+                "margin": 0.008051529790660261
+              }
+            ]
+          },
+          {
+            "fold": 4,
+            "trainingCases": 160,
+            "evaluationCases": 40,
+            "threshold": 0.27722772277227725,
+            "margin": 0.05212903225806448,
+            "metrics": {
+              "evaluatedCases": 40,
+              "truePositives": 14,
+              "trueNegatives": 10,
+              "falsePositives": 12,
+              "falseNegatives": 6,
+              "wrongMatches": 2,
+              "precision": 0.5384615384615384,
+              "recall": 0.7,
+              "f1": 0.6086956521739131,
+              "accuracy": 0.6
+            },
+            "errors": [
+              {
+                "type": "false_positive",
+                "caseId": "customs-value-n5",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.2882882882882883,
+                "margin": 0.0848984577798137
+              },
+              {
+                "type": "false_negative",
+                "caseId": "tariff-classification-p5",
+                "expectedIntentId": "tariff-classification",
+                "topIntentId": "customs-value",
+                "bestScore": 0.29508196721311475,
+                "margin": 0.014380212827149852
+              },
+              {
+                "type": "false_negative",
+                "caseId": "import-duty-calculation-p5",
+                "expectedIntentId": "import-duty-calculation",
+                "topIntentId": "import-duty-calculation",
+                "bestScore": 0.3130434782608696,
+                "margin": 0.009043478260869597
+              },
+              {
+                "type": "false_positive",
+                "caseId": "import-declaration-documents-n5",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.2982456140350877,
+                "margin": 0.07602339181286549
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-retention-p5",
+                "expectedIntentId": "invoice-retention",
+                "topIntentId": "invoice-issue-deadline",
+                "bestScore": 0.5652173913043478,
+                "margin": 0.16521739130434776
+              },
+              {
+                "type": "wrong_match",
+                "caseId": "invoice-numbering-p5",
+                "expectedIntentId": "invoice-numbering",
+                "topIntentId": "invoice-issue-deadline",
+                "bestScore": 0.3655913978494624,
+                "margin": 0.11559139784946237
+              },
+              {
+                "type": "false_positive",
+                "caseId": "invoice-numbering-n5",
+                "topIntentId": "invoice-numbering",
+                "bestScore": 0.35185185185185186,
+                "margin": 0.1154882154882155
+              },
+              {
+                "type": "false_positive",
+                "caseId": "overtime-pay-n5",
+                "topIntentId": "overtime-pay",
+                "bestScore": 0.5344827586206896,
+                "margin": 0.243884468022399
+              },
+              {
+                "type": "false_positive",
+                "caseId": "annual-leave-duration-n5",
+                "topIntentId": "annual-leave-duration",
+                "bestScore": 0.30927835051546393,
+                "margin": 0.12177835051546393
+              },
+              {
+                "type": "false_positive",
+                "caseId": "maternity-leave-duration-n5",
+                "topIntentId": "maternity-leave-duration",
+                "bestScore": 0.3953488372093023,
+                "margin": 0.11252055438101949
+              },
+              {
+                "type": "false_positive",
+                "caseId": "termination-notice-n5",
+                "topIntentId": "weekly-hours",
+                "bestScore": 0.36,
+                "margin": 0.09737373737373733
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-monthly-return-deadline-n5",
+                "topIntentId": "vat-exemptions",
+                "bestScore": 0.43956043956043955,
+                "margin": 0.06251125923257073
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-input-deduction-p5",
+                "expectedIntentId": "vat-input-deduction",
+                "topIntentId": "vat-input-deduction",
+                "bestScore": 0.24193548387096775,
+                "margin": 0.02318548387096775
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-input-deduction-n5",
+                "topIntentId": "credit-note-correction",
+                "bestScore": 0.34951456310679613,
+                "margin": 0.14172235531458832
+              },
+              {
+                "type": "false_negative",
+                "caseId": "vat-invoice-elements-p5",
+                "expectedIntentId": "vat-invoice-elements",
+                "topIntentId": "vat-invoice-elements",
+                "bestScore": 0.3492063492063492,
+                "margin": 0.0013802622498274575
+              },
+              {
+                "type": "false_positive",
+                "caseId": "vat-invoice-elements-n5",
+                "topIntentId": "proof-of-origin",
+                "bestScore": 0.34782608695652173,
+                "margin": 0.05274411974340698
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "evaluatedCases": 200,
+          "truePositives": 57,
+          "trueNegatives": 64,
+          "falsePositives": 44,
+          "falseNegatives": 43,
+          "wrongMatches": 8,
+          "precision": 0.5643564356435643,
+          "recall": 0.57,
+          "f1": 0.5671641791044776,
+          "accuracy": 0.605
+        }
+      },
+      "bySpecialty": {
+        "customs": {
+          "evaluatedCases": 50,
+          "truePositives": 12,
+          "trueNegatives": 18,
+          "falsePositives": 7,
+          "falseNegatives": 13,
+          "wrongMatches": 0,
+          "precision": 0.631578947368421,
+          "recall": 0.48,
+          "f1": 0.5454545454545454,
+          "accuracy": 0.6
+        },
+        "invoicing": {
+          "evaluatedCases": 50,
+          "truePositives": 15,
+          "trueNegatives": 18,
+          "falsePositives": 12,
+          "falseNegatives": 10,
+          "wrongMatches": 5,
+          "precision": 0.5555555555555556,
+          "recall": 0.6,
+          "f1": 0.5769230769230769,
+          "accuracy": 0.66
+        },
+        "labour": {
+          "evaluatedCases": 50,
+          "truePositives": 18,
+          "trueNegatives": 16,
+          "falsePositives": 10,
+          "falseNegatives": 7,
+          "wrongMatches": 1,
+          "precision": 0.6428571428571429,
+          "recall": 0.72,
+          "f1": 0.6792452830188679,
+          "accuracy": 0.68
+        },
+        "vat": {
+          "evaluatedCases": 50,
+          "truePositives": 13,
+          "trueNegatives": 20,
+          "falsePositives": 5,
+          "falseNegatives": 12,
+          "wrongMatches": 0,
+          "precision": 0.7222222222222222,
+          "recall": 0.52,
+          "f1": 0.6046511627906976,
+          "accuracy": 0.66
+        }
+      },
+      "errors": [
+        {
+          "type": "false_negative",
+          "caseId": "customs-value-p3",
+          "expectedIntentId": "customs-value",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.19672131147540983,
+          "margin": 0.01184736189557789
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p1",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "tariff-classification",
+          "bestScore": 0.3047619047619048,
+          "margin": 0.06713814238566718
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p2",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "customs-value",
+          "bestScore": 0.4122137404580153,
+          "margin": 0.04713437537865023
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p3",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "tariff-classification",
+          "bestScore": 0.27722772277227725,
+          "margin": 0.12628432654586216
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p4",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.3619047619047619,
+          "margin": 0.0015444015444015524
+        },
+        {
+          "type": "false_negative",
+          "caseId": "tariff-classification-p5",
+          "expectedIntentId": "tariff-classification",
+          "topIntentId": "customs-value",
+          "bestScore": 0.29508196721311475,
+          "margin": 0.014380212827149852
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-duty-calculation-p2",
+          "expectedIntentId": "import-duty-calculation",
+          "topIntentId": "customs-value",
+          "bestScore": 0.4262295081967213,
+          "margin": 0.00517687661777394
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-duty-calculation-p3",
+          "expectedIntentId": "import-duty-calculation",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.2831858407079646,
+          "margin": 0.08318584070796459
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-duty-calculation-p5",
+          "expectedIntentId": "import-duty-calculation",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.3130434782608696,
+          "margin": 0.009043478260869597
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n1",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.43478260869565216,
+          "margin": 0.14906832298136646
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-duty-calculation-n4",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.3669724770642202,
+          "margin": 0.08395360913969191
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p1",
+          "expectedIntentId": "proof-of-origin",
+          "topIntentId": "proof-of-origin",
+          "bestScore": 0.2777777777777778,
+          "margin": 0.07975797579757976
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proof-of-origin-p2",
+          "expectedIntentId": "proof-of-origin",
+          "topIntentId": "proof-of-origin",
+          "bestScore": 0.3508771929824561,
+          "margin": 0.014428594851615018
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proof-of-origin-n2",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.40816326530612246,
+          "margin": 0.16288024643819793
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-declaration-documents-p2",
+          "expectedIntentId": "import-declaration-documents",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.26666666666666666,
+          "margin": 0.025287356321839066
+        },
+        {
+          "type": "false_negative",
+          "caseId": "import-declaration-documents-p3",
+          "expectedIntentId": "import-declaration-documents",
+          "topIntentId": "customs-value",
+          "bestScore": 0.4444444444444444,
+          "margin": 0.018214936247723135
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n1",
+          "topIntentId": "customs-value",
+          "bestScore": 0.4132231404958678,
+          "margin": 0.07693995465515979
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n2",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.7169811320754716,
+          "margin": 0.32922603003465534
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n3",
+          "topIntentId": "import-declaration-documents",
+          "bestScore": 0.3669724770642202,
+          "margin": 0.06109012412304371
+        },
+        {
+          "type": "false_positive",
+          "caseId": "import-declaration-documents-n4",
+          "topIntentId": "import-duty-calculation",
+          "bestScore": 0.4077669902912621,
+          "margin": 0.08344266596693778
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-issue-deadline-p1",
+          "expectedIntentId": "invoice-issue-deadline",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.4954128440366973,
+          "margin": 0.10366026671710965
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-issue-deadline-p3",
+          "expectedIntentId": "invoice-issue-deadline",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.4421052631578947,
+          "margin": 0.08654970760233915
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-issue-deadline-p4",
+          "expectedIntentId": "invoice-issue-deadline",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.45901639344262296,
+          "margin": 0.14833678179213755
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-issue-deadline-n1",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.42,
+          "margin": 0.21545454545454543
+        },
+        {
+          "type": "false_positive",
+          "caseId": "credit-note-correction-n4",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.43478260869565216,
+          "margin": 0.0981489453293155
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-retention-p1",
+          "expectedIntentId": "invoice-retention",
+          "topIntentId": "vat-invoice-elements",
+          "bestScore": 0.32727272727272727,
+          "margin": 0.012665985699693572
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-retention-p2",
+          "expectedIntentId": "invoice-retention",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.35514018691588783,
+          "margin": 0.00030147723846846164
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-retention-p3",
+          "expectedIntentId": "invoice-retention",
+          "topIntentId": "invoice-issue-deadline",
+          "bestScore": 0.37254901960784315,
+          "margin": 0.04197050721114892
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-retention-p5",
+          "expectedIntentId": "invoice-retention",
+          "topIntentId": "invoice-issue-deadline",
+          "bestScore": 0.5652173913043478,
+          "margin": 0.16521739130434776
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n1",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.4,
+          "margin": 0.16699029126213594
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-retention-n4",
+          "topIntentId": "vat-invoice-elements",
+          "bestScore": 0.3770491803278688,
+          "margin": 0.07516238787503865
+        },
+        {
+          "type": "false_negative",
+          "caseId": "invoice-numbering-p2",
+          "expectedIntentId": "invoice-numbering",
+          "topIntentId": "vat-invoice-elements",
+          "bestScore": 0.3333333333333333,
+          "margin": 0.02721088435374147
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "invoice-numbering-p5",
+          "expectedIntentId": "invoice-numbering",
+          "topIntentId": "invoice-issue-deadline",
+          "bestScore": 0.3655913978494624,
+          "margin": 0.11559139784946237
+        },
+        {
+          "type": "false_positive",
+          "caseId": "invoice-numbering-n5",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.35185185185185186,
+          "margin": 0.1154882154882155
+        },
+        {
+          "type": "false_negative",
+          "caseId": "proforma-validity-p3",
+          "expectedIntentId": "proforma-validity",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.3898305084745763,
+          "margin": 0.022858031410356083
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proforma-validity-n3",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.4835164835164835,
+          "margin": 0.12934981684981683
+        },
+        {
+          "type": "false_positive",
+          "caseId": "proforma-validity-n4",
+          "topIntentId": "proof-of-origin",
+          "bestScore": 0.4444444444444444,
+          "margin": 0.21802935010482177
+        },
+        {
+          "type": "false_negative",
+          "caseId": "weekly-hours-p5",
+          "expectedIntentId": "weekly-hours",
+          "topIntentId": "weekly-hours",
+          "bestScore": 0.2882882882882883,
+          "margin": 0.056709340919867235
+        },
+        {
+          "type": "false_positive",
+          "caseId": "weekly-hours-n1",
+          "topIntentId": "termination-notice",
+          "bestScore": 0.4,
+          "margin": 0.14193548387096777
+        },
+        {
+          "type": "false_positive",
+          "caseId": "weekly-hours-n3",
+          "topIntentId": "termination-notice",
+          "bestScore": 0.42990654205607476,
+          "margin": 0.12990654205607477
+        },
+        {
+          "type": "false_negative",
+          "caseId": "overtime-pay-p1",
+          "expectedIntentId": "overtime-pay",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.3695652173913043,
+          "margin": 0.046332894158981064
+        },
+        {
+          "type": "false_negative",
+          "caseId": "overtime-pay-p4",
+          "expectedIntentId": "overtime-pay",
+          "topIntentId": "weekly-hours",
+          "bestScore": 0.24761904761904763,
+          "margin": 0.06371100164203614
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n1",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.5178571428571429,
+          "margin": 0.21597035040431273
+        },
+        {
+          "type": "false_positive",
+          "caseId": "overtime-pay-n5",
+          "topIntentId": "overtime-pay",
+          "bestScore": 0.5344827586206896,
+          "margin": 0.243884468022399
+        },
+        {
+          "type": "false_negative",
+          "caseId": "annual-leave-duration-p1",
+          "expectedIntentId": "annual-leave-duration",
+          "topIntentId": "maternity-leave-duration",
+          "bestScore": 0.3956043956043956,
+          "margin": 0.03916875204003917
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n1",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.40816326530612246,
+          "margin": 0.12244897959183676
+        },
+        {
+          "type": "false_positive",
+          "caseId": "annual-leave-duration-n4",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.38,
+          "margin": 0.09717171717171719
+        },
+        {
+          "type": "false_negative",
+          "caseId": "maternity-leave-duration-p4",
+          "expectedIntentId": "maternity-leave-duration",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.34285714285714286,
+          "margin": 0.04812030075187973
+        },
+        {
+          "type": "false_positive",
+          "caseId": "maternity-leave-duration-n2",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.4,
+          "margin": 0.19661016949152543
+        },
+        {
+          "type": "false_positive",
+          "caseId": "maternity-leave-duration-n5",
+          "topIntentId": "maternity-leave-duration",
+          "bestScore": 0.3953488372093023,
+          "margin": 0.11252055438101949
+        },
+        {
+          "type": "wrong_match",
+          "caseId": "termination-notice-p1",
+          "expectedIntentId": "termination-notice",
+          "topIntentId": "invoice-retention",
+          "bestScore": 0.41379310344827586,
+          "margin": 0.11691810344827586
+        },
+        {
+          "type": "false_negative",
+          "caseId": "termination-notice-p2",
+          "expectedIntentId": "termination-notice",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.3063063063063063,
+          "margin": 0.08781891134832309
+        },
+        {
+          "type": "false_positive",
+          "caseId": "termination-notice-n5",
+          "topIntentId": "weekly-hours",
+          "bestScore": 0.36,
+          "margin": 0.09737373737373733
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-standard-rate-p2",
+          "expectedIntentId": "vat-standard-rate",
+          "topIntentId": "customs-value",
+          "bestScore": 0.31666666666666665,
+          "margin": 0.07276422764227641
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-standard-rate-n2",
+          "topIntentId": "customs-value",
+          "bestScore": 0.411214953271028,
+          "margin": 0.0974894630749496
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-monthly-return-deadline-p3",
+          "expectedIntentId": "vat-monthly-return-deadline",
+          "topIntentId": "import-declaration-documents",
+          "bestScore": 0.496,
+          "margin": 0.02753153153153154
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n1",
+          "topIntentId": "vat-monthly-return-deadline",
+          "bestScore": 0.6206896551724138,
+          "margin": 0.19030990833697076
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-monthly-return-deadline-n5",
+          "topIntentId": "vat-exemptions",
+          "bestScore": 0.43956043956043955,
+          "margin": 0.06251125923257073
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p1",
+          "expectedIntentId": "vat-input-deduction",
+          "topIntentId": "vat-input-deduction",
+          "bestScore": 0.2413793103448276,
+          "margin": 0.021040327293980143
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p2",
+          "expectedIntentId": "vat-input-deduction",
+          "topIntentId": "annual-leave-duration",
+          "bestScore": 0.26785714285714285,
+          "margin": 0.03645218417945689
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-input-deduction-p5",
+          "expectedIntentId": "vat-input-deduction",
+          "topIntentId": "vat-input-deduction",
+          "bestScore": 0.24193548387096775,
+          "margin": 0.02318548387096775
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-input-deduction-n5",
+          "topIntentId": "credit-note-correction",
+          "bestScore": 0.34951456310679613,
+          "margin": 0.14172235531458832
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p1",
+          "expectedIntentId": "vat-exemptions",
+          "topIntentId": "vat-exemptions",
+          "bestScore": 0.23529411764705882,
+          "margin": 0.019077901430842592
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p2",
+          "expectedIntentId": "vat-exemptions",
+          "topIntentId": "customs-value",
+          "bestScore": 0.2537313432835821,
+          "margin": 0.027316248943959454
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-exemptions-p4",
+          "expectedIntentId": "vat-exemptions",
+          "topIntentId": "vat-standard-rate",
+          "bestScore": 0.2988505747126437,
+          "margin": 0.01624187906046981
+        },
+        {
+          "type": "false_positive",
+          "caseId": "vat-exemptions-n4",
+          "topIntentId": "vat-exemptions",
+          "bestScore": 0.47619047619047616,
+          "margin": 0.19792960662525877
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-invoice-elements-p1",
+          "expectedIntentId": "vat-invoice-elements",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.36538461538461536,
+          "margin": 0.01676076217360617
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-invoice-elements-p2",
+          "expectedIntentId": "vat-invoice-elements",
+          "topIntentId": "vat-invoice-elements",
+          "bestScore": 0.3880597014925373,
+          "margin": 0.018828932261768072
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-invoice-elements-p4",
+          "expectedIntentId": "vat-invoice-elements",
+          "topIntentId": "invoice-numbering",
+          "bestScore": 0.30434782608695654,
+          "margin": 0.008051529790660261
+        },
+        {
+          "type": "false_negative",
+          "caseId": "vat-invoice-elements-p5",
+          "expectedIntentId": "vat-invoice-elements",
+          "topIntentId": "vat-invoice-elements",
+          "bestScore": 0.3492063492063492,
+          "margin": 0.0013802622498274575
+        }
+      ]
+    }
+  }
+}
