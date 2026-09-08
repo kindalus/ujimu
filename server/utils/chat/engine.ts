@@ -22,7 +22,8 @@ import {
 import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
-import { lookupRetrievalHints, storeRetrievalHints } from './retrieval-cache'
+import { storeRetrievalHints } from './retrieval-cache'
+import { lookupRetrievalHintsWithSemantic } from './semantic-retrieval'
 import {
   ChatConversationBusyError,
   ChatConversationExpiredError,
@@ -193,7 +194,7 @@ export async function createChatEventStreamForSpecialist(
       ? readQuarantinedDerivedPathsSafely(qualityDatabase, specialist.id)
       : []
     const retrievalHints = options.analytics
-      ? lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question, blockedWikiPaths)
+      ? await lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question, blockedWikiPaths)
       : undefined
     await chatSession?.beginTurn()
 
@@ -666,14 +667,14 @@ async function* completeStreamResult(input: {
   }
 }
 
-function lookupRetrievalHintsSafely(
+async function lookupRetrievalHintsSafely(
   analytics: ChatAnalyticsOptions,
   specialistId: string,
   question: string,
   blockedWikiPaths: string[]
 ) {
   try {
-    return lookupRetrievalHints(analytics.database, {
+    return await lookupRetrievalHintsWithSemantic(analytics.database, {
       specialistId,
       question,
       now: analytics.now,

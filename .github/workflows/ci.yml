@@ -32,4 +32,4 @@ jobs:
         run: npm run build
 
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: npm run audit:high

@@ -8,10 +8,9 @@ import {
   createSemanticRanker,
   lookupRetrievalHintsWithSemantic,
   SEMANTIC_RETRIEVAL_MARGIN,
-  SEMANTIC_RETRIEVAL_SCORE_THRESHOLD,
-  type SemanticRetrievalCandidate
+  SEMANTIC_RETRIEVAL_SCORE_THRESHOLD
 } from '../server/utils/chat/semantic-retrieval'
-import { storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
+import { storeRetrievalHints, type SemanticRetrievalCandidate } from '../server/utils/chat/retrieval-cache'
 import { initializeDatabase } from '../server/utils/db'
 
 describe('semantic retrieval acceptance', () => {
@@ -66,6 +65,22 @@ describe('semantic retrieval acceptance', () => {
     expect(candidates.find(({ question }) => question.includes('limite máximo')))
       .toMatchObject({ wikiPaths: ['wiki/trabalho.md'] })
 
+    const insufficientScore = await lookupRetrievalHintsWithSemantic(database, {
+      specialistId: 'laboral',
+      question: 'Numa semana quantas horas pode o trabalhador cumprir no máximo?',
+      now,
+      blockedWikiPaths: ['wiki/derived/horas.md']
+    }, {
+      semanticEnabled: true,
+      async rankSemanticCandidates(input) {
+        return input.candidates.map((candidate) => ({
+          candidateKey: candidate.key,
+          score: candidate.question.includes('limite máximo') ? 0.919 : 0.8
+        }))
+      }
+    })
+    expect(insufficientScore).toBeUndefined()
+
     const accepted = await lookupRetrievalHintsWithSemantic(database, {
       specialistId: 'laboral',
       question: 'Numa semana quantas horas pode o trabalhador cumprir no máximo?',
@@ -97,11 +112,14 @@ describe('semantic retrieval acceptance', () => {
     const vectors = new Map([
       ['query: primeira pergunta', [1, 0]],
       ['query: segunda pergunta', [0, 1]],
+      ['query: terceira pergunta', [1, 1]],
       ['query: candidato a', [1, 0]],
-      ['query: candidato b', [0, 1]]
+      ['query: candidato b', [0, 1]],
+      ['query: candidato c', [1, 1]]
     ])
     const ranker = createSemanticRanker({
       dimensions: 2,
+      maxCachedVectors: 2,
       async embed(texts) {
         calls.push(texts)
         return texts.map((text) => vectors.get(text)!)
@@ -114,11 +132,17 @@ describe('semantic retrieval acceptance', () => {
 
     await ranker({ question: 'primeira pergunta', candidates })
     await ranker({ question: 'segunda pergunta', candidates })
+    const afterEviction = await ranker({
+      question: 'terceira pergunta',
+      candidates: [candidate('a', 'candidato a'), candidate('c', 'candidato c')]
+    })
 
     expect(calls).toEqual([
       ['query: primeira pergunta', 'query: candidato a', 'query: candidato b'],
-      ['query: segunda pergunta']
+      ['query: segunda pergunta'],
+      ['query: terceira pergunta', 'query: candidato c']
     ])
+    expect(afterEviction.map(({ candidateKey }) => candidateKey)).toEqual(['a', 'c'])
   })
 
   it('returns no hint and logs no private input when semantic inference fails', async () => {
@@ -132,7 +156,8 @@ describe('semantic retrieval acceptance', () => {
       specialistId: 'laboral', question, now
     }, {
       semanticEnabled: true,
-      async rankSemanticCandidates() { throw new Error('modelo e caminho privados') }
+      timeoutMs: 5,
+      async rankSemanticCandidates() { return await new Promise(() => undefined) }
     })).resolves.toBeUndefined()
 
     expect(log).toHaveBeenCalledWith('[ujimu] semantic retrieval failed', {

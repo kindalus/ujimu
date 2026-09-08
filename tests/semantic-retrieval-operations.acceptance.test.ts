@@ -24,6 +24,7 @@ describe('semantic retrieval operations acceptance', () => {
   it('documents local model provisioning, readiness, thresholds, and the accepted risk', async () => {
     const operations = await readFile('docs/operations.md', 'utf8')
     const readyRoute = await readFile('server/api/admin/ops/readyz.get.ts', 'utf8')
+    const engine = await readFile('server/utils/chat/engine.ts', 'utf8')
     const plugin = await readFile('server/plugins/semantic-retrieval.ts', 'utf8')
     const runtime = await readFile('server/utils/chat/semantic-retrieval.ts', 'utf8')
 
@@ -33,6 +34,7 @@ describe('semantic retrieval operations acceptance', () => {
     expect(operations).toContain('0.003')
     for (const advisory of acceptedAdvisories) expect(operations).toContain(advisory)
     expect(readyRoute).toContain('semanticRetrievalReady')
+    expect(engine).toContain('await lookupRetrievalHintsWithSemantic')
     expect(plugin).toContain('warmSemanticRetrieval')
     expect(runtime).toContain('env.allowRemoteModels = false')
     expect(runtime).toContain('4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c')

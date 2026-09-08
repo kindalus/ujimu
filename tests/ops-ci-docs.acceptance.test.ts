@@ -12,7 +12,7 @@ describe('operations CI and runbook acceptance', () => {
     expect(workflow).toContain('npm test')
     expect(workflow).toContain('npm run typecheck')
     expect(workflow).toContain('npm run build')
-    expect(workflow).toContain('npm audit --audit-level=high')
+    expect(workflow).toContain('npm run audit:high')
   })
 
   it('documents health/readiness, JSONL logs, secrets, and SQLite backup/restore operations', async () => {

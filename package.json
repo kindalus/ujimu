@@ -15,11 +15,13 @@
     "test": "vitest run",
     "pretypecheck": "npm run skills:sync",
     "typecheck": "nuxt typecheck",
+    "audit:high": "node scripts/audit-high.mjs",
     "skills:sync": "node scripts/sync-llm-wiki.mjs --if-missing",
     "skills:update": "node scripts/sync-llm-wiki.mjs --force"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.2",
+    "@huggingface/transformers": "4.2.0",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/ui": "^4.10.0",
     "@simplewebauthn/browser": "^13.3.0",

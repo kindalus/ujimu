@@ -4,6 +4,7 @@ import { defineEventHandler } from 'h3'
 import { requireAdmin } from '../../../utils/admin/guards'
 import { resolveAppConfig } from '../../../utils/config'
 import { getPasskeyReadiness } from '../../../utils/auth/passkeys'
+import { getSemanticRetrievalReadiness } from '../../../utils/chat/semantic-retrieval'
 import { resolveLaunchFeatures } from '../../../utils/features'
 import { getOtpDeliveryCapabilities } from '../../../utils/notifications/provider'
 import { initializeDatabase } from '../../../utils/db'
@@ -22,6 +23,9 @@ interface ReadinessChecks {
   companiesEnabled: boolean
   passkeysEnabled: boolean
   passkeysConfigured: boolean
+  semanticRetrievalEnabled: boolean
+  semanticRetrievalReady: boolean
+  semanticRetrievalStatus: 'disabled' | 'idle' | 'loading' | 'ready' | 'failed'
 }
 
 export default defineEventHandler(async (event) => {
@@ -32,6 +36,7 @@ export default defineEventHandler(async (event) => {
   const passkeyReadiness = getPasskeyReadiness(process.env)
   const launchFeatures = resolveLaunchFeatures(process.env)
   const otpDelivery = getOtpDeliveryCapabilities(process.env)
+  const semanticRetrieval = getSemanticRetrievalReadiness(process.env)
   const checks: ReadinessChecks = {
     database: canQueryDatabase(database),
     dataDirectoryWritable: await canWriteToDirectory(config.dataDir),
@@ -44,7 +49,8 @@ export default defineEventHandler(async (event) => {
     subscriptionsEnabled: launchFeatures.subscriptionsEnabled,
     companiesEnabled: launchFeatures.companiesEnabled,
     passkeysEnabled: passkeyReadiness.passkeysEnabled,
-    passkeysConfigured: passkeyReadiness.passkeysConfigured
+    passkeysConfigured: passkeyReadiness.passkeysConfigured,
+    ...semanticRetrieval
   }
 
   return {

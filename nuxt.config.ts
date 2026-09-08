@@ -51,7 +51,8 @@ export default defineNuxtConfig({
   nitro: {
     externals: {
       traceInclude: [
-        resolve('node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js')
+        resolve('node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js'),
+        resolve('node_modules/onnxruntime-node/dist/index.js')
       ]
     }
   },

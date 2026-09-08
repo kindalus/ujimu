@@ -61,8 +61,39 @@ Configure these outside source control:
 - `UJIMU_PI_INGESTION_PROVIDER` and `UJIMU_PI_INGESTION_MODEL` — optional model override shared by ingestion, administrative derivation, answer-alignment judgement, attribution, and derived-page repair jobs. The independent control answer and repaired-candidate answer continue to use the default chat model.
 - `UJIMU_PI_INGESTION_THINKING_LEVEL` — optional reasoning override for ingestion, answer judgement, attribution, and derived repair; accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Missing or empty input preserves `defaultThinkingLevel` from `<UJIMU_CONFIG_DIR>/settings.json`; invalid input aborts session creation. The Pi SDK may clamp a valid level to the selected model's capabilities.
 - `UJIMU_PI_CHAT_ENABLED` — set to `true` only where user consultations may call the Pi chat runner.
+- `UJIMU_SEMANTIC_RETRIEVAL_ENABLED` — defaults to `false`; set to `true` only after the verified E5 model cache has been provisioned under `<UJIMU_DATA_DIR>/models/transformers`.
 - `UJIMU_PI_CONVERSION_MAX_MARKDOWN_BYTES` — legacy/manual conversion endpoint maximum validated Markdown size; defaults to `1048576`.
 - `UJIMU_PI_PIPELINE_STALE_PROCESSING_MINUTES` — retry age for stale conversion/ingestion processing records; defaults to `30`.
+
+## Local semantic retrieval
+
+`UJIMU_SEMANTIC_RETRIEVAL_ENABLED=true` adds a local semantic fallback after exact fingerprint and trigram Dice matching. It uses `Xenova/multilingual-e5-small` with INT8 weights, a score threshold of `0.92`, and a top-two margin of `0.003`. The runtime never downloads a model and never calls an external embedding service. If startup loading or inference fails, chat continues with lexical retrieval and admin readiness reports `semanticRetrievalReady: false`. Startup warm-up is bounded to 30 seconds and each semantic lookup to 5 seconds.
+
+Before enabling the flag, copy the public model cache into this exact shape:
+
+```text
+<UJIMU_DATA_DIR>/models/transformers/
+  Xenova/multilingual-e5-small/
+    config.json
+    tokenizer.json
+    tokenizer_config.json
+    onnx/model_int8.onnx
+```
+
+Verify `model_int8.onnx` before restart:
+
+```text
+SHA-256  4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c
+```
+
+Candidate embeddings remain in a bounded in-memory cache without question text. Current-question embeddings are discarded after lookup. Semantic matching considers at most 500 recent grouped candidates in the selected specialist and filters quarantined wiki paths before ranking.
+
+The user accepted two high-severity dependency advisories until a compatible safe release exists:
+
+- https://github.com/advisories/GHSA-f88m-g3jw-g9cj
+- https://github.com/advisories/GHSA-xcpc-8h2w-3j85
+
+`npm run audit:high` permits only those two advisory chains and rejects every other high or critical finding. It also fails when either accepted advisory disappears, forcing removal of the stale exception during the safe dependency upgrade.
 
 ## OTP delivery configuration
 

@@ -136,11 +136,11 @@ Known non-blocking warnings:
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
-| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `acceptance-tested` | — | Eight failing acceptance checks specify hybrid matching, bounded vectors, startup warm-up, operations, native tracing, and the exact audit exception. |
+| 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `implemented` | — | Hybrid E5 matching, bounded vector cache, startup warm-up, readiness, feature flag, native tracing, operations, and exact audit exception are implemented; full verification is pending. |
 
 ## Semantic retrieval runtime
 
-Status: `acceptance-tested`
+Status: `implemented`
 
 Approved originating decks:
 
@@ -169,7 +169,16 @@ Acceptance-test state:
 
 - `tests/semantic-retrieval.acceptance.test.ts` specifies ordering, grouping, quarantine filtering, thresholds, candidate-only vector caching, and sanitised failure.
 - `tests/semantic-retrieval-operations.acceptance.test.ts` specifies the pinned dependency, feature flag, local model contract, readiness, native tracing, operations documentation, and recursive two-advisory audit exception.
-- The focused run fails because the semantic runtime, plugin, audit gate, package/configuration changes, and operations contract do not exist yet.
+- The initial focused run failed because the semantic runtime, plugin, audit gate, package/configuration changes, and operations contract did not exist yet.
+- After implementation, all eight focused acceptance checks pass.
+
+Implementation result:
+
+- Exact and trigram Dice matching remain synchronous first choices; only a miss reaches the local E5 ranker.
+- E5 uses score `0.92`, top-two margin `0.003`, known INT8 weight hash, remote-disabled runtime loading, startup warm-up, and lexical fallback.
+- Up to 500 grouped candidates are ranked; up to 2,000 candidate vectors use an in-memory `Float32Array` LRU without cached question text.
+- `@huggingface/transformers@4.2.0` is lockfile-pinned; Nitro traces the native ONNX runtime.
+- `npm run audit:high` accepts only the two user-approved advisory chains and fails on any new high/critical or stale exception.
 
 ## Embedding retrieval calibration
 
