@@ -135,11 +135,11 @@ Known non-blocking warnings:
 | 75 | [`75-derived-verification-sampling-baseline.html`](./75-derived-verification-sampling-baseline.html) | `verified` | 2026-09-07 | Stable 10% sampling, first-revision claims, durable backlog promotion, default-model baseline, post-response enqueue, and code-enforced derived exclusion pass 327 tests, typecheck, and build. |
 | 76 | [`76-derived-alignment-attribution-quarantine.html`](./76-derived-alignment-attribution-quarantine.html) | `verified` | 2026-09-07 | Ingestion-model judgement, separate allowlisted attribution, transient-data cleanup, retrieval filtering, and tool-level quarantine pass 334 tests, typecheck, and build. |
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
-| 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `grilled` | — | Approved isolated calibration with 100 positive and 100 hard-negative synthetic cases; no runtime integration. |
+| 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `acceptance-tested` | — | Four failing acceptance checks require the 200-case corpus, isolated runner, structured results, and report. |
 
 ## Embedding retrieval calibration
 
-Status: `grilled`
+Status: `acceptance-tested`
 
 Approved originating decks:
 
@@ -160,6 +160,11 @@ Refinement and stress-test decisions:
 - Ranking evaluates both matching queries and no-match queries against all 20 canonical candidates.
 - F1 ties favour precision and then the higher threshold; all false positives and false negatives remain visible.
 - The unavailable `grill-me` skill was replaced by this explicit stress test in the active harness.
+
+Acceptance-test state:
+
+- `tests/embedding-retrieval-calibration.acceptance.test.ts` has four checks for corpus balance/privacy, dependency-free validation, pairwise/ranking metrics, and the published report.
+- The focused run fails because the corpus, runner, results, and report do not exist yet.
 
 ## Derived answer quality verification
 
