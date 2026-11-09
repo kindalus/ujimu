@@ -138,6 +138,27 @@ Known non-blocking warnings:
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
 | 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `verified` | 2026-09-08 | Hybrid E5 fallback is active in production at 0.92/0.003; 353 tests, typecheck, build, local model/container smoke, AMD64 warm-up, and a real semantic hint passed. |
 
+## Wiki excerpt context
+
+Status: brainstorm approved 2026-11-09; architecture proposed.
+
+Originating decks:
+
+- [`../brainstorm-wiki-excerpt-context.html`](../brainstorm-wiki-excerpt-context.html) — approved 2026-11-09.
+
+Evidence:
+
+- [`../../../experiments/wiki-excerpt-context/report.md`](../../../experiments/wiki-excerpt-context/report.md) — arm D halved median time and cut median tokens by 64% with no material errors across 30 paired questions; Node and Python search selected the same sections in 30 of 30.
+
+User decisions, 2026-11-09:
+
+- Reuse `UJIMU_SEMANTIC_RETRIEVAL_ENABLED` for the excerpts.
+- Excerpts replace retrieval hints when present.
+- The search slice ships without effect until the indexing slice generates the index automatically.
+- Reindex after ingestion, derivation and derived repair; an out-of-sync index injects no excerpts.
+- Consulted documents split by use (revised after the slice 80 pre-mortem): excerpt pages plus read files for the streamed count and retrieval hints; read files only for `consulted_document_count` (derivation candidates) and derived answer verification.
+- Generate the index in the container with `uv` and Python running the skill's `wiki_index.py`; no Node reimplementation.
+
 ## Semantic retrieval runtime
 
 Status: `verified`
