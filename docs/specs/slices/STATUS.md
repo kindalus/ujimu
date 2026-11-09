@@ -137,6 +137,8 @@ Known non-blocking warnings:
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
 | 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `verified` | 2026-09-08 | Hybrid E5 fallback is active in production at 0.92/0.003; 353 tests, typecheck, build, local model/container smoke, AMD64 warm-up, and a real semantic hint passed. |
+| 80 | [`80-wiki-excerpt-search-prompt.html`](./80-wiki-excerpt-search-prompt.html) | `grilled` | — | Transversal. Node search over the llm-wiki index injects the top six wiki excerpts in place of retrieval hints; spec approved 2026-11-09 after an independent pre-mortem. |
+| 81 | [`81-automatic-wiki-indexing.html`](./81-automatic-wiki-indexing.html) | `planned` | — | Transversal; depends on 80. `uv` and Python in the container reindex after ingestion, derivation and derived repair. |
 
 ## Wiki excerpt context
 
@@ -180,6 +182,43 @@ User decisions, 2026-11-09:
 - Reindex after ingestion, derivation and derived repair; an out-of-sync index injects no excerpts.
 - Consulted documents split by use (revised after the slice 80 pre-mortem): excerpt pages plus read files for the streamed count and retrieval hints; read files only for `consulted_document_count` (derivation candidates) and derived answer verification.
 - Generate the index in the container with `uv` and Python running the skill's `wiki_index.py`; no Node reimplementation.
+
+## Wiki excerpt context
+
+Status: brainstorm, architecture and slice 80 spec approved 2026-11-09; slice 80 `grilled`; slice 81 `planned`.
+
+Originating decks:
+
+- [`../brainstorm-wiki-excerpt-context.html`](../brainstorm-wiki-excerpt-context.html) — approved 2026-11-09.
+- [`../wiki-excerpt-context-architecture.html`](../wiki-excerpt-context-architecture.html) — approved 2026-11-09, version SHA-256 `ae83da073201d4848c6140cf1e1131582d5726913e387c953d42b0be945de1e6` (status label updated afterwards).
+
+Evidence:
+
+- [`../../../experiments/wiki-excerpt-context/report.md`](../../../experiments/wiki-excerpt-context/report.md) — arm D halved median time and cut median tokens by 64% with no material errors across 30 paired questions; Node and Python search selected the same sections in 30 of 30.
+
+User decisions, 2026-11-09:
+
+- Reuse `UJIMU_SEMANTIC_RETRIEVAL_ENABLED` for the excerpts.
+- Excerpts replace retrieval hints when present.
+- The search slice ships without effect until the indexing slice generates the index automatically.
+- Reindex after ingestion, derivation and derived repair; an out-of-sync index injects no excerpts.
+- Consulted documents split by use (revised after the slice 80 pre-mortem): excerpt pages plus read files for the streamed count and retrieval hints; read files only for `consulted_document_count` (derivation candidates) and derived answer verification.
+- Generate the index in the container with `uv` and Python running the skill's `wiki_index.py`; no Node reimplementation.
+
+Slice plan (recommended order, lanes; agreed 2026-11-09):
+
+- 80 — search and prompt, transversal; delivers the measured gain behind the existing flag and stays inert without an index.
+- 81 — automatic indexing, transversal; depends on 80 and is prepared after 80 completes phase 3.
+- Order reason: 80 holds the behaviour and the risk; 81 is infrastructure that only feeds it.
+
+Slice 80 preparation:
+
+- Spec [`80-wiki-excerpt-search-prompt.html`](./80-wiki-excerpt-search-prompt.html) approved 2026-11-09, version SHA-256 `3d9a7c8012d9099f9478a071a8b050223b41da2ce5a6fd2a7577202585a5c6c7` (status label updated afterwards).
+- Independent pre-mortem, 2026-11-09: nine findings, all integrated; the consulted-documents split was re-decided by the user.
+- Seams: `searchWikiExcerpts(input, deps)` (new), `buildChatPrompt`, `createChatEventStreamForSpecialist` with the new `searchWikiExcerpts` option, and the Pi runner with a fake session.
+- Scenarios S1–S15 as listed in the spec; no open decisions; no placeholders.
+- Gate: `npm test`, `npm run typecheck`, `npm run build`, `npm run audit:high`; manual real-model check against a skill-built index, including three off-topic questions.
+- Next action: write the S1 acceptance test.
 
 ## Semantic retrieval runtime
 

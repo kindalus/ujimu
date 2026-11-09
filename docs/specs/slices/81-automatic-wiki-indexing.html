@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Slice 81 — Indexação automática da wiki</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Space+Grotesk:wght@600;700&display=swap");
+:root{--bg:#090907;--panel:#171711;--text:#faf8ef;--muted:#b7b3a5;--line:#3a382f;--accent:#f7ce1b;--good:#8bd7a5}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:radial-gradient(circle at 88% 3%,#302b0e 0,transparent 31%),var(--bg);color:var(--text);font-family:Manrope,sans-serif}
+.slide{display:none;width:100vw;height:100vh;padding:8vh 12vw;align-items:center}
+.slide.active{display:flex}
+.frame{width:min(1100px,100%);padding:clamp(30px,5vw,58px);border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,#ffffff0d,#ffffff04)}
+h1,h2{margin:0;line-height:.98;letter-spacing:-.045em;font-family:"Space Grotesk",sans-serif}
+h1{font-size:clamp(3rem,7vw,6rem)}
+h2{font-size:clamp(2.2rem,5vw,4rem)}
+p,li{color:var(--muted);font-size:1.08rem;line-height:1.5}
+.lead{max-width:900px;margin:22px 0 0;font-size:1.28rem}
+.k{margin-bottom:14px;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px}
+.card{padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.card b{display:block;margin-bottom:6px;color:var(--accent)}
+.card p{margin:0;font-size:.98rem}
+ul{display:grid;gap:10px;margin:24px 0 0;padding-left:1.2rem}
+.good{color:var(--good)}
+code{color:#fff0a0}
+.counter{position:fixed;right:28px;bottom:22px;color:var(--muted);font-size:.8rem}
+.status{position:fixed;left:28px;bottom:22px;color:var(--accent);font-size:.8rem}
+@media(max-width:850px){.slide{padding:5vh 6vw}.grid{grid-template-columns:1fr}.frame{padding:26px}}
+@media print{body{overflow:visible}.slide{display:flex;break-after:page}.counter,.status{display:none}}
+</style>
+</head>
+<body>
+<section class="slide active"><div class="frame"><div class="k">Slice 81 · planeado · transversal</div><h1>Indexação automática da wiki</h1><p class="lead">O contentor passa a correr o <code>wiki_index.py</code> do skill sempre que a wiki muda, para a slice 80 ter efeito em produção.</p></div></section>
+<section class="slide"><div class="frame"><div class="k">Origem aprovada</div><h2>Contexto vinculativo</h2><div class="grid"><div class="card"><b>Brainstorm</b><p><code>../brainstorm-wiki-excerpt-context.html</code></p></div><div class="card"><b>Arquitectura</b><p><code>../wiki-excerpt-context-architecture.html</code></p></div><div class="card"><b>Depende de</b><p>Slice 80: o consumidor do índice.</p></div><div class="card"><b>Decisão</b><p><code>uv</code> e Python no contentor; uma só implementação da indexação.</p></div></div></div></section>
+<section class="slide"><div class="frame"><div class="k">Âmbito previsto</div><h2>O que entra</h2><ul><li>Actualizar o skill empacotado em <code>config/pi/skills/llm-wiki</code> com <code>scripts/wiki_index.py</code>.</li><li>Instalar <code>uv</code> e Python na imagem e pré-instalar as dependências do script, sem rede no runtime.</li><li>Reindexar depois da ingestão, da derivação e da reparação derivada, com <code>--offline</code> e <code>LLM_WIKI_MODEL_DIR</code> apontado para a cache existente.</li><li>Registar o resultado da indexação; uma falha não falha o trabalho principal.</li><li>Uma reindexação manual pelo admin, e a reindexação das especialidades existentes no deploy.</li></ul></div></section>
+<section class="slide"><div class="frame"><div class="k">Sucesso e exclusões</div><h2>Por preparar na 5.x</h2><ul><li>Depois de cada ingestão, derivação ou reparação, o índice fica sincronizado e a slice 80 injecta excertos.</li><li>Uma indexação falhada deixa a resposta no fluxo actual e fica visível ao admin.</li><li>O smoke do contentor gera e lê um índice real sem rede.</li><li>Fora: mudar o skill, ter mais de um modelo, e indexar <code>raw/</code> ou <code>converted/</code>.</li><li>O mapa de impacto, os cenários e o pré-mortem fazem-se só quando a slice 80 terminar a fase 3.</li></ul></div></section>
+<div class="status">planeado</div><div class="counter"><span id="current">1</span> / <span id="total"></span></div>
+<script>const slides=[...document.querySelectorAll('.slide')];let i=0;const total=document.getElementById('total'),current=document.getElementById('current');total.textContent=slides.length;function go(n){slides[i].classList.remove('active');i=Math.max(0,Math.min(n,slides.length-1));slides[i].classList.add('active');current.textContent=i+1}addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(i+1)}if(e.key==='ArrowLeft')go(i-1)});addEventListener('click',e=>go(i+(e.clientX>innerWidth/2?1:-1)));</script>
+</body>
+</html>
