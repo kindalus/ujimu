@@ -159,6 +159,28 @@ User decisions, 2026-11-09:
 - Consulted documents split by use (revised after the slice 80 pre-mortem): excerpt pages plus read files for the streamed count and retrieval hints; read files only for `consulted_document_count` (derivation candidates) and derived answer verification.
 - Generate the index in the container with `uv` and Python running the skill's `wiki_index.py`; no Node reimplementation.
 
+## Wiki excerpt context
+
+Status: brainstorm and architecture approved 2026-11-09; slices not yet planned.
+
+Originating decks:
+
+- [`../brainstorm-wiki-excerpt-context.html`](../brainstorm-wiki-excerpt-context.html) — approved 2026-11-09.
+- [`../wiki-excerpt-context-architecture.html`](../wiki-excerpt-context-architecture.html) — approved 2026-11-09, version SHA-256 `ae83da073201d4848c6140cf1e1131582d5726913e387c953d42b0be945de1e6` (status label updated afterwards).
+
+Evidence:
+
+- [`../../../experiments/wiki-excerpt-context/report.md`](../../../experiments/wiki-excerpt-context/report.md) — arm D halved median time and cut median tokens by 64% with no material errors across 30 paired questions; Node and Python search selected the same sections in 30 of 30.
+
+User decisions, 2026-11-09:
+
+- Reuse `UJIMU_SEMANTIC_RETRIEVAL_ENABLED` for the excerpts.
+- Excerpts replace retrieval hints when present.
+- The search slice ships without effect until the indexing slice generates the index automatically.
+- Reindex after ingestion, derivation and derived repair; an out-of-sync index injects no excerpts.
+- Consulted documents split by use (revised after the slice 80 pre-mortem): excerpt pages plus read files for the streamed count and retrieval hints; read files only for `consulted_document_count` (derivation candidates) and derived answer verification.
+- Generate the index in the container with `uv` and Python running the skill's `wiki_index.py`; no Node reimplementation.
+
 ## Semantic retrieval runtime
 
 Status: `verified`
