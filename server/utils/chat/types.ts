@@ -1,5 +1,6 @@
 import type { SpecialistRuntime } from '../specialists/schema'
 import type { RetrievalHints } from './retrieval-cache'
+import type { WikiExcerpts } from './wiki-excerpts'
 
 export interface ChatCitation {
   sourceTitle: string
@@ -59,6 +60,7 @@ export interface ChatRunnerInput {
   clientTimezone?: string
   citationEvidence: ChatCitation[]
   retrievalHints?: RetrievalHints
+  wikiExcerpts?: WikiExcerpts
   blockedWikiPaths?: string[]
   conversationContext?: ChatConversationContextMessage[]
   piSessionManager?: any

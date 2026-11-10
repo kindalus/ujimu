@@ -23,7 +23,8 @@ import { normalizeChatCitation } from './citations'
 import { getCitationEvidence } from './context'
 import { createDefaultChatRunner, isPiChatEnabled } from './pi-runner'
 import { storeRetrievalHints } from './retrieval-cache'
-import { lookupRetrievalHintsWithSemantic } from './semantic-retrieval'
+import { embedWithLocalModel, isSemanticRetrievalEnabled, lookupRetrievalHintsWithSemantic } from './semantic-retrieval'
+import { searchWikiExcerpts, type WikiExcerptSearch } from './wiki-excerpts'
 import {
   ChatConversationBusyError,
   ChatConversationExpiredError,
@@ -81,7 +82,13 @@ export interface CreateChatEventStreamOptions extends SpecialistPathOptions {
   chatSessionDataDir?: string
   chatSessionSecret?: string
   chatSessionNow?: Date
+  searchWikiExcerpts?: WikiExcerptSearch
 }
+
+const WIKI_EXCERPT_TIMEOUT_MS = 5_000
+
+const defaultSearchWikiExcerpts: WikiExcerptSearch = (input) =>
+  searchWikiExcerpts(input, { embed: embedWithLocalModel, timeoutMs: WIKI_EXCERPT_TIMEOUT_MS })
 
 export async function createChatEventStreamFromBody(
   body: unknown,
@@ -193,7 +200,14 @@ export async function createChatEventStreamForSpecialist(
     const blockedWikiPaths = qualityDatabase
       ? readQuarantinedDerivedPathsSafely(qualityDatabase, specialist.id)
       : []
-    const retrievalHints = options.analytics
+    const wikiExcerpts = isSemanticRetrievalEnabled()
+      ? await (options.searchWikiExcerpts ?? defaultSearchWikiExcerpts)({
+          specialistRoot: specialist.paths.root,
+          question: input.question,
+          blockedWikiPaths
+        })
+      : undefined
+    const retrievalHints = options.analytics && !wikiExcerpts
       ? await lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question, blockedWikiPaths)
       : undefined
     await chatSession?.beginTurn()
@@ -205,6 +219,7 @@ export async function createChatEventStreamForSpecialist(
       ...(input.clientTimezone ? { clientTimezone: input.clientTimezone } : {}),
       citationEvidence,
       ...(retrievalHints ? { retrievalHints } : {}),
+      ...(wikiExcerpts ? { wikiExcerpts } : {}),
       ...(blockedWikiPaths.length > 0 ? { blockedWikiPaths } : {}),
       ...(conversationContext && conversationContext.length > 0 ? { conversationContext } : {}),
       ...(chatSession ? { piSessionManager: chatSession.manager } : {})

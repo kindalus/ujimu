@@ -159,7 +159,7 @@ export function getSemanticRetrievalReadiness(
   }
 }
 
-async function embedWithLocalModel(texts: string[]): Promise<number[][]> {
+export async function embedWithLocalModel(texts: string[]): Promise<number[][]> {
   const extractor = await getFeatureExtractor()
   const vectors: number[][] = []
   for (let index = 0; index < texts.length; index += EMBEDDING_BATCH_SIZE) {
