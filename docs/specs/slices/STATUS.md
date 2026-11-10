@@ -137,12 +137,12 @@ Known non-blocking warnings:
 | 77 | [`77-staged-derived-repair.html`](./77-staged-derived-repair.html) | `verified` | 2026-09-07 | Raw-free staging, constrained new evidence pages, candidate post-check, transactional promotion, retry, missing-source handling, and quarantine release pass 340 tests, typecheck, build, and the high-severity audit gate. |
 | 78 | [`78-embedding-retrieval-calibration.html`](./78-embedding-retrieval-calibration.html) | `verified` | 2026-09-08 | 200 isolated cases, five-fold pairwise/ranking calibration, reproducible model hash, report, 345 tests, typecheck, and build passed. |
 | 79 | [`79-semantic-retrieval-runtime.html`](./79-semantic-retrieval-runtime.html) | `verified` | 2026-09-08 | Hybrid E5 fallback is active in production at 0.92/0.003; 353 tests, typecheck, build, local model/container smoke, AMD64 warm-up, and a real semantic hint passed. |
-| 80 | [`80-wiki-excerpt-search-prompt.html`](./80-wiki-excerpt-search-prompt.html) | `implemented` | 2026-11-10 | Transversal. Node search over the llm-wiki index injects the top six wiki excerpts in place of retrieval hints; S1–S15 pass, typecheck and build pass; the real-model off-topic check is pending. |
+| 80 | [`80-wiki-excerpt-search-prompt.html`](./80-wiki-excerpt-search-prompt.html) | `verified` | 2026-11-10 | Transversal. Node search over the llm-wiki index injects the top six wiki excerpts in place of retrieval hints; S1–S15, typecheck, build and the real-model check (three off-topic questions ended in `insufficient_context`) passed. |
 | 81 | [`81-automatic-wiki-indexing.html`](./81-automatic-wiki-indexing.html) | `planned` | — | Transversal; depends on 80. `uv` and Python in the container reindex after ingestion, derivation and derived repair. |
 
 ## Wiki excerpt context
 
-Status: brainstorm, architecture and slice 80 spec approved 2026-11-09; slice 80 `implemented` 2026-11-10 (base `2e689c0`); slice 81 `planned`.
+Status: brainstorm, architecture and slice 80 spec approved 2026-11-09; slice 80 `verified` 2026-11-10 (base `2e689c0`); slice 81 `planned`.
 
 Originating decks:
 
@@ -185,7 +185,8 @@ Slice 80 implementation, 2026-11-10:
 - Evidence (manual): against a skill-built index of the labour wiki, the Node search returned the same six sections as Python for 30 of 30 questions (four differ only in the order of near ties), resolved the `raw/` source, and took about 5 ms per search.
 - Evidence (reviews): independent review, no blockers; fixed a section without its page (now skipped), case-insensitive `sources/`/`laws/` exclusion, empty results treated as no excerpts, and the no-log assertion for an out-of-sync index. Noted, not changed: the busy timeout blocks the event loop for up to 100 ms while a writer holds the lock; the index caches are not evicted when a specialty is deleted; the score's third decimal can differ from Python at rounding boundaries.
 - Found outside scope: the Pi chat runner can call `session.abort()` after the prompt has already finished (also on the base).
-- Next action: run the real-model check with three off-topic questions ending in `insufficient_context` (needs the sandbox credential), then mark `verified` and prepare slice 81.
+- Evidence (real model), 2026-11-10: in an isolated sandbox with the production chat model (`deepseek-v4-pro`) and the skill-built labour index, all four questions received six excerpts; the three off-topic questions (VAT on imported computers, industrial tax, customs duties on used cars) ended in `insufficient_context` without citations after reading `wiki/index.md`, and the on-topic control answered in 33 s citing Article 148.º with the `raw/` source file. The sandbox credential was deleted after the run.
+- Next action: prepare slice 81.
 
 ## Semantic retrieval runtime
 
