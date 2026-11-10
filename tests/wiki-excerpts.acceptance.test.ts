@@ -143,6 +143,52 @@ describe('wiki excerpt context acceptance', () => {
   })
 })
 
+describe('wiki excerpt prompt acceptance', () => {
+  it('S3 answers from the excerpts with an explicit fallback and no hint block', () => {
+    const prompt = buildChatPrompt({
+      specialist: {} as SpecialistRuntime,
+      question: QUESTION,
+      citationEvidence: [],
+      wikiExcerpts: {
+        results: [
+          {
+            path: 'wiki/derived/horas.md',
+            title: 'Horas semanais',
+            heading: 'Limite semanal',
+            text: 'O período normal é de 44 horas por semana.',
+            citations: '- [Lei Geral do Trabalho](../sources/lei.md),\n  Artigo 95.º',
+            score: 0.87654
+          },
+          { path: 'wiki/articles/art-148.md', title: 'Artigo 148.º', heading: '', text: 'Trabalho suplementar.', citations: '', score: 0.5 }
+        ],
+        sources: [{ page: 'wiki/sources/lei.md', sourceTitle: 'Lei Geral do Trabalho', sourceFile: 'raw/lei.md' }]
+      }
+    })
+
+    expect(prompt).toContain('Wiki excerpts retrieved for this question are included below. If they fully support the answer and its citations, answer from them directly without reading the schema, wiki/index.md or other files.')
+    expect(prompt).toContain('Read files only when the excerpts are insufficient, ambiguous or conflicting.')
+    expect(prompt).toContain('When the excerpts are insufficient, read the local schema and wiki/index.md and continue with the standard workflow.')
+    expect(prompt).toContain('When the answer is a list of cases (for example, every situation that requires notice), treat the excerpts as incomplete unless they plainly cover every case, and continue with the standard workflow from wiki/index.md, reading the pages of the excerpts first.')
+    expect(prompt).toContain('Use answered only when the specialist wiki supports the substantive answer; otherwise explain the limitation and use insufficient_context:')
+    expect(prompt).toContain([
+      'Retrieved wiki excerpts (semantic search over this specialist wiki, best first):',
+      '[1] wiki/derived/horas.md | Horas semanais (score 0.877)',
+      '## Limite semanal',
+      'O período normal é de 44 horas por semana.',
+      'Page citations: - [Lei Geral do Trabalho](../sources/lei.md), Artigo 95.º',
+      '',
+      '[2] wiki/articles/art-148.md | Artigo 148.º (score 0.500)',
+      'Trabalho suplementar.',
+      '',
+      'Sources (use these exact values for sourceTitle and sourceFile):',
+      '- wiki/sources/lei.md -> sourceTitle: "Lei Geral do Trabalho", sourceFile: "raw/lei.md"'
+    ].join('\n'))
+    expect(prompt).not.toContain('Candidate wiki paths')
+    expect(prompt).not.toContain('These paths are hints only.')
+    expect(prompt).not.toContain('Read the local schema and wiki/index.md before candidate pages.')
+  })
+})
+
 async function createFixture(id = 'laboral'): Promise<{ specialist: SpecialistRuntime; database: DatabaseSync }> {
   const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-wiki-excerpts-'))
   const database = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })

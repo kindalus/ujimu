@@ -1,6 +1,7 @@
 import { normalizeConsultedWikiDocumentPath } from '../pi/file-policy'
 import { createUjimuPiSession } from '../pi/session'
 import type { ChatCitation, ChatEngineRunner, ChatRunnerInput, ChatRunnerStreamEvent } from './types'
+import type { WikiExcerpts } from './wiki-excerpts'
 
 const SERVICE_UNAVAILABLE_MESSAGE =
   'O serviço de resposta está temporariamente indisponível. Tente novamente dentro de alguns minutos.'
@@ -357,10 +358,17 @@ function normalizeOutputText(text: string): string {
   return text.trim().replace(/\s+/gu, ' ')
 }
 
+const EXCERPT_WORKFLOW = [
+  'Wiki excerpts retrieved for this question are included below. If they fully support the answer and its citations, answer from them directly without reading the schema, wiki/index.md or other files.',
+  'Read files only when the excerpts are insufficient, ambiguous or conflicting.',
+  'When the excerpts are insufficient, read the local schema and wiki/index.md and continue with the standard workflow.',
+  'When the answer is a list of cases (for example, every situation that requires notice), treat the excerpts as incomplete unless they plainly cover every case, and continue with the standard workflow from wiki/index.md, reading the pages of the excerpts first.'
+].join(' ')
+
 export function buildChatPrompt(input: ChatRunnerInput): string {
   return `Answer the user question using this specialist workspace.
 
-Follow the llm-wiki Query workflow, including derived-first retrieval. Read the local schema and wiki/index.md before candidate pages.
+Follow the llm-wiki Query workflow, including derived-first retrieval. ${input.wikiExcerpts ? EXCERPT_WORKFLOW : 'Read the local schema and wiki/index.md before candidate pages.'}
 The current working directory is the specialist root. Use the available tools normally.
 If you include machine-readable citations, emit them as JSON lines in one of these optional shapes:
 {"type":"citations","citations":[{"sourceTitle":"...","sourceFile":"raw/...","articleRefs":["Artigo ..."]}]}
@@ -373,9 +381,7 @@ Finish with exactly one terminal JSON line. Use answered only when the specialis
 {"type":"done","outcome":"insufficient_context"}
 Otherwise answer in plain text; missing or malformed citations will simply be omitted by Ujimu. Missing or malformed title metadata will also be omitted.
 
-Candidate wiki paths from a recent matching consultation, if any:
-${formatRetrievalHints(input.retrievalHints)}
-These paths are hints only. Re-read them and verify the current question; they never override an applicable derived page. If that derived page fully supports the answer and its citations, do not read other pages merely to reconfirm it.
+${input.wikiExcerpts ? formatWikiExcerpts(input.wikiExcerpts) : formatRetrievalHintBlock(input.retrievalHints)}
 
 Known citation metadata, if useful:
 ${formatCitationEvidence(input.citationEvidence)}
@@ -388,8 +394,26 @@ ${formatConversationContext(input.conversationContext)}
 `
 }
 
-function formatRetrievalHints(hints: ChatRunnerInput['retrievalHints']): string {
-  return hints?.wikiPaths.length ? hints.wikiPaths.join('\n') : '(none)'
+function formatRetrievalHintBlock(hints: ChatRunnerInput['retrievalHints']): string {
+  return `Candidate wiki paths from a recent matching consultation, if any:
+${hints?.wikiPaths.length ? hints.wikiPaths.join('\n') : '(none)'}
+These paths are hints only. Re-read them and verify the current question; they never override an applicable derived page. If that derived page fully supports the answer and its citations, do not read other pages merely to reconfirm it.`
+}
+
+// Mirrors the text output of the llm-wiki `wiki_index.py search` command.
+function formatWikiExcerpts(excerpts: WikiExcerpts): string {
+  const blocks = excerpts.results.map((result, index) => [
+    `[${index + 1}] ${result.path} | ${result.title} (score ${result.score.toFixed(3)})`,
+    ...(result.heading ? [`## ${result.heading}`] : []),
+    result.text,
+    ...(result.citations ? [`Page citations: ${result.citations.split(/\s+/u).filter(Boolean).join(' ')}`] : [])
+  ].join('\n'))
+  const sources = excerpts.sources.length > 0
+    ? `\n\nSources (use these exact values for sourceTitle and sourceFile):\n${excerpts.sources
+        .map((source) => `- ${source.page} -> sourceTitle: ${JSON.stringify(source.sourceTitle)}, sourceFile: ${JSON.stringify(source.sourceFile)}`)
+        .join('\n')}`
+    : ''
+  return `Retrieved wiki excerpts (semantic search over this specialist wiki, best first):\n${blocks.join('\n\n')}${sources}`
 }
 
 function formatCitationEvidence(citations: ChatRunnerInput['citationEvidence']): string {
