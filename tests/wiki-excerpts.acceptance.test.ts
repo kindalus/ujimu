@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
 import { createChatEventStreamForSpecialist } from '../server/utils/chat/engine'
 import { buildChatPrompt } from '../server/utils/chat/pi-runner'
 import { storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
 import type { ChatRunnerInput, ChatStreamEvent } from '../server/utils/chat/types'
-import { searchWikiExcerpts } from '../server/utils/chat/wiki-excerpts'
+import { searchWikiExcerpts, type WikiExcerptSearchInput } from '../server/utils/chat/wiki-excerpts'
 import { initializeDatabase } from '../server/utils/db'
 import { createSpecialist } from '../server/utils/specialists/manager'
 import { resetSpecialistRegistryForTests } from '../server/utils/specialists/registry'
@@ -137,6 +137,224 @@ describe('wiki excerpt context acceptance', () => {
       citations: '- [Lei Geral do Trabalho](../sources/lei.md), Artigo 95.º'
     })
     expect(input.wikiExcerpts?.sources).toEqual([
+      { page: 'wiki/sources/lei.md', sourceTitle: 'Lei Geral do Trabalho', sourceFile: 'raw/lei.md' }
+    ])
+    database.close()
+  })
+
+  it('S4 leaves quarantined derived pages out of the excerpts', async () => {
+    const { specialist, database } = await createFixture()
+    await writeWikiPages(specialist.paths.root, PAGES)
+    await writeWikiIndex(specialist.paths.root, PAGES)
+    database.prepare(`
+      INSERT INTO derived_page_quality (specialist_id, wiki_path, revision_sha256, status, verification_id, updated_at)
+      VALUES (?, 'wiki/derived/horas.md', 'sha256:test', 'quarantined', NULL, ?)
+    `).run(specialist.id, new Date().toISOString())
+    process.env[FLAG] = 'true'
+
+    const input = await captureRunnerInput(specialist, database, { searchWikiExcerpts: fixedSearch })
+
+    expect(input.blockedWikiPaths).toEqual(['wiki/derived/horas.md'])
+    expect(input.wikiExcerpts?.results.length).toBeGreaterThan(0)
+    expect(input.wikiExcerpts?.results.map(({ path }) => path)).not.toContain('wiki/derived/horas.md')
+    database.close()
+  })
+
+  it('S5 falls back to hints without logging when the index is absent', async () => {
+    const { specialist, database } = await createFixture()
+    await writeWikiPages(specialist.paths.root, PAGES)
+    seedHint(database, specialist.id, QUESTION, ['wiki/topics/t5.md'])
+    process.env[FLAG] = 'true'
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const input = await captureRunnerInput(specialist, database, { searchWikiExcerpts: fixedSearch })
+
+    expect(input).not.toHaveProperty('wikiExcerpts')
+    expect(input.retrievalHints).toMatchObject({ wikiPaths: ['wiki/topics/t5.md'] })
+    expect(log).not.toHaveBeenCalled()
+    log.mockRestore()
+    database.close()
+  })
+
+  it('S8 falls back to hints and logs only the code when the model fails or times out', async () => {
+    const { specialist, database } = await createFixture()
+    await writeWikiPages(specialist.paths.root, PAGES)
+    await writeWikiIndex(specialist.paths.root, PAGES)
+    seedHint(database, specialist.id, QUESTION, ['wiki/topics/t5.md'])
+    process.env[FLAG] = 'true'
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    for (const embed of [
+      async () => { throw new Error(`modelo privado falhou: ${QUESTION}`) },
+      () => new Promise<number[][]>(() => undefined)
+    ]) {
+      const input = await captureRunnerInput(specialist, database, {
+        searchWikiExcerpts: (search: WikiExcerptSearchInput) => searchWikiExcerpts(search, { embed, timeoutMs: 20 })
+      })
+      expect(input).not.toHaveProperty('wikiExcerpts')
+      expect(input.retrievalHints).toMatchObject({ wikiPaths: ['wiki/topics/t5.md'] })
+    }
+
+    expect(log.mock.calls).toEqual([
+      ['[ujimu] wiki excerpt search failed', { code: 'WIKI_EXCERPTS_FAILED' }],
+      ['[ujimu] wiki excerpt search failed', { code: 'WIKI_EXCERPTS_FAILED' }]
+    ])
+    expect(JSON.stringify(log.mock.calls)).not.toContain(QUESTION)
+    log.mockRestore()
+    database.close()
+  })
+
+  it('S11 never gives one specialty the excerpts of another', async () => {
+    const { specialist: other, database: otherDatabase } = await createFixture('aduaneira')
+    const otherPages: FixturePage[] = [{
+      path: 'derived/pauta.md',
+      title: 'Pauta aduaneira',
+      sections: [{ heading: 'Direitos', text: 'Direitos de importação.', axis: 0 }]
+    }]
+    await writeWikiPages(other.paths.root, otherPages)
+    await writeWikiIndex(other.paths.root, otherPages)
+    const { specialist, database } = await createFixture()
+    await writeWikiPages(specialist.paths.root, PAGES)
+    await writeWikiIndex(specialist.paths.root, PAGES)
+    process.env[FLAG] = 'true'
+
+    const otherInput = await captureRunnerInput(other, otherDatabase, { searchWikiExcerpts: fixedSearch })
+    const input = await captureRunnerInput(specialist, database, { searchWikiExcerpts: fixedSearch })
+
+    expect(otherInput.wikiExcerpts?.results.map(({ path }) => path)).toEqual(['wiki/derived/pauta.md'])
+    expect(input.wikiExcerpts?.results.map(({ path }) => path)).not.toContain('wiki/derived/pauta.md')
+    expect(input.wikiExcerpts?.results[0]?.path).toBe('wiki/derived/horas.md')
+    otherDatabase.close()
+    database.close()
+  })
+})
+
+describe('wiki excerpt index safety acceptance', () => {
+  it('S6 returns no excerpts while a page differs from the index, and recovers without restarting', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    await writeWikiPages(root, PAGES)
+    await writeWikiIndex(root, PAGES)
+    const page = join(root, 'wiki', 'derived', 'horas.md')
+    const original = await readFile(page, 'utf8')
+    expect(await search(root)).toBeDefined()
+
+    await writeFile(page, `${original}\nAlterado.\n`)
+    expect(await search(root)).toBeUndefined()
+    await writeFile(page, original)
+    expect(await search(root)).toBeDefined()
+
+    await writeFile(join(root, 'wiki', 'topics', 'novo.md'), '# Novo\n')
+    expect(await search(root)).toBeUndefined()
+    await rm(join(root, 'wiki', 'topics', 'novo.md'))
+    expect(await search(root)).toBeDefined()
+
+    await rm(join(root, 'wiki', 'topics', 't8.md'))
+    expect(await search(root)).toBeUndefined()
+    database.close()
+  })
+
+  it('S7 rejects an index with other settings or malformed vectors', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    await writeWikiPages(root, PAGES)
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const nan = new Float32Array(DIMENSIONS)
+    nan[0] = Number.NaN
+
+    for (const options of [
+      { meta: { chunker_version: '2' } },
+      { meta: { model_sha256: '0'.repeat(64) } },
+      { meta: { dimensions: '768' } },
+      { vector: (axis: number) => (axis === 7 ? unitVectorBytes(axis).slice(0, 1532) : unitVectorBytes(axis)) },
+      { vector: (axis: number) => (axis === 7 ? new Uint8Array(nan.buffer) : unitVectorBytes(axis)) }
+    ]) {
+      await writeWikiIndex(root, PAGES, { ...options, indexedAt: crypto.randomUUID() })
+      expect(await search(root)).toBeUndefined()
+    }
+
+    await writeWikiIndex(root, PAGES, { indexedAt: crypto.randomUUID() })
+    expect(await search(root)).toBeDefined()
+    log.mockRestore()
+    database.close()
+  })
+
+  it('S9 returns no excerpts while another connection holds the write lock', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    await writeWikiPages(root, PAGES)
+    const path = await writeWikiIndex(root, PAGES)
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const writer = new DatabaseSync(path)
+    writer.exec('BEGIN EXCLUSIVE')
+
+    expect(await search(root)).toBeUndefined()
+
+    writer.exec('ROLLBACK')
+    writer.close()
+    expect(await search(root)).toBeDefined()
+    log.mockRestore()
+    database.close()
+  })
+
+  it('S10 reloads a replaced index without restarting', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    await writeWikiPages(root, PAGES)
+    await writeWikiIndex(root, PAGES)
+    expect((await search(root))?.results[0]?.path).toBe('wiki/derived/horas.md')
+
+    const added: FixturePage = { path: 'topics/novo.md', title: 'Novo', sections: [{ heading: 'Novo', text: 'Texto novo.', axis: 0 }] }
+    const replaced = [added, ...PAGES.map((page) => page.path === 'derived/horas.md'
+      ? { ...page, sections: page.sections.map((section) => ({ ...section, axis: section.axis + 20 })) }
+      : page)]
+    await writeWikiPages(root, [added])
+    await writeWikiIndex(root, replaced, { indexedAt: '2026-11-10T11:00:00Z' })
+
+    expect((await search(root))?.results[0]?.path).toBe('wiki/topics/novo.md')
+    database.close()
+  })
+
+  it('S12 leaves symlinked pages out of the excerpts', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    const outside: FixturePage = { path: 'topics/fora.md', title: 'Fora', sections: [{ heading: 'Fora', text: 'Conteúdo exterior.', axis: 0 }] }
+    await writeWikiPages(root, PAGES)
+    await writeFile(join(root, 'fora.md'), pageMarkdown(outside))
+    await symlink(join(root, 'fora.md'), join(root, 'wiki', 'topics', 'fora.md'))
+    await writeWikiIndex(root, [outside, ...PAGES])
+
+    const excerpts = await search(root)
+
+    expect(excerpts?.results[0]?.path).toBe('wiki/derived/horas.md')
+    expect(excerpts?.results.map(({ path }) => path)).not.toContain('wiki/topics/fora.md')
+    database.close()
+  })
+
+  it('S13 lists only sources whose file exists under raw/', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    const sourcePage = (name: string, sourceFile: string): FixturePage => ({
+      path: `sources/${name}.md`,
+      title: `Fonte ${name}`,
+      sections: [{ heading: 'Resumo', text: `Resumo ${name}.`, axis: 30 }],
+      sourceTitle: `Fonte ${name}`,
+      sourceFile
+    })
+    const pages = PAGES.map((page) => page.path === 'derived/horas.md'
+      ? { ...page, citedSources: ['sources/convertida.md', 'sources/inexistente.md', 'sources/fuga.md', 'sources/lei.md'] }
+      : page)
+    pages.push(
+      sourcePage('convertida', 'converted/lei.md'),
+      sourcePage('inexistente', 'raw/inexistente.pdf'),
+      sourcePage('fuga', 'raw/../specialist.yaml')
+    )
+    await mkdir(join(root, 'converted'), { recursive: true })
+    await writeFile(join(root, 'converted', 'lei.md'), '# Lei\n')
+    await writeWikiPages(root, pages)
+    await writeWikiIndex(root, pages)
+
+    expect((await search(root))?.sources).toEqual([
       { page: 'wiki/sources/lei.md', sourceTitle: 'Lei Geral do Trabalho', sourceFile: 'raw/lei.md' }
     ])
     database.close()
@@ -277,6 +495,18 @@ async function writeWikiIndex(
   }
   index.close()
   return path
+}
+
+async function fixedEmbed(texts: string[]): Promise<number[][]> {
+  return texts.map(() => queryVector())
+}
+
+function fixedSearch(input: WikiExcerptSearchInput) {
+  return searchWikiExcerpts(input, { embed: fixedEmbed, timeoutMs: 1_000 })
+}
+
+function search(root: string) {
+  return fixedSearch({ specialistRoot: root, question: QUESTION })
 }
 
 function unitVectorBytes(axis: number): Uint8Array {
