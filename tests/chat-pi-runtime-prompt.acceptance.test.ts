@@ -392,6 +392,54 @@ A Lei Geral do Trabalho fixa o período normal de trabalho nos termos do Artigo 
     expect(events.at(-1)).toEqual({ type: 'done', grounded: true, outcome: 'answered' })
   })
 
+  it('omits narration from assistant messages that end in tool calls', async () => {
+    const narration = "I'll start by reading the local schema and wiki index."
+    const answer = '**22 dias úteis por ano** (Artigo 204.º).'
+    let subscriber: ((event: unknown) => void) | undefined
+    createUjimuPiSessionMock.mockResolvedValue({
+      session: {
+        prompt: vi.fn(async () => {
+          const toolMessage = {
+            role: 'assistant',
+            content: [{ type: 'text', text: narration }, { type: 'toolCall', id: 'read-1', name: 'read', arguments: { path: 'wiki/index.md' } }],
+            stopReason: 'toolUse'
+          }
+          const answerMessage = { role: 'assistant', content: [{ type: 'text', text: answer }], stopReason: 'stop' }
+          subscriber?.({ type: 'message_start', message: { role: 'assistant', content: [] } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_start', contentIndex: 0 } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: narration } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'toolcall_start', contentIndex: 1 } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_end', contentIndex: 0, content: narration } })
+          subscriber?.({ type: 'message_end', message: toolMessage })
+          subscriber?.({ type: 'message_start', message: { role: 'assistant', content: [] } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_start', contentIndex: 0 } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: answer } })
+          subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_end', contentIndex: 0, content: answer } })
+          subscriber?.({ type: 'message_end', message: answerMessage })
+          subscriber?.({ type: 'agent_end', messages: [toolMessage, answerMessage] })
+        }),
+        subscribe: vi.fn((callback: (event: unknown) => void) => {
+          subscriber = callback
+          return () => {
+            subscriber = undefined
+          }
+        }),
+        abort: vi.fn(async () => undefined),
+        dispose: vi.fn()
+      }
+    })
+
+    const { createPiChatRunner } = await import('../server/utils/chat/pi-runner')
+    const run = await createPiChatRunner().run({
+      specialist: specialistRuntimeFixture({ citationsRequired: false }),
+      question: 'Quantos dias de férias tem um trabalhador por ano?',
+      citationEvidence: citationEvidenceFixture()
+    })
+
+    const events = await collectRunnerEvents(run.events!)
+    expect(joinDeltas(events)).toBe(answer)
+  })
+
   it('fails without exposing the user prompt when the Pi assistant ends with an error', async () => {
     let subscriber: ((event: unknown) => void) | undefined
     createUjimuPiSessionMock.mockResolvedValue({
