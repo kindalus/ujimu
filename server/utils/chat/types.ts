@@ -47,7 +47,15 @@ export type ChatRunnerStreamEvent =
   | { type: 'citation'; citation: ChatCitation }
   | { type: 'title'; title: string }
   | ChatMetricsEvent
-  | { type: 'done'; grounded: boolean; outcome?: ChatAnswerOutcome; consultedDocuments?: string[] }
+  | {
+      type: 'done'
+      grounded: boolean
+      outcome?: ChatAnswerOutcome
+      /** Wiki pages the answer drew on: excerpt pages plus files read. */
+      consultedDocuments?: string[]
+      /** Wiki files read during the answer; equal to consultedDocuments when absent. */
+      readDocuments?: string[]
+    }
 
 export interface ChatConversationContextMessage {
   role: 'user' | 'assistant'

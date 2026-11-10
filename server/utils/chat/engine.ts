@@ -459,6 +459,7 @@ async function* streamRunnerEventResult(input: {
   let grounded = false
   let analyticsOutcome: ChatAnswerOutcome | undefined
   let consultedDocuments: string[] | undefined
+  let readDocuments: string[] | undefined
   let totalTokens: number | undefined
   let title: string | undefined
 
@@ -495,6 +496,7 @@ async function* streamRunnerEventResult(input: {
       grounded = event.grounded
       analyticsOutcome = event.outcome ?? (event.grounded ? 'answered' : undefined)
       consultedDocuments = event.consultedDocuments
+      readDocuments = event.readDocuments ?? event.consultedDocuments
       break
     }
 
@@ -516,6 +518,7 @@ async function* streamRunnerEventResult(input: {
       analytics: input.analytics,
       analyticsOutcome,
       consultedDocuments,
+      readDocuments,
       title
     })
   } catch {
@@ -589,6 +592,7 @@ async function* streamRunnerResult(input: {
       analytics: input.analytics,
       analyticsOutcome: input.analyticsOutcome,
       consultedDocuments: input.consultedDocuments,
+      readDocuments: input.consultedDocuments,
       title: input.title
     })
   } catch {
@@ -607,6 +611,7 @@ async function* completeStreamResult(input: {
   analytics?: StreamAnalyticsPersistence
   analyticsOutcome?: ChatAnswerOutcome
   consultedDocuments?: string[]
+  readDocuments?: string[]
   title?: string
 }): AsyncIterable<ChatStreamEvent> {
   for (const citation of input.citations) {
@@ -667,6 +672,7 @@ async function* completeStreamResult(input: {
       input.answer,
       input.citations,
       input.consultedDocuments,
+      input.readDocuments,
       persisted
     )
   }
@@ -720,6 +726,7 @@ function scheduleQuestionAnalytics(
   answer: string,
   citations: ChatCitation[],
   consultedDocuments: string[] | undefined,
+  readDocuments: string[] | undefined,
   persisted?: { conversationId: string; userMessageId: string }
 ): void {
   setImmediate(async () => {
@@ -733,7 +740,8 @@ function scheduleQuestionAnalytics(
         userId: analytics.userId,
         conversationId: persisted?.conversationId,
         userMessageId: persisted?.userMessageId,
-        consultedDocumentCount: consultedDocuments?.length,
+        // Derivation candidates count only the files the agent had to read.
+        consultedDocumentCount: readDocuments?.length,
         occurredAt: analytics.now
       })
       if (event && outcome === 'answered' && consultedDocuments && consultedDocuments.length > 0) {
@@ -742,13 +750,15 @@ function scheduleQuestionAnalytics(
           wikiPaths: consultedDocuments,
           now: analytics.now
         })
+      }
+      if (event && outcome === 'answered' && readDocuments && readDocuments.length > 0) {
         const verification = await enqueueDerivedAnswerVerification(analytics.database, {
           sourceEventId: event.id,
           specialistRoot: analytics.specialistRoot,
           originalAnswer: answer,
           originalCitations: citations,
           conversationContext: analytics.conversationContext,
-          consultedDocuments,
+          consultedDocuments: readDocuments,
           now: analytics.now
         })
         if (verification) scheduleDueBackgroundJobs()

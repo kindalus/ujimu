@@ -6,14 +6,20 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
 import { createChatEventStreamForSpecialist } from '../server/utils/chat/engine'
-import { buildChatPrompt } from '../server/utils/chat/pi-runner'
-import { storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
-import type { ChatRunnerInput, ChatStreamEvent } from '../server/utils/chat/types'
+import { buildChatPrompt, createPiChatRunner } from '../server/utils/chat/pi-runner'
+import { lookupRetrievalHints, storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
+import type { ChatRunnerInput, ChatRunnerStreamEvent, ChatStreamEvent } from '../server/utils/chat/types'
 import { searchWikiExcerpts, type WikiExcerptSearchInput } from '../server/utils/chat/wiki-excerpts'
 import { initializeDatabase } from '../server/utils/db'
 import { createSpecialist } from '../server/utils/specialists/manager'
 import { resetSpecialistRegistryForTests } from '../server/utils/specialists/registry'
 import type { SpecialistRuntime } from '../server/utils/specialists/schema'
+
+const createUjimuPiSessionMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../server/utils/pi/session', () => ({
+  createUjimuPiSession: createUjimuPiSessionMock
+}))
 
 const DIMENSIONS = 384
 const QUESTION = 'Quantas horas por semana?'
@@ -407,6 +413,76 @@ describe('wiki excerpt prompt acceptance', () => {
   })
 })
 
+describe('wiki excerpt consulted documents acceptance', () => {
+  it('S14 reports excerpt pages plus reads as consulted, and only reads as read', async () => {
+    const { specialist, database } = await createFixture()
+    const root = specialist.paths.root
+    await writeWikiPages(root, [...PAGES, { path: 'topics/tempo.md', title: 'Tempo', sections: [] }])
+    const excerpt = (path: string) => ({ path, title: path, heading: '', text: 'Texto.', citations: '', score: 0.9 })
+    const done = async (wikiExcerpts?: ChatRunnerInput['wikiExcerpts']) => {
+      createUjimuPiSessionMock.mockResolvedValueOnce(fakePiSession(['wiki/topics/tempo.md']))
+      const run = await createPiChatRunner().run({
+        specialist,
+        question: QUESTION,
+        citationEvidence: [],
+        ...(wikiExcerpts ? { wikiExcerpts } : {})
+      })
+      const events: ChatRunnerStreamEvent[] = []
+      for await (const event of run.events!) events.push(event)
+      return events.at(-1)
+    }
+
+    expect(await done({
+      results: [excerpt('wiki/derived/horas.md'), excerpt('wiki/articles/art-148.md'), excerpt('wiki/derived/horas.md')],
+      sources: []
+    })).toEqual({
+      type: 'done',
+      grounded: true,
+      outcome: 'answered',
+      consultedDocuments: ['wiki/articles/art-148.md', 'wiki/derived/horas.md', 'wiki/topics/tempo.md'],
+      readDocuments: ['wiki/topics/tempo.md']
+    })
+    expect(await done()).toEqual({
+      type: 'done',
+      grounded: true,
+      outcome: 'answered',
+      consultedDocuments: ['wiki/topics/tempo.md']
+    })
+    database.close()
+  })
+
+  it('S15 stores hints from every consulted page but counts and verifies only the reads', async () => {
+    const { specialist, database } = await createFixture()
+    await writeWikiPages(specialist.paths.root, [...PAGES, { path: 'topics/tempo.md', title: 'Tempo', sections: [] }])
+    const consultedDocuments = ['wiki/articles/art-148.md', 'wiki/derived/horas.md', 'wiki/topics/tempo.md']
+
+    await collect(await createChatEventStreamForSpecialist(specialist, { specialistId: specialist.id, question: QUESTION }, {
+      analytics: { database },
+      runner: {
+        async run() {
+          return {
+            grounded: false,
+            citations: [],
+            deltas: toAsyncDeltas([]),
+            events: (async function* (): AsyncIterable<ChatRunnerStreamEvent> {
+              yield { type: 'delta', text: 'Resposta.' }
+              yield { type: 'done', grounded: true, outcome: 'answered', consultedDocuments, readDocuments: ['wiki/topics/tempo.md'] }
+            })()
+          }
+        }
+      }
+    }))
+    await waitFor(() => database.prepare('SELECT COUNT(*) AS count FROM question_retrieval_hints').get())
+
+    expect(lookupRetrievalHints(database, { specialistId: specialist.id, question: QUESTION })?.wikiPaths).toEqual(consultedDocuments)
+    expect(database.prepare('SELECT consulted_document_count FROM question_analytics_events').all())
+      .toEqual([{ consulted_document_count: 1 }])
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(database.prepare('SELECT COUNT(*) AS count FROM answer_verifications').get()).toEqual({ count: 0 })
+    database.close()
+  })
+})
+
 async function createFixture(id = 'laboral'): Promise<{ specialist: SpecialistRuntime; database: DatabaseSync }> {
   const dataDir = await mkdtemp(join(tmpdir(), 'ujimu-wiki-excerpts-'))
   const database = await initializeDatabase({ dataDir, dbPath: join(dataDir, 'db', 'ujimu.sqlite') })
@@ -546,6 +622,35 @@ async function captureRunnerInput(
   await new Promise((resolve) => setImmediate(resolve))
   if (!captured) throw new Error('Runner was not called.')
   return captured
+}
+
+function fakePiSession(reads: string[]) {
+  let subscriber: ((event: unknown) => void) | undefined
+  return {
+    session: {
+      prompt: vi.fn(async () => {
+        reads.forEach((path, index) => {
+          subscriber?.({ type: 'tool_execution_start', toolCallId: `read-${index}`, toolName: 'read', args: { path } })
+          subscriber?.({ type: 'tool_execution_end', toolCallId: `read-${index}`, toolName: 'read', isError: false })
+        })
+        subscriber?.({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Resposta.\n{"type":"done","outcome":"answered"}' } })
+      }),
+      subscribe: vi.fn((callback: (event: unknown) => void) => {
+        subscriber = callback
+        return () => { subscriber = undefined }
+      }),
+      abort: vi.fn(async () => undefined),
+      dispose: vi.fn()
+    }
+  }
+}
+
+async function waitFor(check: () => unknown): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const row = check() as { count?: number } | undefined
+    if (row && row.count !== 0) return
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
 }
 
 async function collect(events: AsyncIterable<ChatStreamEvent>): Promise<ChatStreamEvent[]> {

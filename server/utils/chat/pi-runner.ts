@@ -142,18 +142,23 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
         queue.push({ type: 'metrics', totalTokens: finalTotalTokens })
       }
 
-      const consultedDocuments = await normalizeConsultedDocuments(cwd, successfulReadPaths)
+      const readDocuments = await normalizeConsultedDocuments(cwd, successfulReadPaths)
+      const excerptDocuments = input.wikiExcerpts
+        ? await normalizeConsultedDocuments(cwd, new Set(input.wikiExcerpts.results.map(({ path }) => path)))
+        : []
+      const consultedDocuments = [...new Set([...excerptDocuments, ...readDocuments])].sort()
+      // Without excerpts both lists are the reads, so the done event keeps its single list.
+      const documents = consultedDocuments.length === 0
+        ? {}
+        : input.wikiExcerpts ? { consultedDocuments, readDocuments } : { consultedDocuments }
       if (pendingDoneEvent) {
-        queue.push({
-          ...pendingDoneEvent,
-          ...(consultedDocuments.length > 0 ? { consultedDocuments } : {})
-        })
+        queue.push({ ...pendingDoneEvent, ...documents })
       } else if (!sawTerminalEvent) {
         queue.push({
           type: 'done',
           grounded: emittedAssistantOutput,
           ...(emittedAssistantOutput ? { outcome: 'answered' as const } : {}),
-          ...(consultedDocuments.length > 0 ? { consultedDocuments } : {})
+          ...documents
         })
       }
       queue.close()
