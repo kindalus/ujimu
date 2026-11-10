@@ -88,6 +88,12 @@ SHA-256  4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c
 
 Candidate embeddings remain in a bounded in-memory cache without question text. Current-question embeddings are discarded after lookup. Semantic matching considers at most 500 recent grouped candidates in the selected specialist and filters quarantined wiki paths before ranking.
 
+### Wiki excerpts
+
+With the same flag, each question first searches `<specialist>/db/wiki-index.sqlite`, the index written by the llm-wiki `wiki_index.py` script, and the prompt receives the six best sections outside `sources/` and `laws/` instead of the retrieval hints. The search is bounded to 5 seconds and reads the index read-only. It returns nothing, and the hints run as before, when the index is absent, has other settings, has malformed vectors, is locked by a writer, the model fails, or any `wiki/**/*.md` page (other than `index.md` and `log.md`) differs from it. Only failures log, with the code `WIKI_EXCERPTS_FAILED`; an absent or out-of-sync index logs nothing.
+
+Until the index is rebuilt automatically, any ingestion, derivation or derived-page repair puts the index out of sync and turns excerpts off for that specialty until `wiki_index.py index` is run again.
+
 The user accepted two high-severity dependency advisories until a compatible safe release exists:
 
 - https://github.com/advisories/GHSA-f88m-g3jw-g9cj

@@ -113,7 +113,8 @@ async function search(input: WikiExcerptSearchInput, deps: WikiExcerptSearchDeps
 
   const blocked = new Set(input.blockedWikiPaths ?? [])
   const eligible = index.sections.filter(({ path }) =>
-    !EXCLUDED_PREFIXES.some((prefix) => path.startsWith(prefix)) && !blocked.has(`wiki/${path}`))
+    // Case-insensitive, like the skill's `not like 'sources/%'`.
+    !EXCLUDED_PREFIXES.some((prefix) => path.toLowerCase().startsWith(prefix)) && !blocked.has(`wiki/${path}`))
   if (eligible.length === 0) return undefined
 
   const [query] = await deps.embed([`${index.queryPrefix}${input.question}`])
@@ -136,7 +137,9 @@ async function search(input: WikiExcerptSearchInput, deps: WikiExcerptSearchDeps
     }
     if (!pageAllowed.get(section.path)) continue
 
-    const page = index.pages.get(section.path)!
+    // The skill joins sections to pages; a section without its page is skipped.
+    const page = index.pages.get(section.path)
+    if (!page) continue
     results.push({
       path: wikiPath,
       title: page.title,

@@ -200,13 +200,14 @@ export async function createChatEventStreamForSpecialist(
     const blockedWikiPaths = qualityDatabase
       ? readQuarantinedDerivedPathsSafely(qualityDatabase, specialist.id)
       : []
-    const wikiExcerpts = isSemanticRetrievalEnabled()
+    const foundExcerpts = isSemanticRetrievalEnabled()
       ? await (options.searchWikiExcerpts ?? defaultSearchWikiExcerpts)({
           specialistRoot: specialist.paths.root,
           question: input.question,
           blockedWikiPaths
         })
       : undefined
+    const wikiExcerpts = foundExcerpts?.results.length ? foundExcerpts : undefined
     const retrievalHints = options.analytics && !wikiExcerpts
       ? await lookupRetrievalHintsSafely(options.analytics, specialist.id, input.question, blockedWikiPaths)
       : undefined

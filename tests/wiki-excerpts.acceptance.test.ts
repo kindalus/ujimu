@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recordQuestionAnalyticsEvent } from '../server/utils/analytics/questions'
-import { createChatEventStreamForSpecialist } from '../server/utils/chat/engine'
+import { createChatEventStreamForSpecialist, type CreateChatEventStreamOptions } from '../server/utils/chat/engine'
 import { buildChatPrompt, createPiChatRunner } from '../server/utils/chat/pi-runner'
 import { lookupRetrievalHints, storeRetrievalHints } from '../server/utils/chat/retrieval-cache'
 import type { ChatRunnerInput, ChatRunnerStreamEvent, ChatStreamEvent } from '../server/utils/chat/types'
@@ -195,7 +195,7 @@ describe('wiki excerpt context acceptance', () => {
       () => new Promise<number[][]>(() => undefined)
     ]) {
       const input = await captureRunnerInput(specialist, database, {
-        searchWikiExcerpts: (search: WikiExcerptSearchInput) => searchWikiExcerpts(search, { embed, timeoutMs: 20 })
+        searchWikiExcerpts: (search) => searchWikiExcerpts(search, { embed, timeoutMs: 20 })
       })
       expect(input).not.toHaveProperty('wikiExcerpts')
       expect(input.retrievalHints).toMatchObject({ wikiPaths: ['wiki/topics/t5.md'] })
@@ -243,6 +243,7 @@ describe('wiki excerpt index safety acceptance', () => {
     await writeWikiIndex(root, PAGES)
     const page = join(root, 'wiki', 'derived', 'horas.md')
     const original = await readFile(page, 'utf8')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     expect(await search(root)).toBeDefined()
 
     await writeFile(page, `${original}\nAlterado.\n`)
@@ -257,6 +258,8 @@ describe('wiki excerpt index safety acceptance', () => {
 
     await rm(join(root, 'wiki', 'topics', 't8.md'))
     expect(await search(root)).toBeUndefined()
+    expect(log).not.toHaveBeenCalled()
+    log.mockRestore()
     database.close()
   })
 
@@ -268,13 +271,14 @@ describe('wiki excerpt index safety acceptance', () => {
     const nan = new Float32Array(DIMENSIONS)
     nan[0] = Number.NaN
 
-    for (const options of [
+    const variants: Array<Parameters<typeof writeWikiIndex>[2]> = [
       { meta: { chunker_version: '2' } },
       { meta: { model_sha256: '0'.repeat(64) } },
       { meta: { dimensions: '768' } },
       { vector: (axis: number) => (axis === 7 ? unitVectorBytes(axis).slice(0, 1532) : unitVectorBytes(axis)) },
       { vector: (axis: number) => (axis === 7 ? new Uint8Array(nan.buffer) : unitVectorBytes(axis)) }
-    ]) {
+    ]
+    for (const options of variants) {
       await writeWikiIndex(root, PAGES, { ...options, indexedAt: crypto.randomUUID() })
       expect(await search(root)).toBeUndefined()
     }
@@ -605,7 +609,7 @@ function seedHint(database: DatabaseSync, specialistId: string, question: string
 async function captureRunnerInput(
   specialist: SpecialistRuntime,
   database: DatabaseSync,
-  options: Record<string, unknown> = {},
+  options: CreateChatEventStreamOptions = {},
   question = QUESTION
 ): Promise<ChatRunnerInput> {
   let captured: ChatRunnerInput | undefined
