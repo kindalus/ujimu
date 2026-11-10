@@ -20,7 +20,7 @@
     "skills:update": "node scripts/sync-llm-wiki.mjs --force"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.2",
+    "@earendil-works/pi-coding-agent": "^1.5.1",
     "@huggingface/transformers": "4.2.0",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/ui": "^4.10.0",
