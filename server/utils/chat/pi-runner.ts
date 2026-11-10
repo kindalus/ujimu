@@ -5,6 +5,8 @@ import type { WikiExcerpts } from './wiki-excerpts'
 
 const SERVICE_UNAVAILABLE_MESSAGE =
   'O serviço de resposta está temporariamente indisponível. Tente novamente dentro de alguns minutos.'
+// Observed narration is one short sentence; answers pass this within about a second of streaming.
+const NARRATION_HOLD_CHARS = 200
 
 export function isPiChatEnabled(option: boolean | undefined): boolean {
   return option ?? process.env.UJIMU_PI_CHAT_ENABLED === 'true'
@@ -73,7 +75,35 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
     queue.push(event)
   })
 
+  // Text in a message that goes on to call a tool is narration ("I'll start by reading…"),
+  // not the answer. Hold each message's opening text until it is long enough to be the
+  // answer or the message ends without a tool call; drop it when a tool call follows.
+  let heldText = ''
+  let messageStreaming = false
+  let messageCallsTool = false
+  const emitText = (text: string) => {
+    rawAssistantText += text
+    parser.push(text)
+  }
+  const releaseHeldText = () => {
+    if (heldText) emitText(heldText)
+    heldText = ''
+  }
+
   const unsubscribe = session.subscribe((event: any) => {
+    if (event?.type === 'message_start' && event.message?.role === 'assistant') {
+      heldText = ''
+      messageStreaming = false
+      messageCallsTool = false
+      return
+    }
+
+    if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'toolcall_start') {
+      messageCallsTool = true
+      heldText = ''
+      return
+    }
+
     if (event?.type === 'tool_execution_start' && event.toolName === 'read') {
       const path = event.args?.path
       if (typeof event.toolCallId === 'string' && typeof path === 'string') {
@@ -91,8 +121,16 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
 
     if (event?.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
       const delta = typeof event.assistantMessageEvent.delta === 'string' ? event.assistantMessageEvent.delta : ''
-      rawAssistantText += delta
-      parser.push(delta)
+      if (messageCallsTool) return
+      if (messageStreaming) {
+        emitText(delta)
+        return
+      }
+      heldText += delta
+      if (heldText.length >= NARRATION_HOLD_CHARS) {
+        messageStreaming = true
+        releaseHeldText()
+      }
       return
     }
 
@@ -110,6 +148,11 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
 
     if (event?.type === 'message_end') {
       if (event.message?.role !== 'assistant') return
+      const content = event.message?.content
+      if (!messageCallsTool && !(Array.isArray(content) && content.some((part: any) => part?.type === 'toolCall'))) {
+        releaseHeldText()
+      }
+      heldText = ''
       assistantFailure = extractAssistantFailure(event.message)
       finalAssistantText = extractAssistantText(event.message) || finalAssistantText
       finalTotalTokens = extractTotalTokens(event.message) ?? finalTotalTokens
@@ -127,6 +170,7 @@ async function* runPiChatStream(input: ChatRunnerInput): AsyncIterable<ChatRunne
     .then(async () => {
       if (assistantFailure) throw assistantFailure
 
+      releaseHeldText()
       if (!rawAssistantText && finalAssistantText) {
         parser.push(finalAssistantText)
       }
